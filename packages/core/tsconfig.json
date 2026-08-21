@@ -9,6 +9,11 @@
     // typecheck silently; without it they are a compile error.
     "types": [],
     "isolatedDeclarations": true, // forces explicit types on every export
+    // No source maps in the published package: the .d.ts map pointed at src/,
+    // which `files: ["dist"]` never ships, and the .js map was 3x the size of
+    // the code. Flip this back to true if consumers need to debug into source.
+    "declarationMap": false,
+    "sourceMap": false,
     "rootDir": ".",
     "outDir": ".tsbuild" // tsdown owns dist/; tsc only type-checks
   },
