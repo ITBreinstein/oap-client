@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM"], // for fetch/Response/Headers types only
+    "types": [], // no node types — keeps the core runtime-neutral
+    "isolatedDeclarations": true, // forces explicit types on every export
+    "rootDir": ".",
+    "outDir": ".tsbuild" // tsdown owns dist/; tsc only type-checks
+  },
+  "include": ["src", "test"]
+}

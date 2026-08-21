@@ -1,0 +1,15 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+
+# Keep versions identical across workspaces without a syncing tool.
+catalog:
+  typescript: ~6.0.0
+  vitest: ^4.1.0
+  react: ^19.2.0
+  react-dom: ^19.2.0
+
+# pnpm blocks lifecycle scripts by default (pnpm 11 spells this `allowBuilds`,
+# not pnpm 10's `onlyBuiltDependencies`). Decide each one explicitly.
+allowBuilds:
+  msw: false # browser service-worker only; we use msw/node

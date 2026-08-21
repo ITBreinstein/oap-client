@@ -1,0 +1,42 @@
+{
+  "name": "@breinstein/ogcapi-processes",
+  "version": "0.1.0",
+  "license": "MIT",
+  "description": "A runtime-neutral OGC API - Processes client: discovery, execution, job polling and results.",
+  "keywords": [
+    "ogc",
+    "ogcapi",
+    "ogc-api-processes",
+    "geospatial",
+    "client"
+  ],
+  "type": "module",
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/breinstein/breinstein-oap-client.git",
+    "directory": "packages/core"
+  },
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "prepublishOnly": "pnpm build"
+  }
+}

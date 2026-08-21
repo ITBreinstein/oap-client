@@ -1,0 +1,48 @@
+{
+  "name": "breinstein-oap-client",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.1.2",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "typecheck": "tsc -b --pretty",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "boundaries": "depcruise apps packages",
+    "graph": "depcruise --output-type dot apps packages | dot -Tsvg > docs/architecture.svg",
+    "test": "vitest run",
+    "test:interop": "vitest run --config packages/core/vitest.interop.config.ts",
+    "test:e2e": "playwright test",
+    "build": "pnpm -r build",
+    "pack:check": "pnpm --filter @breinstein/ogcapi-processes exec npm pack --dry-run",
+    "verify": "pnpm typecheck && pnpm lint && pnpm boundaries && pnpm format:check && pnpm test && pnpm build"
+  },
+  "prettier": {
+    "printWidth": 100,
+    "singleQuote": false
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "0.18.5",
+    "@eslint/js": "10.0.1",
+    "@playwright/test": "1.62.1",
+    "@types/node": "24.13.3",
+    "@vitejs/plugin-react": "6.1.0",
+    "@vitest/coverage-v8": "4.1.11",
+    "dependency-cruiser": "18.2.0",
+    "eslint": "10.8.1",
+    "eslint-config-prettier": "10.1.8",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "jsdom": "30.0.1",
+    "msw": "2.15.0",
+    "prettier": "3.9.6",
+    "publint": "0.3.24",
+    "tsdown": "0.22.14",
+    "typescript": "catalog:",
+    "typescript-eslint": "8.67.0",
+    "vite": "8.2.2",
+    "vitest": "catalog:"
+  }
+}

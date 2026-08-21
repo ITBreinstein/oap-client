@@ -1,0 +1,9 @@
+services:
+  pygeoapi-cors:
+    image: geopython/pygeoapi:0.21.0 # pin the digest in CI
+    ports: ["5000:80"]
+    volumes: ["../pygeoapi/config-cors.yml:/pygeoapi/local.config.yml:ro"]
+  pygeoapi-nocors:
+    image: geopython/pygeoapi:0.21.0
+    ports: ["5001:80"]
+    volumes: ["../pygeoapi/config-nocors.yml:/pygeoapi/local.config.yml:ro"]

@@ -1,0 +1,45 @@
+# pygeoapi with CORS off — forces the relay fallback path.
+server:
+  bind: { host: 0.0.0.0, port: 80 }
+  url: http://localhost:5001
+  mimetype: application/json; charset=UTF-8
+  encoding: utf-8
+  language: en-US
+  cors: false
+  pretty_print: true
+  limit: 10
+  map:
+    url: https://tile.openstreetmap.org/{z}/{x}/{y}.png
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+  manager:
+    name: TinyDB
+    connection: /tmp/pygeoapi-process-manager.db
+    output_dir: /tmp
+
+logging:
+  level: INFO
+
+metadata:
+  identification:
+    title: { en: pygeoapi (CORS disabled) }
+    description: { en: Reference OGC API - Processes server for the relay-required path }
+    keywords: { en: [processes, testbed] }
+    keywords_type: theme
+    terms_of_service: https://creativecommons.org/licenses/by/4.0/
+    url: https://example.org
+  license:
+    name: CC-BY 4.0 license
+    url: https://creativecommons.org/licenses/by/4.0/
+  provider:
+    name: Breinstein
+    url: https://example.org
+  contact:
+    name: Breinstein
+    email: dev@example.org
+    role: pointOfContact
+
+resources:
+  hello-world:
+    type: process
+    processor:
+      name: HelloWorld

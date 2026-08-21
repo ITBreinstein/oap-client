@@ -1,0 +1,3 @@
+# .gitignore is honoured automatically; these two are tracked but not ours to format.
+pnpm-lock.yaml
+docs/architecture.svg

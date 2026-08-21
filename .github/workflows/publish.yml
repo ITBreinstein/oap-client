@@ -1,0 +1,23 @@
+name: publish
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  id-token: write # required; this is what mints the OIDC token
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: pnpm, registry-url: "https://registry.npmjs.org" }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm verify
+      # Trusted publishing: configure the rule in the npm package settings to
+      # point at this exact workflow file. The first version must be published
+      # by hand with a token — the rule can only be set on an existing package.
+      - run: pnpm --filter @breinstein/ogcapi-processes publish --access public --no-git-checks

@@ -1,1 +1,56 @@
 # oap-client
+
+Breinstein's OGC API - Processes client: a runtime-neutral protocol core, a web
+interface, and a small relay for servers that do not send CORS headers.
+
+| Workspace                      | What it is                                                            |
+| ------------------------------ | --------------------------------------------------------------------- |
+| [packages/core](packages/core) | `@breinstein/ogcapi-processes` — the published, framework-free client |
+| [apps/web](apps/web)           | Vite + React interface (static output)                                |
+| [apps/relay](apps/relay)       | Hono relay, used only when a server refuses direct fetch              |
+
+## Getting started
+
+```bash
+corepack enable
+pnpm install
+pnpm verify        # typecheck, lint, boundaries, format, test, build
+```
+
+Other entry points:
+
+```bash
+pnpm --filter @breinstein/web dev     # interface on :5173
+pnpm test:e2e                         # Playwright, needs a built web app
+pnpm test:interop                     # live third-party servers; never blocking
+pnpm graph                            # regenerate docs/architecture.svg (needs graphviz)
+
+docker compose -f infra/compose/pygeoapi.yml up -d   # reference servers on :5000 (CORS) and :5001 (no CORS)
+```
+
+## Boundaries
+
+Four rules, enforced twice — by `no-restricted-imports` in
+[eslint.config.js](eslint.config.js) for direct imports, and by
+[.dependency-cruiser.cjs](.dependency-cruiser.cjs) for transitive leakage:
+
+1. `packages/core` depends on no framework and no map library.
+2. `packages/core` never imports application code.
+3. Only `apps/web/src/map` may import `maplibre-gl` or `terra-draw`.
+4. `apps/web/src/map` knows geometry, not the protocol — it never imports the core.
+
+## Toolchain
+
+Recorded in [docs/toolchain-and-project-setup.md](docs/toolchain-and-project-setup.md).
+Two things to know before touching versions:
+
+- **TypeScript is pinned to `~6.0.0`.** TS 7 has no stable compiler API until
+  7.1, so `typescript-eslint` cannot run on it (its peer range is
+  `>=4.8.4 <6.1.0`). To watch the upgrade, add `@typescript/native-preview` and
+  run `tsgo --noEmit` as a non-blocking sidecar lane.
+- **pnpm, not npm workspaces.** Strict, non-hoisted `node_modules` is what makes
+  boundary rule 1 an install-time guarantee rather than a convention.
+
+## Licence
+
+MIT. Third-party provenance is tracked in [THIRD_PARTY.md](THIRD_PARTY.md).
