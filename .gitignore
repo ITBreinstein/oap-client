@@ -6,3 +6,7 @@ coverage/
 .playwright/
 .DS_Store
 *.local
+
+AGENTS.md
+CLAUDE.md
+CLAUDE.local.md
