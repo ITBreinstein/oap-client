@@ -67,7 +67,7 @@ knowing before someone "corrects" it back.
 | 7   | `exports` → `index.js` / `index.d.ts`      | `index.mjs` / `index.d.mts` + `.cjs` / `.d.cts`, split under `import`/`require` | The filenames tsdown actually emits. Verified: `attw` and `publint` both clean                                                                                                                          |
 
 Deviation 8 is the one that would have quietly wasted the exercise. With the
-default resolver, `apps/web/src/App.tsx → @breinstein/ogcapi-processes` came back
+default resolver, `apps/web/src/App.tsx → @breinstein/ogcapi-processes-core` came back
 unresolved, so dependency-cruiser never walked _into_ `packages/core` — and the
 `core-is-framework-free` rule, whose entire job is catching transitive leakage,
 had nothing to inspect. `tsconfig.base.json` now maps the package name to
@@ -84,6 +84,39 @@ include `test/` as well as `src/`, so `pnpm typecheck` covers the tests and
 `typescript-eslint`'s project service can type-check every linted file without
 an `allowDefaultProject` escape hatch. Root-level config files and `e2e/` are
 the exception — they sit in `tseslint.configs.disableTypeChecked`.
+
+## 2b. Runtime targets for `packages/core`
+
+The published package is **ESM only, Node >=18, modern browsers (ES2022)**, and
+contains no DOM-specific and no Node-specific API. No CJS build, no `main`, no
+`browser` field. Enforced rather than documented:
+
+- `lib: ["ES2022", "DOM"]` with **no `@types/node`**. The DOM lib supplies types
+  for `fetch`, `Response`, `Headers`, `Blob`, `AbortController` and `URL`, all
+  native in Node 18+. Adding `@types/node` is what would let `Buffer` and
+  `node:` imports type-check silently.
+- `no-restricted-globals` and `no-restricted-imports` on `packages/core/src/**`,
+  at `error`. Note the built-ins are matched as exact `paths`, not `patterns`:
+  ESLint's pattern matching is gitignore-flavoured, so a bare `"http"` pattern
+  also matches `./http/fetch.ts` and fired on our own source.
+- A `core-is-runtime-neutral` dependency-cruiser rule for Node built-ins reached
+  transitively.
+- `pnpm test:smoke` — packs the package, installs the tarball into a throwaway
+  directory outside the repo, then (a) imports it on bare Node and constructs a
+  client with a stub fetch, and (b) bundles it with `esbuild --platform=browser
+--target=es2022`. Also runs `publint` and `attw` against the tarball.
+
+The two smoke lanes are complementary, and both were verified by deliberately
+breaking them: a `node:buffer` import passes the Node lane and fails the browser
+bundle; a `document` reference passes the browser bundle and fails the Node lane.
+
+`attw` runs with `--profile esm-only`. That is not a waiver: `node10 resolution
+failed` and `CJS resolves to ESM` are the _intended_ consequences of publishing
+no CJS build and no `main`. Every other attw rule still applies.
+
+`tsdown` is configured `platform: "neutral"` with `fixedExtension: false`, which
+is both semantically right for this package and what produces plain
+`dist/index.js` / `dist/index.d.ts` instead of `.mjs` / `.cjs`.
 
 ## 3. Order of work — done
 
@@ -102,7 +135,7 @@ the avoidable version of that risk.
 
 Still to do by hand, off-repo:
 
-- Publish `@breinstein/ogcapi-processes@0.1.0` once with a token, then configure
+- Publish `@breinstein/ogcapi-processes-core@0.1.0` once with a token, then configure
   the npm Trusted Publisher rule against `.github/workflows/publish.yml`.
   Trusted publishing can only be configured on a package that already exists.
 - Confirm `repository.url` in `packages/core/package.json` matches the GitHub

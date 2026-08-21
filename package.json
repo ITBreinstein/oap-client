@@ -15,9 +15,9 @@
     "graph": "depcruise --output-type dot apps packages | dot -Tsvg > docs/architecture.svg",
     "test": "vitest run",
     "test:interop": "vitest run --config packages/core/vitest.interop.config.ts",
+    "test:smoke": "node smoke/run.mjs",
     "test:e2e": "playwright test",
     "build": "pnpm -r build",
-    "pack:check": "pnpm --filter @breinstein/ogcapi-processes exec npm pack --dry-run",
     "verify": "pnpm typecheck && pnpm lint && pnpm boundaries && pnpm format:check && pnpm test && pnpm build"
   },
   "prettier": {
@@ -32,6 +32,7 @@
     "@vitejs/plugin-react": "6.1.0",
     "@vitest/coverage-v8": "4.1.11",
     "dependency-cruiser": "18.2.0",
+    "esbuild": "0.28.2",
     "eslint": "10.8.1",
     "eslint-config-prettier": "10.1.8",
     "eslint-plugin-react-hooks": "7.1.1",

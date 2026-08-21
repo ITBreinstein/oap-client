@@ -1,8 +1,13 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "lib": ["ES2023", "DOM"], // for fetch/Response/Headers types only
-    "types": [], // no node types — keeps the core runtime-neutral
+    // ES2022 is the published baseline. DOM supplies the types for fetch,
+    // Response, Headers, Blob, AbortController and URL — all native in Node 18+.
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    // No @types/node. Its presence is what lets Buffer and node: imports
+    // typecheck silently; without it they are a compile error.
+    "types": [],
     "isolatedDeclarations": true, // forces explicit types on every export
     "rootDir": ".",
     "outDir": ".tsbuild" // tsdown owns dist/; tsc only type-checks

@@ -12,4 +12,5 @@ catalog:
 # pnpm blocks lifecycle scripts by default (pnpm 11 spells this `allowBuilds`,
 # not pnpm 10's `onlyBuiltDependencies`). Decide each one explicitly.
 allowBuilds:
+  esbuild: true # native binary; needed to bundle the browser smoke test
   msw: false # browser service-worker only; we use msw/node

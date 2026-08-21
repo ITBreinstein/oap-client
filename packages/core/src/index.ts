@@ -1,9 +1,13 @@
 /**
- * @breinstein/ogcapi-processes — a runtime-neutral OGC API - Processes client.
+ * @breinstein/ogcapi-processes-core — a runtime-neutral OGC API - Processes client.
  *
- * Nothing here may import React, MapLibre, or application code; see §5 of the
- * architecture plan and the boundary rules in eslint.config.js.
+ * ESM only, Node >=18 and modern browsers. Nothing here may import React,
+ * MapLibre, application code, or a Node built-in; see the boundary and
+ * runtime-neutrality rules in eslint.config.js.
  */
+export { createClient } from "./client.js";
+export type { Client, ClientOptions } from "./client.js";
+export type { FetchLike } from "./http/fetch.js";
 export { OgcApiError } from "./errors/ogc-api-error.js";
 export type { ProblemDetails } from "./errors/ogc-api-error.js";
 

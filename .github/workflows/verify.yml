@@ -11,6 +11,7 @@ jobs:
         with: { node-version: 24, cache: pnpm }
       - run: pnpm install --frozen-lockfile
       - run: pnpm verify
+      - run: pnpm test:smoke
       - run: pnpm exec playwright install --with-deps chromium
       - run: docker compose -f infra/compose/pygeoapi.yml up -d --wait
       - run: pnpm test:e2e

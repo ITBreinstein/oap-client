@@ -20,7 +20,7 @@
     // Resolve the workspace package to its source, so type-checking and
     // dependency-cruiser both work without packages/core/dist existing.
     "paths": {
-      "@breinstein/ogcapi-processes": ["./packages/core/src/index.ts"]
+      "@breinstein/ogcapi-processes-core": ["./packages/core/src/index.ts"]
     }
   }
 }

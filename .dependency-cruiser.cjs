@@ -7,6 +7,14 @@ module.exports = {
       to: { path: "node_modules/(react|react-dom|maplibre-gl|terra-draw)" },
     },
     {
+      // ESLint catches a direct `node:fs` import; this catches one reached
+      // through a dependency, which is the version nobody spots in review.
+      name: "core-is-runtime-neutral",
+      severity: "error",
+      from: { path: "^packages/core/src" },
+      to: { dependencyTypes: ["core"] },
+    },
+    {
       name: "core-does-not-know-apps",
       severity: "error",
       from: { path: "^packages/core" },

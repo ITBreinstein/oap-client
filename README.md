@@ -3,11 +3,11 @@
 Breinstein's OGC API - Processes client: a runtime-neutral protocol core, a web
 interface, and a small relay for servers that do not send CORS headers.
 
-| Workspace                      | What it is                                                            |
-| ------------------------------ | --------------------------------------------------------------------- |
-| [packages/core](packages/core) | `@breinstein/ogcapi-processes` — the published, framework-free client |
-| [apps/web](apps/web)           | Vite + React interface (static output)                                |
-| [apps/relay](apps/relay)       | Hono relay, used only when a server refuses direct fetch              |
+| Workspace                      | What it is                                                                 |
+| ------------------------------ | -------------------------------------------------------------------------- |
+| [packages/core](packages/core) | `@breinstein/ogcapi-processes-core` — the published, framework-free client |
+| [apps/web](apps/web)           | Vite + React interface (static output)                                     |
+| [apps/relay](apps/relay)       | Hono relay, used only when a server refuses direct fetch                   |
 
 ## Getting started
 
@@ -23,6 +23,7 @@ Other entry points:
 pnpm --filter @breinstein/web dev     # interface on :5173
 pnpm test:e2e                         # Playwright, needs a built web app
 pnpm test:interop                     # live third-party servers; never blocking
+pnpm test:smoke                       # consumer tests against a packed tarball
 pnpm graph                            # regenerate docs/architecture.svg (needs graphviz)
 
 docker compose -f infra/compose/pygeoapi.yml up -d   # reference servers on :5000 (CORS) and :5001 (no CORS)
@@ -38,6 +39,13 @@ Four rules, enforced twice — by `no-restricted-imports` in
 2. `packages/core` never imports application code.
 3. Only `apps/web/src/map` may import `maplibre-gl` or `terra-draw`.
 4. `apps/web/src/map` knows geometry, not the protocol — it never imports the core.
+
+A fifth rule guards the published package's runtime target: `packages/core/src`
+may use no DOM-specific and no Node-specific API. `no-restricted-globals` and
+`no-restricted-imports` catch direct use, dependency-cruiser catches Node
+built-ins reached transitively, and two consumer smoke tests
+(`pnpm test:smoke`) catch anything that survives both — see
+[Supported environments](packages/core/README.md#supported-environments).
 
 ## Toolchain
 
