@@ -1,7 +1,7 @@
 # pygeoapi with CORS off — forces the relay fallback path.
 server:
   bind: { host: 0.0.0.0, port: 80 }
-  url: http://localhost:5001
+  url: http://localhost:5081
   mimetype: application/json; charset=UTF-8
   encoding: utf-8
   language: en-US
