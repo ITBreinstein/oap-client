@@ -30,5 +30,29 @@ export type { ParsedMediaType } from "./http/media-type.js";
 export type { WebLink } from "./http/link-header.js";
 export type { FetchLike } from "./http/fetch.js";
 
+// Form generation. The plan is plain data: the core decides which control an
+// input needs and renders nothing, so a viewer — ours or anyone else's — can
+// consume it without inheriting a framework.
+export type { InputDescription, ProcessDescription } from "./processes/description.js";
+export { resolveFormPlan } from "./forms/resolve.js";
+export type {
+  BboxControl,
+  CheckboxControl,
+  Control,
+  Diagnostic,
+  DiagnosticCode,
+  FieldPlan,
+  FormPlan,
+  GeometryControl,
+  GeometryType,
+  GeometryWrapper,
+  JsonControl,
+  ListControl,
+  NumberControl,
+  Option,
+  SelectControl,
+  TextControl,
+} from "./forms/plan.js";
+
 /** Package version, mirrored from package.json for observation records. */
 export const VERSION: string = "0.1.0";
