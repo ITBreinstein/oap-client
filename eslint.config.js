@@ -115,6 +115,33 @@ export default tseslint.config(
     },
   },
 
+  // The HTTP boundary lives in src/http/ and nothing above it may bypass it.
+  // A later block replaces an earlier rule config outright, so the runtime
+  // globals from the block above are repeated here.
+  {
+    files: ["packages/core/src/**/*.ts"],
+    ignores: ["packages/core/src/http/**"],
+    rules: {
+      "no-restricted-globals": [
+        "error",
+        ...singleRuntimeGlobals,
+        {
+          name: "fetch",
+          message: "only packages/core/src/http may call fetch: go through send()",
+        },
+      ],
+      // no-restricted-globals only sees a bare identifier, and `globalThis.fetch`
+      // is exactly how you would sidestep it.
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "MemberExpression[object.name='globalThis'][property.name='fetch']",
+          message: "only packages/core/src/http may call fetch: go through send()",
+        },
+      ],
+    },
+  },
+
   // §5, most important rule: only the map binding touches MapLibre imperatively.
   {
     files: ["apps/web/src/**/*.{ts,tsx}"],

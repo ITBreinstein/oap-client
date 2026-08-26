@@ -14,6 +14,7 @@ jobs:
       - run: pnpm test:smoke
       - run: pnpm exec playwright install --with-deps chromium
       - run: docker compose -f infra/compose/pygeoapi.yml up -d --wait
+      - run: pnpm test:contract
       - run: pnpm test:e2e
       - if: failure()
         uses: actions/upload-artifact@v4

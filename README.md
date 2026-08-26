@@ -22,6 +22,7 @@ Other entry points:
 ```bash
 pnpm --filter @breinstein/web dev     # interface on :5173
 pnpm test:e2e                         # Playwright, needs a built web app
+pnpm test:contract                    # pinned pygeoapi; needs the compose stack up
 pnpm test:interop                     # live third-party servers; never blocking
 pnpm test:smoke                       # consumer tests against a packed tarball
 pnpm graph                            # regenerate docs/architecture.svg (needs graphviz)
@@ -31,7 +32,7 @@ docker compose -f infra/compose/pygeoapi.yml up -d   # reference servers on :508
 
 ## Boundaries
 
-Four rules, enforced twice — by `no-restricted-imports` in
+Six rules. The first four are enforced twice — by `no-restricted-imports` in
 [eslint.config.js](eslint.config.js) for direct imports, and by
 [.dependency-cruiser.cjs](.dependency-cruiser.cjs) for transitive leakage:
 
@@ -46,6 +47,10 @@ may use no DOM-specific and no Node-specific API. `no-restricted-globals` and
 built-ins reached transitively, and two consumer smoke tests
 (`pnpm test:smoke`) catch anything that survives both — see
 [Supported environments](packages/core/README.md#supported-environments).
+
+A sixth rule keeps the HTTP boundary in one place: only
+`packages/core/src/http` may call `fetch`. Everything above it works in terms of
+a `ResponseEnvelope` and the classifier's verdict on it.
 
 ## Toolchain
 

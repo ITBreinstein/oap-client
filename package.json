@@ -14,6 +14,7 @@
     "boundaries": "depcruise apps packages",
     "graph": "depcruise --output-type dot apps packages | dot -Tsvg > docs/architecture.svg",
     "test": "vitest run",
+    "test:contract": "vitest run --config packages/core/vitest.contract.config.ts",
     "test:interop": "vitest run --config packages/core/vitest.interop.config.ts",
     "test:smoke": "node smoke/run.mjs",
     "test:e2e": "playwright test",
