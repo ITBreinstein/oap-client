@@ -1,14 +1,14 @@
-# @breinstein/ogcapi-processes-core
+# @breinstein/oap-client
 
 A runtime-neutral [OGC API - Processes](https://ogcapi.ogc.org/processes/) client:
 discovery, conformance, process listing, execution, job polling and results.
 
 ```bash
-pnpm add @breinstein/ogcapi-processes-core
+pnpm add @breinstein/oap-client
 ```
 
 ```ts
-import { createClient, requireOk } from "@breinstein/ogcapi-processes-core";
+import { createClient, requireOk } from "@breinstein/oap-client";
 
 const client = createClient({ baseUrl: "https://example.org/ogc" });
 const response = await requireOk(await client.send("processes"));

@@ -9,7 +9,7 @@
     "preview": "vite preview --port 4173"
   },
   "dependencies": {
-    "@breinstein/ogcapi-processes-core": "workspace:*",
+    "@breinstein/oap-client": "workspace:*",
     "react": "catalog:",
     "react-dom": "catalog:"
   },

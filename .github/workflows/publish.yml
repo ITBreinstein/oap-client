@@ -20,4 +20,4 @@ jobs:
       # Trusted publishing: configure the rule in the npm package settings to
       # point at this exact workflow file. The first version must be published
       # by hand with a token — the rule can only be set on an existing package.
-      - run: pnpm --filter @breinstein/ogcapi-processes-core publish --access public --no-git-checks
+      - run: pnpm --filter @breinstein/oap-client publish --access public --no-git-checks

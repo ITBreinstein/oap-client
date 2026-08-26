@@ -67,7 +67,7 @@ knowing before someone "corrects" it back.
 | 7   | `exports` → `index.js` / `index.d.ts`      | `index.mjs` / `index.d.mts` + `.cjs` / `.d.cts`, split under `import`/`require` | The filenames tsdown actually emits. Verified: `attw` and `publint` both clean                                                                                                                          |
 
 Deviation 8 is the one that would have quietly wasted the exercise. With the
-default resolver, `apps/web/src/App.tsx → @breinstein/ogcapi-processes-core` came back
+default resolver, `apps/web/src/App.tsx → @breinstein/oap-client` came back
 unresolved, so dependency-cruiser never walked _into_ `packages/core` — and the
 `core-is-framework-free` rule, whose entire job is catching transitive leakage,
 had nothing to inspect. `tsconfig.base.json` now maps the package name to
@@ -135,7 +135,7 @@ the avoidable version of that risk.
 
 Still to do by hand, off-repo:
 
-- Publish `@breinstein/ogcapi-processes-core@0.1.0` once with a token, then configure
+- Publish `@breinstein/oap-client@0.1.0` once with a token, then configure
   the npm Trusted Publisher rule against `.github/workflows/publish.yml`.
   Trusted publishing can only be configured on a package that already exists.
 - Confirm `repository.url` in `packages/core/package.json` matches the GitHub

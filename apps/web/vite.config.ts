@@ -7,7 +7,7 @@ export default defineConfig({
   resolve: {
     alias: {
       // Use core's source in dev and test; the published entry is dist/.
-      "@breinstein/ogcapi-processes-core": fileURLToPath(
+      "@breinstein/oap-client": fileURLToPath(
         new URL("../../packages/core/src/index.ts", import.meta.url),
       ),
     },

@@ -1,4 +1,4 @@
-import { VERSION } from "@breinstein/ogcapi-processes-core";
+import { VERSION } from "@breinstein/oap-client";
 
 export function App() {
   return (

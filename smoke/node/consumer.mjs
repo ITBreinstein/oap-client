@@ -2,13 +2,7 @@
 // The assertion is simply that import and construction succeed: a Node-only or
 // DOM-only API in the published bundle would throw before we get to the end.
 import assert from "node:assert/strict";
-import {
-  createClient,
-  ProcessesError,
-  VERSION,
-  classify,
-  requireOk,
-} from "@breinstein/ogcapi-processes-core";
+import { createClient, ProcessesError, VERSION, classify, requireOk } from "@breinstein/oap-client";
 
 assert.match(VERSION, /^\d+\.\d+\.\d+$/, "VERSION should be semver");
 

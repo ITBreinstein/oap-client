@@ -17,7 +17,7 @@ import { fileURLToPath } from "node:url";
 const smokeDir = fileURLToPath(new URL(".", import.meta.url));
 const repoRoot = resolve(smokeDir, "..");
 const coreDir = join(repoRoot, "packages", "core");
-const PKG = "@breinstein/ogcapi-processes-core";
+const PKG = "@breinstein/oap-client";
 
 const run = (cmd, args, cwd, quiet = true) =>
   execFileSync(cmd, args, {

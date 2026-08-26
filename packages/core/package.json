@@ -1,5 +1,5 @@
 {
-  "name": "@breinstein/ogcapi-processes-core",
+  "name": "@breinstein/oap-client",
   "version": "0.1.0",
   "license": "MIT",
   "description": "A runtime-neutral OGC API - Processes client: discovery, execution, job polling and results.",

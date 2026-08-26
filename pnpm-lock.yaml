@@ -95,7 +95,7 @@ importers:
 
   apps/web:
     dependencies:
-      '@breinstein/ogcapi-processes-core':
+      '@breinstein/oap-client':
         specifier: workspace:*
         version: link:../../packages/core
       react:

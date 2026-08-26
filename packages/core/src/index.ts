@@ -1,5 +1,5 @@
 /**
- * @breinstein/ogcapi-processes-core — a runtime-neutral OGC API - Processes client.
+ * @breinstein/oap-client — a runtime-neutral OGC API - Processes client.
  *
  * ESM only, Node >=18 and modern browsers. Nothing here may import React,
  * MapLibre, application code, or a Node built-in; see the boundary and
