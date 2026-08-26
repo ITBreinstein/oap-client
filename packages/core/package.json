@@ -17,7 +17,7 @@
   "sideEffects": false,
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/breinstein/breinstein-oap-client.git",
+    "url": "git+https://github.com/ITBreinstein/oap-client.git",
     "directory": "packages/core"
   },
   "files": [
