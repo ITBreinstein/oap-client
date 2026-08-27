@@ -35,6 +35,8 @@ export type { FetchLike } from "./http/fetch.js";
 // consume it without inheriting a framework.
 export type { InputDescription, ProcessDescription } from "./processes/description.js";
 export { resolveFormPlan } from "./forms/resolve.js";
+export { toExecuteBody, toExecuteRequest } from "./forms/encode.js";
+export type { ByReference, ExecuteBody, ExecuteOptions, FormValues } from "./forms/encode.js";
 export type {
   BboxControl,
   CheckboxControl,
