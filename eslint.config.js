@@ -53,7 +53,15 @@ const singleRuntimeGlobals = [
 
 export default tseslint.config(
   {
-    ignores: ["**/dist/**", "**/.tsbuild/**", "**/node_modules/**", "**/.playwright/**"],
+    ignores: [
+      "**/dist/**",
+      "**/.tsbuild/**",
+      "**/node_modules/**",
+      "**/.playwright/**",
+      // A pinned third-party checkout, cloned by infra/zoo/zoo.sh as a build
+      // input. Not our source, and never edited in place — see infra/zoo/README.md.
+      "infra/zoo/.checkout/**",
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.strictTypeChecked,

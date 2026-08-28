@@ -1,8 +1,9 @@
 import { configDefaults, defineConfig } from "vitest/config";
 
 // tsc -b writes type-check output to .tsbuild/; it is not a test source.
-// contract/ needs Docker and interop/ needs the public internet; both have their
-// own config so that `pnpm test` stays runnable with neither.
+// contract/ needs the pinned pygeoapi, and interop/ needs a live server —
+// ZOO on :5090 via ./infra/zoo/zoo.sh, or a third-party endpoint. Both have
+// their own config so that `pnpm test` stays runnable with neither.
 const exclude = [...configDefaults.exclude, "**/.tsbuild/**"];
 
 export default defineConfig({

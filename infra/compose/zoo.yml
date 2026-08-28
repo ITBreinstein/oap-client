@@ -1,0 +1,22 @@
+# ZOO-Project, the second server implementation in the matrix.
+#
+# This file is an *override*, never used on its own: infra/zoo/zoo.sh layers it
+# over the pinned fork checkout's own docker-compose.yml, whose relative volume
+# paths only resolve against that checkout. Run `./infra/zoo/zoo.sh up`.
+services:
+  zookernel:
+    image: ${ZOO_IMAGE:?run ./infra/zoo/zoo.sh, not docker compose directly}
+    ports: !override ["5090:80"]
+    # Rendered by zoo.sh from the checkout's own configuration, with the root
+    # URL pointed at the port this kernel is actually published on. Merged by
+    # container path, so these replace the checkout's mounts rather than
+    # doubling them.
+    volumes:
+      - ../.conf/main-5090.cfg:/usr/lib/cgi-bin/main.cfg
+      - ../.conf/oas-5090.cfg:/usr/lib/cgi-bin/oas.cfg
+
+  zoofpm:
+    image: ${ZOO_IMAGE:?run ./infra/zoo/zoo.sh, not docker compose directly}
+    volumes:
+      - ../.conf/main-5090.cfg:/usr/lib/cgi-bin/main.cfg
+      - ../.conf/oas-5090.cfg:/usr/lib/cgi-bin/oas.cfg

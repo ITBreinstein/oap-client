@@ -23,12 +23,19 @@ Other entry points:
 pnpm --filter @breinstein/web dev     # interface on :5173
 pnpm test:e2e                         # Playwright, needs a built web app
 pnpm test:contract                    # pinned pygeoapi; needs the compose stack up
-pnpm test:interop                     # live third-party servers; never blocking
+pnpm test:interop                     # ZOO-Project and third-party servers; never blocking
 pnpm test:smoke                       # consumer tests against a packed tarball
 pnpm graph                            # regenerate docs/architecture.svg (needs graphviz)
 
 docker compose -f infra/compose/pygeoapi.yml up -d   # reference servers on :5080 (CORS) and :5081 (no CORS)
+./infra/zoo/zoo.sh up                               # ZOO-Project reference deployment on :5090
 ```
+
+Two implementations, because one cannot tell a server's deviation apart from an
+ambiguous specification. pygeoapi is the pinned, deterministic lane that blocks
+CI; ZOO-Project is a second implementation with nothing in common but the
+standard, and it reports without blocking — see
+[infra/zoo/README.md](infra/zoo/README.md).
 
 ## Boundaries
 
