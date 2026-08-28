@@ -10,10 +10,14 @@
   },
   "dependencies": {
     "@breinstein/oap-client": "workspace:*",
+    "maplibre-gl": "^6.6.0",
     "react": "catalog:",
-    "react-dom": "catalog:"
+    "react-dom": "catalog:",
+    "terra-draw": "^1.32.3",
+    "terra-draw-maplibre-gl-adapter": "^1.4.1"
   },
   "devDependencies": {
+    "@types/geojson": "^7946.0.16",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.4"
   }
