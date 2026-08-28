@@ -75,6 +75,126 @@ itself. Two operations deliberately bypass it and call `classify()` directly: a
 **failed job** is a valid 200 whose document must reach the caller, and a
 **capability probe** treats a 405 on `DELETE /jobs/{id}` as the answer.
 
+## Discovery: `inspect()`
+
+```ts
+import { createClient, findLink } from "@breinstein/oap-client";
+
+const client = createClient({ baseUrl: "http://localhost:5080" });
+const service = await client.inspect();
+
+service.title; // "pygeoapi (CORS enabled)"
+service.url; // "http://localhost:5080/"  — after redirects
+service.capabilities; // { sync: true, async: true, dismiss: false, callback: true, … }
+
+// Navigate by what the server advertised, not by building a path.
+findLink(service.links, "processes")?.href; // "http://localhost:5080/processes"
+```
+
+`inspect()` fetches the landing page, follows its conformance link, and derives
+capabilities. Pass a `signal` to cancel it; it is threaded into both requests, so
+a user who corrects a mistyped URL cannot have the first lookup race the second.
+
+### Follow links; do not build paths
+
+`${baseUrl}/processes` breaks the first time a server mounts its API behind a
+gateway or under a path prefix, and you find out during a demo. Every href is
+resolved against `ResponseEnvelope.url` — the URL the document was **served**
+from, after redirects — never the URL you typed:
+
+```
+typed:   https://demo.example.nl/oapi      server 301s to add the slash
+served:  https://demo.example.nl/oapi/
+link:    { "rel": "processes", "href": "processes" }
+
+new URL("processes", "…/oapi")   → https://demo.example.nl/processes        404
+new URL("processes", "…/oapi/")  → https://demo.example.nl/oapi/processes   ✓
+```
+
+That is RFC 3986 §5.2.3: without a trailing slash the last segment is a file and
+gets replaced. The user-supplied base URL is deliberately not a parameter of the
+resolver — what it cannot reach, it cannot use by mistake.
+
+Links from the `Link` **header** and the document **body** are merged and
+deduped, because servers are inconsistent about which they use. A malformed link
+entry is skipped and recorded, never thrown: one bad link must not take down
+discovery of the other eleven.
+
+### Relation matching tolerates both spellings
+
+OGC registers its relations as full URIs; IANA registers short names; servers
+pick either. `findLink` matches both, and it is not defensive programming —
+pygeoapi 0.21 advertises **conformance under the short name** and **processes
+under the long OGC URI**, on the same landing page. Either form alone finds one
+and misses the other.
+
+Where several links share a relation, `application/json` wins, then any `+json`
+suffix type, then an untyped link, then the first match. An untyped link
+outranks a `text/html` one because unknown beats known-wrong.
+
+### JSON is requested explicitly, and HTML is a failure
+
+Every GET sends `Accept: application/json`. `classify()` calls a `200 text/html`
+landing page `ok` — correctly, nothing went wrong at the HTTP level — so
+checking the media type is this layer's job:
+
+```ts
+requireJson(envelope); // throws NotJsonError unless application/json or a +json suffix
+```
+
+If a server ignores `Accept` and answers non-JSON, the request is retried
+**once** with `?f=json` appended, preserving existing query parameters. `f=json`
+is never sent on the first attempt: it is an OGC convention, not a normative
+requirement, and appending it blindly risks colliding with a server's own `f`
+handling. If the retry is non-JSON too, `NotJsonError`. Which path succeeded is
+reported — "ignores `Accept`, requires `f=json`" is an interoperability finding.
+
+### Capabilities are advertised, assumed, or neither
+
+```ts
+interface ServiceCapabilities {
+  sync: boolean; // ASSUMED — derived from Core; no conformance class covers it
+  async: boolean; // ASSUMED — must be probed before it is believed
+  dismiss: boolean; // ADVERTISED by its own conformance class
+  callback: boolean; // ADVERTISED by its own conformance class
+  rawConformance: readonly string[]; // every URI as received
+}
+```
+
+In Part 1 v1.0 `dismiss` and `callback` are conformance classes but sync and
+async execution are not — both live inside Core, so no server can tell you it
+honours `Prefer: respond-async`. Those two fields are optimism, and the type
+says so.
+
+**Capabilities are a UI convenience, never a gate.** A `false` means "not
+declared", which is not "not supported": pygeoapi 0.21 answers
+`DELETE /jobs/{id}` with a 200 and `GET /jobs` with a 200 while declaring
+neither conformance class. A client that gated on `capabilities.dismiss` would
+never send the request, and would never discover that. Nothing in this layer
+throws over a missing class.
+
+Conformance URIs are **parsed**, not string-compared — the version lives inside
+the URI, so whole-string matching would read every draft-v2 URI as "unknown".
+Unparseable URIs survive in `rawConformance`; evidence is never discarded.
+
+A service with a valid landing page but a broken or missing conformance document
+is **degraded, not dead**: capabilities come back all-`false`, an observation is
+recorded, and the caller proceeds.
+
+### Observations
+
+Pass `onObservation` to receive structured records of what was seen — landing
+page fetched, whether the `f=json` fallback was needed, whether the conformance
+link was advertised or guessed, class counts, and each skipped link:
+
+```ts
+await client.inspect({ onObservation: (o) => matrix.record(o) });
+```
+
+URLs are redacted to origin and path at the point of creation, not at the sink,
+so a credential in a query string cannot leak through a log line. A throwing
+sink is swallowed: a broken logger is not a broken service.
+
 ## Supported environments
 
 - **ESM only.** No CommonJS build is published. There is no `main` field — a CJS

@@ -9,6 +9,9 @@
     // typecheck silently; without it they are a compile error.
     "types": [],
     "isolatedDeclarations": true, // forces explicit types on every export
+    // Captured pygeoapi payloads under test/fixtures/ are imported directly by
+    // the tests, so an upstream change surfaces as a diff rather than as prose.
+    "resolveJsonModule": true,
     // No source maps in the published package: the .d.ts map pointed at src/,
     // which `files: ["dist"]` never ships, and the .js map was 3x the size of
     // the code. Flip this back to true if consumers need to debug into source.
@@ -17,5 +20,7 @@
     "rootDir": ".",
     "outDir": ".tsbuild" // tsdown owns dist/; tsc only type-checks
   },
-  "include": ["src", "test"]
+  // A bare directory include expands only to .ts/.tsx, so the captured
+  // pygeoapi payloads have to be named explicitly for the tests to import them.
+  "include": ["src", "test", "test/fixtures/**/*.json"]
 }

@@ -1,6 +1,7 @@
 import { send, type SendOptions } from "./http/transport.js";
 import type { ResponseEnvelope } from "./http/envelope.js";
 import { type FetchLike, resolveFetch } from "./http/fetch.js";
+import { inspect, type InspectOptions, type ServiceDescription } from "./discovery/inspect.js";
 
 export interface ClientOptions {
   /** Landing page of the OGC API - Processes service. */
@@ -14,6 +15,9 @@ export interface ClientOptions {
 /** Per-request options; `fetch` is fixed at construction and cannot be overridden here. */
 export type RequestOptions = Omit<SendOptions, "fetch">;
 
+/** Per-call discovery options; transport concerns come from the client. */
+export type InspectRequestOptions = Omit<InspectOptions, "fetch" | "maxBufferBytes">;
+
 export interface Client {
   readonly baseUrl: URL;
   /**
@@ -24,6 +28,14 @@ export interface Client {
    * `requireOk` to turn a server's refusal into a `ProcessesError`.
    */
   send(path: string, options?: RequestOptions): Promise<ResponseEnvelope>;
+  /**
+   * Fetch the landing page and conformance document, and describe the service.
+   *
+   * Everything downstream of this should navigate by the returned `links`
+   * rather than by building paths from `baseUrl` — that is the whole point of
+   * the call. Pass a `signal` to cancel it.
+   */
+  inspect(options?: InspectRequestOptions): Promise<ServiceDescription>;
 }
 
 export function createClient(options: ClientOptions): Client {
@@ -41,6 +53,13 @@ export function createClient(options: ClientOptions): Client {
       return send(new URL(path, baseUrl), {
         ...(options.maxBufferBytes === undefined ? {} : { maxBufferBytes: options.maxBufferBytes }),
         ...requestOptions,
+        fetch: doFetch,
+      });
+    },
+    inspect(inspectOptions: InspectRequestOptions = {}): Promise<ServiceDescription> {
+      return inspect(baseUrl, {
+        ...(options.maxBufferBytes === undefined ? {} : { maxBufferBytes: options.maxBufferBytes }),
+        ...inspectOptions,
         fetch: doFetch,
       });
     },

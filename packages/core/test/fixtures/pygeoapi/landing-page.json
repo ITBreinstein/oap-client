@@ -1,0 +1,80 @@
+{
+    "links":[
+        {
+            "rel":"about",
+            "type":"text/html",
+            "title":"pygeoapi (CORS enabled)",
+            "href":"https://example.org"
+        },
+        {
+            "rel":"self",
+            "type":"application/json",
+            "title":"This document as JSON",
+            "href":"http://localhost:5080?f=json"
+        },
+        {
+            "rel":"alternate",
+            "type":"application/ld+json",
+            "title":"This document as RDF (JSON-LD)",
+            "href":"http://localhost:5080?f=jsonld"
+        },
+        {
+            "rel":"alternate",
+            "type":"text/html",
+            "title":"This document as HTML",
+            "href":"http://localhost:5080?f=html",
+            "hreflang":"en-US"
+        },
+        {
+            "rel":"service-desc",
+            "type":"application/vnd.oai.openapi+json;version=3.0",
+            "title":"The OpenAPI definition as JSON",
+            "href":"http://localhost:5080/openapi"
+        },
+        {
+            "rel":"service-doc",
+            "type":"text/html",
+            "title":"The OpenAPI definition as HTML",
+            "href":"http://localhost:5080/openapi?f=html",
+            "hreflang":"en-US"
+        },
+        {
+            "rel":"conformance",
+            "type":"application/json",
+            "title":"Conformance",
+            "href":"http://localhost:5080/conformance"
+        },
+        {
+            "rel":"data",
+            "type":"application/json",
+            "title":"Collections",
+            "href":"http://localhost:5080/collections"
+        },
+        {
+            "rel":"http://www.opengis.net/def/rel/ogc/1.0/processes",
+            "type":"application/json",
+            "title":"Processes",
+            "href":"http://localhost:5080/processes"
+        },
+        {
+            "rel":"http://www.opengis.net/def/rel/ogc/1.0/job-list",
+            "type":"application/json",
+            "title":"Jobs",
+            "href":"http://localhost:5080/jobs"
+        },
+        {
+            "rel":"http://www.opengis.net/def/rel/ogc/1.0/tiling-schemes",
+            "type":"application/json",
+            "title":"The list of supported tiling schemes as JSON",
+            "href":"http://localhost:5080/TileMatrixSets?f=json"
+        },
+        {
+            "rel":"http://www.opengis.net/def/rel/ogc/1.0/tiling-schemes",
+            "type":"text/html",
+            "title":"The list of supported tiling schemes as HTML",
+            "href":"http://localhost:5080/TileMatrixSets?f=html"
+        }
+    ],
+    "title":"pygeoapi (CORS enabled)",
+    "description":"Reference OGC API - Processes server for the verify lane"
+}
