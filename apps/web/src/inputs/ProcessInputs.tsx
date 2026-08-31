@@ -1,4 +1,5 @@
 import { type ReactElement, useState } from "react";
+import { PolygonDrawMap } from "../map/PolygonDrawMap.js";
 
 /**
  * The parts of an OGC API - Processes input description this form reads.
@@ -125,6 +126,84 @@ function NumberField({
   );
 }
 
+/** Text for the raw editor: a string as typed, anything else pretty-printed. */
+function jsonText(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string") return value;
+  return JSON.stringify(value, null, 2);
+}
+
+/**
+ * The parsed value when the text is valid JSON, and the raw text when it is
+ * not — so a half-typed object is preserved rather than discarded, while
+ * anything complete is held as the structure the server will be sent.
+ */
+function toJson(text: string): unknown {
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return text;
+  }
+}
+
+/**
+ * The fallback control: a raw JSON editor, with drawing offered alongside.
+ *
+ * Drawing is opt-in rather than automatic on purpose. Nothing in a schema like
+ * `{ "oneOf": [...] }` says "this is a polygon" — the only clue is often the
+ * English title, and keying off prose would break on the first server that
+ * writes it in Dutch. The user knows it is geometry when the schema does not
+ * say, so the interface lets them say so.
+ */
+function JsonField({
+  id,
+  value,
+  onChange,
+}: {
+  id: string;
+  value: unknown;
+  onChange: (value: unknown) => void;
+}): ReactElement {
+  // The text is owned here, not derived from `value`: re-deriving it on every
+  // keystroke would reformat the document while it is being typed.
+  const [text, setText] = useState(() => jsonText(value));
+  const [drawing, setDrawing] = useState(false);
+
+  const write = (next: string): void => {
+    setText(next);
+    onChange(toJson(next));
+  };
+
+  return (
+    <>
+      <textarea
+        id={id}
+        rows={8}
+        cols={60}
+        value={text}
+        onChange={(event) => {
+          write(event.target.value);
+        }}
+      />
+      <button
+        type="button"
+        onClick={() => {
+          setDrawing((previous) => !previous);
+        }}
+      >
+        {drawing ? "Hide map" : "Draw on a map"}
+      </button>
+      {drawing && (
+        <PolygonDrawMap
+          onChange={(features) => {
+            write(JSON.stringify(features, null, 2));
+          }}
+        />
+      )}
+    </>
+  );
+}
+
 function Field({
   id,
   input,
@@ -199,15 +278,7 @@ function Field({
   // Anything else — objects, arrays, a missing type — is still enterable as raw
   // JSON rather than not enterable at all. Which inputs land here is worth
   // recording: it is what this client cannot yet generate a control for.
-  return (
-    <textarea
-      id={id}
-      value={typeof current === "string" ? current : JSON.stringify(current, null, 2)}
-      onChange={(event) => {
-        onChange(event.target.value);
-      }}
-    />
-  );
+  return <JsonField id={id} value={value} onChange={onChange} />;
 }
 
 export function ProcessInputs({ inputs, values, onChange }: ProcessInputsProps): ReactElement {

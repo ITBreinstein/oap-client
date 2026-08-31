@@ -28,7 +28,26 @@ commands in the matching contract test.
 | ----------------- | --------------- | --------------------------- | ------- | ---------- |
 | `pygeoapi/`       | pygeoapi 0.21.0 | `geopython/pygeoapi:0.21.0` | MIT     | 2026-08-26 |
 
-## 3. Dependencies
+## 3. Runtime services
+
+Services the interface calls at runtime that are neither bundled code nor a
+captured payload. They carry obligations that outlive a build.
+
+| Service                    | Endpoint                                         | Licence / terms                                    | Used by                       |
+| -------------------------- | ------------------------------------------------ | -------------------------------------------------- | ----------------------------- |
+| OpenStreetMap raster tiles | `https://tile.openstreetmap.org/{z}/{x}/{y}.png` | Map data ODbL 1.0; attribution required on the map | `apps/web/src/map/basemap.ts` |
+
+The attribution is rendered by MapLibre's own attribution control, fed by the
+`attribution` field on the source in `basemap.ts`. Removing that field removes
+the credit and breaks the licence, so it is not cosmetic.
+
+One thing to settle before anything is deployed publicly: the OSM Foundation's
+[Tile Usage Policy](https://operations.osmfoundation.org/policies/tiles/) covers
+these tiles, and it does not permit an application to lean on them as its
+basemap at any volume. Fine for development and a demo; a deployment needs its
+own tiles or a commercial provider.
+
+## 4. Dependencies
 
 Regenerate with:
 
