@@ -9,6 +9,34 @@ import { type InputDescription, ProcessInputs, defaultValues } from "./inputs/Pr
  */
 const DEFAULT_URL = "http://localhost:5001/processes/bgt-land-cover-summary";
 
+/**
+ * Suggestions for the URL box, which stays free text — this is a datalist, not
+ * a closed set of supported servers.
+ *
+ * The fixtures are addressed through the dev server's own `/fixtures` route
+ * rather than Vite's `/@fs/` one, so no absolute path from a particular
+ * machine ends up in the source of a public repository.
+ */
+function suggestions(): readonly { readonly url: string; readonly label: string }[] {
+  const fixture = (name: string): { url: string; label: string } => ({
+    url: `${window.location.origin}/fixtures/zoo-project/processes/${name}.json`,
+    label: `${name} — captured ZOO-Project description`,
+  });
+
+  return [
+    { url: DEFAULT_URL, label: "BGT land cover — live pygeoapi :5001" },
+    {
+      url: "http://localhost:5080/processes/hello-world",
+      label: "hello-world — live pygeoapi :5080",
+    },
+    fixture("Buffer"),
+    fixture("Centroid"),
+    fixture("Ogr2Ogr"),
+    fixture("echo"),
+    fixture("longProcess"),
+  ];
+}
+
 interface ProcessDescription {
   readonly id?: string;
   readonly title?: string;
@@ -104,6 +132,32 @@ export function App(): ReactElement {
             }}
           />{" "}
           <button type="submit">Load</button>
+        </p>
+        <p>
+          {/*
+            A plain select rather than a datalist on the input above. A datalist
+            filters its options against whatever is already typed, so a box
+            holding a full URL matches exactly one of them and the list looks
+            empty. This always shows everything.
+          */}
+          <label htmlFor="process-url-preset">or jump to</label>{" "}
+          <select
+            id="process-url-preset"
+            value=""
+            onChange={(event) => {
+              setUrl(event.target.value);
+              load(event.target.value);
+            }}
+          >
+            <option value="" disabled>
+              Choose a known service…
+            </option>
+            {suggestions().map((suggestion) => (
+              <option key={suggestion.url} value={suggestion.url}>
+                {suggestion.label}
+              </option>
+            ))}
+          </select>
         </p>
       </form>
 
