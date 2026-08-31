@@ -25,45 +25,10 @@ import { ProcessesError } from "../../src/http/errors.js";
 import { inspect } from "../../src/discovery/inspect.js";
 import { findLink } from "../../src/links/find.js";
 import { send } from "../../src/http/transport.js";
+import { LANDING, ZOO, answering } from "./zoo.js";
 import type { Observation } from "../../src/observations.js";
 
-const ZOO = "http://localhost:5090/ogc-api";
-
-/**
- * The landing page, *with* its trailing slash.
- *
- * Not cosmetic here: without it ZOO answers 400 and an XML exception report
- * rather than redirecting, so every `inspect()` in this file would fail on a
- * URL a user would reasonably paste. Pinned as its own test below, and written
- * up as finding 0010.
- */
-const LANDING = `${ZOO}/`;
-
-/**
- * A *usable* landing page, not merely a reachable socket.
- *
- * A half-started ZOO answers 503 from Apache while the FPM worker is still
- * coming up, and a stack restarted with `docker start` rather than
- * `./infra/zoo/zoo.sh up` stays that way. Both are completed HTTP responses, so
- * a probe that only asked "did anything come back" would turn this lane's whole
- * file red instead of skipping it — which is the one thing a non-blocking lane
- * must not do.
- */
-async function answering(url: string): Promise<boolean> {
-  try {
-    const response = await send(`${url}/`, {
-      headers: { Accept: "application/json" },
-      signal: AbortSignal.timeout(5_000),
-    });
-    return response.status === 200 && response.isJson;
-  } catch {
-    return false;
-  }
-}
-
-// Resolved once, at module load: a per-test probe would cost five seconds per
-// test on a machine that simply is not running the stack.
-const zooUp = await answering(ZOO);
+const zooUp = await answering();
 
 const observations: Observation[] = [];
 const record = (observation: Observation): void => {
@@ -154,6 +119,42 @@ describe.skipIf(!zooUp)("ZOO-Project links are configured, not derived from the 
       expect(response.status).toBe(200);
       expect(response.headers.get("access-control-allow-origin")).toBeNull();
     }
+  });
+});
+
+describe.skipIf(!zooUp)("content negotiation, the other way round", () => {
+  it("answers a browser-shaped Accept with JSON — the pygeoapi trap inverted", async () => {
+    // pygeoapi answers this exact header with HTML (finding 0007), which is why
+    // the core sets Accept explicitly and has a ?f=json fallback behind it. ZOO
+    // ignores Accept entirely and always serves JSON. Both behaviours are
+    // wrong in opposite directions, and a client that assumed either one would
+    // break on the other.
+    const browser = await send(LANDING, {
+      headers: {
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,*/*;q=0.8",
+      },
+    });
+
+    expect(browser.status).toBe(200);
+    expect(browser.mediaType).toBe("application/json");
+    expect(browser.isJson).toBe(true);
+  });
+
+  it("serves JSON with no Accept header at all", async () => {
+    const implicit = await send(LANDING);
+    expect(implicit.mediaType).toBe("application/json");
+  });
+
+  it("rejects ?f=json with 400 — the fallback would make things worse, not better", async () => {
+    // The core appends ?f=json only when the first response was not JSON. Against
+    // ZOO that never happens, so the fallback never fires and nothing breaks
+    // today. But it is loaded: were ZOO ever to serve HTML for some Accept, the
+    // recovery step would turn a usable response into a 400. Finding 0012.
+    const fallback = await send(`${LANDING}?f=json`, { headers: { Accept: "application/json" } });
+
+    expect(fallback.status).toBe(400);
+    expect(fallback.isJson).toBe(true);
+    await expect(fallback.json()).resolves.toMatchObject({ title: "BadRequest" });
   });
 });
 
