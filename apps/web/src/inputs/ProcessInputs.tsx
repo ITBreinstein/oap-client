@@ -1,4 +1,4 @@
-import type { ReactElement } from "react";
+import { type ReactElement, useState } from "react";
 
 /**
  * The parts of an OGC API - Processes input description this form reads.
@@ -32,6 +32,24 @@ function isRequired(input: InputDescription): boolean {
 }
 
 /**
+ * The values a freshly loaded form starts out holding.
+ *
+ * A control shows its schema's `default`, so the form has to hold it too. If it
+ * did not, the box would read 300 while the request left the input out
+ * entirely — the server would then apply its own default, which is not
+ * necessarily the one on screen.
+ */
+export function defaultValues(
+  inputs: Readonly<Record<string, InputDescription>>,
+): Record<string, unknown> {
+  const values: Record<string, unknown> = {};
+  for (const [id, input] of Object.entries(inputs)) {
+    if (input.schema?.default !== undefined) values[id] = input.schema.default;
+  }
+  return values;
+}
+
+/**
  * Values and schema defaults arrive as `unknown`, and a server is free to put an
  * object in either. Only scalars have a sensible text form; anything else is
  * shown as JSON rather than as `[object Object]`.
@@ -43,6 +61,68 @@ function asText(value: unknown): string {
   // Safe without a fallback: these values came from a parsed JSON response, so
   // they can never be the function or symbol that makes `stringify` undefined.
   return JSON.stringify(value);
+}
+
+/**
+ * Parses a number the user is part-way through typing.
+ *
+ * `undefined` for anything not yet a complete number — a lone `-`, an empty
+ * box, `1e` — so a half-typed value counts as absent rather than as something
+ * wrong being held.
+ */
+function toNumber(text: string): number | undefined {
+  const trimmed = text.trim();
+  if (trimmed === "") return undefined;
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+/**
+ * A number, entered as text.
+ *
+ * Deliberately not `type="number"`. A browser reports a half-typed value like
+ * `-` as an empty string, and a controlled input writes that empty string
+ * straight back — erasing the character as it is typed, which makes a negative
+ * number impossible to enter. Holding the text exactly as typed and converting
+ * only once it parses is what makes it work. The cost is the spinner arrows and
+ * browser-enforced `min`/`max`, neither of which validated anything yet.
+ */
+function NumberField({
+  id,
+  integer,
+  value,
+  onChange,
+}: {
+  id: string;
+  integer: boolean;
+  value: unknown;
+  onChange: (value: unknown) => void;
+}): ReactElement {
+  const [text, setText] = useState(() => asText(value));
+  const [lastValue, setLastValue] = useState(value);
+
+  // Re-sync when the value changes from outside — a newly loaded process, or
+  // seeded defaults. The second check matters: the parent echoes back what this
+  // field just emitted, and treating that echo as an outside change would wipe
+  // the text mid-edit. `-` parses to `undefined`, so without it the character
+  // would be erased the instant it was typed.
+  if (value !== lastValue) {
+    setLastValue(value);
+    if (value !== toNumber(text)) setText(asText(value));
+  }
+
+  return (
+    <input
+      id={id}
+      type="text"
+      inputMode={integer ? "numeric" : "decimal"}
+      value={text}
+      onChange={(event) => {
+        setText(event.target.value);
+        onChange(toNumber(event.target.value));
+      }}
+    />
+  );
 }
 
 function Field({
@@ -57,7 +137,11 @@ function Field({
   onChange: (value: unknown) => void;
 }): ReactElement {
   const schema = input.schema ?? {};
-  const current = value ?? schema.default ?? "";
+  // Deliberately no fall back to `schema.default`: the container seeds those
+  // with `defaultValues` when a process loads, and falling back here as well
+  // would refill a box the moment the user emptied it, making an optional
+  // input impossible to leave out.
+  const current = value ?? "";
 
   if (schema.enum) {
     return (
@@ -79,18 +163,10 @@ function Field({
 
   if (schema.type === "number" || schema.type === "integer") {
     return (
-      <input
-        id={id}
-        type="number"
-        value={asText(current)}
-        min={schema.minimum}
-        max={schema.maximum}
-        step={schema.type === "integer" ? 1 : "any"}
-        onChange={(event) => {
-          // An empty box is absent, not zero — the server must not be sent 0.
-          onChange(event.target.value === "" ? undefined : event.target.valueAsNumber);
-        }}
-      />
+      // `value`, not `current`: the field compares what it is given against
+      // what it last emitted, and `current` has already turned an absent value
+      // into "" — which would read as an outside change and wipe the text.
+      <NumberField id={id} integer={schema.type === "integer"} value={value} onChange={onChange} />
     );
   }
 
