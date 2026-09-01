@@ -195,6 +195,127 @@ URLs are redacted to origin and path at the point of creation, not at the sink,
 so a credential in a query string cannot leak through a log line. A throwing
 sink is swallowed: a broken logger is not a broken service.
 
+## Processes: `listProcesses()` and `getProcess()`
+
+```ts
+const client = createClient({ baseUrl: "http://localhost:5080" });
+
+const list = await client.listProcesses();
+list.processes[0].id; // "hello-world"
+list.processes[0].execution.async; // true
+list.processes[0].execution.defaulted; // false — the server actually said so
+list.truncated; // false
+list.numberTotal; // undefined here; 703 against ZOO
+
+const process = await client.getProcess("hello-world", { summary: list.processes[0] });
+process.inputs[0]; // { id: "name", minOccurs: 1, required: true, multiple: false, schema: … }
+process.outputs[0].schema["contentMediaType"]; // "application/json"
+```
+
+Neither method needs `inspect()` to have been called first — they run discovery
+themselves and remember the resolved list URL for the life of the client. Both
+take a `signal`.
+
+### The core preserves; the layer above interprets
+
+Deciding that one input deserves a number field and another a map draw tool is
+**not** this package's job. Its obligation is narrower and stricter: never
+discard anything that decision will need.
+
+So the `schema` member of every input and output comes back **deep-equal to what
+the server sent**. No key filtering, no defaulting, no normalising, no rewriting
+of `$ref` into an absolute URL, and no dereferencing — following a `$ref` means
+a second request, to a third-party host, for a possibly-YAML document, from a
+browser CORS will block.
+
+`JsonSchema` is therefore an open index signature with no named members, and
+that is deliberate. Naming `type?: string` would be a claim this layer cannot
+keep: nothing here checks it, and a server that sends `"type": 42` would hand
+you a value typed `string` that is a number. `unknown` per key is exactly what
+the runtime check proves, and it forces narrowing at the point of use — which a
+foreign server makes necessary anyway.
+
+### Cardinality: the OGC defaults are inverted
+
+`minOccurs` and `maxOccurs` both default to `1`, so **an input with neither
+field is required**. A parser written by someone thinking in JSON Schema — where
+required-ness is a separate `required: []` array — makes every field optional,
+the user submits an empty one, and the server's rejection is unexplainable
+during a demo. The default is load-bearing: 1 541 of ZOO's 5 098 inputs omit
+`minOccurs` and 4 947 omit `maxOccurs`.
+
+`maxOccurs` is `number | "unbounded"`, a union with a _literal_. Every read must
+handle both arms — `maxOccurs > 1` alone is a bug, because comparing a string to
+a number silently yields `false` — so `required` and `multiple` are derived once
+here rather than by each caller. `multiple` also decides the wire shape of the
+execute request: above 1, the value is a JSON array rather than a bare value.
+
+### Inputs and outputs are arrays, though the wire shape is an object
+
+The server sends `"inputs": { "message": {…}, "bbox": {…} }`. The key is folded
+in as `id` and you get an array back, because object key order is only
+guaranteed for keys that do not look like integers — an input id of `"1"` would
+silently jump to the front of your form — and because `.map()` wants an array.
+
+`ProcessDescription extends ProcessSummary`, so a description goes anywhere a
+summary does.
+
+### Execution options carry their own honesty flag
+
+```ts
+interface ProcessExecutionOptions {
+  sync: boolean;
+  async: boolean;
+  dismiss: boolean;
+  declared: readonly string[]; // jobControlOptions verbatim
+  defaulted: boolean; // true when the server said nothing and sync-only was assumed
+}
+```
+
+`defaulted` separates "the server told us sync-only" from "the server said
+nothing and the spec default is sync-only". The two look identical without it,
+and they are different statements.
+
+### Pagination is followed, with a ceiling
+
+`listProcesses()` follows `rel="next"` and stops at whichever comes first: no
+`next`, a `next` href already visited, 20 pages, or your abort signal — checked
+_between_ pages, not only at the start. A server pointing `next` at itself is a
+real bug in the wild and an unguarded loop hangs the tab.
+
+When something other than the server stopped the walk, `truncated` is `true` and
+`truncationReason` says which, so the UI can say "showing the first N" rather
+than presenting a partial catalogue as the whole one. Ids are deduplicated
+across pages, first occurrence winning.
+
+### Tolerant, except about `id`
+
+Fatal: the document is not an object, `processes` is not an array, or a process
+has no string `id`. The error names the page and index — `page 1, entry at
+index 3` — because it will be read by someone staring at an unfamiliar server's
+output.
+
+Everything else degrades and is recorded: a missing `version`, an absent
+`jobControlOptions`, `keywords` sent as a bare string, an input with no schema.
+A thrown error is a blank screen; a degraded field is one imperfect widget.
+
+Members this layer does not model are kept nowhere, but **their names** reach
+the observation — ZOO sends `mutable`, `metadata`, `extended-schema` and
+`raw_schema1`; pygeoapi sends `example`. That is a cheap early-warning signal
+for vendor extensions and v2 draft fields, without giving any caller a way to
+reach around the typed API into the raw document.
+
+A 404 on a description becomes `ProcessNotFoundError`, so the UI can say "no
+such process on this service" rather than "HTTP 404".
+
+### The schema-shape census
+
+The `process-fetched` observation carries counts — and only counts — of how many
+inputs use an inline `type`, an `enum`, a `$ref`, a composition keyword, a
+`contentMediaType`, a `format`, or no schema at all. No ids, titles,
+descriptions or values. It is the form-generation failure catalogue assembling
+itself from real traffic instead of being reconstructed by hand later.
+
 ## Supported environments
 
 - **ESM only.** No CommonJS build is published. There is no `main` field — a CJS

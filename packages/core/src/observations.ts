@@ -78,6 +78,74 @@ export type Observation =
       /** The document that carried the bad link, redacted. */
       readonly documentUrl: string;
       readonly reason: SkippedLinkReason;
+    }
+  | {
+      /**
+       * Where the process list was looked for. `path-fallback` means either the
+       * landing page advertised no `processes` link or discovery itself failed,
+       * and `./processes` was guessed — a finding in its own right.
+       */
+      readonly kind: "processes-link";
+      readonly source: "advertised" | "path-fallback";
+      readonly url: string;
+    }
+  | {
+      readonly kind: "process-list-fetched";
+      /** The URL of the **last** page walked, redacted. */
+      readonly url: string;
+      readonly status: number;
+      readonly usedFormatFallback: boolean;
+      /** Pages actually fetched. 1 unless the server advertised `next`. */
+      readonly pageCount: number;
+      /** Summaries returned, after deduplication. */
+      readonly processCount: number;
+      /** Entries dropped because an earlier page already carried that id. */
+      readonly duplicateCount: number;
+      /** The walk stopped for our reasons, not the server's. */
+      readonly truncated: boolean;
+      readonly truncationReason: "page-cap" | "cycle" | undefined;
+      /** The server's own `numberTotal`, when it declared a usable one. */
+      readonly numberTotal: number | undefined;
+      /** Structural degradations, as codes. Never carries a value from the document. */
+      readonly warnings: readonly string[];
+      /** Names only, of members this layer does not model. Vendor or v2-draft signal. */
+      readonly unrecognisedKeys: readonly string[];
+    }
+  | {
+      readonly kind: "process-fetched";
+      readonly url: string;
+      /** Server-chosen identifier, already present in the redacted path. */
+      readonly processId: string;
+      readonly status: number;
+      readonly usedFormatFallback: boolean;
+      /** Whether the server told us where the description lives, or we rebuilt it. */
+      readonly route: "advertised-link" | "constructed-path";
+      readonly inputCount: number;
+      readonly outputCount: number;
+      /** `jobControlOptions` verbatim; empty when the server declared none. */
+      readonly declaredJobControlOptions: readonly string[];
+      /** True when the OGC sync-only default was applied because nothing was declared. */
+      readonly jobControlDefaulted: boolean;
+      readonly warnings: readonly string[];
+      readonly unrecognisedKeys: readonly string[];
+      /**
+       * The form-generation failure catalogue, assembling itself from real
+       * traffic. Counts only — no input ids, titles, descriptions or values.
+       *
+       * Written out here rather than imported from `processes/types.ts` so this
+       * module stays a leaf: everything above it depends on observations, and
+       * nothing it depends on can then become a cycle.
+       */
+      readonly schemaShapes: {
+        readonly total: number;
+        readonly inlineType: number;
+        readonly enumerated: number;
+        readonly ref: number;
+        readonly composed: number;
+        readonly contentMediaType: number;
+        readonly formatted: number;
+        readonly absent: number;
+      };
     };
 
 export type ObservationKind = Observation["kind"];

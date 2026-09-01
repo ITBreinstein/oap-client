@@ -6,7 +6,14 @@
  * runtime-neutrality rules in eslint.config.js.
  */
 export { createClient } from "./client.js";
-export type { Client, ClientOptions, InspectRequestOptions, RequestOptions } from "./client.js";
+export type {
+  Client,
+  ClientOptions,
+  GetProcessRequestOptions,
+  InspectRequestOptions,
+  ListRequestOptions,
+  RequestOptions,
+} from "./client.js";
 
 // The HTTP boundary. `src/http/` is the only place in the core that may call
 // fetch; everything above it works in terms of envelopes and classifications.
@@ -33,7 +40,7 @@ export type { FetchLike } from "./http/fetch.js";
 // Links. Everything above the transport navigates by these rather than by
 // concatenating paths onto the base URL — a server is free to mount its API
 // wherever it likes, and only it knows where that is.
-export { collectLinks, readBodyLinks } from "./links/resolve.js";
+export { collectLinks, readBodyLinks, resolveBodyLinks } from "./links/resolve.js";
 export { findLink, findLinks, requireLink } from "./links/find.js";
 export { aliasesFor, matchesRelation } from "./links/types.js";
 export type { KnownRelation, Link } from "./links/types.js";
@@ -59,8 +66,55 @@ export type { ConformanceClass, ParsedConformance } from "./conformance/parse.js
 export { deriveCapabilities, unknownCapabilities } from "./conformance/capabilities.js";
 export type { ServiceCapabilities } from "./conformance/capabilities.js";
 
+// Processes: the list and the description, and the types the whole product —
+// the generated form, the draw tool, the execute body, the result renderers —
+// is built on. Preservative, never interpretive: what to *do* with an input
+// schema is `apps/web`'s decision, and this layer's job is to lose nothing it
+// will need to make it.
+export {
+  DEFAULT_MAX_OCCURS,
+  DEFAULT_MAX_PAGES,
+  DEFAULT_MIN_OCCURS,
+  UNBOUNDED,
+  deriveExecution,
+  getProcess,
+  listProcesses,
+  normaliseCardinality,
+  parseDescription,
+  parseSummary,
+  processUrlFor,
+  resolveProcessUrl,
+} from "./processes/index.js";
+export type {
+  Cardinality,
+  CardinalityWarning,
+  GetProcessOptions,
+  InputDescription,
+  JsonSchema,
+  ListProcessesOptions,
+  NormalisedCardinality,
+  OutputDescription,
+  ParseDescriptionOptions,
+  ParseReport,
+  ParseSummaryOptions,
+  ParsedDescription,
+  ProcessDescription,
+  ProcessExecutionOptions,
+  ProcessList,
+  ProcessListTruncation,
+  ProcessSummary,
+  ResolutionRoute,
+  SchemaShapeCensus,
+} from "./processes/index.js";
+
 // Errors raised above the transport, by the layers that read documents.
-export { MalformedDocumentError, MissingLinkError, NotJsonError } from "./errors.js";
+export {
+  MalformedDocumentError,
+  MalformedProcessDocumentError,
+  MissingLinkError,
+  NotJsonError,
+  ProcessNotFoundError,
+} from "./errors.js";
 
 // Observations: what the client saw, redacted at the point of creation.
 export { observe, redactUrl } from "./observations.js";

@@ -96,3 +96,59 @@ export class MalformedDocumentError extends Error {
     this.reason = reason;
   }
 }
+
+/**
+ * A process list or process description was JSON of the wrong shape, in one of
+ * the few ways this layer treats as fatal.
+ *
+ * Strictness here has an asymmetric cost. A thrown error is a blank screen; a
+ * degraded field is a form with one imperfect widget. So the fatal set is
+ * deliberately tiny — the document is not an object, `processes` is not an
+ * array, an entry has no string `id` — and everything else degrades and is
+ * recorded as a warning on the observation.
+ *
+ * Distinct from {@link MalformedDocumentError} rather than reusing it, because
+ * `where` is the part that matters: whoever reads this is staring at an
+ * unfamiliar server's output and needs the offending index or id, not just the
+ * URL of a document with 703 entries in it.
+ */
+export class MalformedProcessDocumentError extends Error {
+  override readonly name = "MalformedProcessDocumentError";
+  readonly url: string;
+  /** What was expected and what was there instead. */
+  readonly reason: string;
+  /** The offending location, e.g. `entry at index 3`. Undefined for the whole document. */
+  readonly where: string | undefined;
+
+  constructor(url: string, reason: string, where?: string, options?: { cause?: unknown }) {
+    const at = where === undefined ? "" : ` (${where})`;
+    super(`Malformed process document at ${url}${at}: ${reason}`, options);
+    this.url = url;
+    this.reason = reason;
+    this.where = where;
+  }
+}
+
+/**
+ * The service answered 404 for a process description.
+ *
+ * Worth its own type despite `classify()` already reporting an HTTP error: a
+ * mistyped or withdrawn process id is a normal user-facing situation, and the
+ * UI should say "no such process on this service" rather than "HTTP 404".
+ *
+ * Both reference servers make this reachable — pygeoapi 0.21.0 answers 404 with
+ * a `NoSuchProcess` exception, and ZOO answers 404 with the OGC
+ * `no-such-process` exception URI. Finding 0014's 400-for-an-unknown-*path*
+ * does not apply: ZOO routes `/processes/{id}` and gets the status right there.
+ */
+export class ProcessNotFoundError extends Error {
+  override readonly name = "ProcessNotFoundError";
+  readonly processId: string;
+  readonly url: string;
+
+  constructor(processId: string, url: string, options?: { cause?: unknown }) {
+    super(`No process "${processId}" on this service (404 from ${url})`, options);
+    this.processId = processId;
+    this.url = url;
+  }
+}

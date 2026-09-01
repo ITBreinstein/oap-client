@@ -47,7 +47,8 @@ export interface Link {
  * is a compile error, and a table key that is not in the union is a compile
  * error too. The two still cannot drift; only the direction of the check moved.
  */
-export type KnownRelation = "self" | "alternate" | "serviceDesc" | "conformance" | "processes";
+export type KnownRelation =
+  "self" | "alternate" | "serviceDesc" | "conformance" | "processes" | "next" | "prev";
 
 const REL_ALIASES: Readonly<Record<KnownRelation, readonly string[]>> = {
   self: ["self"],
@@ -55,6 +56,11 @@ const REL_ALIASES: Readonly<Record<KnownRelation, readonly string[]>> = {
   serviceDesc: ["service-desc"],
   conformance: ["conformance", "http://www.opengis.net/def/rel/ogc/1.0/conformance"],
   processes: ["processes", "http://www.opengis.net/def/rel/ogc/1.0/processes"],
+  // Paging. IANA-registered short names only: neither reference server writes
+  // an OGC URI form for these, and ZOO advertises both on a limited page
+  // (`?limit=20` → `next` with `skip=20`; `prev` from the second page on).
+  next: ["next"],
+  prev: ["prev", "previous"],
 };
 
 /**

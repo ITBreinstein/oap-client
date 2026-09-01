@@ -1,0 +1,86 @@
+{
+    "processes":[
+        {
+            "version":"0.2.0",
+            "id":"hello-world",
+            "title":"Hello World",
+            "description":"An example process that takes a name as input, and echoes it back as output. Intended to demonstrate a simple process with a single literal input.",
+            "jobControlOptions":[
+                "sync-execute",
+                "async-execute"
+            ],
+            "keywords":[
+                "hello world",
+                "example",
+                "echo"
+            ],
+            "links":[
+                {
+                    "type":"text/html",
+                    "rel":"about",
+                    "title":"information",
+                    "href":"https://example.org/process",
+                    "hreflang":"en-US"
+                },
+                {
+                    "type":"application/json",
+                    "rel":"self",
+                    "href":"http://localhost:5080/processes/hello-world?f=json",
+                    "title":"Process description as JSON",
+                    "hreflang":"en-US"
+                },
+                {
+                    "type":"text/html",
+                    "rel":"alternate",
+                    "href":"http://localhost:5080/processes/hello-world?f=html",
+                    "title":"Process description as HTML",
+                    "hreflang":"en-US"
+                },
+                {
+                    "type":"text/html",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/job-list",
+                    "href":"http://localhost:5080/jobs?f=html",
+                    "title":"Jobs list as HTML",
+                    "hreflang":"en-US"
+                },
+                {
+                    "type":"application/json",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/job-list",
+                    "href":"http://localhost:5080/jobs?f=json",
+                    "title":"Jobs list as JSON",
+                    "hreflang":"en-US"
+                },
+                {
+                    "type":"application/json",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/execute",
+                    "href":"http://localhost:5080/processes/hello-world/execution?f=json",
+                    "title":"Execution for this process as JSON",
+                    "hreflang":"en-US"
+                }
+            ],
+            "outputTransmission":[
+                "value"
+            ]
+        }
+    ],
+    "links":[
+        {
+            "type":"application/json",
+            "rel":"self",
+            "title":"This document as JSON",
+            "href":"http://localhost:5080/processes?f=json"
+        },
+        {
+            "type":"application/ld+json",
+            "rel":"alternate",
+            "title":"This document as RDF (JSON-LD)",
+            "href":"http://localhost:5080/processes?f=jsonld"
+        },
+        {
+            "type":"text/html",
+            "rel":"alternate",
+            "title":"This document as HTML",
+            "href":"http://localhost:5080/processes?f=html"
+        }
+    ]
+}
