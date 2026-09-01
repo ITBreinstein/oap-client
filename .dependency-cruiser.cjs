@@ -32,6 +32,23 @@ module.exports = {
       from: { path: "^apps/web/src/map" },
       to: { path: "^packages/core" },
     },
+    {
+      // The execution layer sits on the transport, the links, the process
+      // types, the errors and the observations — and on nothing else. Discovery
+      // and conformance are deliberately out of reach: execution navigates by a
+      // URL it was handed, and a dependency on the layer that *finds* that URL
+      // would make the operation impossible to test or reuse in isolation.
+      name: "execution-sits-on-its-own-layers",
+      severity: "error",
+      from: { path: "^packages/core/src/execution" },
+      to: {
+        path: "^packages/core/src",
+        pathNot: [
+          "^packages/core/src/(execution|http|links|processes)/",
+          "^packages/core/src/(errors|observations)\\.ts$",
+        ],
+      },
+    },
     { name: "no-circular", severity: "error", from: {}, to: { circular: true } },
     // pnpm makes an undeclared import unresolvable; make that a build failure
     // rather than something you notice after publishing.

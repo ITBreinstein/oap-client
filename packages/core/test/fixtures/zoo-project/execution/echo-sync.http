@@ -1,0 +1,9 @@
+HTTP/1.1 200 Ok
+Date: Tue, 01 Sep 2026 09:10:39 GMT
+Server: Apache/2.4.29 (Ubuntu)
+X-Powered-By: ZOO-Project
+Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self';
+Content-Length: 17
+Content-Type: application/json;charset=UTF-8
+
+{"a":"plugfest"}

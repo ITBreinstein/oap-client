@@ -7,6 +7,8 @@ import { findLink } from "./links/find.js";
 import { observe, redactUrl, type ObservationSink } from "./observations.js";
 import { listProcesses, type ListProcessesOptions } from "./processes/list-processes.js";
 import { getProcess, type GetProcessOptions } from "./processes/get-process.js";
+import { execute, type ExecuteOptions } from "./execution/index.js";
+import type { Execution } from "./execution/index.js";
 import type { ProcessDescription, ProcessList } from "./processes/types.js";
 
 export interface ClientOptions {
@@ -35,6 +37,9 @@ export type ListRequestOptions = Omit<ListProcessesOptions, "fetch" | "maxBuffer
 
 /** Per-call description options; transport concerns come from the client. */
 export type GetProcessRequestOptions = Omit<GetProcessOptions, "fetch" | "maxBufferBytes">;
+
+/** Per-call execution options; transport concerns come from the client. */
+export type ExecuteRequestOptions = Omit<ExecuteOptions, "fetch" | "maxBufferBytes">;
 
 export interface Client {
   readonly baseUrl: URL;
@@ -71,6 +76,28 @@ export interface Client {
    * does — and its `self` link is followed instead of a rebuilt path.
    */
   getProcess(processId: string, options?: GetProcessRequestOptions): Promise<ProcessDescription>;
+  /**
+   * Run a process, and hand back what the server actually did.
+   *
+   * The returned {@link Execution} is a discriminated union: branch on `kind`.
+   * `"immediate"` carries the {@link ResponseEnvelope} **unparsed**, because
+   * the correct parse depends on a media type the core has no opinion about —
+   * a synchronous execution may answer with GeoJSON, a PNG, a zip or GML.
+   * `"job"` carries a {@link JobHandle} with the status URL and how it was
+   * found.
+   *
+   * Which arm you get is decided by the response's own evidence, never by
+   * `options.mode`: a server may return a job for a request that did not ask
+   * for one, and may run something synchronously despite `Prefer:
+   * respond-async`. `requestedMode` survives on both arms so the disagreement
+   * can be recorded rather than smoothed over.
+   *
+   * Pass `description` — the UI almost always has it — and its `execute` link
+   * is used instead of a rebuilt path, and its inputs are checked for arity
+   * mismatches. Those checks **warn and send anyway**; the core does not refuse
+   * a request because it disagrees with a description.
+   */
+  execute(processId: string, options?: ExecuteRequestOptions): Promise<Execution>;
 }
 
 /**
@@ -195,6 +222,21 @@ export function createClient(options: ClientOptions): Client {
       return getProcess(url, processId, {
         ...transport,
         ...getOptions,
+        ...(sink === undefined ? {} : { onObservation: sink }),
+      });
+    },
+    async execute(
+      processId: string,
+      executeOptions: ExecuteRequestOptions = {},
+    ): Promise<Execution> {
+      const sink = executeOptions.onObservation ?? options.onObservation;
+      // Only needed for the constructed-path fallback; a description carrying
+      // an `execute` link makes this discovery free on the second call and
+      // irrelevant on the first.
+      const url = await discoverProcessesUrl(sink, executeOptions.signal);
+      return execute(url, processId, {
+        ...transport,
+        ...executeOptions,
         ...(sink === undefined ? {} : { onObservation: sink }),
       });
     },

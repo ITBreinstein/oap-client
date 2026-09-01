@@ -152,3 +152,75 @@ export class ProcessNotFoundError extends Error {
     this.url = url;
   }
 }
+
+/**
+ * A response neither arm of {@link Execution} could be derived from.
+ *
+ * Two ways to get here, both from a server we do not recognise: a 201/202 with
+ * no `Location` and no usable body link (T7 case 3), or a response whose
+ * evidence points at a job that has no discoverable status URL (T6 case 4).
+ *
+ * The message names everything that was and was not present, because whoever
+ * reads it is looking at an unfamiliar server and a wrong guess here would
+ * produce a job handle pointing nowhere — which fails later, and somewhere
+ * else. Guessing is the one thing this error exists to prevent.
+ */
+export class AmbiguousExecutionResponseError extends Error {
+  override readonly name = "AmbiguousExecutionResponseError";
+  /** Final URL after redirects. */
+  readonly url: string;
+  readonly status: number;
+  /** Whether a `Location` header was readable. False in a browser is finding 0002. */
+  readonly locationPresent: boolean;
+  readonly mediaType: string | undefined;
+  /** Relations found in the response body, so the reader can see what *was* there. */
+  readonly bodyLinkRelations: readonly string[];
+
+  constructor(
+    url: string,
+    status: number,
+    locationPresent: boolean,
+    mediaType: string | undefined,
+    bodyLinkRelations: readonly string[],
+  ) {
+    const rels =
+      bodyLinkRelations.length === 0
+        ? "no body links"
+        : `body links: ${bodyLinkRelations.join(", ")}`;
+    super(
+      `Cannot tell what ${url} did with the execute request: status ${String(status)}, ` +
+        `Location ${locationPresent ? "present" : "absent"}, ` +
+        `media type ${mediaType ?? "undeclared"}, ${rels}. ` +
+        `The response looks like a job was created but carries no way to reach it.`,
+    );
+    this.url = url;
+    this.status = status;
+    this.locationPresent = locationPresent;
+    this.mediaType = mediaType;
+    this.bodyLinkRelations = Object.freeze([...bodyLinkRelations]);
+  }
+}
+
+/**
+ * The per-call execution deadline expired before the server answered.
+ *
+ * Deliberately **not** an {@link AbortError}. "The user cancelled" and "the
+ * server never answered" are different facts about a service, and a matrix that
+ * cannot tell them apart cannot say anything about whether synchronous
+ * execution is viable for real calculations. See T8.
+ */
+export class ExecutionTimeoutError extends Error {
+  override readonly name = "ExecutionTimeoutError";
+  readonly url: string;
+  readonly timeoutMs: number;
+
+  constructor(url: string, timeoutMs: number, options?: { cause?: unknown }) {
+    super(
+      `Execution request to ${url} did not answer within ${String(timeoutMs)} ms. ` +
+        `Raise timeoutMs if the process is genuinely this slow.`,
+      options,
+    );
+    this.url = url;
+    this.timeoutMs = timeoutMs;
+  }
+}

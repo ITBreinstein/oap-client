@@ -48,7 +48,15 @@ export interface Link {
  * error too. The two still cannot drift; only the direction of the check moved.
  */
 export type KnownRelation =
-  "self" | "alternate" | "serviceDesc" | "conformance" | "processes" | "next" | "prev";
+  | "self"
+  | "alternate"
+  | "serviceDesc"
+  | "conformance"
+  | "processes"
+  | "next"
+  | "prev"
+  | "execute"
+  | "monitor";
 
 const REL_ALIASES: Readonly<Record<KnownRelation, readonly string[]>> = {
   self: ["self"],
@@ -61,6 +69,17 @@ const REL_ALIASES: Readonly<Record<KnownRelation, readonly string[]>> = {
   // (`?limit=20` → `next` with `skip=20`; `prev` from the second page on).
   next: ["next"],
   prev: ["prev", "previous"],
+  // Execution. Both reference servers advertise this on the process
+  // description, and both write only the long OGC URI form — never the short
+  // `execute` — which is the mirror image of how they spell `conformance`.
+  // Verified 2026-09-01 against pygeoapi 0.21.0 and ZOO fork 46289f6.
+  execute: ["execute", "http://www.opengis.net/def/rel/ogc/1.0/execute"],
+  // Where a created job reports its status. ZOO writes `rel="monitor"` in the
+  // body of its async 201, and that link is the *only* route to the job from a
+  // cross-origin browser, where `Location` is filtered out — see T7 and
+  // finding 0002. `status` is included because OGC registers it for the same
+  // resource and a server may reasonably pick it.
+  monitor: ["monitor", "status", "http://www.opengis.net/def/rel/ogc/1.0/monitor"],
 };
 
 /**

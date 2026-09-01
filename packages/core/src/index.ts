@@ -9,6 +9,7 @@ export { createClient } from "./client.js";
 export type {
   Client,
   ClientOptions,
+  ExecuteRequestOptions,
   GetProcessRequestOptions,
   InspectRequestOptions,
   ListRequestOptions,
@@ -107,8 +108,43 @@ export type {
   SchemaShapeCensus,
 } from "./processes/index.js";
 
+// Execution: the single POST that runs a process. Returns the *envelope*, not
+// a parsed body — the correct parse depends on a media type the core has no
+// opinion about, and §7.3 gives that decision to `apps/web`'s result adapters.
+// Both arms of `Execution` and the `JobHandle` are exported now, in this task,
+// so the run button and the job panel compile against them before Task 5 gives
+// `JobHandle` its methods.
+export {
+  DEFAULT_EXECUTE_TIMEOUT_MS,
+  buildHeaders,
+  buildPayload,
+  buildRequest,
+  checkArity,
+  classifyExecution,
+  describeInputKind,
+  execute,
+  executionUrlFor,
+  gatherEvidence,
+  isJobDocument,
+  resolveExecutionUrl,
+} from "./execution/index.js";
+export type {
+  ExecuteInputValue,
+  ExecuteOptions,
+  ExecuteOutputSelection,
+  ExecutePayload,
+  ExecuteRequest,
+  ExecuteTransportOptions,
+  Execution,
+  ExecutionEvidence,
+  ExecutionMode,
+  JobHandle,
+} from "./execution/index.js";
+
 // Errors raised above the transport, by the layers that read documents.
 export {
+  AmbiguousExecutionResponseError,
+  ExecutionTimeoutError,
   MalformedDocumentError,
   MalformedProcessDocumentError,
   MissingLinkError,
@@ -119,6 +155,7 @@ export {
 // Observations: what the client saw, redacted at the point of creation.
 export { observe, redactUrl } from "./observations.js";
 export type {
+  ExecutionOutcome,
   Observation,
   ObservationKind,
   ObservationSink,

@@ -29,6 +29,9 @@ export function redactUrl(url: string): string {
   }
 }
 
+/** How one execution ended. `error` covers every non-ok classification. */
+export type ExecutionOutcome = "immediate" | "job" | "error" | "transport-failure";
+
 /** Why a link advertised by a server was dropped rather than followed. */
 export type SkippedLinkReason =
   "not-an-object" | "missing-href" | "missing-rel" | "unresolvable-href";
@@ -146,6 +149,63 @@ export type Observation =
         readonly formatted: number;
         readonly absent: number;
       };
+    }
+  | {
+      /**
+       * One execution, recorded whether it succeeded, was refused, or never
+       * reached a server.
+       *
+       * **Never the input values, and never the response body.** Input values
+       * are user data and may contain anything a form accepted; a result body
+       * may be large, binary, or sensitive. Input *ids* and value *kinds* are
+       * what the failure catalogue actually needs, and they are safe.
+       */
+      readonly kind: "execution";
+      readonly url: string;
+      readonly processId: string;
+      /** Whether the server advertised the execute endpoint, or we rebuilt it. */
+      readonly route: "advertised-link" | "constructed-path";
+      /** What the caller asked for, which the server is free to ignore. */
+      readonly requestedMode: "sync" | "async";
+      readonly requestedResponse: "document" | "raw" | undefined;
+      /**
+       * Whether the caller supplied an `outputs` block. ZOO refuses a body that
+       * carries only `inputs` (finding 0025), so this column is what makes that
+       * correlation visible in the matrix rather than only in a stack trace.
+       */
+      readonly outputsSupplied: boolean;
+      readonly status: number | undefined;
+      readonly mediaType: string | undefined;
+      /**
+       * Wall-clock milliseconds from request to response. A matrix column of
+       * its own: it is the evidence behind any recommendation about whether
+       * synchronous execution is viable for real calculations.
+       */
+      readonly elapsedMs: number;
+      readonly outcome: ExecutionOutcome;
+      /** The arm of `Execution` produced, when one was. */
+      readonly resultKind: "immediate" | "job" | undefined;
+      /** Asked sync and got a job, or the reverse. A finding when true. */
+      readonly disagreedWithRequestedMode: boolean;
+      /** Which route reached the job. Undefined unless one was created. */
+      readonly discoveredVia: "location-header" | "body-link" | undefined;
+      /**
+       * Whether a `Location` header was readable at all. False from a browser
+       * against a server that does not expose it is finding 0002 reproducing
+       * itself, and is the whole reason `discoveredVia` is recorded beside it.
+       */
+      readonly locationPresent: boolean;
+      readonly jobIdKnown: boolean;
+      /** The arity warnings from T3, as messages. Never carries a value. */
+      readonly warnings: readonly string[];
+      /** Input ids, in the order supplied. */
+      readonly inputIds: readonly string[];
+      /** Value kinds parallel to `inputIds`, e.g. `"array of 4 numbers"`. */
+      readonly inputKinds: readonly string[];
+      /** Whether the server explained a refusal in a parseable problem document. */
+      readonly problemPresent: boolean;
+      /** Names only, of job-document members this layer does not model. */
+      readonly unrecognisedKeys: readonly string[];
     };
 
 export type ObservationKind = Observation["kind"];

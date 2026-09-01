@@ -1,0 +1,11 @@
+HTTP/1.1 201 Created
+Date: Tue, 01 Sep 2026 09:10:40 GMT
+Server: Apache/2.4.29 (Ubuntu)
+X-Powered-By: ZOO-Project
+Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self';
+Preference-Applied: respond-async
+Location: http://localhost:5090/ogc-api/jobs/00c727f6-a5e5-11f1-b25a-0a2d8ab6f6a5
+Content-Length: 492
+Content-Type: application/json;charset=UTF-8
+
+{"progress":0,"id":"00c727f6-a5e5-11f1-b25a-0a2d8ab6f6a5","jobID":"00c727f6-a5e5-11f1-b25a-0a2d8ab6f6a5","type":"process","processID":"echo","created":"2026-09-01T09:10:40.497Z","started":"2026-09-01T09:10:40.497Z","updated":"2026-09-01T09:10:40.497Z","status":"running","message":"ZOO-Kernel accepted to run your service!","links":[{"title":"Status location","rel":"monitor","type":"application\/json","href":"http:\/\/localhost:5090\/ogc-api\/jobs\/00c727f6-a5e5-11f1-b25a-0a2d8ab6f6a5"}]}

@@ -1,0 +1,16 @@
+HTTP/1.1 400 BAD REQUEST
+Server: gunicorn
+Date: Tue, 01 Sep 2026 09:10:39 GMT
+Connection: keep-alive
+Content-Type: application/json
+X-Powered-By: pygeoapi 0.21.0
+Content-Language: en-US
+Location: http://localhost:5080/jobs/002de7da-a5e5-11f1-b8a2-ba40680883d4
+Access-Control-Allow-Origin: *
+Content-Length: 150
+
+{
+    "type":"InvalidParameterValue",
+    "code":"InvalidParameterValue",
+    "description":"Error executing process: Cannot process without a name"
+}

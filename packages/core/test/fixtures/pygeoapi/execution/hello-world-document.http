@@ -1,0 +1,19 @@
+HTTP/1.1 200 OK
+Server: gunicorn
+Date: Tue, 01 Sep 2026 09:10:39 GMT
+Connection: keep-alive
+Content-Type: application/json
+X-Powered-By: pygeoapi 0.21.0
+Content-Language: en-US
+Location: http://localhost:5080/jobs/001df014-a5e5-11f1-ac04-ba40680883d4
+Access-Control-Allow-Origin: *
+Content-Length: 108
+
+{
+    "outputs":[
+        {
+            "id":"echo",
+            "value":"Hello plugfest!"
+        }
+    ]
+}

@@ -7,6 +7,14 @@ drift. `.prettierignore` excludes this whole tree — a fixture that has been
 through a pretty-printer can no longer prove what the server sent, and ZOO's
 compact, slash-escaped JSON is itself part of the evidence.
 
+Two file extensions, and the difference matters. A `.json` fixture is a response
+**body**. A `.http` fixture is a whole `curl -i` capture — status line, every
+response header, then the body. Execution fixtures are `.http` because for this
+operation the headers *are* half the evidence: `Location` on a synchronous 200
+is finding 0024, `Preference-Applied` is what proves the async preference was
+honoured rather than guessed, and a `Content-Type` that disagrees with its own
+body is finding 0026. A body-only capture would have lost all three.
+
 A finding that names a fixture has to name a *rebuildable* server, which is why
 the versions are recorded here rather than left to a commit message.
 
@@ -16,6 +24,7 @@ the versions are recorded here rather than left to a commit message.
     captured  landing-page.json, landing-page-browser-accept.html,
               conformance.json                                        2026-08-26
               process-list.json, processes/hello-world.json           2026-08-31
+              execution/*.http                                        2026-09-01
 
 Re-capture by hand against `http://localhost:5080`; there is no script, because
 the set is four files and the server is one pinned image.
@@ -35,6 +44,7 @@ the set is four files and the server is one pinned image.
               process-list-limit20-skip20.json,
               process-list-limit20-skip690.json,
               processes/Gdal_Translate.json                            2026-08-31
+              execution/*.http                                         2026-09-01
 
 Re-capture with `./infra/zoo/capture-fixtures.sh`, and only when the pinned SHA
 in `infra/zoo/pinned.env` changes. Read the diff before committing it.
@@ -75,3 +85,31 @@ capture failure.
 - `Gdal_Translate` — the **only** process of 703 with a live
   `maxOccurs: "unbounded"`, on its `GCP` input.
 - `longProcess` — for async polling, later.
+
+## `*/execution/`
+
+Captured 2026-09-01 against both servers, with `curl -isS -X POST` and
+`Content-Type: application/json`. What each one holds and why it is kept:
+
+    pygeoapi/execution/
+      hello-world-sync.http           200 + Location, body is the result   0024
+      hello-world-document.http       response:"document" → outputs array  0027
+      hello-world-raw.http            response:"raw" → identical to default 0027
+      hello-world-async-201.http      201, Preference-Applied, body `null` 0004
+      hello-world-missing-input.http  400 + Location, non-RFC7807 body     0024, 0001
+      hello-world-reference.http      transmissionMode ignored silently    0028
+
+    zoo-project/execution/
+      echo-inputs-only-400.http       inputs-only body is refused          0025
+      echo-sync.http                  the same body plus `outputs` works   0025
+      echo-raw.http                   raw single output, mislabelled JSON  0026
+      echo-async-201.http             201 + full job document + monitor link
+      echo-missing-input-500.http     rejected input reported as 500       0016
+      echo-bbox.http                  the ogc-bbox input, executed         0023
+      buffer-raw-gml.http             GML under Content-Type: application/json 0026
+
+`hello-world-*.http` carry a fresh job UUID and timestamp per capture, so they
+are read for shape and headers rather than compared byte-for-byte. Re-capture by
+replaying the `curl` in the finding that names the file; there is no script,
+because each one exists to prove a different claim and a script would invite
+re-capturing all of them without reading the diff.

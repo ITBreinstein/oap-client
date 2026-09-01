@@ -1,0 +1,10 @@
+HTTP/1.1 400 Bad request
+Date: Tue, 01 Sep 2026 09:10:39 GMT
+Server: Apache/2.4.29 (Ubuntu)
+X-Powered-By: ZOO-Project
+Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self';
+Connection: close
+Transfer-Encoding: chunked
+Content-Type: application/json;charset=UTF-8
+
+{"title":"InvalidParameterValue","type":"InvalidParameterValue","detail":"ZOO-Kernel cannot parse your POST data: None"}
