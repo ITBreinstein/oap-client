@@ -205,6 +205,33 @@ export function readGeoJson(text: string): GeoJsonReadResult {
 }
 
 /**
+ * The corners of the smallest box containing every feature, as
+ * `[west, south, east, north]`. `undefined` when there is nothing to bound.
+ *
+ * A map that loads a file without moving to it looks like it did nothing: the
+ * shape is there, three pixels wide, somewhere off screen.
+ */
+export function boundsOf(
+  features: readonly Feature[],
+): readonly [number, number, number, number] | undefined {
+  let west = Infinity;
+  let south = Infinity;
+  let east = -Infinity;
+  let north = -Infinity;
+
+  for (const feature of features) {
+    for (const [x = 0, y = 0] of positionsOf(feature.geometry)) {
+      west = Math.min(west, x);
+      south = Math.min(south, y);
+      east = Math.max(east, x);
+      north = Math.max(north, y);
+    }
+  }
+
+  return Number.isFinite(west) ? [west, south, east, north] : undefined;
+}
+
+/**
  * Splits what was read into the types a caller can use and the rest.
  *
  * The counts are for telling the user what happened to the remainder: silently

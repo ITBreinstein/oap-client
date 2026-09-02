@@ -191,7 +191,7 @@ function JsonField({
           setDrawing((previous) => !previous);
         }}
       >
-        {drawing ? "Hide map" : "Draw on a map"}
+        {drawing ? "Hide map" : "Draw or upload geometry"}
       </button>
       {drawing && (
         <PolygonDrawMap

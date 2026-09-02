@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   type GeoJsonAccepted,
+  boundsOf,
   describeLoad,
   partitionByType,
   readGeoJson,
@@ -145,6 +146,25 @@ describe("files that cannot be used", () => {
       crs: { type: "name", properties: { name: "urn:ogc:def:crs:OGC:1.3:CRS84" } },
     });
     expect(accept(text).features).toHaveLength(1);
+  });
+});
+
+describe("bounding what was read", () => {
+  it("spans every feature", () => {
+    const { features } = accept(
+      JSON.stringify({
+        type: "GeometryCollection",
+        geometries: [
+          { type: "Point", coordinates: [4.9, 52.3] },
+          { type: "Polygon", coordinates: SQUARE },
+        ],
+      }),
+    );
+    expect(boundsOf(features)).toEqual([4.9, 52.1, 5.2, 52.3]);
+  });
+
+  it("has nothing to bound when there are no features", () => {
+    expect(boundsOf([])).toBeUndefined();
   });
 });
 

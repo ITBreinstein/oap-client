@@ -2,6 +2,7 @@ import type { Feature, FeatureCollection, Polygon } from "geojson";
 import { Map as MapLibreMap, setWorkerUrl } from "maplibre-gl";
 import maplibreWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url";
 import {
+  type GeoJSONStoreFeatures,
   TerraDraw,
   TerraDrawPolygonMode,
   TerraDrawSelectMode,
@@ -9,6 +10,7 @@ import {
 } from "terra-draw";
 import { TerraDrawMapLibreGLAdapter } from "terra-draw-maplibre-gl-adapter";
 import { INITIAL_VIEW, OSM_STYLE } from "./basemap.js";
+import { boundsOf } from "./geojson.js";
 import "maplibre-gl/dist/maplibre-gl.css";
 
 /**
@@ -49,7 +51,22 @@ export interface PolygonDrawOptions {
   readonly onStateChange?: ((state: DrawState) => void) | undefined;
 }
 
+/** What became of features handed to {@link PolygonDraw.setFeatures}. */
+export interface LoadReport {
+  readonly added: number;
+  /** One reason per feature Terra Draw refused, in its own words. */
+  readonly rejected: readonly string[];
+}
+
 export interface PolygonDraw {
+  /**
+   * Replaces everything drawn with `features`, and moves the view to them.
+   *
+   * Replaces rather than appends: it is the predictable half of the choice, and
+   * undo covers the regret. Anything Terra Draw will not accept comes back in
+   * the report rather than disappearing.
+   */
+  setFeatures(features: readonly Feature[]): LoadReport;
   /**
    * Starts placing one new shape. Editing resumes by itself once the ring
    * closes — drawing is finite, so it is an action rather than a mode you have
@@ -205,6 +222,39 @@ export function createPolygonDraw({
   });
 
   return {
+    setFeatures(features: readonly Feature[]): LoadReport {
+      if (!started) return { added: 0, rejected: ["The map has not finished loading."] };
+
+      draw.clear();
+      // Terra Draw stores the mode that owns each feature alongside it, so an
+      // imported shape has to declare which mode will be editing it.
+      const results = draw.addFeatures(
+        features.map((feature) => ({
+          ...feature,
+          properties: { mode: "polygon" },
+        })) as GeoJSONStoreFeatures[],
+      );
+
+      const rejected = results
+        .filter((result) => !result.valid)
+        .map((result) => result.reason ?? "Terra Draw rejected the shape without saying why.");
+
+      const bounds = boundsOf(features);
+      if (bounds) {
+        const [west, south, east, north] = bounds;
+        // maxZoom stops a single point filling the screen at street level.
+        map.fitBounds(
+          [
+            [west, south],
+            [east, north],
+          ],
+          { padding: 40, maxZoom: 16, animate: false },
+        );
+      }
+
+      emit();
+      return { added: results.length - rejected.length, rejected };
+    },
     addPolygon(): void {
       if (!started) return;
       placing = true;
