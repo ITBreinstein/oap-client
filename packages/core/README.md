@@ -1,18 +1,40 @@
 # @breinstein/oap-client
 
-A runtime-neutral [OGC API - Processes](https://ogcapi.ogc.org/processes/) client:
-discovery, conformance, process listing, execution, job polling and results.
+A runtime-neutral [OGC API - Processes](https://ogcapi.ogc.org/processes/) client.
+
+**Shipped:** service discovery, conformance and capabilities, process listing
+and descriptions, and synchronous execution.
+
+**Not yet shipped:** job polling, status and dismissal, execution callbacks, and
+result-retrieval helpers. `execute()` already returns a `job` handle when a
+server creates one, so the shape those operations will attach to is fixed — but
+they are not in this release, and polling a `statusUrl` is currently yours to do.
 
 ```bash
 pnpm add @breinstein/oap-client
 ```
 
 ```ts
-import { createClient, requireOk } from "@breinstein/oap-client";
+import { createClient } from "@breinstein/oap-client";
 
 const client = createClient({ baseUrl: "https://example.org/ogc" });
-const response = await requireOk(await client.send("processes"));
-const processes = await response.json();
+
+const { processes } = await client.listProcesses();
+const summary = processes.find((p) => p.id === "hello-world");
+if (summary === undefined) throw new Error("no such process on this service");
+
+const description = await client.getProcess(summary.id, { summary });
+
+const execution = await client.execute(description.id, {
+  inputs: { name: "world" },
+  description,
+});
+
+if (execution.kind === "immediate") {
+  console.log(execution.response.mediaType, await execution.response.json());
+} else {
+  console.log("server made a job:", execution.job.statusUrl);
+}
 ```
 
 ## The HTTP boundary
@@ -316,6 +338,146 @@ inputs use an inline `type`, an `enum`, a `$ref`, a composition keyword, a
 descriptions or values. It is the form-generation failure catalogue assembling
 itself from real traffic instead of being reconstructed by hand later.
 
+## Execution: `execute()`
+
+```ts
+const execution = await client.execute("hello-world", {
+  inputs: { name: "world" },
+  description: process, // optional: enables arity warnings and link-first routing
+  mode: "sync", // the default; "async" sends Prefer: respond-async
+  timeoutMs: 120_000, // the default; a sync calculation is still a calculation
+});
+
+if (execution.kind === "immediate") {
+  execution.response.mediaType; // "application/json"
+  execution.response.filename; // from Content-Disposition, when the server sent one
+  const body = await execution.response.json();
+} else {
+  execution.job.statusUrl; // absolute, resolved against the response URL
+  execution.job.jobId; // when the server named it
+  execution.job.discoveredVia; // "location-header" | "body-link"
+  execution.requestedMode; // "sync" — the server made a job anyway
+}
+```
+
+`Execution` is a discriminated union, so `kind` narrows: inside the `immediate`
+branch `response` is available and `job` is a compile error. Adding a third arm
+later makes an incomplete `switch` fail to compile rather than fall through.
+
+`requestedMode` is on **both** arms deliberately. It is what you asked for, while
+`kind` is what happened, and when they disagree that is worth recording rather
+than smoothing away.
+
+### The result is an envelope, not a parsed body
+
+A synchronous execution can answer with GeoJSON, a PNG, a zip, plain text, GML,
+or a JSON document wrapping several of those. The correct parse depends on a
+media type this package has no opinion about, so `execute()` returns the
+`ResponseEnvelope` and leaves interpretation to the layer above. Everything a
+renderer needs is already on it: `Content-Type`, the `Content-Disposition`
+filename, `Content-Crs`, and a body readable more than once.
+
+The only place the body is inspected is classification, and that read is gated on
+the media type **and** wrapped in a `try` — because a server that returns XML
+under `Content-Type: application/json` exists, and a client that trusts the label
+throws on it. ZOO-Project's raw mode does exactly this.
+
+### What happened is decided by the response, not by what you asked
+
+The tempting implementation is `if (mode === "async") { …job… }`. It is wrong,
+because the server decides: a server may create a job for a request that did not
+ask for one, and may run something synchronously despite `Prefer: respond-async`,
+since `Prefer` is a preference and not a command.
+
+So classification reads the response:
+
+1. status **201 or 202** → a job;
+2. any other success whose JSON body is a job document — a `status` in the OGC
+   job vocabulary, usually with `jobID` → a job;
+3. otherwise → an immediate result.
+
+A `Location` header is deliberately **not** step 1. pygeoapi 0.21 sends
+`Location` on _every_ synchronous execution — and on its 400s — while the body
+carries the finished result and the job it names is already `successful`.
+Treating the header as the discriminator returns a job handle for every
+synchronous run against that server, discards the answer the client is already
+holding, and renders a status document where the result belongs. `Location` is
+therefore a _route to_ a job already concluded to exist, not evidence that one
+does.
+
+### `Content-Type: application/json` on every request
+
+Not merely because the specification says so. `fetch(url, { method: "POST", body:
+someString })` sets `text/plain;charset=UTF-8` by itself, and one of the two
+reference servers answers that with signal 11, SIGSEGV — a crash, not a 415. The
+header is set explicitly on every execute request, and pinned by a unit test
+rather than a live one, because the live version of that check takes down the
+server it is run against.
+
+`Accept` is an explicit `*/*`, which is not the same as omitting it: a browser
+given no `Accept` supplies its own ranked list with `text/html` first and gets
+back a web page. The wildcard overrides that without constraining what the server
+may return.
+
+### `outputs` and `response` are sent only when you supply them
+
+Neither is synthesised from the process description. Choosing what a process
+should emit is a presentation decision, and a helpfully-generated block asking
+for `transmissionMode: "reference"` against a server declaring
+`outputTransmission: ["value"]` is a self-inflicted failure.
+
+One consequence worth knowing before you meet it: ZOO-Project rejects a body
+carrying only `inputs`, with `400 InvalidParameterValue` and the text
+`"cannot parse your POST data"`. Any `outputs` member — even `{}` — makes the
+same request succeed. That is a defect in that server, and this package does not
+paper over it with a per-server workaround, so **pass `outputs` explicitly if you
+need to run against ZOO.**
+
+### Arity is checked and never enforced
+
+Pass `description` and each supplied input is compared against the cardinality
+the server published — an array where `maxOccurs` is 1, a bare value where it is
+greater, a missing required input, an input the description does not declare.
+Each mismatch becomes a warning on the observation, and **the request is sent
+anyway**.
+
+Warning rather than blocking is the point. Neither reference server validates the
+cardinality it publishes — one leaks a Python traceback, the other stringifies
+the array into the result — and a client that refused to send could never have
+established that. A missing required input may also just be a server default
+about to apply.
+
+### Two routes to a job, because one of them vanishes in a browser
+
+`Location` is not a CORS-safelisted response header, so a cross-origin browser
+request cannot read it unless the server also sends
+`Access-Control-Expose-Headers: Location`. Neither reference server does. In Node
+the header route works perfectly; in a browser, against the same server, it is
+silently absent.
+
+So a job is located by `Location` first, then by a `monitor` or `self` link in the
+response body, and `discoveredVia` records which route was taken. If neither
+exists, `AmbiguousExecutionResponseError` names the status, whether `Location` was
+present, the media type and every body relation found — because a guess here
+produces a job handle pointing nowhere, which fails later and somewhere else.
+
+### Timeouts and aborts stay separable
+
+`timeoutMs` and your `signal` can both cancel the request, and the resulting
+error says which fired: `ExecutionTimeoutError` for the deadline, `AbortError`
+for you. "The user cancelled" and "the server never answered" are different facts
+about a service. Elapsed milliseconds are recorded on every execution, including
+failures.
+
+### Errors are outcomes
+
+A refusal throws `ProcessesError` carrying whatever problem document the server
+provided. No input-validation error is invented, because the status cannot tell
+you whose fault it was: ZOO answers a rejected input with **500**, and an unknown
+path with **400** rather than 404. Nothing here special-cases a status code, and
+nothing retries — a failed execution is information, and retrying a
+non-idempotent POST is how you get two jobs.
+
 ## Supported environments
 
 - **ESM only.** No CommonJS build is published. There is no `main` field — a CJS
@@ -353,4 +515,4 @@ The last three run against a packed tarball installed into a throwaway directory
 outside the repo, not against the workspace source. Run them with
 `pnpm test:smoke` from the repo root.
 
-Part of the [oap-client](https://github.com/breinstein/breinstein-oap-client) monorepo. MIT.
+Part of the [oap-client](https://github.com/ITBreinstein/oap-client) monorepo. MIT.

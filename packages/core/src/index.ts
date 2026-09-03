@@ -163,4 +163,4 @@ export type {
 } from "./observations.js";
 
 /** Package version, mirrored from package.json for observation records. */
-export const VERSION: string = "0.1.0";
+export const VERSION: string = "0.2.0";
