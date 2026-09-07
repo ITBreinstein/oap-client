@@ -1,5 +1,5 @@
 import { type ReactElement, useState } from "react";
-import { PolygonDrawMap } from "../map/PolygonDrawMap.js";
+import { GeometryMap } from "../map/GeometryMap.js";
 
 /**
  * The parts of an OGC API - Processes input description this form reads.
@@ -194,7 +194,11 @@ function JsonField({
         {drawing ? "Hide map" : "Draw or upload geometry"}
       </button>
       {drawing && (
-        <PolygonDrawMap
+        <GeometryMap
+          // Every tool, for now: nothing in a `oneOf` says which geometry an
+          // input wants, so offering all of them beats guessing. Form
+          // generation will narrow this per input once it can read that.
+          tools={["Polygon", "BoundingBox", "LineString", "Point"]}
           onChange={(features) => {
             write(JSON.stringify(features, null, 2));
           }}

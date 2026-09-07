@@ -1,13 +1,37 @@
 import type { FeatureCollection } from "geojson";
 import { type ReactElement, useEffect, useRef, useState } from "react";
-import { type DrawState, type PolygonDraw, createPolygonDraw } from "./draw-polygon.js";
+import {
+  type DrawState,
+  type GeometryDraw,
+  type Tool,
+  createGeometryDraw,
+  geometryTypeOf,
+} from "./draw-geometry.js";
 import { MAX_FILE_BYTES, describeLoad, partitionByType, readGeoJson } from "./geojson.js";
 
-/** The only geometry this map can draw or hold, until a schema says otherwise. */
-const ACCEPTED = ["Polygon"] as const;
+/** Toolbar wording, in the user's terms rather than GeoJSON's. */
+const TOOL_LABELS: Record<Tool, string> = {
+  Point: "Add point",
+  LineString: "Add line",
+  Polygon: "Add area",
+  BoundingBox: "Add box",
+};
 
-export interface PolygonDrawMapProps {
+const TOOL_HINTS: Record<Tool, string> = {
+  Point: "Click to place the point.",
+  LineString: "Click to place each point along the line; double-click to finish.",
+  Polygon:
+    "Click to place each corner. Click the first corner again, or double-click, to close the shape.",
+  BoundingBox: "Drag to pull out a rectangle.",
+};
+
+export interface GeometryMapProps {
   readonly onChange: (features: FeatureCollection) => void;
+  /**
+   * Which tools to offer. Also decides what an uploaded file may contribute:
+   * a map offering only areas has no use for the points in a file.
+   */
+  readonly tools?: readonly Tool[];
   /** CSS height for the map. A map with no height renders nothing at all. */
   readonly height?: string;
 }
@@ -19,11 +43,23 @@ export interface PolygonDrawMapProps {
  * because `onChange` changed identity, which would throw away whatever the user
  * had drawn. The callback is therefore read through a ref rather than captured.
  */
-export function PolygonDrawMap({ onChange, height = "320px" }: PolygonDrawMapProps): ReactElement {
+export function GeometryMap({
+  onChange,
+  tools = ["Polygon"],
+  height = "320px",
+}: GeometryMapProps): ReactElement {
   const container = useRef<HTMLDivElement>(null);
-  const drawing = useRef<PolygonDraw | undefined>(undefined);
+  const drawing = useRef<GeometryDraw | undefined>(undefined);
   const latestOnChange = useRef(onChange);
-  const [state, setState] = useState<DrawState>({ placing: false, hasSelection: false });
+  const [state, setState] = useState<DrawState>({ placing: undefined, hasSelection: false });
+  // The tool list is read once, when the map is built: it decides which Terra
+  // Draw modes get registered. Keying the effect on its contents rather than
+  // its identity means a caller passing a fresh array literal every render
+  // does not tear the map down, while a genuinely different set does.
+  const toolsKey = tools.join(",");
+  const toolsRef = useRef(tools);
+  // What an uploaded file may contribute, derived from the tools on offer.
+  const accepted = [...new Set(tools.map(geometryTypeOf))];
   const [notice, setNotice] = useState<string | undefined>(undefined);
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -49,9 +85,9 @@ export function PolygonDrawMap({ onChange, height = "320px" }: PolygonDrawMapPro
           return;
         }
 
-        const { usable, ignored } = partitionByType(read.features, ACCEPTED);
+        const { usable, ignored } = partitionByType(read.features, accepted);
         if (usable.length === 0) {
-          setNotice(`${file.name} contains no polygons, which is all this input can take.`);
+          setNotice(`${file.name} has nothing this input can take (${accepted.join(", ")}).`);
           return;
         }
 
@@ -68,14 +104,16 @@ export function PolygonDrawMap({ onChange, height = "320px" }: PolygonDrawMapPro
 
   useEffect(() => {
     latestOnChange.current = onChange;
-  }, [onChange]);
+    toolsRef.current = tools;
+  }, [onChange, tools]);
 
   useEffect(() => {
     const element = container.current;
     if (element === null) return;
 
-    const created = createPolygonDraw({
+    const created = createGeometryDraw({
       container: element,
+      tools: toolsRef.current,
       onChange: (features) => {
         latestOnChange.current(features);
       },
@@ -87,20 +125,26 @@ export function PolygonDrawMap({ onChange, height = "320px" }: PolygonDrawMapPro
       created.destroy();
       drawing.current = undefined;
     };
-  }, []);
+  }, [toolsKey]);
 
   return (
     <div>
       <p>
-        <button
-          type="button"
-          disabled={state.placing}
-          onClick={() => {
-            drawing.current?.addPolygon();
-          }}
-        >
-          {state.placing ? "Placing…" : "Add polygon"}
-        </button>{" "}
+        {tools.map((tool) => (
+          <span key={tool}>
+            <button
+              type="button"
+              // Disabled across the board while placing: switching tool
+              // mid-shape would abandon it without saying so.
+              disabled={state.placing !== undefined}
+              onClick={() => {
+                drawing.current?.add(tool);
+              }}
+            >
+              {state.placing === tool ? "Placing…" : TOOL_LABELS[tool]}
+            </button>{" "}
+          </span>
+        ))}
         <button
           type="button"
           onClick={() => {
@@ -177,9 +221,9 @@ export function PolygonDrawMap({ onChange, height = "320px" }: PolygonDrawMapPro
       />
       {notice !== undefined && <p data-testid="map-notice">{notice}</p>}
       <p>
-        {state.placing
-          ? "Click to place each corner. Click the first corner again, or double-click, to close the shape — editing resumes by itself."
-          : "Click a shape to select it, then: drag a corner to move it, click or drag a midpoint to add one, right-click a corner to remove it. Escape deselects. A triangle keeps all three corners — a polygon cannot have fewer."}
+        {state.placing !== undefined
+          ? `${TOOL_HINTS[state.placing]} Editing resumes by itself.`
+          : "Click a shape to select it, then drag it or its points to move them. On a line or area: click or drag a midpoint to add a point, right-click a point to remove it. Escape deselects."}
       </p>
     </div>
   );
