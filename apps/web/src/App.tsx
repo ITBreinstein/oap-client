@@ -1,6 +1,11 @@
-import { VERSION, fetchJson } from "@breinstein/oap-client";
+import {
+  type ProcessDescription,
+  VERSION,
+  fetchJson,
+  parseDescription,
+} from "@breinstein/oap-client";
 import { type ReactElement, useCallback, useEffect, useState } from "react";
-import { type InputDescription, ProcessInputs, defaultValues } from "./inputs/ProcessInputs.js";
+import { ProcessInputs, defaultValues } from "./inputs/ProcessInputs.js";
 
 /**
  * A process description URL to start from. Editable on the page: this is a
@@ -37,25 +42,6 @@ function suggestions(): readonly { readonly url: string; readonly label: string 
   ];
 }
 
-interface ProcessDescription {
-  readonly id?: string;
-  readonly title?: string;
-  readonly description?: string;
-  readonly inputs?: Readonly<Record<string, InputDescription>>;
-}
-
-/**
- * The body arrives as `unknown` on purpose — the core parses JSON but does not
- * vouch for its shape. A server can return valid JSON that is not a process
- * description at all, so check before trusting it.
- */
-function asProcessDescription(body: unknown): ProcessDescription | undefined {
-  // Every field is optional, so any object satisfies the type. The check that
-  // earns its keep is the one above: a string or a number is not a description.
-  if (typeof body !== "object" || body === null) return undefined;
-  return body;
-}
-
 export function App(): ReactElement {
   const [url, setUrl] = useState(DEFAULT_URL);
   // `attempt` rather than the URL alone: pressing Load with the same URL still
@@ -73,15 +59,19 @@ export function App(): ReactElement {
 
     fetchJson(request.url, { signal: controller.signal })
       .then((document) => {
-        const described = asProcessDescription(document.body);
-        if (described === undefined) {
-          setError("That URL returned JSON, but not a process description.");
-          return;
-        }
+        // The core parses JSON but vouches for nothing inside it, so the shape
+        // check belongs here. `parseDescription` throws when the document is
+        // not a process description at all — no `id`, or not an object — and
+        // degrades everything survivable into warnings instead.
+        const { process: described } = parseDescription(document.body, {
+          // The URL the document was *served* from, so its links resolve
+          // against the right base after a redirect or an `?f=json` retry.
+          documentUrl: document.envelope.url,
+        });
         setProcess(described);
         // Seed the schema defaults the controls are about to display, so the
         // form holds what it shows.
-        setValues(described.inputs ? defaultValues(described.inputs) : {});
+        setValues(defaultValues(described.inputs));
       })
       .catch((cause: unknown) => {
         if (controller.signal.aborted) return;
@@ -166,10 +156,11 @@ export function App(): ReactElement {
 
       {process && (
         <section>
-          <h2>{process.title ?? process.id ?? "Process"}</h2>
+          {/* `id` is guaranteed: a document without one never parses. */}
+          <h2>{process.title ?? process.id}</h2>
           {process.description !== undefined && <p>{process.description}</p>}
 
-          {process.inputs ? (
+          {process.inputs.length > 0 ? (
             <ProcessInputs inputs={process.inputs} values={values} onChange={handleChange} />
           ) : (
             <p>This process description declares no inputs.</p>

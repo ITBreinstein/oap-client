@@ -1,35 +1,16 @@
+import type { InputDescription, JsonSchema } from "@breinstein/oap-client";
 import { type ReactElement, useState } from "react";
 import { GeometryMap } from "../map/GeometryMap.js";
 
-/**
- * The parts of an OGC API - Processes input description this form reads.
- * Everything is optional: servers leave out what they like, and the form has to
- * stay useful when they do.
- */
-export interface InputSchema {
-  readonly type?: string;
-  readonly minimum?: number;
-  readonly maximum?: number;
-  readonly default?: unknown;
-  readonly enum?: readonly unknown[];
-}
-
-export interface InputDescription {
-  readonly title?: string;
-  readonly description?: string;
-  readonly minOccurs?: number;
-  readonly schema?: InputSchema;
-}
-
 interface ProcessInputsProps {
-  readonly inputs: Readonly<Record<string, InputDescription>>;
+  /**
+   * An array, not an object keyed by id, because that is what the core hands
+   * over — and because JavaScript orders integer-like keys first, so an input
+   * called `1` would jump above the rest of a server's declared order.
+   */
+  readonly inputs: readonly InputDescription[];
   readonly values: Readonly<Record<string, unknown>>;
   readonly onChange: (id: string, value: unknown) => void;
-}
-
-/** `minOccurs` defaults to 1, so an absent one means required. */
-function isRequired(input: InputDescription): boolean {
-  return (input.minOccurs ?? 1) > 0;
 }
 
 /**
@@ -40,14 +21,30 @@ function isRequired(input: InputDescription): boolean {
  * entirely — the server would then apply its own default, which is not
  * necessarily the one on screen.
  */
-export function defaultValues(
-  inputs: Readonly<Record<string, InputDescription>>,
-): Record<string, unknown> {
+export function defaultValues(inputs: readonly InputDescription[]): Record<string, unknown> {
   const values: Record<string, unknown> = {};
-  for (const [id, input] of Object.entries(inputs)) {
-    if (input.schema?.default !== undefined) values[id] = input.schema.default;
+  for (const input of inputs) {
+    const fallback = input.schema["default"];
+    if (fallback !== undefined) values[input.id] = fallback;
   }
   return values;
+}
+
+/**
+ * A schema arrives with every member typed `unknown` — the core passes it
+ * through exactly as the server wrote it and vouches for nothing inside. So
+ * each key this form reads is narrowed here, once, and a member of the wrong
+ * type is treated as absent rather than trusted into a control.
+ */
+function schemaType(schema: JsonSchema): string | undefined {
+  const type = schema["type"];
+  return typeof type === "string" ? type : undefined;
+}
+
+/** The options of an enum, when there is a non-empty list of them. */
+function schemaEnum(schema: JsonSchema): readonly unknown[] | undefined {
+  const options = schema["enum"];
+  return Array.isArray(options) && options.length > 0 ? options : undefined;
 }
 
 /**
@@ -219,14 +216,16 @@ function Field({
   value: unknown;
   onChange: (value: unknown) => void;
 }): ReactElement {
-  const schema = input.schema ?? {};
-  // Deliberately no fall back to `schema.default`: the container seeds those
-  // with `defaultValues` when a process loads, and falling back here as well
-  // would refill a box the moment the user emptied it, making an optional
+  const schema = input.schema;
+  const options = schemaEnum(schema);
+  const type = schemaType(schema);
+  // Deliberately no fall back to the schema's `default`: the container seeds
+  // those with `defaultValues` when a process loads, and falling back here as
+  // well would refill a box the moment the user emptied it, making an optional
   // input impossible to leave out.
   const current = value ?? "";
 
-  if (schema.enum) {
+  if (options) {
     return (
       <select
         id={id}
@@ -235,7 +234,7 @@ function Field({
           onChange(event.target.value);
         }}
       >
-        {schema.enum.map((option) => (
+        {options.map((option) => (
           <option key={asText(option)} value={asText(option)}>
             {asText(option)}
           </option>
@@ -244,16 +243,16 @@ function Field({
     );
   }
 
-  if (schema.type === "number" || schema.type === "integer") {
+  if (type === "number" || type === "integer") {
     return (
       // `value`, not `current`: the field compares what it is given against
       // what it last emitted, and `current` has already turned an absent value
       // into "" — which would read as an outside change and wipe the text.
-      <NumberField id={id} integer={schema.type === "integer"} value={value} onChange={onChange} />
+      <NumberField id={id} integer={type === "integer"} value={value} onChange={onChange} />
     );
   }
 
-  if (schema.type === "boolean") {
+  if (type === "boolean") {
     return (
       <input
         id={id}
@@ -266,7 +265,7 @@ function Field({
     );
   }
 
-  if (schema.type === "string") {
+  if (type === "string") {
     return (
       <input
         id={id}
@@ -288,19 +287,19 @@ function Field({
 export function ProcessInputs({ inputs, values, onChange }: ProcessInputsProps): ReactElement {
   return (
     <div>
-      {Object.entries(inputs).map(([id, input]) => (
-        <p key={id}>
-          <label htmlFor={id}>
-            {input.title ?? id}
-            {isRequired(input) ? " *" : ""}
+      {inputs.map((input) => (
+        <p key={input.id}>
+          <label htmlFor={input.id}>
+            {input.title ?? input.id}
+            {input.required ? " *" : ""}
           </label>
           {input.description ? <span>{input.description}</span> : null}
           <Field
-            id={id}
+            id={input.id}
             input={input}
-            value={values[id]}
+            value={values[input.id]}
             onChange={(value) => {
-              onChange(id, value);
+              onChange(input.id, value);
             }}
           />
         </p>

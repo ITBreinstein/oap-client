@@ -85,7 +85,7 @@ describe("against descriptions captured from ZOO-Project", () => {
     const process = readCapturedProcess(name);
     const host = render(name);
 
-    const ids = Object.keys(process.inputs);
+    const ids = process.inputs.map((input) => input.id);
     expect(ids.length).toBeGreaterThan(0);
 
     for (const id of ids) {

@@ -3,7 +3,7 @@ import CentroidJson from "../../../packages/core/test/fixtures/zoo-project/proce
 import Ogr2OgrJson from "../../../packages/core/test/fixtures/zoo-project/processes/Ogr2Ogr.json?raw";
 import echoJson from "../../../packages/core/test/fixtures/zoo-project/processes/echo.json?raw";
 import longProcessJson from "../../../packages/core/test/fixtures/zoo-project/processes/longProcess.json?raw";
-import type { InputDescription } from "../src/inputs/ProcessInputs.js";
+import { type ProcessDescription, parseDescription } from "@breinstein/oap-client";
 
 /**
  * Process descriptions captured from a live ZOO-Project, borrowed from the
@@ -27,18 +27,23 @@ const captured = {
   longProcess: longProcessJson,
 } as const;
 
-/** Only the part of a process description this interface reads so far. */
-export interface CapturedProcess {
-  readonly id: string;
-  readonly title?: string;
-  readonly inputs: Readonly<Record<string, InputDescription>>;
-}
-
 export type CapturedProcessName = keyof typeof captured;
 
 /** Every process in the captured set, by the fixture's own file name. */
 export const capturedProcessNames = Object.keys(captured) as readonly CapturedProcessName[];
 
-export function readCapturedProcess(name: CapturedProcessName): CapturedProcess {
-  return JSON.parse(captured[name]) as CapturedProcess;
+/**
+ * Parsed by the core, exactly as `App` parses a live one.
+ *
+ * The alternative — casting the raw JSON to a hand-written interface — would
+ * let these tests pass against a shape the running app never sees, which is
+ * the one thing a fixture-driven test must not do.
+ *
+ * The URL these were captured from, so the parse resolves links against a
+ * plausible base. Nothing is fetched.
+ */
+export function readCapturedProcess(name: CapturedProcessName): ProcessDescription {
+  return parseDescription(JSON.parse(captured[name]), {
+    documentUrl: `http://localhost/ogc-api/processes/${name}`,
+  }).process;
 }
