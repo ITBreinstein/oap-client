@@ -6,3 +6,8 @@ docs/architecture.svg
 # destroy the evidence: the point is that they are byte-for-byte what the
 # server sent, so a diff after re-capturing means the server changed.
 packages/core/test/fixtures/
+
+# Execute requests copied from the scenario repository, same reasoning: a diff
+# here should mean the capture changed, not that a formatter ran. The JSON only;
+# the README beside them is ours. See that README for provenance.
+apps/web/test/fixtures/forms/**/*.json

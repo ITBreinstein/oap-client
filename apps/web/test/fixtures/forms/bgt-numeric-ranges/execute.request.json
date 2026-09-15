@@ -1,0 +1,17 @@
+{
+  "method": "POST",
+  "url": "{{baseUrl}}/processes/bgt-land-cover-summary/execution?f=json",
+  "headers": {
+    "Accept": "application/json",
+    "Content-Type": "application/json"
+  },
+  "body": {
+    "response": "document",
+    "inputs": {
+      "latitude": 52.6324,
+      "longitude": 4.7534,
+      "inner_radius_m": 300,
+      "outer_radius_m": 500
+    }
+  }
+}

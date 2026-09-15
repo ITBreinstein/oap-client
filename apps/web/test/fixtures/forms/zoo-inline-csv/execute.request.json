@@ -1,0 +1,38 @@
+{
+  "method": "POST",
+  "url": "{{baseUrl}}/processes/SAGA.table_tools.3/execution",
+  "headers": {
+    "Accept": "application/json",
+    "Content-Type": "application/json"
+  },
+  "body": {
+    "inputs": {
+      "TABLE_A": {
+        "value": "id,name,elevation_m\n1,Waagplein,2.1\n2,Victoriepark,3.4\n3,Alkmaarderhout,1.8\n",
+        "format": {
+          "mediaType": "text/csv",
+          "encoding": "utf-8"
+        }
+      },
+      "TABLE_B": {
+        "value": "id,category\n1,centre\n2,park\n3,woodland\n",
+        "format": {
+          "mediaType": "text/csv",
+          "encoding": "utf-8"
+        }
+      },
+      "FIELDS_ALL": true,
+      "KEEP_ALL": true,
+      "CMP_CASE": true
+    },
+    "outputs": {
+      "RESULT": {
+        "format": {
+          "mediaType": "text/csv"
+        },
+        "transmissionMode": "value"
+      }
+    },
+    "response": "document"
+  }
+}

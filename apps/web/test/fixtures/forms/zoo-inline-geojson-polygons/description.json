@@ -1,0 +1,485 @@
+{
+  "status": 200,
+  "headers": {
+    "Date": "Fri, 28 Aug 2026 13:37:09 GMT",
+    "Server": "Apache/2.4.29 (Ubuntu)",
+    "X-Powered-By": "ZOO-Project",
+    "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self';",
+    "Link": "<https://www.opengis.net/dev/profile/OGC/0/ogc-process-description>; rel=\"profile\"",
+    "Content-Length": "5839",
+    "Connection": "close",
+    "Content-Type": "application/json;charset=UTF-8"
+  },
+  "final_url": "{{baseUrl}}/processes/SAGA.shapes_polygons.5",
+  "body": {
+    "id": "SAGA.shapes_polygons.5",
+    "title": "Polygon Dissolve",
+    "description": "Merges polygons, which share the same attribute value, and (optionally) dissolves borders between adjacent polygon parts. If no attribute or combination of attributes is chosen, all polygons will be merged. Uses the free and open source software library &lt;b&gt;Clipper&lt;/b&gt; created by Angus Johnson.",
+    "mutable": false,
+    "version": "1.0.0",
+    "jobControlOptions": [
+      "sync-execute",
+      "async-execute",
+      "dismiss"
+    ],
+    "outputTransmission": [
+      "value",
+      "reference"
+    ],
+    "links": [
+      {
+        "rel": "http://www.opengis.net/def/rel/ogc/1.0/execute",
+        "type": "application/json",
+        "title": "Execute End Point",
+        "href": "{{baseUrl}}/processes/SAGA.shapes_polygons.5/execution"
+      },
+      {
+        "rel": "alternate",
+        "type": "text/html",
+        "title": "Execute End Point",
+        "href": "{{baseUrl}}/processes/SAGA.shapes_polygons.5/execution.html"
+      }
+    ],
+    "inputs": {
+      "POLYGONS": {
+        "title": "Polygons",
+        "description": "Polygons",
+        "extended-schema": {
+          "oneOf": [
+            {
+              "allOf": [
+                {
+                  "$ref": "http://zoo-project.org/dl/link.json"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "enum": [
+                        "text/xml",
+                        "application/vnd.google-earth.kml+xml",
+                        "application/json"
+                      ]
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "type": "object",
+              "required": [
+                "value"
+              ],
+              "properties": {
+                "value": {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "contentEncoding": "utf-8",
+                      "contentMediaType": "text/xml"
+                    },
+                    {
+                      "type": "string",
+                      "contentEncoding": "base64",
+                      "contentMediaType": "application/vnd.google-earth.kml+xml"
+                    },
+                    {
+                      "type": "object"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "schema": {
+          "oneOf": [
+            {
+              "type": "string",
+              "contentEncoding": "utf-8",
+              "contentMediaType": "text/xml"
+            },
+            {
+              "type": "string",
+              "contentEncoding": "base64",
+              "contentMediaType": "application/vnd.google-earth.kml+xml"
+            },
+            {
+              "type": "object"
+            }
+          ]
+        },
+        "raw_schema1": "true"
+      },
+      "FIELDS": {
+        "title": "Dissolve Field(s)",
+        "description": "Dissolve Field(s)",
+        "minOccurs": 0,
+        "extended-schema": {
+          "oneOf": [
+            {
+              "allOf": [
+                {
+                  "$ref": "http://zoo-project.org/dl/link.json"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "enum": [
+                        "text/csv",
+                        "text/csv"
+                      ]
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "type": "object",
+              "required": [
+                "value"
+              ],
+              "properties": {
+                "value": {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "contentEncoding": "utf-8",
+                      "contentMediaType": "text/csv"
+                    },
+                    {
+                      "type": "string",
+                      "contentEncoding": "base64",
+                      "contentMediaType": "text/csv"
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "nullable": true
+        },
+        "schema": {
+          "oneOf": [
+            {
+              "type": "string",
+              "contentEncoding": "utf-8",
+              "contentMediaType": "text/csv"
+            },
+            {
+              "type": "string",
+              "contentEncoding": "base64",
+              "contentMediaType": "text/csv"
+            }
+          ]
+        },
+        "raw_schema1": "true"
+      },
+      "STATISTICS": {
+        "title": "Statistics Field(s)",
+        "description": "Statistics Field(s)",
+        "minOccurs": 0,
+        "extended-schema": {
+          "oneOf": [
+            {
+              "allOf": [
+                {
+                  "$ref": "http://zoo-project.org/dl/link.json"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "enum": [
+                        "text/csv",
+                        "text/csv"
+                      ]
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "type": "object",
+              "required": [
+                "value"
+              ],
+              "properties": {
+                "value": {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "contentEncoding": "utf-8",
+                      "contentMediaType": "text/csv"
+                    },
+                    {
+                      "type": "string",
+                      "contentEncoding": "base64",
+                      "contentMediaType": "text/csv"
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "nullable": true
+        },
+        "schema": {
+          "oneOf": [
+            {
+              "type": "string",
+              "contentEncoding": "utf-8",
+              "contentMediaType": "text/csv"
+            },
+            {
+              "type": "string",
+              "contentEncoding": "base64",
+              "contentMediaType": "text/csv"
+            }
+          ]
+        },
+        "raw_schema1": "true"
+      },
+      "STAT_SUM": {
+        "title": "Sum",
+        "description": "Sum",
+        "minOccurs": 0,
+        "schema": {
+          "type": "boolean",
+          "default": false,
+          "enum": [
+            "true",
+            "false"
+          ],
+          "nullable": true
+        }
+      },
+      "STAT_AVG": {
+        "title": "Mean",
+        "description": "Mean",
+        "minOccurs": 0,
+        "schema": {
+          "type": "boolean",
+          "default": true,
+          "enum": [
+            "true",
+            "false"
+          ],
+          "nullable": true
+        }
+      },
+      "STAT_MIN": {
+        "title": "Minimum",
+        "description": "Minimum",
+        "minOccurs": 0,
+        "schema": {
+          "type": "boolean",
+          "default": false,
+          "enum": [
+            "true",
+            "false"
+          ],
+          "nullable": true
+        }
+      },
+      "STAT_MAX": {
+        "title": "Maximum",
+        "description": "Maximum",
+        "minOccurs": 0,
+        "schema": {
+          "type": "boolean",
+          "default": false,
+          "enum": [
+            "true",
+            "false"
+          ],
+          "nullable": true
+        }
+      },
+      "STAT_RNG": {
+        "title": "Range",
+        "description": "Range",
+        "minOccurs": 0,
+        "schema": {
+          "type": "boolean",
+          "default": false,
+          "enum": [
+            "true",
+            "false"
+          ],
+          "nullable": true
+        }
+      },
+      "STAT_DEV": {
+        "title": "Deviation",
+        "description": "Deviation",
+        "minOccurs": 0,
+        "schema": {
+          "type": "boolean",
+          "default": false,
+          "enum": [
+            "true",
+            "false"
+          ],
+          "nullable": true
+        }
+      },
+      "STAT_VAR": {
+        "title": "Variance",
+        "description": "Variance",
+        "minOccurs": 0,
+        "schema": {
+          "type": "boolean",
+          "default": false,
+          "enum": [
+            "true",
+            "false"
+          ],
+          "nullable": true
+        }
+      },
+      "STAT_LST": {
+        "title": "Listing",
+        "description": "Listing",
+        "minOccurs": 0,
+        "schema": {
+          "type": "boolean",
+          "default": false,
+          "enum": [
+            "true",
+            "false"
+          ],
+          "nullable": true
+        }
+      },
+      "STAT_NUM": {
+        "title": "Count",
+        "description": "Count",
+        "minOccurs": 0,
+        "schema": {
+          "type": "boolean",
+          "default": false,
+          "enum": [
+            "true",
+            "false"
+          ],
+          "nullable": true
+        }
+      },
+      "STAT_NAMING": {
+        "title": "Field Naming",
+        "description": "Field Naming",
+        "minOccurs": 0,
+        "schema": {
+          "type": "string",
+          "default": "variable type + original name",
+          "enum": [
+            "variable type + original name",
+            "original name + variable type",
+            "original name",
+            "variable type"
+          ],
+          "nullable": true
+        }
+      },
+      "BND_KEEP": {
+        "title": "Keep Boundaries",
+        "description": "Keep Boundaries",
+        "minOccurs": 0,
+        "schema": {
+          "type": "boolean",
+          "default": false,
+          "enum": [
+            "true",
+            "false"
+          ],
+          "nullable": true
+        }
+      },
+      "MIN_AREA": {
+        "title": "Minimum Area",
+        "description": "Minimum Area",
+        "minOccurs": 0,
+        "schema": {
+          "type": "number",
+          "default": 0,
+          "format": "float",
+          "nullable": true
+        }
+      }
+    },
+    "outputs": {
+      "DISSOLVED": {
+        "title": "Dissolved Polygons",
+        "description": "Dissolved Polygons",
+        "extended-schema": {
+          "oneOf": [
+            {
+              "allOf": [
+                {
+                  "$ref": "http://zoo-project.org/dl/link.json"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "enum": [
+                        "text/xml",
+                        "application/vnd.google-earth.kml+xml",
+                        "application/json"
+                      ]
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "type": "object",
+              "required": [
+                "value"
+              ],
+              "properties": {
+                "value": {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "contentEncoding": "utf-8",
+                      "contentMediaType": "text/xml"
+                    },
+                    {
+                      "type": "string",
+                      "contentEncoding": "base64",
+                      "contentMediaType": "application/vnd.google-earth.kml+xml"
+                    },
+                    {
+                      "type": "object"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "schema": {
+          "oneOf": [
+            {
+              "type": "string",
+              "contentEncoding": "utf-8",
+              "contentMediaType": "text/xml"
+            },
+            {
+              "type": "string",
+              "contentEncoding": "base64",
+              "contentMediaType": "application/vnd.google-earth.kml+xml"
+            },
+            {
+              "type": "object"
+            }
+          ]
+        },
+        "raw_schema1": "true"
+      }
+    }
+  }
+}

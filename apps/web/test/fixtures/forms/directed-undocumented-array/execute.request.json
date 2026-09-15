@@ -1,0 +1,16 @@
+{
+  "method": "POST",
+  "url": "{{baseUrl}}/processes/climada-simple-example-denmark-process/execution",
+  "headers": {
+    "Content-Type": "application/json",
+    "Accept": "application/json"
+  },
+  "body": {
+    "inputs": {
+      "intensity": [
+        0,
+        30
+      ]
+    }
+  }
+}

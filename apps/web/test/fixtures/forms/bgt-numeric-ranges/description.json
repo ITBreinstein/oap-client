@@ -1,0 +1,485 @@
+{
+  "status": 200,
+  "headers": {
+    "Server": "gunicorn",
+    "Date": "Mon, 31 Aug 2026 09:27:15 GMT",
+    "Connection": "close",
+    "Content-Type": "application/json",
+    "X-Powered-By": "pygeoapi 0.23.4",
+    "Content-Language": "en-US",
+    "Access-Control-Allow-Origin": "http://localhost:5173",
+    "Vary": "Origin",
+    "Content-Length": "19349"
+  },
+  "final_url": "{{baseUrl}}/processes/bgt-land-cover-summary?f=json",
+  "body": {
+    "version": "0.2.0",
+    "id": "bgt-land-cover-summary",
+    "title": "BKN-oriented BGT land-cover summary",
+    "description": "Calculates BKN-oriented land-cover proxies within two circular radii around a WGS 84 coordinate using live PDOK BGT data. The results do not directly measure vegetation height or tree-canopy volume and are not an official BKN assessment.",
+    "keywords": [
+      "BKN",
+      "BGT",
+      "PDOK",
+      "land cover",
+      "Netherlands"
+    ],
+    "jobControlOptions": [
+      "sync-execute"
+    ],
+    "outputTransmission": [
+      "value"
+    ],
+    "links": [
+      {
+        "type": "text/html",
+        "rel": "about",
+        "title": "PDOK BGT API",
+        "href": "https://api.pdok.nl/lv/bgt/ogc/v1",
+        "hreflang": "nl"
+      },
+      {
+        "type": "text/html",
+        "rel": "about",
+        "title": "Basiskwaliteit Natuur toolbox",
+        "href": "https://www.samenvoorbiodiversiteit.nl/toolbox/basiskwaliteitnatuur",
+        "hreflang": "nl"
+      },
+      {
+        "type": "application/json",
+        "rel": "self",
+        "href": "{{baseUrl}}/processes/bgt-land-cover-summary?f=json",
+        "title": "Process description as JSON",
+        "hreflang": "en-US"
+      },
+      {
+        "type": "text/html",
+        "rel": "alternate",
+        "href": "{{baseUrl}}/processes/bgt-land-cover-summary?f=html",
+        "title": "Process description as HTML",
+        "hreflang": "en-US"
+      },
+      {
+        "type": "text/html",
+        "rel": "http://www.opengis.net/def/rel/ogc/1.0/job-list",
+        "href": "{{baseUrl}}/jobs?f=html",
+        "title": "Jobs list as HTML",
+        "hreflang": "en-US"
+      },
+      {
+        "type": "application/json",
+        "rel": "http://www.opengis.net/def/rel/ogc/1.0/job-list",
+        "href": "{{baseUrl}}/jobs?f=json",
+        "title": "Jobs list as JSON",
+        "hreflang": "en-US"
+      },
+      {
+        "type": "application/json",
+        "rel": "http://www.opengis.net/def/rel/ogc/1.0/execute",
+        "href": "{{baseUrl}}/processes/bgt-land-cover-summary/execution?f=json",
+        "title": "Execution for this process as JSON",
+        "hreflang": "en-US"
+      }
+    ],
+    "inputs": {
+      "latitude": {
+        "title": "Latitude",
+        "description": "WGS 84 latitude in decimal degrees.",
+        "schema": {
+          "type": "number",
+          "minimum": -90,
+          "maximum": 90
+        },
+        "minOccurs": 1,
+        "maxOccurs": 1
+      },
+      "longitude": {
+        "title": "Longitude",
+        "description": "WGS 84 longitude in decimal degrees.",
+        "schema": {
+          "type": "number",
+          "minimum": -180,
+          "maximum": 180
+        },
+        "minOccurs": 1,
+        "maxOccurs": 1
+      },
+      "inner_radius_m": {
+        "title": "Inner radius",
+        "description": "Radius in metres for the first complete circular area.",
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5000,
+          "default": 300
+        },
+        "minOccurs": 0,
+        "maxOccurs": 1
+      },
+      "outer_radius_m": {
+        "title": "Outer radius",
+        "description": "Radius in metres for the second complete circular area.",
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5000,
+          "default": 500
+        },
+        "minOccurs": 0,
+        "maxOccurs": 1
+      }
+    },
+    "outputs": {
+      "summary": {
+        "title": "BKN-oriented BGT land-cover summary",
+        "description": "Percentages, provenance, source diagnostics and execution timings.",
+        "schema": {
+          "contentMediaType": "application/json",
+          "type": "object",
+          "required": [
+            "process",
+            "source",
+            "input",
+            "is_partial",
+            "fetch_failures",
+            "classification",
+            "timing_seconds",
+            "completed_at",
+            "within_inner_radius",
+            "within_outer_radius"
+          ],
+          "properties": {
+            "process": {
+              "type": "object",
+              "required": [
+                "name",
+                "algorithm_version"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "algorithm_version": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            "source": {
+              "type": "object",
+              "required": [
+                "name",
+                "retrieved_at",
+                "collections",
+                "feature_counts",
+                "page_counts"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "retrieved_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "collections": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string",
+                    "format": "uri"
+                  }
+                },
+                "feature_counts": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "page_counts": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                }
+              },
+              "additionalProperties": false
+            },
+            "input": {
+              "type": "object",
+              "required": [
+                "latitude",
+                "longitude",
+                "inner_radius_m",
+                "outer_radius_m"
+              ],
+              "properties": {
+                "latitude": {
+                  "type": "number",
+                  "minimum": -90,
+                  "maximum": 90
+                },
+                "longitude": {
+                  "type": "number",
+                  "minimum": -180,
+                  "maximum": 180
+                },
+                "inner_radius_m": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 5000
+                },
+                "outer_radius_m": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 5000
+                }
+              },
+              "additionalProperties": false
+            },
+            "is_partial": {
+              "type": "boolean"
+            },
+            "fetch_failures": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "classification": {
+              "type": "object",
+              "required": [
+                "is_official_standard",
+                "method",
+                "unpaved_surface_definition",
+                "unknown_vegetation_types",
+                "overlap_priority"
+              ],
+              "properties": {
+                "is_official_standard": {
+                  "type": "boolean"
+                },
+                "method": {
+                  "type": "string"
+                },
+                "unpaved_surface_definition": {
+                  "type": "string"
+                },
+                "unknown_vegetation_types": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "uniqueItems": true
+                },
+                "overlap_priority": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "uniqueItems": true
+                }
+              },
+              "additionalProperties": false
+            },
+            "timing_seconds": {
+              "type": "object",
+              "required": [
+                "by_collection",
+                "total"
+              ],
+              "properties": {
+                "by_collection": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "number",
+                    "minimum": 0
+                  }
+                },
+                "total": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "additionalProperties": false
+            },
+            "completed_at": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "within_inner_radius": {
+              "type": "object",
+              "required": [
+                "bkn_indicators",
+                "supporting_land_cover"
+              ],
+              "properties": {
+                "bkn_indicators": {
+                  "type": "object",
+                  "required": [
+                    "low_vegetation_proxy_pct",
+                    "medium_vegetation_proxy_pct",
+                    "high_vegetation_proxy_pct",
+                    "water_surface_pct",
+                    "unpaved_surface_proxy_pct"
+                  ],
+                  "properties": {
+                    "low_vegetation_proxy_pct": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "medium_vegetation_proxy_pct": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "high_vegetation_proxy_pct": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "water_surface_pct": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "unpaved_surface_proxy_pct": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "supporting_land_cover": {
+                  "type": "object",
+                  "required": [
+                    "unknown_vegetation_pct",
+                    "road_pct",
+                    "built_pct",
+                    "bgt_explicitly_unpaved_pct"
+                  ],
+                  "properties": {
+                    "unknown_vegetation_pct": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "road_pct": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "built_pct": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "bgt_explicitly_unpaved_pct": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            },
+            "within_outer_radius": {
+              "type": "object",
+              "required": [
+                "bkn_indicators",
+                "supporting_land_cover"
+              ],
+              "properties": {
+                "bkn_indicators": {
+                  "type": "object",
+                  "required": [
+                    "low_vegetation_proxy_pct",
+                    "medium_vegetation_proxy_pct",
+                    "high_vegetation_proxy_pct",
+                    "water_surface_pct",
+                    "unpaved_surface_proxy_pct"
+                  ],
+                  "properties": {
+                    "low_vegetation_proxy_pct": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "medium_vegetation_proxy_pct": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "high_vegetation_proxy_pct": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "water_surface_pct": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "unpaved_surface_proxy_pct": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "supporting_land_cover": {
+                  "type": "object",
+                  "required": [
+                    "unknown_vegetation_pct",
+                    "road_pct",
+                    "built_pct",
+                    "bgt_explicitly_unpaved_pct"
+                  ],
+                  "properties": {
+                    "unknown_vegetation_pct": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "road_pct": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "built_pct": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "bgt_explicitly_unpaved_pct": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    "example": {
+      "inputs": {
+        "latitude": 52.6324,
+        "longitude": 4.7534,
+        "inner_radius_m": 300,
+        "outer_radius_m": 500
+      }
+    }
+  }
+}
