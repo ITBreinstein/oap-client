@@ -49,6 +49,25 @@ export interface ServiceCapabilities {
    * **Advertised** by its own conformance class.
    */
   readonly callback: boolean;
+  /**
+   * The job list at `GET /jobs`.
+   *
+   * **Advertised** by its own conformance class — when the server declares it.
+   * A `false` here means "not declared", which is not the same as "not
+   * supported", and pygeoapi is the live counter-example for this field just as
+   * it is for `dismiss`: it answers `GET /jobs` with a 200, **and advertises a
+   * `job-list` link on its own landing page**, while its conformance document
+   * declines to declare the class (finding 0006). The server contradicts itself
+   * across two of its own documents; this field reports only what the
+   * conformance document said.
+   *
+   * It matters more than a job list usually would. When a browser cannot read
+   * `Location` on an async execute, the job list is the only honest way to
+   * offer the user their job back — see `jobs/list-jobs.ts`. Gating that
+   * recovery on this flag would disable it against pygeoapi, which is exactly
+   * the server that needs it.
+   */
+  readonly jobList: boolean;
   /** Every URI as received, including ones we could not parse. */
   readonly rawConformance: readonly string[];
 }
@@ -78,6 +97,7 @@ export function deriveCapabilities(parsed: ParsedConformance): ServiceCapabiliti
     async: core,
     dismiss: declares(parsed, "dismiss"),
     callback: declares(parsed, "callback"),
+    jobList: declares(parsed, "job-list"),
     rawConformance: parsed.raw,
   };
 }
@@ -95,6 +115,7 @@ export function unknownCapabilities(): ServiceCapabilities {
     async: false,
     dismiss: false,
     callback: false,
+    jobList: false,
     rawConformance: Object.freeze([]),
   };
 }

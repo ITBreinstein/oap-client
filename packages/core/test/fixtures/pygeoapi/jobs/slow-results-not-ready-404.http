@@ -1,0 +1,15 @@
+HTTP/1.1 404 NOT FOUND
+Server: gunicorn
+Date: Wed, 16 Sep 2026 08:58:18 GMT
+Connection: keep-alive
+Content-Type: application/json
+X-Powered-By: pygeoapi 0.21.0
+Content-Language: en-US
+Access-Control-Allow-Origin: *
+Content-Length: 114
+
+{
+    "code":"ResultNotReady",
+    "type":"ResultNotReady",
+    "description":"job accepted but not yet running"
+}

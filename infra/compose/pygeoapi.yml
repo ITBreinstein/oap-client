@@ -1,9 +1,25 @@
+# Two pygeoapi instances from one pinned image: the same API, differing only in
+# whether it sends CORS headers. :5080 exercises the direct-fetch path, :5081
+# forces the relay fallback — see the browser-constraints rule in the agent
+# notes.
+#
+# Both mount ../pygeoapi/plugins on PYTHONPATH so the repository's own
+# processors (currently `slow`) load as ordinary pygeoapi plugins without
+# rebuilding the image. See infra/README.md.
 services:
   pygeoapi-cors:
     image: geopython/pygeoapi:0.21.0 # pin the digest in CI
     ports: ["5080:80"]
-    volumes: ["../pygeoapi/config-cors.yml:/pygeoapi/local.config.yml:ro"]
+    environment:
+      PYTHONPATH: /pygeoapi/plugins
+    volumes:
+      - "../pygeoapi/config-cors.yml:/pygeoapi/local.config.yml:ro"
+      - "../pygeoapi/plugins:/pygeoapi/plugins:ro"
   pygeoapi-nocors:
     image: geopython/pygeoapi:0.21.0
     ports: ["5081:80"]
-    volumes: ["../pygeoapi/config-nocors.yml:/pygeoapi/local.config.yml:ro"]
+    environment:
+      PYTHONPATH: /pygeoapi/plugins
+    volumes:
+      - "../pygeoapi/config-nocors.yml:/pygeoapi/local.config.yml:ro"
+      - "../pygeoapi/plugins:/pygeoapi/plugins:ro"

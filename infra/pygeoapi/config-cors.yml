@@ -43,3 +43,12 @@ resources:
     type: process
     processor:
       name: HelloWorld
+  # A process that is still running when the second poll arrives. Registered
+  # because `hello-world` finishes before the first poll returns, which makes
+  # every asynchronous code path — `running`, progress, Retry-After, dismissal
+  # of a live job — unobservable. Source and rationale:
+  # infra/pygeoapi/plugins/breinstein_slow.py, documented in infra/README.md.
+  slow:
+    type: process
+    processor:
+      name: breinstein_slow.SlowProcessor

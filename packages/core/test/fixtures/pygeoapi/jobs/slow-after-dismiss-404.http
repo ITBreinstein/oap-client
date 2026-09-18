@@ -1,0 +1,15 @@
+HTTP/1.1 404 NOT FOUND
+Server: gunicorn
+Date: Wed, 16 Sep 2026 08:58:41 GMT
+Connection: keep-alive
+Content-Type: application/json
+X-Powered-By: pygeoapi 0.21.0
+Content-Language: en-US
+Access-Control-Allow-Origin: *
+Content-Length: 132
+
+{
+    "code":"InvalidParameterValue",
+    "type":"InvalidParameterValue",
+    "description":"c1a9c370-b1ac-11f1-847f-0a31f4dc3bd9"
+}

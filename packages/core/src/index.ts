@@ -9,10 +9,15 @@ export { createClient } from "./client.js";
 export type {
   Client,
   ClientOptions,
+  DismissJobRequestOptions,
   ExecuteRequestOptions,
+  GetJobRequestOptions,
   GetProcessRequestOptions,
+  GetResultsRequestOptions,
   InspectRequestOptions,
+  ListJobsRequestOptions,
   ListRequestOptions,
+  PollJobRequestOptions,
   RequestOptions,
 } from "./client.js";
 
@@ -141,11 +146,69 @@ export type {
   JobHandle,
 } from "./execution/index.js";
 
+// Jobs: status, polling, results and dismissal — the other half of asynchronous
+// execution, and the layer that makes `JobHandle` useful. Free functions with
+// thin client wrappers, deliberately not methods on the handle: a handle with
+// methods cannot be held in React state or passed through a reducer without
+// dragging a live client behind it. See `jobs/index.ts`.
+//
+// Two rules are load-bearing here and are spelled out where they live: a job
+// poll *classifies* rather than require-oks, so a failed job is a return value
+// and not an exception; and `getResults()` hands back the envelope unparsed,
+// for the same reason `execute()` does.
+export {
+  DEFAULT_MAX_JOB_PAGES,
+  DEFAULT_MAX_POLLS,
+  DEFAULT_POLL_TIMEOUT_MS,
+  INITIAL_POLL_INTERVAL_MS,
+  MAX_POLL_INTERVAL_MS,
+  MIN_POLL_INTERVAL_MS,
+  RESULTS_ACCEPT,
+  dismissJob,
+  getJob,
+  getResults,
+  isAbsoluteUrl,
+  isJobState,
+  isTerminalState,
+  isUnsupportedDismissStatus,
+  jobUrlFor,
+  jobsFallback,
+  listJobs,
+  parseJobStatus,
+  pollJob,
+  readJobStatus,
+  resolveResultsUrl,
+  resultsUrlFor,
+  waitForJob,
+} from "./jobs/index.js";
+export type {
+  Dismissal,
+  DismissJobOptions,
+  GetResultsOptions,
+  JobList,
+  JobListTruncation,
+  JobRequestOptions,
+  JobResults,
+  JobState,
+  JobStatus,
+  JobStatusRead,
+  JobTransportOptions,
+  ListJobsOptions,
+  ParseJobStatusOptions,
+  PollJobOptions,
+  PollOutcome,
+  PollReport,
+  ResultsRoute,
+} from "./jobs/index.js";
+
 // Errors raised above the transport, by the layers that read documents.
 export {
   AmbiguousExecutionResponseError,
   ExecutionTimeoutError,
+  JobNotFoundError,
+  JobPollTimeoutError,
   MalformedDocumentError,
+  MalformedJobDocumentError,
   MalformedProcessDocumentError,
   MissingLinkError,
   NotJsonError,
@@ -159,8 +222,9 @@ export type {
   Observation,
   ObservationKind,
   ObservationSink,
+  PollLoopOutcome,
   SkippedLinkReason,
 } from "./observations.js";
 
 /** Package version, mirrored from package.json for observation records. */
-export const VERSION: string = "0.2.0";
+export const VERSION: string = "0.3.0";

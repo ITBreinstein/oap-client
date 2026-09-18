@@ -1,0 +1,37 @@
+HTTP/1.1 200 OK
+Server: gunicorn
+Date: Wed, 16 Sep 2026 08:58:40 GMT
+Connection: keep-alive
+Content-Type: application/json
+X-Powered-By: pygeoapi 0.21.0
+Content-Language: en-US
+Access-Control-Allow-Origin: *
+Content-Length: 942
+
+{
+    "type":"process",
+    "processID":"slow",
+    "jobID":"c1a9c370-b1ac-11f1-847f-0a31f4dc3bd9",
+    "status":"successful",
+    "message":"Job complete",
+    "progress":100,
+    "parameters":null,
+    "created":"2026-09-16T08:58:16.695702Z",
+    "started":"2026-09-16T08:58:16.696115Z",
+    "finished":"2026-09-16T08:58:36.810825Z",
+    "updated":"2026-09-16T08:58:36.810948Z",
+    "links":[
+        {
+            "href":"http://localhost:5080/jobs/c1a9c370-b1ac-11f1-847f-0a31f4dc3bd9/results?f=html",
+            "rel":"http://www.opengis.net/def/rel/ogc/1.0/results",
+            "type":"text/html",
+            "title":"Results of job as HTML"
+        },
+        {
+            "href":"http://localhost:5080/jobs/c1a9c370-b1ac-11f1-847f-0a31f4dc3bd9/results?f=json",
+            "rel":"http://www.opengis.net/def/rel/ogc/1.0/results",
+            "type":"application/json",
+            "title":"Results of job as JSON"
+        }
+    ]
+}

@@ -53,19 +53,8 @@ import { readBodyLinks, resolveBodyLinks } from "../links/resolve.js";
 import { findLink } from "../links/find.js";
 import type { Link } from "../links/types.js";
 import type { ObservationSink } from "../observations.js";
+import { isJobState } from "../jobs/types.js";
 import type { Execution, ExecutionMode, JobHandle } from "./types.js";
-
-/**
- * The OGC job status vocabulary, verbatim per the house naming rule. A body
- * whose `status` is one of these is a job document and not a result.
- */
-const JOB_STATUSES: ReadonlySet<string> = new Set([
-  "accepted",
-  "running",
-  "successful",
-  "failed",
-  "dismissed",
-]);
 
 /**
  * Members of a job document this layer models. Anything else at the top level
@@ -163,7 +152,9 @@ export async function gatherEvidence(
 export function isJobDocument(body: unknown): boolean {
   if (!isRecord(body)) return false;
   const status: unknown = body["status"];
-  return typeof status === "string" && JOB_STATUSES.has(status.toLowerCase());
+  // The vocabulary lives in `jobs/types.ts` — one list, imported, rather than
+  // two copies that must agree and eventually will not.
+  return typeof status === "string" && isJobState(status);
 }
 
 /** `jobID`, then `id`, then the last path segment of the status URL. */

@@ -1,0 +1,17 @@
+HTTP/1.1 200 OK
+Server: gunicorn
+Date: Wed, 16 Sep 2026 08:58:40 GMT
+Connection: keep-alive
+Content-Type: application/json
+X-Powered-By: pygeoapi 0.21.0
+Content-Language: en-US
+Access-Control-Allow-Origin: *
+Content-Length: 97
+
+{
+    "id": "slept",
+    "value": {
+        "message": "fixture",
+        "seconds": 20.0
+    }
+}

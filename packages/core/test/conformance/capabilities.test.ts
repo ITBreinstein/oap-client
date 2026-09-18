@@ -154,6 +154,7 @@ describe("unknownCapabilities", () => {
       async: false,
       dismiss: false,
       callback: false,
+      jobList: false,
       rawConformance: [],
     });
   });

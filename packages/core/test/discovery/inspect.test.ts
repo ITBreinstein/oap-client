@@ -165,6 +165,7 @@ describe("inspect — degradation", () => {
       async: false,
       dismiss: false,
       callback: false,
+      jobList: false,
       rawConformance: [],
     });
     expect(service.links.length).toBeGreaterThan(0);

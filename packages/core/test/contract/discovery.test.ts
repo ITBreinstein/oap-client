@@ -91,8 +91,9 @@ describe("the conformance document", () => {
       sync: true,
       async: true,
       callback: true,
-      // Not declared. See the under-advertisement test below.
+      // Neither is declared. See the under-advertisement test below.
       dismiss: false,
+      jobList: false,
       rawConformance: conformanceFixture.conformsTo,
     });
   });

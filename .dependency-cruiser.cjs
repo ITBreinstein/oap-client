@@ -38,6 +38,15 @@ module.exports = {
       // and conformance are deliberately out of reach: execution navigates by a
       // URL it was handed, and a dependency on the layer that *finds* that URL
       // would make the operation impossible to test or reuse in isolation.
+      //
+      // `jobs/types.ts` is reachable, and **only** that file — not the rest of
+      // the jobs layer. It owns the OGC job status vocabulary, which execution
+      // needs to tell a job document from a result and jobs needs to decide
+      // whether a job is terminal. Two copies of one list eventually disagree,
+      // so there is one, and it lives with the layer the vocabulary is named
+      // after. Allowing the single types module keeps the invariant the rule
+      // exists for: execution still cannot reach an *operation* in another
+      // layer, only a type — exactly as it already reaches `processes/types`.
       name: "execution-sits-on-its-own-layers",
       severity: "error",
       from: { path: "^packages/core/src/execution" },
@@ -45,6 +54,29 @@ module.exports = {
         path: "^packages/core/src",
         pathNot: [
           "^packages/core/src/(execution|http|links|processes)/",
+          "^packages/core/src/jobs/types\\.ts$",
+          "^packages/core/src/(errors|observations)\\.ts$",
+        ],
+      },
+    },
+    {
+      // The jobs layer, under the same discipline and for the same reason: it
+      // is handed a job URL and must never depend on the layer that finds one.
+      // `discovery/negotiate` is the one exception, and it is the same
+      // exception `processes` already takes — `fetchJson` is the shared
+      // `?f=json` negotiation policy, not a discovery operation, and a second
+      // copy of it in this layer is how the two fall out of step.
+      //
+      // Note what is absent: `execution`. The dependency runs the other way,
+      // and allowing both directions is how a cycle gets in.
+      name: "jobs-sit-on-their-own-layers",
+      severity: "error",
+      from: { path: "^packages/core/src/jobs" },
+      to: {
+        path: "^packages/core/src",
+        pathNot: [
+          "^packages/core/src/(jobs|http|links)/",
+          "^packages/core/src/discovery/negotiate\\.ts$",
           "^packages/core/src/(errors|observations)\\.ts$",
         ],
       },

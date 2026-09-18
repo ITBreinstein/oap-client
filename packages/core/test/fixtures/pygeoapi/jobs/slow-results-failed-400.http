@@ -1,0 +1,15 @@
+HTTP/1.1 400 BAD REQUEST
+Server: gunicorn
+Date: Wed, 16 Sep 2026 08:58:55 GMT
+Connection: keep-alive
+Content-Type: application/json
+X-Powered-By: pygeoapi 0.21.0
+Content-Language: en-US
+Access-Control-Allow-Origin: *
+Content-Length: 106
+
+{
+    "code":"InvalidParameterValue",
+    "type":"InvalidParameterValue",
+    "description":"job failed"
+}

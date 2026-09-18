@@ -1,0 +1,74 @@
+HTTP/1.1 200 OK
+Server: gunicorn
+Date: Wed, 16 Sep 2026 08:58:57 GMT
+Connection: keep-alive
+Content-Type: application/json
+X-Powered-By: pygeoapi 0.21.0
+Content-Language: en-US
+Access-Control-Allow-Origin: *
+Content-Length: 2309
+
+{
+    "jobs":[
+        {
+            "type":"process",
+            "processID":"slow",
+            "jobID":"b6434016-b1ab-11f1-bcb1-5af372e9265a",
+            "status":"failed",
+            "message":"InvalidParameterValue: Error executing process: The \"seconds\" input must not be negative",
+            "progress":5,
+            "parameters":null,
+            "created":"2026-09-16T08:50:48.067966Z",
+            "started":"2026-09-16T08:50:48.068275Z",
+            "finished":"2026-09-16T08:50:48.075730Z",
+            "updated":"2026-09-16T08:50:48.075806Z"
+        },
+        {
+            "type":"process",
+            "processID":"slow",
+            "jobID":"774150ce-b1ab-11f1-9c9d-5af372e9265a",
+            "status":"successful",
+            "message":"Job complete",
+            "progress":100,
+            "parameters":null,
+            "created":"2026-09-16T08:49:02.359536Z",
+            "started":"2026-09-16T08:49:02.359861Z",
+            "finished":"2026-09-16T08:49:04.396872Z",
+            "updated":"2026-09-16T08:49:04.396987Z",
+            "links":[
+                {
+                    "href":"http://localhost:5080/jobs/774150ce-b1ab-11f1-9c9d-5af372e9265a/results?f=html",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/results",
+                    "type":"text/html",
+                    "title":"Results of job as HTML"
+                },
+                {
+                    "href":"http://localhost:5080/jobs/774150ce-b1ab-11f1-9c9d-5af372e9265a/results?f=json",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/results",
+                    "type":"application/json",
+                    "title":"Results of job as JSON"
+                }
+            ]
+        }
+    ],
+    "links":[
+        {
+            "href":"http://localhost:5080/jobs?f=html",
+            "rel":"alternate",
+            "type":"text/html",
+            "title":"Jobs list as HTML"
+        },
+        {
+            "href":"http://localhost:5080/jobs?f=json",
+            "rel":"self",
+            "type":"application/json",
+            "title":"Jobs list as JSON"
+        },
+        {
+            "href":"http://localhost:5080/jobs?offset=2&limit=2",
+            "rel":"next",
+            "type":"application/json",
+            "title":"Items (next)"
+        }
+    ]
+}

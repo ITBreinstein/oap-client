@@ -1,0 +1,10 @@
+HTTP/1.1 200 OK 
+Date: Wed, 16 Sep 2026 08:59:42 GMT
+Server: Apache/2.4.29 (Ubuntu)
+X-Powered-By: ZOO-Project
+Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self';
+Link: <https://www.opengis.net/dev/profile/OGC/0/jobs-list>; rel="profile"
+Content-Length: 1792
+Content-Type: application/json;charset=UTF-8
+
+{"jobs":[{"id":"f5aac3b2-a5e6-11f1-843b-0a2d8ab6f6a5","jobID":"f5aac3b2-a5e6-11f1-843b-0a2d8ab6f6a5","type":"process","processID":"echo","created":"2026-09-01T09:24:40.839Z","started":"2026-09-01T09:24:40.839Z","finished":"2026-09-01T09:24:41.049Z","updated":"2026-09-01T09:24:40.873Z","status":"successful","message":"ZOO-Kernel successfully run your service!","links":[{"title":"Status location","rel":"monitor","type":"application\/json","href":"http:\/\/localhost:5090\/ogc-api\/jobs\/f5aac3b2-a5e6-11f1-843b-0a2d8ab6f6a5"},{"title":"Result location","rel":"http:\/\/www.opengis.net\/def\/rel\/ogc\/1.0\/results","type":"application\/json","href":"http:\/\/localhost:5090\/ogc-api\/jobs\/f5aac3b2-a5e6-11f1-843b-0a2d8ab6f6a5\/results"}]},{"id":"86bd9c38-a5e4-11f1-bc37-0a2d8ab6f6a5","jobID":"86bd9c38-a5e4-11f1-bc37-0a2d8ab6f6a5","type":"process","processID":"echo","created":"2026-09-01T09:07:15.776Z","started":"2026-09-01T09:07:15.776Z","finished":"2026-09-01T09:07:15.988Z","updated":"2026-09-01T09:07:15.830Z","status":"successful","message":"ZOO-Kernel successfully run your service!","links":[{"title":"Status location","rel":"monitor","type":"application\/json","href":"http:\/\/localhost:5090\/ogc-api\/jobs\/86bd9c38-a5e4-11f1-bc37-0a2d8ab6f6a5"},{"title":"Result location","rel":"http:\/\/www.opengis.net\/def\/rel\/ogc\/1.0\/results","type":"application\/json","href":"http:\/\/localhost:5090\/ogc-api\/jobs\/86bd9c38-a5e4-11f1-bc37-0a2d8ab6f6a5\/results"}]}],"links":[{"rel":"self","type":"application\/json","href":"http:\/\/localhost:5090\/ogc-api\/jobs"},{"rel":"alternate","type":"text\/html","href":"http:\/\/localhost:5090\/ogc-api\/jobs.html"},{"rel":"next","type":"application\/json","href":"http:\/\/localhost:5090\/ogc-api\/jobs?limit=2&skip=2"}],"numberTotal":14}

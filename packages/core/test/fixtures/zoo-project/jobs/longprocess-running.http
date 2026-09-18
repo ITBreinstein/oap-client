@@ -1,0 +1,10 @@
+HTTP/1.1 200 OK 
+Date: Wed, 16 Sep 2026 08:59:17 GMT
+Server: Apache/2.4.29 (Ubuntu)
+X-Powered-By: ZOO-Project
+Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self';
+Link: <https://www.opengis.net/dev/profile/OGC/0/jobs-description>; rel="profile"
+Content-Length: 467
+Content-Type: application/json;charset=UTF-8
+
+{"progress":40,"id":"e11ee0be-b1ac-11f1-9647-862eff345597","jobID":"e11ee0be-b1ac-11f1-9647-862eff345597","type":"process","processID":"longProcess","created":"2026-09-16T08:59:09.521Z","started":"2026-09-16T08:59:09.521Z","updated":"2026-09-16T08:59:17.691Z","status":"running","message":"Step 40","links":[{"title":"Status location","rel":"monitor","type":"application\/json","href":"http:\/\/localhost:5090\/ogc-api\/jobs\/e11ee0be-b1ac-11f1-9647-862eff345597"}]}

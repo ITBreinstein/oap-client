@@ -56,7 +56,9 @@ export type KnownRelation =
   | "next"
   | "prev"
   | "execute"
-  | "monitor";
+  | "monitor"
+  | "results"
+  | "jobList";
 
 const REL_ALIASES: Readonly<Record<KnownRelation, readonly string[]>> = {
   self: ["self"],
@@ -80,6 +82,23 @@ const REL_ALIASES: Readonly<Record<KnownRelation, readonly string[]>> = {
   // finding 0002. `status` is included because OGC registers it for the same
   // resource and a server may reasonably pick it.
   monitor: ["monitor", "status", "http://www.opengis.net/def/rel/ogc/1.0/monitor"],
+  // Where a finished job's outputs live. Both reference servers advertise this
+  // on the job document and both write **only** the long OGC URI form — the
+  // short `results` is not emitted by either, and is carried here for the same
+  // reason the short `execute` is: a third server is free to prefer it.
+  // Verified 2026-09-16 against pygeoapi 0.21.0 and ZOO fork 46289f6.
+  //
+  // pygeoapi advertises the relation three times on a running job, once per
+  // representation (`?f=html`, `?f=json`, and an untyped
+  // `application/octet-stream`), so `findLink`'s media-type scoring is what
+  // picks the JSON one — see finding 0036.
+  results: ["results", "http://www.opengis.net/def/rel/ogc/1.0/results"],
+  // The service's job list. Both reference servers advertise it on the landing
+  // page, and — again — both write only the long form. pygeoapi advertises the
+  // link while declining to declare the matching conformance class, which is
+  // finding 0006 and the reason `capabilities.jobList` is documented as
+  // evidence rather than permission.
+  jobList: ["jobs", "job-list", "http://www.opengis.net/def/rel/ogc/1.0/job-list"],
 };
 
 /**

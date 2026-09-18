@@ -3,12 +3,13 @@
 A runtime-neutral [OGC API - Processes](https://ogcapi.ogc.org/processes/) client.
 
 **Shipped:** service discovery, conformance and capabilities, process listing
-and descriptions, and synchronous execution.
+and descriptions, synchronous and asynchronous execution, job status, polling,
+results retrieval, dismissal, and the job list.
 
-**Not yet shipped:** job polling, status and dismissal, execution callbacks, and
-result-retrieval helpers. `execute()` already returns a `job` handle when a
-server creates one, so the shape those operations will attach to is fixed — but
-they are not in this release, and polling a `statusUrl` is currently yours to do.
+**Not yet shipped:** execution callbacks (the `subscriber` member) and the relay
+that receives them. Polling is the baseline and works everywhere; callbacks are
+an optimisation on top of it, and the client is designed to stay useful with the
+relay switched off.
 
 ```bash
 pnpm add @breinstein/oap-client
@@ -33,7 +34,15 @@ const execution = await client.execute(description.id, {
 if (execution.kind === "immediate") {
   console.log(execution.response.mediaType, await execution.response.json());
 } else {
-  console.log("server made a job:", execution.job.statusUrl);
+  const status = await client.waitForJob(execution.job.statusUrl, {
+    onStatus: (s) => console.log(s.status, s.progress),
+  });
+  if (status.status === "successful") {
+    const { envelope } = await client.getResults(execution.job.statusUrl, { status });
+    console.log(envelope.mediaType, await envelope.json());
+  } else {
+    console.error("job did not succeed:", status.status, status.message);
+  }
 }
 ```
 
@@ -477,6 +486,246 @@ you whose fault it was: ZOO answers a rejected input with **500**, and an unknow
 path with **400** rather than 404. Nothing here special-cases a status code, and
 nothing retries — a failed execution is information, and retrying a
 non-idempotent POST is how you get two jobs.
+
+## Jobs: status, polling, results and dismissal
+
+When a server creates a job, `execute()` hands back a `JobHandle` with a
+`statusUrl`. These are the operations that make it useful. They are free
+functions with thin client wrappers, deliberately **not** methods on the handle
+— a handle with methods cannot be held in React state, serialised, or passed
+through a reducer without dragging a live client behind it.
+
+```ts
+const status = await client.getJob(jobUrlOrId);
+const report = await client.pollJob(jobUrlOrId, { onStatus, signal, timeoutMs });
+const final = await client.waitForJob(jobUrlOrId);
+const { envelope } = await client.getResults(jobUrlOrId, { status });
+const outcome = await client.dismissJob(jobUrlOrId);
+const { jobs } = await client.listJobs();
+```
+
+Each takes either an absolute status URL or a bare job id.
+
+### A failed job is a return value, not an exception
+
+This is the rule the whole layer is built around. A failed job is a perfectly
+valid `200` whose document says `status: "failed"`, so `getJob()` classifies the
+response rather than requiring it to be ok, and hands back a `JobStatus`:
+
+```ts
+const status = await client.getJob(url);
+if (status.status === "failed") {
+  console.error(status.message); // the server's own words
+}
+```
+
+There is no `JobFailedError`. Throwing would discard the server's explanation
+and replace it with a worse version of the same information, and the job panel's
+entire purpose is to show what the server said. `waitForJob()` resolves for
+`failed` and `dismissed` too; whether a failure is an error is the caller's
+decision.
+
+What _does_ throw: a 404 (`JobNotFoundError`), a 5xx (`ProcessesError`), a
+transport failure, an abort, and a body with no usable `status`
+(`MalformedJobDocumentError`).
+
+### `running` is not a status you can wait for
+
+pygeoapi 0.21.0 reports `status: "accepted"` for the **whole** of a job's
+execution and goes straight to `successful`. It never reports `running`, and its
+`progress` is a hardcoded `5` until the job finishes at `100`:
+
+```
+POST /processes/slow/execution   Prefer: respond-async
+HTTP/1.1 201 CREATED
+
+GET /jobs/{id}          → {"status":"accepted","progress":5,  …}   ← still working
+GET /jobs/{id}          → {"status":"successful","progress":100, …}
+```
+
+ZOO, on the same sequence, reports `running` with real moving progress
+(`"Step 40"`, `"Step 70"`). Two conformant-looking servers, opposite readings of
+the same vocabulary.
+
+So nothing here treats `running` as the signal that work has started. The only
+distinction anything depends on is `terminal`, derived once on `JobStatus`:
+
+```ts
+if (!status.terminal) keepPolling();
+```
+
+An **unrecognised** status degrades rather than throwing: `rawStatus` keeps the
+server's word verbatim, `statusRecognised` is `false`, a warning is recorded,
+and the job is treated as non-terminal so the loop keeps going under its own
+poll cap. A server inventing a status word should cost you a warning, not the
+whole job.
+
+### Polling is authoritative, and cancellable
+
+Callbacks are doorbells; polling is truth. That ordering is deliberate and it
+predates the relay on purpose — if a callback were ever the source of truth,
+every missed, duplicated or reordered notification would become a job-state bug
+that is impossible to reproduce.
+
+```ts
+const report = await client.pollJob(url, {
+  onStatus: setStatus, // called once per poll, in order
+  signal: controller.signal,
+  timeoutMs: 600_000,
+});
+```
+
+- **The abort signal is checked between polls**, not only at the start, so
+  closing a job panel provably makes no further request.
+- **`Retry-After` is honoured when sent**, in either wire format. `Retry-After: 0`
+  means "ask again now" and is obeyed as such. Neither reference server sends
+  the header at all, which is exactly why the backoff below has to be right.
+- **Otherwise a bounded backoff**: 1 s, growing to a 10 s ceiling, with a 500 ms
+  floor. A server-supplied value is capped at the ceiling but **not** raised to
+  the floor — the floor exists to stop us hammering a server that has told us
+  nothing, and a server sending `Retry-After: 0` has told us something.
+- **The total deadline is separate from your signal**, and so is its error:
+  `JobPollTimeoutError` for the deadline, `AbortError` for you. The timeout
+  error carries the last status seen, the poll count and the elapsed time,
+  because "still running after twenty minutes" and "never answered at all" are
+  different failures.
+
+`PollReport` carries the whole sequence — poll count, elapsed time, every status
+in order, whether `Retry-After` was seen and honoured, and how it ended. That is
+the evidence behind any claim about whether asynchronous execution is usable
+against a given service.
+
+`onStatus` is a callback rather than an async iterator because it composes with
+React state without ceremony (`onStatus: setStatus` is the whole integration),
+and an iterator's real advantage is backpressure, which a loop that sleeps
+between polls has none to apply.
+
+### Dismissal answers a question; it does not fail
+
+```ts
+const outcome = await client.dismissJob(url);
+if (outcome.kind === "unsupported") {
+  // 405 or 501 — this server cannot dismiss. Not an error.
+}
+```
+
+A `405` is the answer the request asked for, so it is a return value. A `400`,
+`403` or `500` is a genuine refusal and throws — "this server will not let you
+dismiss _this_ job" and "this server cannot dismiss jobs at all" are different
+statements.
+
+**Nothing gates on `capabilities.dismiss`.** pygeoapi answers `DELETE` with a
+`200` while declaring no dismiss conformance class at all. A client that checked
+first would have hidden the button on a server that honours every cancellation,
+and shipped "pygeoapi does not support dismiss", which is false. A conformance
+class is evidence, not authorisation.
+
+On **both** reference servers a successful dismissal **deletes** the job rather
+than parking it at `status: "dismissed"`, so the next `GET` is a 404:
+
+```
+DELETE /jobs/{id}   → 200  {"status":"dismissed", …}
+GET    /jobs/{id}   → 404
+```
+
+That means `JobNotFoundError` is the _normal_ end state of a cancelled job, not
+an anomaly. `pollJob()` treats a 404 mid-poll as the ordinary ending it is and
+reports `outcome: "dismissed-remotely"` rather than throwing.
+
+### Results come back as an envelope
+
+Same rule as `execute()`, for the same reason: a result may be GeoJSON, a PNG, a
+zip, GML, or a JSON document wrapping several of those, and the correct parse
+depends on a media type this layer has no opinion about.
+
+```ts
+const { envelope, route } = await client.getResults(url, { status });
+envelope.mediaType; // "application/json", "image/png", …
+envelope.filename; // from Content-Disposition
+envelope.contentCrs; // OGC Content-Crs
+```
+
+`route` says whether the job document advertised the results (`"advertised-link"`)
+or the path was rebuilt (`"constructed-path"`). Both reference servers advertise
+the relation, and both write **only** the long OGC URI form.
+
+**The `Accept` header is not `*/*`.** Against pygeoapi that returns a rendered
+HTML page from the one endpoint whose entire purpose is to deliver the result:
+
+```
+GET /jobs/{id}/results   Accept: */*
+HTTP/1.1 200 OK
+Content-Type: text/html
+```
+
+So the request sends `application/json, */*;q=0.8` — a preference a
+content-negotiating server can act on, while a result that is legitimately a PNG
+or a zip is still acceptable and still arrives.
+
+### A known gap: chunked result bodies are not size-guarded
+
+`ResponseEnvelope` refuses to buffer a body whose **declared** `Content-Length`
+exceeds `maxBufferBytes`. A chunked response declares no length, so it is
+buffered regardless of size — and a result is exactly the response most likely
+to be both large and chunked. ZOO's results endpoint sends
+`Transfer-Encoding: chunked` on every response.
+
+This is **tracked, not fixed**, against the October milestone. Fixing it properly
+means streaming into a `Blob` with a running byte count, which changes the
+envelope's reader contract for every caller, and doing that in the same change
+as the job layer would couple two unrelated risks. Until then, pass an explicit
+`maxBufferBytes` if you expect large results, and use `blob()` rather than
+`text()` or `json()`.
+
+### The job list, and why it is not a filter API
+
+```ts
+const { jobs, truncated } = await client.listJobs({ limit: 20 });
+```
+
+Follows `rel="next"` to a bounded depth, stopping on a cycle or the page cap and
+setting `truncated` when it does. The two servers page differently — pygeoapi
+builds `next` with `offset=`, ZOO with `skip=` — which costs nothing, because
+the walk follows the advertised link rather than constructing one.
+
+There are deliberately **no `processID` or `status` arguments**. ZOO honours both
+query parameters; pygeoapi accepts them and silently ignores them, returning the
+full list either way. A filter that is silently ignored is worse than no filter,
+so the caller filters the returned array, which is correct everywhere.
+
+One unreadable entry is skipped and counted rather than failing the page. That
+matters more than it sounds: in a browser against pygeoapi, an asynchronous
+execute throws `AmbiguousExecutionResponseError`, because `Location` is not
+exposed cross-origin and the async `201` body is the literal `null`. The browser
+has started a job it cannot name, and the job list is the only honest recovery —
+show the user their recent jobs and let them recognise their own. **The client
+never guesses**, because assuming the newest job is yours is wrong the moment two
+people share a demo server.
+
+### What a browser can and cannot do
+
+Measured in a real browser, not inferred:
+
+| Operation           | `:5080` (CORS) | `:5081` (no CORS) |
+| ------------------- | -------------- | ----------------- |
+| `GET /jobs/{id}`    | works          | blocked           |
+| `DELETE /jobs/{id}` | **works**      | blocked           |
+| read `Location`     | **blocked**    | blocked           |
+
+`DELETE` is not a simple request, so it needs an `OPTIONS` preflight — a CORS
+surface nothing before this touched. pygeoapi's `cors: true` answers it with
+`Access-Control-Allow-Methods` including `DELETE`, so dismissal really is
+reachable from a browser. `Location` is not, on either port, because neither
+sends `Access-Control-Expose-Headers`.
+
+That last row is the one that matters most. An asynchronous execute from a
+browser against pygeoapi starts a job the page cannot name: `Location` is
+filtered out, and the async `201` body is the literal `null`, so there is no
+fallback. `execute()` raises `AmbiguousExecutionResponseError` rather than
+guessing, and `listJobs()` is the honest recovery — show the user their recent
+jobs and let them pick. Until a server sends
+`Access-Control-Expose-Headers: Location`, asynchronous execution needs either
+that recovery or the relay.
 
 ## Supported environments
 

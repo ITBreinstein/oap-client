@@ -1,3 +1,5 @@
+import type { JobStatus } from "./jobs/types.js";
+
 /**
  * Errors raised *above* the transport, by the layers that understand OGC API -
  * Processes documents.
@@ -222,5 +224,109 @@ export class ExecutionTimeoutError extends Error {
     );
     this.url = url;
     this.timeoutMs = timeoutMs;
+  }
+}
+
+/**
+ * A job document was JSON of the wrong shape, in one of the two ways this layer
+ * treats as fatal: the body is not an object, or it carries no usable `status`.
+ *
+ * A **new class rather than a `where` on {@link MalformedProcessDocumentError}**,
+ * for symmetry with Task 3 and for one concrete reason beyond it: a job panel
+ * and a process form are different screens with different recovery paths. A UI
+ * that catches "the process catalogue is broken" and a UI that catches "this
+ * one job is unreadable" want to do different things, and `instanceof` is how
+ * they tell those apart without string-matching a message.
+ *
+ * Note what is deliberately *not* here: an unrecognised `status` string is not
+ * fatal. See `jobs/parse-status.ts`.
+ */
+export class MalformedJobDocumentError extends Error {
+  override readonly name = "MalformedJobDocumentError";
+  readonly url: string;
+  /** What was expected and what was there instead. */
+  readonly reason: string;
+  /** The offending location, e.g. `page 2, entry at index 3`. */
+  readonly where: string | undefined;
+
+  constructor(url: string, reason: string, where?: string, options?: { cause?: unknown }) {
+    const at = where === undefined ? "" : ` (${where})`;
+    super(`Malformed job document at ${url}${at}: ${reason}`, options);
+    this.url = url;
+    this.reason = reason;
+    this.where = where;
+  }
+}
+
+/**
+ * The service answered 404 for a job status read.
+ *
+ * Mirrors {@link ProcessNotFoundError}, including the reasoning: the UI should
+ * say "that job no longer exists on this service" rather than "HTTP 404".
+ *
+ * **This is the normal end state after a successful dismissal on both reference
+ * servers.** Neither pygeoapi nor ZOO parks a dismissed job at
+ * `status: "dismissed"`; both delete it, and the next `GET` is a 404 (finding
+ * 0035). So a poll loop that has just seen a dismissal must treat this as the
+ * expected outcome rather than a crash, and `pollJob()` does.
+ */
+export class JobNotFoundError extends Error {
+  override readonly name = "JobNotFoundError";
+  readonly jobId: string | undefined;
+  readonly url: string;
+
+  constructor(url: string, jobId?: string, options?: { cause?: unknown }) {
+    const which = jobId === undefined ? "That job" : `Job "${jobId}"`;
+    super(`${which} no longer exists on this service (404 from ${url})`, options);
+    this.jobId = jobId;
+    this.url = url;
+  }
+}
+
+/**
+ * The total polling deadline expired before the job reached a terminal status.
+ *
+ * Deliberately **not** an {@link AbortError}, for the reason
+ * {@link ExecutionTimeoutError} is not one either: "the user closed the panel"
+ * and "the job never finished" are different facts about a service, and a
+ * matrix that cannot tell them apart cannot say whether asynchronous execution
+ * is usable for real work.
+ *
+ * Carries the last status seen, because "still running after twenty minutes"
+ * and "never answered at all" are different failures and the difference is the
+ * whole content of the report.
+ */
+export class JobPollTimeoutError extends Error {
+  override readonly name = "JobPollTimeoutError";
+  readonly url: string;
+  readonly timeoutMs: number;
+  readonly pollCount: number;
+  readonly elapsedMs: number;
+  /** The last status read, or undefined if no poll ever completed. */
+  readonly lastStatus: JobStatus | undefined;
+
+  constructor(
+    url: string,
+    timeoutMs: number,
+    pollCount: number,
+    elapsedMs: number,
+    lastStatus: JobStatus | undefined,
+    options?: { cause?: unknown },
+  ) {
+    const seen =
+      lastStatus === undefined
+        ? "no status was ever read"
+        : `last status was "${lastStatus.rawStatus}"`;
+    super(
+      `Job at ${url} did not reach a terminal status within ${String(timeoutMs)} ms ` +
+        `(${String(pollCount)} polls over ${String(elapsedMs)} ms; ${seen}). ` +
+        `Raise timeoutMs if the process is genuinely this slow.`,
+      options,
+    );
+    this.url = url;
+    this.timeoutMs = timeoutMs;
+    this.pollCount = pollCount;
+    this.elapsedMs = elapsedMs;
+    this.lastStatus = lastStatus;
   }
 }

@@ -34,8 +34,14 @@ docker compose -f infra/compose/pygeoapi.yml up -d   # reference servers on :508
 Two implementations, because one cannot tell a server's deviation apart from an
 ambiguous specification. pygeoapi is the pinned, deterministic lane that blocks
 CI; ZOO-Project is a second implementation with nothing in common but the
-standard, and it reports without blocking — see
-[infra/zoo/README.md](infra/zoo/README.md).
+standard, and it reports without blocking — see [infra/README.md](infra/README.md)
+and [infra/zoo/README.md](infra/zoo/README.md).
+
+The pinned pygeoapi also carries a processor of our own, `slow`, mounted from
+[infra/pygeoapi/plugins](infra/pygeoapi/plugins) without rebuilding the image.
+The stock image's only process finishes before the first poll returns, which
+makes the whole asynchronous surface — polling, progress, dismissing a _running_
+job — impossible to test. See [infra/README.md](infra/README.md).
 
 ## Boundaries
 

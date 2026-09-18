@@ -12,5 +12,11 @@ export default defineConfig({
     include: ["test/interop/**/*.test.ts"],
     testTimeout: 60_000,
     hookTimeout: 60_000,
+    // One file at a time. ZOO is a single stateful deployment behind a small
+    // FPM worker pool, not an isolated fixture: files running in parallel start
+    // concurrent asynchronous jobs, saturate the pool, and then fail on
+    // deadlines that say nothing about the client. Serialising costs a couple
+    // of minutes and buys a lane whose red actually means something.
+    fileParallelism: false,
   },
 });

@@ -90,6 +90,7 @@ describe.skipIf(!zooUp)("ZOO-Project discovery", () => {
       async: true,
       dismiss: true,
       callback: true,
+      jobList: true,
       rawConformance: conformanceFixture.conformsTo,
     });
   });

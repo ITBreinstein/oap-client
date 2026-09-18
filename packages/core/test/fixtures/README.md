@@ -23,8 +23,10 @@ the versions are recorded here rather than left to a commit message.
     server    geopython/pygeoapi:0.21.0   (infra/compose/pygeoapi.yml, port 5080)
     captured  landing-page.json, landing-page-browser-accept.html,
               conformance.json                                        2026-08-26
-              process-list.json, processes/hello-world.json           2026-08-31
+              processes/hello-world.json                              2026-08-31
               execution/*.http                                        2026-09-01
+              jobs/*.http                                             2026-09-16
+              process-list.json  (re-captured; now carries `slow`)    2026-09-16
 
 Re-capture by hand against `http://localhost:5080`; there is no script, because
 the set is four files and the server is one pinned image.
@@ -45,6 +47,7 @@ the set is four files and the server is one pinned image.
               process-list-limit20-skip690.json,
               processes/Gdal_Translate.json                            2026-08-31
               execution/*.http                                         2026-09-01
+              jobs/*.http                                              2026-09-16
 
 Re-capture with `./infra/zoo/capture-fixtures.sh`, and only when the pinned SHA
 in `infra/zoo/pinned.env` changes. Read the diff before committing it.
@@ -113,3 +116,47 @@ are read for shape and headers rather than compared byte-for-byte. Re-capture by
 replaying the `curl` in the finding that names the file; there is no script,
 because each one exists to prove a different claim and a script would invite
 re-capturing all of them without reading the diff.
+
+## `*/jobs/`
+
+Captured 2026-09-16 against both servers, with `curl -isS`. The pygeoapi set uses
+the `slow` process, which this repository adds to the pinned image precisely so
+that a job can be observed *before* it finishes — see `infra/README.md`. The ZOO
+set uses `longProcess` and `failR`.
+
+    pygeoapi/jobs/
+      slow-async-201.http               201, Preference-Applied, body `null`   0004
+      slow-accepted.http                still executing, yet `status:accepted` 0032
+      slow-successful.http              terminal, progress 100
+      slow-failed.http                  failure is prose in `message`, no
+                                        `exception`, and no `links` at all     0034, 0042
+      slow-results.http                 the result, for Accept: application/json
+      slow-results-accept-any-html.http the *same* result for Accept: */*,
+                                        as a rendered HTML page                0036
+      slow-results-not-ready-404.http   404 ResultNotReady while unfinished
+      slow-results-failed-400.http      400 for a failed job (ZOO answers 200)  0041
+      slow-delete-200.http              JSON body under Content-Type text/html  0037
+      slow-delete-running-200.http      identical for a *running* job
+      slow-after-dismiss-404.http       the job is gone, not parked             0035
+      job-list-limit2.http              `jobs`, no numberTotal, `next` with offset=
+      preflight-delete-cors.http        OPTIONS on :5080 — DELETE is allowed    0040
+      preflight-delete-nocors.http      OPTIONS on :5081 — no CORS headers      0040
+
+    zoo-project/jobs/
+      longprocess-async-201.http        201 whose body is a full job document
+                                        carrying rel="monitor" — the route a
+                                        browser needs and pygeoapi lacks        0039
+      longprocess-running.http          a genuinely `running` job, progress 40  0032
+      longprocess-successful.http       terminal, with a `results` link
+      longprocess-results.http          Transfer-Encoding: chunked, no length
+      longprocess-delete-200.http       honest application/json, rel="parent"   0037
+      longprocess-after-dismiss-404.http  proper OGC no-such-job exception URI  0035
+      failr-failed.http                 failure in `message`, no `exception`    0034
+      failr-results-200-exception.http  200 whose body is an exception report   0041
+      job-list-limit2.http              `numberTotal`, `next` with skip=        0019
+      preflight-delete.http             200 saying "CORS is enabled." with no
+                                        CORS headers at all                     0040
+
+Job ids and timestamps are fresh per capture, so these are read for shape and
+headers rather than compared byte-for-byte. Re-capture by replaying the `curl`
+in the finding that names the file.

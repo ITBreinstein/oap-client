@@ -29,6 +29,16 @@ export function redactUrl(url: string): string {
   }
 }
 
+/**
+ * How one poll loop ended.
+ *
+ * `dismissed-remotely` is its own outcome rather than an `error` because on
+ * both reference servers a dismissed job stops existing (finding 0035), so a
+ * 404 mid-poll is an ordinary ending and folding it into `error` would make
+ * every cancellation look like a defect.
+ */
+export type PollLoopOutcome = "terminal" | "timeout" | "aborted" | "error" | "dismissed-remotely";
+
 /** How one execution ended. `error` covers every non-ok classification. */
 export type ExecutionOutcome = "immediate" | "job" | "error" | "transport-failure";
 
@@ -75,6 +85,7 @@ export type Observation =
       readonly async: boolean;
       readonly dismiss: boolean;
       readonly callback: boolean;
+      readonly jobList: boolean;
     }
   | {
       readonly kind: "link-skipped";
@@ -89,6 +100,17 @@ export type Observation =
        * and `./processes` was guessed — a finding in its own right.
        */
       readonly kind: "processes-link";
+      readonly source: "advertised" | "path-fallback";
+      readonly url: string;
+    }
+  | {
+      /**
+       * Where the job list was looked for. `path-fallback` means the landing
+       * page advertised no `job-list` link and `./jobs` was guessed — a finding
+       * in its own right, and one neither reference server produces: both
+       * advertise the link, as the long OGC URI.
+       */
+      readonly kind: "job-list-link";
       readonly source: "advertised" | "path-fallback";
       readonly url: string;
     }
@@ -206,6 +228,125 @@ export type Observation =
       readonly problemPresent: boolean;
       /** Names only, of job-document members this layer does not model. */
       readonly unrecognisedKeys: readonly string[];
+    }
+  | {
+      /**
+       * One job status read. The row behind every asynchronous cell in the
+       * matrix: what the server called the state, whether it paced us, and
+       * whether it explained a failure in a structured way or in prose.
+       */
+      readonly kind: "job-status";
+      readonly url: string;
+      /** The status on the wire, which is 200 even for a failed job. */
+      readonly httpStatus: number;
+      /**
+       * The status after vocabulary matching.
+       *
+       * Written out rather than imported from `jobs/types.ts` so this module
+       * stays a leaf — everything above it depends on observations, and an
+       * import back down would be a cycle. Same reason `schemaShapes` is
+       * spelled out above instead of imported from `processes/types.ts`.
+       */
+      readonly status: "accepted" | "running" | "successful" | "failed" | "dismissed";
+      /** What the server actually wrote, verbatim. */
+      readonly rawStatus: string;
+      /** False when `rawStatus` was outside the OGC vocabulary. A finding when false. */
+      readonly statusRecognised: boolean;
+      readonly terminal: boolean;
+      /**
+       * Whether the server paced us. False on every response from both
+       * reference servers — finding 0033 — which is why the poll loop's own
+       * backoff is the thing that has to be right.
+       */
+      readonly retryAfterPresent: boolean;
+      readonly progressPresent: boolean;
+      /**
+       * Whether the failure arrived as a structured `exception` member rather
+       * than as prose in `message`. False on both reference servers.
+       */
+      readonly exceptionPresent: boolean;
+      /**
+       * Whether `classify()` read this job body as a problem document. A `true`
+       * here at `httpStatus` 200 means the shared heuristic in `problem.ts` is
+       * mis-reading job documents, which is not a local decision to fix.
+       */
+      readonly classifiedAsException: boolean;
+      readonly warnings: readonly string[];
+      /** Names only, of job-document members this layer does not model. */
+      readonly unrecognisedKeys: readonly string[];
+    }
+  | {
+      /**
+       * One completed poll loop.
+       *
+       * The status sequence is the matrix column that answers "is asynchronous
+       * execution actually usable against this service", which no amount of
+       * reading the specification can answer. It is what shows that pygeoapi
+       * reports `accepted` for a job's whole execution and never `running`
+       * (finding 0032).
+       */
+      readonly kind: "job-polled";
+      readonly url: string;
+      readonly jobIdKnown: boolean;
+      readonly pollCount: number;
+      readonly elapsedMs: number;
+      /** Every status seen, in order, verbatim. */
+      readonly statusSequence: readonly string[];
+      readonly outcome: PollLoopOutcome;
+      readonly retryAfterSeen: boolean;
+      readonly retryAfterHonoured: boolean;
+      /** True when a server-supplied or caller-supplied interval hit a bound. */
+      readonly backoffClamped: boolean;
+    }
+  | {
+      readonly kind: "job-results";
+      readonly url: string;
+      /** Whether the job document advertised the results, or we rebuilt the path. */
+      readonly route: "advertised-link" | "constructed-path";
+      readonly status: number;
+      /**
+       * What came back. `text/html` here is finding 0036 reproducing itself:
+       * pygeoapi content-negotiates this endpoint and renders a page for a
+       * request that does not state a preference.
+       */
+      readonly mediaType: string | undefined;
+      readonly contentCrsPresent: boolean;
+      readonly filenamePresent: boolean;
+      /** A *declared* Content-Length over the buffer limit. Chunked bodies declare none. */
+      readonly bodyTooLarge: boolean;
+      readonly ok: boolean;
+    }
+  | {
+      /**
+       * One dismissal. This single record is the declared-versus-observed cell
+       * for dismiss: `declaredDismiss` is what the conformance document
+       * claimed, `status` and `outcome` are what actually happened. pygeoapi
+       * answers 200 while declaring nothing (finding 0006), and that gap is
+       * only visible because both halves are on one row.
+       */
+      readonly kind: "job-dismissed";
+      readonly url: string;
+      readonly status: number;
+      readonly outcome: "dismissed" | "unsupported" | "error";
+      /** Whether the service declared the dismiss conformance class, if known. */
+      readonly declaredDismiss: boolean | undefined;
+    }
+  | {
+      readonly kind: "job-list";
+      /** The URL of the **last** page walked, redacted. */
+      readonly url: string;
+      readonly status: number;
+      readonly usedFormatFallback: boolean;
+      readonly pageCount: number;
+      readonly jobCount: number;
+      readonly duplicateCount: number;
+      /** Entries that would not parse and were skipped rather than thrown on. */
+      readonly unparseableCount: number;
+      readonly truncated: boolean;
+      readonly truncationReason: "page-cap" | "cycle" | undefined;
+      readonly numberTotal: number | undefined;
+      /** Whether the server advertised `next` at all. */
+      readonly advertisedPagination: boolean;
     };
 
 export type ObservationKind = Observation["kind"];

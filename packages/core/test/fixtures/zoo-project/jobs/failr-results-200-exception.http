@@ -1,0 +1,10 @@
+HTTP/1.1 200 OK
+Date: Wed, 16 Sep 2026 08:59:42 GMT
+Server: Apache/2.4.29 (Ubuntu)
+X-Powered-By: ZOO-Project
+Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self';
+Link: <https://www.opengis.net/dev/profile/OGC/0/ogc-results>; rel="profile"
+Transfer-Encoding: chunked
+Content-Type: application/json;charset=UTF-8
+
+{"title":"NoApplicableCode","type":"NoApplicableCode","detail":"Unable to run the Service. The message returned back by the Service was the following: Unable to run the Service. The message returned back by the Service was the following: Failed running from R world!"}

@@ -1,0 +1,10 @@
+HTTP/1.1 200 OK 
+Date: Wed, 16 Sep 2026 08:59:42 GMT
+Server: Apache/2.4.29 (Ubuntu)
+X-Powered-By: ZOO-Project
+Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self';
+Link: <https://www.opengis.net/dev/profile/OGC/0/jobs-description>; rel="profile"
+Content-Length: 592
+Content-Type: application/json;charset=UTF-8
+
+{"id":"f18222b8-b1ac-11f1-9932-862eff345597","jobID":"f18222b8-b1ac-11f1-9932-862eff345597","type":"process","processID":"failR","created":"2026-09-16T08:59:37.013Z","started":"2026-09-16T08:59:37.013Z","finished":"2026-09-16T08:59:37.373Z","updated":"2026-09-16T08:59:37.050Z","status":"failed","message":"Unable to run the Service. The message returned back by the Service was the following: Failed running from R world!","links":[{"title":"Status location","rel":"monitor","type":"application\/json","href":"http:\/\/localhost:5090\/ogc-api\/jobs\/f18222b8-b1ac-11f1-9932-862eff345597"}]}

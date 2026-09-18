@@ -202,6 +202,7 @@ export async function inspect(
     async: capabilities.async,
     dismiss: capabilities.dismiss,
     callback: capabilities.callback,
+    jobList: capabilities.jobList,
   });
 
   return {

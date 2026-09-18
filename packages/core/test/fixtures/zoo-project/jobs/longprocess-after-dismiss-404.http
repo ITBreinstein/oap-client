@@ -1,0 +1,10 @@
+HTTP/1.1 404 Not Found
+Date: Wed, 16 Sep 2026 08:59:36 GMT
+Server: Apache/2.4.29 (Ubuntu)
+X-Powered-By: ZOO-Project
+Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self';
+Link: <https://www.opengis.net/dev/profile/OGC/0/jobs-description>; rel="profile"
+Transfer-Encoding: chunked
+Content-Type: application/json;charset=UTF-8
+
+{"title":"NoSuchJob","type":"http:\/\/www.opengis.net\/def\/exceptions\/ogcapi-processes-1\/1.0\/no-such-job","detail":"The JobID from the request does not match any of the Jobs running on this server"}

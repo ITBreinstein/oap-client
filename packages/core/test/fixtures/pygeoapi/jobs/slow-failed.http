@@ -1,0 +1,23 @@
+HTTP/1.1 200 OK
+Server: gunicorn
+Date: Wed, 16 Sep 2026 08:58:55 GMT
+Connection: keep-alive
+Content-Type: application/json
+X-Powered-By: pygeoapi 0.21.0
+Content-Language: en-US
+Access-Control-Allow-Origin: *
+Content-Length: 453
+
+{
+    "type":"process",
+    "processID":"slow",
+    "jobID":"d6d58dce-b1ac-11f1-b153-0a31f4dc3bd9",
+    "status":"failed",
+    "message":"InvalidParameterValue: Error executing process: The \"seconds\" input must not be negative",
+    "progress":5,
+    "parameters":null,
+    "created":"2026-09-16T08:58:52.211685Z",
+    "started":"2026-09-16T08:58:52.212107Z",
+    "finished":"2026-09-16T08:58:52.225307Z",
+    "updated":"2026-09-16T08:58:52.225357Z"
+}

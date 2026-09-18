@@ -9,6 +9,27 @@ import { listProcesses, type ListProcessesOptions } from "./processes/list-proce
 import { getProcess, type GetProcessOptions } from "./processes/get-process.js";
 import { execute, type ExecuteOptions } from "./execution/index.js";
 import type { Execution } from "./execution/index.js";
+import {
+  dismissJob,
+  getJob,
+  getResults,
+  isAbsoluteUrl,
+  jobUrlFor,
+  jobsFallback,
+  listJobs,
+  pollJob,
+  waitForJob,
+  type Dismissal,
+  type DismissJobOptions,
+  type GetResultsOptions,
+  type JobList,
+  type JobRequestOptions,
+  type JobResults,
+  type JobStatus,
+  type ListJobsOptions,
+  type PollJobOptions,
+  type PollReport,
+} from "./jobs/index.js";
 import type { ProcessDescription, ProcessList } from "./processes/types.js";
 
 export interface ClientOptions {
@@ -40,6 +61,20 @@ export type GetProcessRequestOptions = Omit<GetProcessOptions, "fetch" | "maxBuf
 
 /** Per-call execution options; transport concerns come from the client. */
 export type ExecuteRequestOptions = Omit<ExecuteOptions, "fetch" | "maxBufferBytes">;
+
+/** Per-call job options; transport concerns come from the client. */
+export type JobRequestOptionsFor<T> = Omit<T, "fetch" | "maxBufferBytes">;
+
+/** Per-call status-read options. */
+export type GetJobRequestOptions = JobRequestOptionsFor<JobRequestOptions>;
+/** Per-call poll options. */
+export type PollJobRequestOptions = JobRequestOptionsFor<PollJobOptions>;
+/** Per-call results options. */
+export type GetResultsRequestOptions = JobRequestOptionsFor<GetResultsOptions>;
+/** Per-call dismiss options. */
+export type DismissJobRequestOptions = JobRequestOptionsFor<DismissJobOptions>;
+/** Per-call job-list options. */
+export type ListJobsRequestOptions = JobRequestOptionsFor<ListJobsOptions>;
 
 export interface Client {
   readonly baseUrl: URL;
@@ -98,6 +133,64 @@ export interface Client {
    * a request because it disagrees with a description.
    */
   execute(processId: string, options?: ExecuteRequestOptions): Promise<Execution>;
+  /**
+   * Read one job's status.
+   *
+   * Takes either an absolute status URL — the `statusUrl` off a
+   * {@link JobHandle} — or a bare job id, which is all a browser has when it
+   * recovered the job from the job list because it could not read `Location`.
+   *
+   * A **failed job is not an error**: it resolves with a {@link JobStatus}
+   * whose `status` is `"failed"`, carrying the server's own explanation. A 404
+   * raises {@link JobNotFoundError}, which on both reference servers is the
+   * normal state of a job that has been dismissed.
+   */
+  getJob(jobUrlOrId: string, options?: GetJobRequestOptions): Promise<JobStatus>;
+  /**
+   * Poll a job to a terminal status, reporting progress as it goes.
+   *
+   * Pass `onStatus` to drive a progress display — it is called once per poll,
+   * in order, and a callback that throws cannot break the loop. Pass `signal`
+   * to cancel: the signal is checked *between* polls, so a cancelled loop
+   * provably makes no further request.
+   *
+   * Resolves for a failed or dismissed job as readily as for a successful one.
+   * Rejects with {@link JobPollTimeoutError} if the total deadline expires,
+   * which is deliberately a different error from the caller's abort.
+   */
+  pollJob(jobUrlOrId: string, options?: PollJobRequestOptions): Promise<PollReport>;
+  /** {@link Client.pollJob}, resolving with the final status rather than the report. */
+  waitForJob(jobUrlOrId: string, options?: PollJobRequestOptions): Promise<JobStatus>;
+  /**
+   * Fetch a finished job's results, **unparsed**.
+   *
+   * Returns the {@link ResponseEnvelope} for the same reason `execute()` does:
+   * a result may be GeoJSON, a PNG, a zip or GML, and the correct parse depends
+   * on a media type the core has no opinion about. Pass the `status` you
+   * already hold and its advertised `results` link is used instead of a rebuilt
+   * path.
+   */
+  getResults(jobUrlOrId: string, options?: GetResultsRequestOptions): Promise<JobResults>;
+  /**
+   * Ask the service to dismiss a job.
+   *
+   * Returns a {@link Dismissal} rather than `void`, and a 405 or 501 is
+   * `kind: "unsupported"` rather than an exception — a server saying it cannot
+   * dismiss is the answer the request asked for, not a failure. Anything else
+   * non-ok still throws.
+   *
+   * **Never gated on `capabilities.dismiss`.** pygeoapi honours `DELETE` while
+   * declaring no dismiss class, and a client that checked first would never
+   * have found out.
+   */
+  dismissJob(jobUrlOrId: string, options?: DismissJobRequestOptions): Promise<Dismissal>;
+  /**
+   * The service's jobs, following `rel="next"` to a bounded depth.
+   *
+   * Prefers the `job-list` link the landing page advertises, falling back to a
+   * constructed `./jobs`, and remembers which for the life of the client.
+   */
+  listJobs(options?: ListJobsRequestOptions): Promise<JobList>;
 }
 
 /**
@@ -192,6 +285,71 @@ export function createClient(options: ClientOptions): Client {
     return pending;
   }
 
+  /**
+   * The resolved job-list URL, remembered per client.
+   *
+   * Deliberately **not** the same shape as `discoverProcessesUrl` above, which
+   * carries a defect this one avoids: that function bakes the *first* caller's
+   * `signal` into the memoised promise, so two concurrent calls share one
+   * discovery and whichever caller cancels first makes the other fail with an
+   * `AbortError` it never asked for. It is pre-existing and out of this task's
+   * scope to change, but it is not worth copying.
+   *
+   * Here the shared discovery takes no caller signal at all. It cannot fail —
+   * every error degrades to the path fallback — so there is nothing for one
+   * caller's cancellation to poison, and each caller still honours its own
+   * signal at the call site below.
+   */
+  let jobsUrl: Promise<string> | undefined;
+
+  function discoverJobsUrl(sink: ObservationSink | undefined): Promise<string> {
+    jobsUrl ??= (async (): Promise<string> => {
+      const landing = baseUrl.toString();
+      try {
+        const service = await inspect(baseUrl, {
+          ...transport,
+          ...(sink === undefined ? {} : { onObservation: sink }),
+        });
+        const advertised = findLink(service.links, "jobList");
+        if (advertised !== undefined) {
+          observe(sink, {
+            kind: "job-list-link",
+            source: "advertised",
+            url: redactUrl(advertised.href),
+          });
+          return advertised.href;
+        }
+        // Both reference servers advertise the link, so reaching this is itself
+        // worth recording — see finding 0006 for the server that advertises the
+        // link while declaring no matching conformance class.
+        const guessed = jobsFallback(service.url);
+        observe(sink, { kind: "job-list-link", source: "path-fallback", url: redactUrl(guessed) });
+        return guessed;
+      } catch {
+        const guessed = jobsFallback(landing);
+        observe(sink, { kind: "job-list-link", source: "path-fallback", url: redactUrl(guessed) });
+        return guessed;
+      }
+    })();
+    return jobsUrl;
+  }
+
+  /**
+   * An absolute status URL, whatever the caller had.
+   *
+   * A `JobHandle` carries the absolute URL the server itself gave out, and that
+   * is always preferred. A bare id has to be turned into a URL somewhere, and
+   * doing it once here beats doing it at every call site — which is half the
+   * reason these are client methods at all.
+   */
+  async function resolveJobUrl(
+    jobUrlOrId: string,
+    sink: ObservationSink | undefined,
+  ): Promise<string> {
+    if (isAbsoluteUrl(jobUrlOrId)) return jobUrlOrId;
+    return jobUrlFor(await discoverJobsUrl(sink), jobUrlOrId);
+  }
+
   return {
     baseUrl,
     send(path: string, requestOptions: RequestOptions = {}): Promise<ResponseEnvelope> {
@@ -237,6 +395,72 @@ export function createClient(options: ClientOptions): Client {
       return execute(url, processId, {
         ...transport,
         ...executeOptions,
+        ...(sink === undefined ? {} : { onObservation: sink }),
+      });
+    },
+    async getJob(jobUrlOrId: string, jobOptions: GetJobRequestOptions = {}): Promise<JobStatus> {
+      const sink = jobOptions.onObservation ?? options.onObservation;
+      const url = await resolveJobUrl(jobUrlOrId, sink);
+      return getJob(url, {
+        ...transport,
+        ...jobOptions,
+        ...(sink === undefined ? {} : { onObservation: sink }),
+      });
+    },
+    async pollJob(
+      jobUrlOrId: string,
+      pollOptions: PollJobRequestOptions = {},
+    ): Promise<PollReport> {
+      const sink = pollOptions.onObservation ?? options.onObservation;
+      const url = await resolveJobUrl(jobUrlOrId, sink);
+      return pollJob(url, {
+        ...transport,
+        ...pollOptions,
+        ...(sink === undefined ? {} : { onObservation: sink }),
+      });
+    },
+    async waitForJob(
+      jobUrlOrId: string,
+      pollOptions: PollJobRequestOptions = {},
+    ): Promise<JobStatus> {
+      const sink = pollOptions.onObservation ?? options.onObservation;
+      const url = await resolveJobUrl(jobUrlOrId, sink);
+      return waitForJob(url, {
+        ...transport,
+        ...pollOptions,
+        ...(sink === undefined ? {} : { onObservation: sink }),
+      });
+    },
+    async getResults(
+      jobUrlOrId: string,
+      resultsOptions: GetResultsRequestOptions = {},
+    ): Promise<JobResults> {
+      const sink = resultsOptions.onObservation ?? options.onObservation;
+      const url = await resolveJobUrl(jobUrlOrId, sink);
+      return getResults(url, {
+        ...transport,
+        ...resultsOptions,
+        ...(sink === undefined ? {} : { onObservation: sink }),
+      });
+    },
+    async dismissJob(
+      jobUrlOrId: string,
+      dismissOptions: DismissJobRequestOptions = {},
+    ): Promise<Dismissal> {
+      const sink = dismissOptions.onObservation ?? options.onObservation;
+      const url = await resolveJobUrl(jobUrlOrId, sink);
+      return dismissJob(url, {
+        ...transport,
+        ...dismissOptions,
+        ...(sink === undefined ? {} : { onObservation: sink }),
+      });
+    },
+    async listJobs(listOptions: ListJobsRequestOptions = {}): Promise<JobList> {
+      const sink = listOptions.onObservation ?? options.onObservation;
+      const url = await discoverJobsUrl(sink);
+      return listJobs(url, {
+        ...transport,
+        ...listOptions,
         ...(sink === undefined ? {} : { onObservation: sink }),
       });
     },

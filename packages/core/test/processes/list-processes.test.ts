@@ -50,7 +50,9 @@ describe("listProcesses on a single page", () => {
 
     const list = await listProcesses(LIST);
 
-    expect(list.processes.map((process) => process.id)).toEqual(["hello-world"]);
+    // Two, since Task 5 registered the `slow` process on the pinned server so
+    // that asynchronous polling could be tested at all — see infra/README.md.
+    expect(list.processes.map((process) => process.id)).toEqual(["hello-world", "slow"]);
     expect(list.pageCount).toBe(1);
     expect(list.truncated).toBe(false);
     expect(list).not.toHaveProperty("truncationReason");
