@@ -35,13 +35,23 @@ the versions are recorded here rather than left to a commit message.
               process-list.json  (re-captured; now carries `slow`)    2026-09-16
               callbacks/*.http, jobs/job-list-{first,last}-page.http,
               execution/preflight-execute-{cors,nocors}.http          2026-09-23
+              processes/breinstein-{bbox,inputs,png}.json,
+              process-list.json  (re-captured; now carries all five)  2026-09-23
+
+The three `breinstein-*` descriptions are processes this repository adds to the
+pinned image (see `infra/README.md`). They are the only descriptions a browser
+can fetch live — `:5080` is the one server with CORS — so they are what the web
+client's generated form is tested against, in Vitest from these files and in
+Playwright live.
 
 Re-capture by hand against `http://localhost:5080`; there is no script, because
-the set is four files and the server is one pinned image.
+the set is a handful of files and the server is one pinned image.
 
     docker compose -f infra/compose/pygeoapi.yml up -d --wait
     curl -sSf -H 'Accept: application/json' -o pygeoapi/process-list.json \
       http://localhost:5080/processes
+    curl -sSf -H 'Accept: application/json' -o pygeoapi/processes/breinstein-bbox.json \
+      http://localhost:5080/processes/breinstein-bbox
 
 ## `zoo-project/`
 

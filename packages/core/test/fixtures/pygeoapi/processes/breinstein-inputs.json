@@ -1,0 +1,178 @@
+{
+    "version":"1.0.0",
+    "id":"breinstein-inputs",
+    "title":"Every input kind",
+    "description":"Takes one input of every kind a generated form renders and returns them unchanged, plus a plain-text summary. Exists so that a form can be tested against exactly what the server received.",
+    "jobControlOptions":[
+        "sync-execute",
+        "async-execute"
+    ],
+    "keywords":[
+        "echo",
+        "inputs",
+        "testbed"
+    ],
+    "links":[
+        {
+            "type":"text/html",
+            "rel":"about",
+            "title":"information",
+            "href":"https://example.org/process",
+            "hreflang":"en-US"
+        },
+        {
+            "type":"application/json",
+            "rel":"self",
+            "href":"http://localhost:5080/processes/breinstein-inputs?f=json",
+            "title":"Process description as JSON",
+            "hreflang":"en-US"
+        },
+        {
+            "type":"text/html",
+            "rel":"alternate",
+            "href":"http://localhost:5080/processes/breinstein-inputs?f=html",
+            "title":"Process description as HTML",
+            "hreflang":"en-US"
+        },
+        {
+            "type":"text/html",
+            "rel":"http://www.opengis.net/def/rel/ogc/1.0/job-list",
+            "href":"http://localhost:5080/jobs?f=html",
+            "title":"Jobs list as HTML",
+            "hreflang":"en-US"
+        },
+        {
+            "type":"application/json",
+            "rel":"http://www.opengis.net/def/rel/ogc/1.0/job-list",
+            "href":"http://localhost:5080/jobs?f=json",
+            "title":"Jobs list as JSON",
+            "hreflang":"en-US"
+        },
+        {
+            "type":"application/json",
+            "rel":"http://www.opengis.net/def/rel/ogc/1.0/execute",
+            "href":"http://localhost:5080/processes/breinstein-inputs/execution?f=json",
+            "title":"Execution for this process as JSON",
+            "hreflang":"en-US"
+        }
+    ],
+    "inputs":{
+        "label":{
+            "title":"Label",
+            "description":"A short string of at most 20 characters.",
+            "schema":{
+                "type":"string",
+                "maxLength":20
+            },
+            "minOccurs":1,
+            "maxOccurs":1
+        },
+        "notes":{
+            "title":"Notes",
+            "description":"Free text; may span several lines.",
+            "schema":{
+                "type":"string",
+                "contentMediaType":"text/plain"
+            },
+            "minOccurs":1,
+            "maxOccurs":1
+        },
+        "count":{
+            "title":"Count",
+            "description":"A whole number from 1 to 10.",
+            "schema":{
+                "type":"integer",
+                "minimum":1,
+                "maximum":10
+            },
+            "minOccurs":1,
+            "maxOccurs":1
+        },
+        "ratio":{
+            "title":"Ratio",
+            "description":"Any number; 0.5 unless changed.",
+            "schema":{
+                "type":"number",
+                "default":0.5
+            },
+            "minOccurs":1,
+            "maxOccurs":1
+        },
+        "colour":{
+            "title":"Colour",
+            "description":"One of three values.",
+            "schema":{
+                "type":"string",
+                "enum":[
+                    "red",
+                    "green",
+                    "blue"
+                ]
+            },
+            "minOccurs":1,
+            "maxOccurs":1
+        },
+        "enabled":{
+            "title":"Enabled",
+            "description":"Yes or no.",
+            "schema":{
+                "type":"boolean"
+            },
+            "minOccurs":1,
+            "maxOccurs":1
+        },
+        "tags":{
+            "title":"Tags",
+            "description":"Up to three short strings.",
+            "schema":{
+                "type":"string"
+            },
+            "minOccurs":1,
+            "maxOccurs":3
+        },
+        "comment":{
+            "title":"Comment",
+            "description":"Optional; left out of the request when empty.",
+            "schema":{
+                "type":"string"
+            },
+            "minOccurs":0,
+            "maxOccurs":1
+        }
+    },
+    "outputs":{
+        "echo":{
+            "title":"Received inputs",
+            "description":"The inputs exactly as the server received them.",
+            "schema":{
+                "type":"object",
+                "contentMediaType":"application/json"
+            }
+        },
+        "summary":{
+            "title":"Summary",
+            "description":"One line per input received, as plain text.",
+            "schema":{
+                "type":"string",
+                "contentMediaType":"text/plain"
+            }
+        }
+    },
+    "example":{
+        "inputs":{
+            "label":"example",
+            "notes":"first line\nsecond line",
+            "count":3,
+            "ratio":0.5,
+            "colour":"green",
+            "enabled":true,
+            "tags":[
+                "a",
+                "b"
+            ]
+        }
+    },
+    "outputTransmission":[
+        "value"
+    ]
+}

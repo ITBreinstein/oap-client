@@ -101,11 +101,45 @@ the job last long enough to _observe_, but the vocabulary and the progress
 numbers are pygeoapi's. A genuinely `running` job with moving progress only
 exists on ZOO, and the interop lane is where that is asserted.
 
-### The rest of the coverage gap
+### `breinstein-bbox`, `breinstein-inputs`, `breinstein-png`
 
-Three more processors are on the backlog, each closing a hole the stock image
-leaves: **non-JSON output**, **multiple outputs**, and a **bbox input**. Add them
-here the same way, and say in the config comment what each one is for.
+```yaml
+breinstein-bbox:
+  type: process
+  processor:
+    name: breinstein_bbox.BboxProcessor
+```
+
+…and the same for `breinstein_inputs.InputsProcessor` and
+`breinstein_png.PngProcessor`. The three coverage-gap processes that were left
+on the backlog after `slow`, one hole each. `:5080` is the only server a browser
+can reach (findings 0049, 0050), so without them the web client's generated form
+had nothing to be tested against but two string inputs.
+
+| Process             | Closes                               | Inputs → outputs                                                                                                                                                                                 |
+| ------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `breinstein-bbox`   | a bounding-box input                 | one `format: "ogc-bbox"` object (`properties.bbox`, four numbers, and `properties.crs`, CRS84 only) → the box as a GeoJSON `Feature` polygon, `application/geo+json`                             |
+| `breinstein-inputs` | every form control, multiple outputs | a bounded string, a multi-line string, a bounded integer, a number with a default, an enum, a boolean, a string repeatable three times, one optional string → `echo` (JSON) and `summary` (text) |
+| `breinstein-png`    | a non-JSON output                    | one bounded integer → an `image/png` of that size                                                                                                                                                |
+
+Same rule as `slow`: each one **echoes or reshapes its inputs and computes
+nothing**. Three details are deliberate:
+
+- **`breinstein-bbox` refuses any CRS but CRS84** rather than reprojecting.
+  Reprojection would be the process doing geography, and whether a client
+  swaps axes is the client's decision to be tested, not the server's to hide.
+- **`breinstein-inputs` does no validation of its own.** Whether a wrong-typed
+  or out-of-range value is refused is then pygeoapi's decision alone, which is
+  the thing worth measuring. It echoes the inputs as received, so a browser test
+  asserts on what arrived rather than on what the client believes it sent.
+  Its multi-line input is `type: "string"` with `contentMediaType: "text/plain"`:
+  JSON Schema has no multi-line keyword, and this is the nearest standard one.
+- **Two outputs travel as one JSON results map** (`{ "echo": …, "summary": … }`)
+  because a pygeoapi processor returns one media type and one payload. Ask for
+  `summary` alone and it comes back raw as `text/plain`.
+
+`breinstein-png` builds its PNG with `zlib` and `struct` only, so the pinned
+image needs no extra package.
 
 ## Re-creating the stack after a config change
 
