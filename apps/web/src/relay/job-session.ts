@@ -14,17 +14,17 @@
 import {
   createClient,
   getJob,
+  type Client,
   type ExecuteOutputSelection,
   type Execution,
-  type Observation,
+  type ProcessDescription,
 } from "@breinstein/oap-client";
+import type { WebObservation } from "../observations.js";
 import type { RelayEndpoint } from "./contract.js";
 import { openDoorbells, type DoorbellStream, type StreamState } from "./doorbells.js";
 import { JobReconciler, type TrackedJob } from "./reconciler.js";
 import { createRelayClient, type RelayClient } from "./relay-client.js";
-import { createRoutedFetch, type ExecuteRouteObservation } from "./routed-fetch.js";
-
-export type WebObservation = Observation | ExecuteRouteObservation;
+import { createRoutedFetch } from "./routed-fetch.js";
 
 export interface JobRow extends TrackedJob {
   readonly endpointKey: string;
@@ -39,18 +39,37 @@ export interface JobSessionSnapshot {
 
 export interface JobSession {
   endpoints(): Promise<RelayEndpoint[]>;
-  /** Start one asynchronous execution. Resolves once the job is known, or refused. */
+  /**
+   * A core client for one endpoint, reporting into this session's
+   * observations and sending through the same route choice as `run`. For
+   * everything but an asynchronous execute: discovery, the process list and
+   * descriptions, a synchronous run, results and dismissal.
+   */
+  client(endpoint: RelayEndpoint): Client;
+  /**
+   * Start one asynchronous execution. Resolves once the job is known, or refused.
+   * Pass the description and the core uses its `execute` link and checks arity.
+   */
   run(
     endpoint: RelayEndpoint,
     processId: string,
     inputs: Record<string, unknown>,
     outputs: Record<string, unknown>,
+    description?: ProcessDescription,
   ): Promise<Execution>;
+  /** Start reconciling a job the caller found some other way — a sync run the server made async. */
+  track(endpoint: RelayEndpoint, statusUrl: string): void;
+  /** Add an observation the web app made itself (T4). */
+  record(observation: WebObservation): void;
   subscribe(listener: (snapshot: JobSessionSnapshot) => void): () => void;
   dispose(): void;
 }
 
-const OBSERVATIONS_KEPT = 50;
+/**
+ * Enough for a long demo session, bounded so a page left open for a day does
+ * not grow without limit. The export button writes whatever is kept.
+ */
+const OBSERVATIONS_KEPT = 1_000;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -148,7 +167,24 @@ export function createJobSession(relayUrl: string | undefined): JobSession {
       return relay === undefined ? [] : relay.endpoints();
     },
 
-    async run(endpoint, processId, inputs, outputs) {
+    client(endpoint) {
+      return createClient({
+        baseUrl: endpoint.baseUrl,
+        onObservation: observe,
+        fetch: createRoutedFetch({ endpoint, relay, session: doorbells, onRoute: observe }),
+      });
+    },
+
+    track(endpoint, statusUrl) {
+      meta.set(statusUrl, { endpointKey: endpoint.key, route: "direct" });
+      reconciler.track(statusUrl);
+    },
+
+    record(observation) {
+      observe(observation);
+    },
+
+    async run(endpoint, processId, inputs, outputs, description) {
       const refs = new Map<string, string>();
       let route: "direct" | "relay" | undefined;
       const client = createClient({
@@ -171,6 +207,7 @@ export function createJobSession(relayUrl: string | undefined): JobSession {
         inputs,
         outputs: toOutputSelection(outputs),
         mode: "async",
+        ...(description === undefined ? {} : { description }),
       });
       if (execution.kind === "job") {
         const { statusUrl } = execution.job;
