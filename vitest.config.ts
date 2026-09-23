@@ -22,7 +22,12 @@ export default defineConfig({
       // Picks up apps/web/vite.config.ts (React plugin + core alias).
       "apps/web",
       {
-        test: { name: "relay", root: "apps/relay", environment: "node", exclude },
+        test: {
+          name: "relay",
+          root: "apps/relay",
+          environment: "node",
+          exclude: [...exclude, "test/contract/**"],
+        },
       },
     ],
   },

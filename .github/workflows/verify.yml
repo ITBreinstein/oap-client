@@ -13,8 +13,14 @@ jobs:
       - run: pnpm verify
       - run: pnpm test:smoke
       - run: pnpm exec playwright install --with-deps chromium
+      # pygeoapi reaches the relay's callback receiver on this runner as
+      # host.docker.internal — mapped to the host gateway in the compose file,
+      # because Linux does not provide the name the way Docker Desktop does.
       - run: docker compose -f infra/compose/pygeoapi.yml up -d --wait
+      # The core's contract lane, then the relay's: real callbacks from pygeoapi.
       - run: pnpm test:contract
+      # Starts the relay with infra/relay/ci.json (callbacks on for pygeoapi)
+      # and a web build that knows its URL. See playwright.config.ts.
       - run: pnpm test:e2e
       - if: failure()
         uses: actions/upload-artifact@v4

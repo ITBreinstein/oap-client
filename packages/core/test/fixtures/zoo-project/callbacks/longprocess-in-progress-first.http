@@ -1,0 +1,8 @@
+POST /cb/zoo-success-plain-1790153486310/in-progress HTTP/1.1
+Host: host.docker.internal:9911
+User-Agent: ZooWPSClient
+Accept: */*
+Content-Type: application/json
+Content-Length: 477
+
+{"progress":0,"id":"f6140fa6-b72b-11f1-aa17-3a9d4c7adc78","jobID":"f6140fa6-b72b-11f1-aa17-3a9d4c7adc78","type":"process","processID":"longProcess","created":"2026-09-23T08:51:26.776Z","started":"2026-09-23T08:51:26.776Z","updated":"2026-09-23T08:51:26.776Z","status":"running","message":"No message provided","links":[{"title":"Status location","rel":"monitor","type":"application\/json","href":"http:\/\/localhost:5090\/ogc-api\/jobs\/f6140fa6-b72b-11f1-aa17-3a9d4c7adc78"}]}

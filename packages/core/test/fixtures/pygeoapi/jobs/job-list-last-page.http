@@ -1,0 +1,222 @@
+HTTP/1.1 200 OK
+Server: gunicorn
+Date: Wed, 23 Sep 2026 08:57:10 GMT
+Connection: keep-alive
+Content-Type: application/json
+X-Powered-By: pygeoapi 0.21.0
+Content-Language: en-US
+Access-Control-Allow-Origin: *
+Content-Length: 8935
+
+{
+    "jobs":[
+        {
+            "type":"process",
+            "processID":"slow",
+            "jobID":"9f4207ea-b72c-11f1-84a5-0a4eb7d4f744",
+            "status":"successful",
+            "message":"Job complete",
+            "progress":100,
+            "parameters":null,
+            "created":"2026-09-23T08:56:10.354711Z",
+            "started":"2026-09-23T08:56:10.354780Z",
+            "finished":"2026-09-23T08:56:11.419204Z",
+            "updated":"2026-09-23T08:56:11.419277Z",
+            "links":[
+                {
+                    "href":"http://localhost:5080/jobs/9f4207ea-b72c-11f1-84a5-0a4eb7d4f744/results?f=html",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/results",
+                    "type":"text/html",
+                    "title":"Results of job as HTML"
+                },
+                {
+                    "href":"http://localhost:5080/jobs/9f4207ea-b72c-11f1-84a5-0a4eb7d4f744/results?f=json",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/results",
+                    "type":"application/json",
+                    "title":"Results of job as JSON"
+                }
+            ]
+        },
+        {
+            "type":"process",
+            "processID":"slow",
+            "jobID":"9f372ad2-b72c-11f1-84a5-0a4eb7d4f744",
+            "status":"successful",
+            "message":"Job complete",
+            "progress":100,
+            "parameters":null,
+            "created":"2026-09-23T08:56:10.284094Z",
+            "started":"2026-09-23T08:56:10.284330Z",
+            "finished":"2026-09-23T08:56:11.392370Z",
+            "updated":"2026-09-23T08:56:11.392434Z",
+            "links":[
+                {
+                    "href":"http://localhost:5080/jobs/9f372ad2-b72c-11f1-84a5-0a4eb7d4f744/results?f=html",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/results",
+                    "type":"text/html",
+                    "title":"Results of job as HTML"
+                },
+                {
+                    "href":"http://localhost:5080/jobs/9f372ad2-b72c-11f1-84a5-0a4eb7d4f744/results?f=json",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/results",
+                    "type":"application/json",
+                    "title":"Results of job as JSON"
+                }
+            ]
+        },
+        {
+            "type":"process",
+            "processID":"slow",
+            "jobID":"5b5bfe50-b72c-11f1-84a5-0a4eb7d4f744",
+            "status":"successful",
+            "message":"Job complete",
+            "progress":100,
+            "parameters":null,
+            "created":"2026-09-23T08:54:16.439856Z",
+            "started":"2026-09-23T08:54:16.439931Z",
+            "finished":"2026-09-23T08:54:46.554363Z",
+            "updated":"2026-09-23T08:54:46.554437Z",
+            "links":[
+                {
+                    "href":"http://localhost:5080/jobs/5b5bfe50-b72c-11f1-84a5-0a4eb7d4f744/results?f=html",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/results",
+                    "type":"text/html",
+                    "title":"Results of job as HTML"
+                },
+                {
+                    "href":"http://localhost:5080/jobs/5b5bfe50-b72c-11f1-84a5-0a4eb7d4f744/results?f=json",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/results",
+                    "type":"application/json",
+                    "title":"Results of job as JSON"
+                }
+            ]
+        },
+        {
+            "type":"process",
+            "processID":"slow",
+            "jobID":"4d41f770-b72c-11f1-84a5-0a4eb7d4f744",
+            "status":"successful",
+            "message":"Job complete",
+            "progress":100,
+            "parameters":null,
+            "created":"2026-09-23T08:53:52.789647Z",
+            "started":"2026-09-23T08:53:52.790980Z",
+            "finished":"2026-09-23T08:54:22.957570Z",
+            "updated":"2026-09-23T08:54:22.957685Z",
+            "links":[
+                {
+                    "href":"http://localhost:5080/jobs/4d41f770-b72c-11f1-84a5-0a4eb7d4f744/results?f=html",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/results",
+                    "type":"text/html",
+                    "title":"Results of job as HTML"
+                },
+                {
+                    "href":"http://localhost:5080/jobs/4d41f770-b72c-11f1-84a5-0a4eb7d4f744/results?f=json",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/results",
+                    "type":"application/json",
+                    "title":"Results of job as JSON"
+                }
+            ]
+        },
+        {
+            "type":"process",
+            "processID":"slow",
+            "jobID":"a9e45dc0-b72b-11f1-84a5-0a4eb7d4f744",
+            "status":"successful",
+            "message":"Job complete",
+            "progress":100,
+            "parameters":null,
+            "created":"2026-09-23T08:49:18.851747Z",
+            "started":"2026-09-23T08:49:18.855665Z",
+            "finished":"2026-09-23T08:49:47.113423Z",
+            "updated":"2026-09-23T08:49:47.113498Z",
+            "links":[
+                {
+                    "href":"http://localhost:5080/jobs/a9e45dc0-b72b-11f1-84a5-0a4eb7d4f744/results?f=html",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/results",
+                    "type":"text/html",
+                    "title":"Results of job as HTML"
+                },
+                {
+                    "href":"http://localhost:5080/jobs/a9e45dc0-b72b-11f1-84a5-0a4eb7d4f744/results?f=json",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/results",
+                    "type":"application/json",
+                    "title":"Results of job as JSON"
+                }
+            ]
+        },
+        {
+            "type":"process",
+            "processID":"slow",
+            "jobID":"a9e3b4e2-b72b-11f1-be67-0a4eb7d4f744",
+            "status":"successful",
+            "message":"Job complete",
+            "progress":100,
+            "parameters":null,
+            "created":"2026-09-23T08:49:18.841522Z",
+            "started":"2026-09-23T08:49:18.844373Z",
+            "finished":"2026-09-23T08:49:27.011388Z",
+            "updated":"2026-09-23T08:49:27.011517Z",
+            "links":[
+                {
+                    "href":"http://localhost:5080/jobs/a9e3b4e2-b72b-11f1-be67-0a4eb7d4f744/results?f=html",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/results",
+                    "type":"text/html",
+                    "title":"Results of job as HTML"
+                },
+                {
+                    "href":"http://localhost:5080/jobs/a9e3b4e2-b72b-11f1-be67-0a4eb7d4f744/results?f=json",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/results",
+                    "type":"application/json",
+                    "title":"Results of job as JSON"
+                }
+            ]
+        },
+        {
+            "type":"process",
+            "processID":"slow",
+            "jobID":"a9e5ac0c-b72b-11f1-bbfb-0a4eb7d4f744",
+            "status":"failed",
+            "message":"InvalidParameterValue: Error executing process: The \"seconds\" input must not be negative",
+            "progress":5,
+            "parameters":null,
+            "created":"2026-09-23T08:49:18.708845Z",
+            "started":"2026-09-23T08:49:18.709108Z",
+            "finished":"2026-09-23T08:49:18.867473Z",
+            "updated":"2026-09-23T08:49:18.867551Z"
+        },
+        {
+            "type":"process",
+            "processID":"slow",
+            "jobID":"a9e1e644-b72b-11f1-bbfb-0a4eb7d4f744",
+            "status":"failed",
+            "message":"InvalidParameterValue: Error executing process: HTTPConnectionPool(host='host.docker.internal', port=9912): Max retries exceeded with url: /cb/pygeoapi-success-unreach-success-1790153358496/success (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7fffbb0f83a0>: Failed to establish a new connection: [Errno 111] Connection refused'))",
+            "progress":100,
+            "parameters":null,
+            "created":"2026-09-23T08:49:18.688809Z",
+            "started":"2026-09-23T08:49:18.690625Z",
+            "finished":"2026-09-23T08:49:26.967164Z",
+            "updated":"2026-09-23T08:49:26.967227Z"
+        }
+    ],
+    "links":[
+        {
+            "href":"http://localhost:5080/jobs?f=html",
+            "rel":"alternate",
+            "type":"text/html",
+            "title":"Jobs list as HTML"
+        },
+        {
+            "href":"http://localhost:5080/jobs?f=json",
+            "rel":"self",
+            "type":"application/json",
+            "title":"Jobs list as JSON"
+        },
+        {
+            "href":"http://localhost:5080/jobs?offset=60",
+            "type":"application/json",
+            "rel":"prev",
+            "title":"Items (prev)"
+        }
+    ]
+}

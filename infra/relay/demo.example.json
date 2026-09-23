@@ -1,0 +1,19 @@
+{
+  "publicUrl": "https://relay.example.org",
+  "allowedOrigins": ["https://client.example.org"],
+  "endpoints": [
+    {
+      "key": "example-pygeoapi",
+      "baseUrl": "https://ogc.example.org",
+      "executeRoute": "relay",
+      "callbacks": false
+    }
+  ],
+  "limits": {
+    "maxExecuteBodyBytes": 1048576,
+    "maxUpstreamResponseBytes": 262144,
+    "upstreamTimeoutMs": 30000,
+    "maxSessions": 10000,
+    "maxRegistrationsPerSession": 100
+  }
+}

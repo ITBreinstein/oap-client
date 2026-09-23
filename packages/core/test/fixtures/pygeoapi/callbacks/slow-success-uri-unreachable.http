@@ -1,0 +1,23 @@
+HTTP/1.1 200 OK
+Server: gunicorn
+Date: Wed, 23 Sep 2026 08:57:10 GMT
+Connection: keep-alive
+Content-Type: application/json
+X-Powered-By: pygeoapi 0.21.0
+Content-Language: en-US
+Access-Control-Allow-Origin: *
+Content-Length: 727
+
+{
+    "type":"process",
+    "processID":"slow",
+    "jobID":"a9e1e644-b72b-11f1-bbfb-0a4eb7d4f744",
+    "status":"failed",
+    "message":"InvalidParameterValue: Error executing process: HTTPConnectionPool(host='host.docker.internal', port=9912): Max retries exceeded with url: /cb/pygeoapi-success-unreach-success-1790153358496/success (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7fffbb0f83a0>: Failed to establish a new connection: [Errno 111] Connection refused'))",
+    "progress":100,
+    "parameters":null,
+    "created":"2026-09-23T08:49:18.688809Z",
+    "started":"2026-09-23T08:49:18.690625Z",
+    "finished":"2026-09-23T08:49:26.967164Z",
+    "updated":"2026-09-23T08:49:26.967227Z"
+}

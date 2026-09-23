@@ -1,0 +1,8 @@
+POST /cb/zoo-failure-plain-1790153523556/failed HTTP/1.1
+Host: host.docker.internal:9911
+User-Agent: ZooWPSClient
+Accept: */*
+Content-Type: application/json
+Content-Length: 268
+
+{"title":"NoApplicableCode","type":"NoApplicableCode","detail":"Unable to run the Service. The message returned back by the Service was the following: Unable to run the Service. The message returned back by the Service was the following: Failed running from R world!"}

@@ -20,9 +20,14 @@ pygeoapi.
 ## The two pygeoapi ports
 
 Identical configuration but for one flag. `:5080` sets `cors: true` and
-exercises the direct-fetch path; `:5081` sets `cors: false` and forces the relay
-fallback. Both are needed: a client that only ever met a CORS-enabled server
-would ship with a whole class of browser failure untested.
+exercises the direct-fetch path; `:5081` sets `cors: false`. Both are needed: a
+client that only ever met a CORS-enabled server would ship with a whole class of
+browser failure untested.
+
+The relay does not rescue `:5081`. It carries the asynchronous execute and
+nothing else, so on `:5081` it can name a job the browser still cannot read
+(finding 0049). On `:5080` it is what makes asynchronous execution work from a
+browser at all — see [relay/](relay/) and finding 0039.
 
 What the split has actually shown, measured rather than assumed:
 
@@ -33,8 +38,20 @@ What the split has actually shown, measured rather than assumed:
 - On **both**, `Location` is invisible to a browser: neither port sends
   `Access-Control-Expose-Headers`, so an asynchronous execute starts a job the
   page cannot name. Findings 0002 and 0009.
+- Through the relay, on `:5080`, the browser names the job, watches it
+  complete, and hears its callbacks. On `:5081` it names the job and cannot read
+  it.
 
-`e2e/jobs-cors.spec.ts` asserts all three in a real browser.
+`e2e/jobs-cors.spec.ts` asserts the first three in a real browser, and
+`e2e/relay-async.spec.ts` the last.
+
+## Callbacks reach the host
+
+Both ports map `host.docker.internal` to the host gateway, so pygeoapi can call
+a relay — or `callbacks/listener.mjs` — running on the host. Docker Desktop
+provides the name anyway; Linux, and so CI, needs the mapping. Probes for what
+the servers send, and what they do when the receiver misbehaves, are in
+[callbacks/](callbacks/).
 
 ## Our own processes
 
