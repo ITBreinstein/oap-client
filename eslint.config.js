@@ -78,7 +78,14 @@ export default tseslint.config(
 
   // Config files and E2E specs live outside the composite projects.
   {
-    files: ["*.config.{js,ts}", "*.cjs", "**/*.config.{js,ts}", "e2e/**/*.ts", "smoke/**/*.mjs"],
+    files: [
+      "*.config.{js,ts}",
+      "*.cjs",
+      "**/*.config.{js,ts}",
+      "e2e/**/*.ts",
+      "smoke/**/*.mjs",
+      "infra/**/*.mjs",
+    ],
     extends: [tseslint.configs.disableTypeChecked],
   },
   {
@@ -86,10 +93,12 @@ export default tseslint.config(
     languageOptions: { sourceType: "commonjs" },
   },
 
-  // The smoke consumers are plain .mjs, so no-undef applies and nothing declares
-  // their globals. They run on Node against the packed tarball.
+  // The smoke consumers and the infra scripts are plain .mjs, so no-undef
+  // applies and nothing declares their globals. Both run on bare Node — the
+  // smoke consumers against the packed tarball, the infra scripts against a
+  // live container — and neither is part of a composite TypeScript project.
   {
-    files: ["smoke/**/*.mjs"],
+    files: ["smoke/**/*.mjs", "infra/**/*.mjs"],
     languageOptions: {
       globals: {
         console: "readonly",
@@ -97,6 +106,8 @@ export default tseslint.config(
         globalThis: "readonly",
         URL: "readonly",
         Response: "readonly",
+        fetch: "readonly",
+        setTimeout: "readonly",
       },
     },
   },

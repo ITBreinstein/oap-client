@@ -577,13 +577,17 @@ const report = await client.pollJob(url, {
 
 - **The abort signal is checked between polls**, not only at the start, so
   closing a job panel provably makes no further request.
-- **`Retry-After` is honoured when sent**, in either wire format. `Retry-After: 0`
-  means "ask again now" and is obeyed as such. Neither reference server sends
-  the header at all, which is exactly why the backoff below has to be right.
+- **`Retry-After` is honoured when sent**, in either wire format, down to a hard
+  `MIN_RETRY_AFTER_MS` of one second. Numeric `Retry-After` is in whole seconds,
+  so one second is the shortest wait a server can express: the minimum overrides
+  only `Retry-After: 0` and dates already in the past, and honours every other
+  instruction exactly. A value this client cannot read as one of RFC 9110's two
+  forms — negative, fractional, signed, or prose — is ignored outright, and the
+  backoff takes over; the raw header is recorded on a `retry-after` observation
+  either way.
 - **Otherwise a bounded backoff**: 1 s, growing to a 10 s ceiling, with a 500 ms
-  floor. A server-supplied value is capped at the ceiling but **not** raised to
-  the floor — the floor exists to stop us hammering a server that has told us
-  nothing, and a server sending `Retry-After: 0` has told us something.
+  floor. Because that floor is _below_ the one-second `Retry-After` minimum, a
+  server can currently only ever lengthen a wait, never shorten one.
 - **The total deadline is separate from your signal**, and so is its error:
   `JobPollTimeoutError` for the deadline, `AbortError` for you. The timeout
   error carries the last status seen, the poll count and the elapsed time,
@@ -594,6 +598,13 @@ const report = await client.pollJob(url, {
 in order, whether `Retry-After` was seen and honoured, and how it ended. That is
 the evidence behind any claim about whether asynchronous execution is usable
 against a given service.
+
+> **Unverified against any live server.** Neither pygeoapi nor ZOO-Project sends
+> `Retry-After` on any response, at any point in a job's life (finding 0033), so
+> everything in this section is covered by unit tests against fixtures and by
+> nothing else. It is the first thing to re-check against the first third-party
+> endpoint that does send the header — including whether the one-second minimum
+> ever fights an instruction a real server meant.
 
 `onStatus` is a callback rather than an async iterator because it composes with
 React state without ceremony (`onStatus: setStatus` is the whole integration),

@@ -42,6 +42,17 @@ export type PollLoopOutcome = "terminal" | "timeout" | "aborted" | "error" | "di
 /** How one execution ended. `error` covers every non-ok classification. */
 export type ExecutionOutcome = "immediate" | "job" | "error" | "transport-failure";
 
+/**
+ * What the poll loop did with one `Retry-After` header.
+ *
+ * `ignored` is the interesting one: it means the server sent something that is
+ * neither delta-seconds nor an HTTP-date, and the loop fell back to its own
+ * backoff. The raw value rides along on the observation so a malformed header
+ * can be reported to whoever operates that server rather than merely
+ * tolerated.
+ */
+export type RetryAfterDisposition = "honoured" | "clamped" | "ignored";
+
 /** Why a link advertised by a server was dropped rather than followed. */
 export type SkippedLinkReason =
   "not-an-object" | "missing-href" | "missing-rel" | "unresolvable-href";
@@ -274,6 +285,34 @@ export type Observation =
       readonly warnings: readonly string[];
       /** Names only, of job-document members this layer does not model. */
       readonly unrecognisedKeys: readonly string[];
+    }
+  | {
+      /**
+       * One `Retry-After`, and what the loop did with it.
+       *
+       * Emitted per header rather than per loop, because a server that paces
+       * every poll differently is exactly the case the matrix wants to see and
+       * the per-loop `retryAfterSeen` flag flattens that to a boolean. Neither
+       * reference server sends the header at all (finding 0033), so in practice
+       * this is the record that will first appear against a third-party
+       * endpoint.
+       */
+      readonly kind: "retry-after";
+      readonly url: string;
+      /** The header verbatim, as received. Never parsed, never normalised. */
+      readonly raw: string;
+      readonly disposition: RetryAfterDisposition;
+      /**
+       * What the header parsed to, before clamping. `undefined` when the value
+       * was not one of RFC 9110's two forms — a negative, fractional or signed
+       * number, or prose. See finding 0045.
+       */
+      readonly parsedMs: number | undefined;
+      /**
+       * The wait actually used. `undefined` for `ignored`, where the loop's own
+       * backoff decides and this header contributed nothing.
+       */
+      readonly effectiveDelayMs: number | undefined;
     }
   | {
       /**

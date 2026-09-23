@@ -74,13 +74,30 @@ export interface EnvelopeOptions {
   readonly maxBufferBytes?: number | undefined;
 }
 
+/**
+ * `Retry-After`, in milliseconds. RFC 9110 §10.2.3 defines exactly two forms:
+ * delta-seconds (a non-negative integer) and an HTTP-date. Anything else is
+ * ignored, and ignoring it means `undefined` — the caller then falls back to
+ * its own pacing rather than being handed a number nobody meant.
+ *
+ * The `numericish` guard is the part that is easy to get wrong, and this
+ * function *did* get it wrong until 2026-09-22 (finding 0045). Without it,
+ * `-5`, `1.5` and `+5` all fail the integer test and fall through to
+ * `Date.parse`, which does not reject them: V8 reads `"-5"` as the year 2001,
+ * an already-elapsed date, which clamps to `0` — so a malformed header was
+ * silently honoured as "poll again immediately", the most aggressive reading
+ * available. A value that is trying to be a number and failing is a broken
+ * header, not a date, and is refused as one.
+ */
 function parseRetryAfter(header: string | null): number | undefined {
   if (header === null) return undefined;
   const value = header.trim();
   if (value === "") return undefined;
 
-  // delta-seconds: a non-negative integer.
-  if (/^\d+$/.test(value)) return Number(value) * 1000;
+  // delta-seconds: a non-negative integer, and nothing that merely resembles
+  // one. A leading digit, sign or point means the sender meant a number.
+  const numericish = /^[+\-.\d]/.test(value);
+  if (numericish) return /^\d+$/.test(value) ? Number(value) * 1000 : undefined;
 
   // HTTP-date. Already-elapsed dates clamp to 0 rather than going negative.
   const at = Date.parse(value);

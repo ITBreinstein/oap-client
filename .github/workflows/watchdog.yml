@@ -1,0 +1,157 @@
+name: watchdog
+
+# Tests that assert a known defect is *still there*.
+#
+# Read this lane backwards: the pool test is `it.fails`, so a red pool test is
+# the expected state and a green one is the alarm — it would mean ZOO stopped
+# losing asynchronous workers and finding 0044 needs rewriting. See
+# packages/core/test/watch/zoo-worker-pool.test.ts.
+#
+# Separate from `interop` because it depletes the server on purpose, takes
+# minutes, and inverts the meaning of a red run. Monthly: the thing it watches
+# for is an upstream release, not a commit of ours.
+#
+# ## Three outcomes, and how to tell them apart
+#
+# The job used to be `continue-on-error` at the job level, which made all three
+# look identical from the Actions list. It no longer is:
+#
+# | outcome        | job     | how to recognise it                             |
+# | -------------- | ------- | ----------------------------------------------- |
+# | normal         | green   | pool.json present, verdict in the summary       |
+# | broken run     | **red** | "the watchdog produced no measurement"          |
+# | watchdog alarm | **red** | "ALARM"; the summary says what to do about it   |
+#
+# A broken run is a failed ZOO build, a container that never came up, or a
+# characterisation that produced nothing — none of which say anything about
+# ZOO's behaviour, and all of which once passed silently.
+#
+# Both red states fail the job, for opposite reasons, and the run summary is
+# what tells them apart. The alarm fails on purpose: an alarm nobody is
+# interrupted by is not an alarm. The watchdog step itself keeps
+# `continue-on-error` so that the verdict step still runs and still explains
+# itself — the job outcome is decided there, not by the test step.
+on:
+  schedule: [{ cron: "0 6 1 * *" }]
+  workflow_dispatch:
+
+jobs:
+  watchdog:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+
+      # The full stack, built from the pinned fork. Budget for the kernel
+      # compile; the runner is native amd64, so no emulation on top of it.
+      # Not tolerated: a stack that will not start is a broken run.
+      - name: start ZOO
+        run: ./infra/zoo/zoo.sh up
+
+      # Re-measure the pool on native amd64. The numbers in finding 0044 were
+      # taken on Apple Silicon, where ZOO's amd64-only image runs under Rosetta;
+      # this is the architecture check that keeps the finding honest. Runs
+      # before the tests, on the pool `zoo.sh up` just created.
+      #
+      # `pipefail` matters here: without it the exit status is `tee`'s, so a
+      # script that dies on its first request still writes an empty pool.json
+      # and reports success. That is exactly the silent-broken-run case.
+      - name: characterise the worker pool
+        shell: bash
+        run: |
+          set -o pipefail
+          node infra/zoo/characterise-pool.mjs 4 4 4 4 4 4 | tee pool.json
+        continue-on-error: true
+
+      # The measurement is the deliverable, so its absence fails the job. An
+      # empty or truncated file counts as absent: `jq` has to find at least one
+      # wave carrying a worker count, or there is nothing to record in 0044.
+      - name: the measurement must exist
+        shell: bash
+        run: |
+          if [ ! -s pool.json ]; then
+            echo "::error::the watchdog produced no measurement (pool.json is missing or empty)"
+            exit 1
+          fi
+          waves=$(jq 'length' pool.json 2>/dev/null || echo 0)
+          counted=$(jq '[.[] | select(.poolBefore != null)] | length' pool.json 2>/dev/null || echo 0)
+          echo "waves=$waves with-worker-counts=$counted"
+          if [ "$waves" -lt 1 ] || [ "$counted" -lt 1 ]; then
+            echo "::error::pool.json holds no usable wave; the run says nothing about ZOO"
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with: { name: pool-characterisation, path: pool.json, if-no-files-found: error }
+
+      # `test:watchdog` refreshes the pool first: every test here starts from a
+      # full pool and depletes it itself, which is the whole point.
+      #
+      # `continue-on-error` here does not mean the outcome is tolerated — the
+      # verdict step below fails the job on it. It means this step does not
+      # short-circuit the run, so the verdict is still written and the
+      # observations are still uploaded. Note what a red step means here:
+      # `it.fails` reports the *expected* failure as a pass, so red is the
+      # alarm, not the norm.
+      - name: watchdog tests
+        id: watchdog
+        run: pnpm test:watchdog
+        continue-on-error: true
+
+      # Always runs, including after a failed measurement, so the run summary
+      # says which of the three outcomes this was without anyone opening a log.
+      - name: verdict
+        if: always()
+        shell: bash
+        run: |
+          # An `if`, not `[ ... ] && alarm=yes`: GitHub runs `shell: bash` with
+          # `set -e`, so the `&&` form would exit non-zero whenever the test
+          # is false — which is the *normal* case, and would fail every healthy
+          # run for the opposite of the intended reason.
+          alarm=no
+          if [ "${{ steps.watchdog.outcome }}" = "failure" ]; then
+            alarm=yes
+          fi
+          {
+            echo "## Watchdog verdict"
+            echo
+            if [ -s pool.json ]; then
+              echo '| wave | workers before | workers after | wall (s) |'
+              echo '| ---- | -------------- | ------------- | -------- |'
+              jq -r '.[] | "| N=\(.n) | \(.poolBefore) | \(.poolAfter) | \(.wallMs / 1000 | floor) |"' \
+                pool.json || echo '(pool.json did not parse)'
+              echo
+            else
+              echo '**No measurement.** This run says nothing about ZOO.'
+              echo
+            fi
+            if [ "$alarm" = yes ]; then
+              echo '> **ALARM — the watchdog went green.**'
+              echo '>'
+              echo '> The pool test is `it.fails`, so a failing step means it'
+              echo '> *passed*: a new job still completed after two dozen others.'
+              echo '> ZOO may have stopped losing workers. Re-measure with'
+              echo '> `infra/zoo/characterise-pool.mjs`, then rewrite finding 0044.'
+              echo '> Do not delete the test, and do not drop the `zoo.sh refresh`'
+              echo '> pretask on `pnpm test:interop`, until that is done.'
+              echo '>'
+              echo '> This job is red *because* of this. It is not a broken run:'
+              echo '> the measurement above was taken successfully.'
+            else
+              echo 'Watchdog red, as expected: finding 0044 still holds.'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # The alarm fails the job. A monthly run whose only signal is a line
+          # in a summary nobody opens is not a signal.
+          if [ "$alarm" = yes ]; then
+            echo "::error::ALARM: the watchdog passed, so finding 0044 may no longer hold. Re-measure before changing anything."
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: observations, path: observations/, if-no-files-found: warn }

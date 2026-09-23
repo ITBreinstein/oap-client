@@ -12,11 +12,19 @@ export default defineConfig({
     include: ["test/interop/**/*.test.ts"],
     testTimeout: 60_000,
     hookTimeout: 60_000,
-    // One file at a time. ZOO is a single stateful deployment behind a small
-    // FPM worker pool, not an isolated fixture: files running in parallel start
-    // concurrent asynchronous jobs, saturate the pool, and then fail on
-    // deadlines that say nothing about the client. Serialising costs a couple
-    // of minutes and buys a lane whose red actually means something.
-    fileParallelism: false,
+    // Default file parallelism, deliberately restored.
+    //
+    // Task 5 set `fileParallelism: false` on the theory that parallel files
+    // saturate a small ZOO worker pool. Characterising that pool (finding 0044,
+    // `infra/zoo/characterise-pool.mjs`) showed the theory was wrong: ZOO's
+    // asynchronous capacity decays at about one worker per job run and does not
+    // recover, at the same rate whether the jobs are sequential or concurrent.
+    // Concurrency is not the variable — total jobs run since the container
+    // started is. Serialising does not fix that, it only changes how many runs
+    // it takes to hit the wall: with the lane serialised, runs 1-3 passed, run
+    // 4 took two and a half times as long, and run 5 failed.
+    //
+    // So the cause is addressed where it lives — `pnpm test:interop` restarts
+    // `zoofpm` first — and the lane is free to run its files in parallel again.
   },
 });

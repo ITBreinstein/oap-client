@@ -105,6 +105,32 @@ describe("headers", () => {
   it("ignores an unparseable Retry-After", () => {
     expect(envelope(null, { headers: { "retry-after": "soon" } }).retryAfterMs).toBeUndefined();
   });
+
+  it("reads zero delta-seconds as zero, not as absent", () => {
+    // The envelope reports what the server sent. Deciding that zero is too
+    // eager to obey is the poll loop's job — see MIN_RETRY_AFTER_MS — and
+    // collapsing it to `undefined` here would destroy the evidence first.
+    expect(envelope(null, { headers: { "retry-after": "0" } }).retryAfterMs).toBe(0);
+  });
+
+  // Finding 0045. Each of these used to fall through the delta-seconds test
+  // into `Date.parse`, which reads "-5" and "1.5" as years in 2001 — already
+  // elapsed, so they clamped to 0 and were honoured as "retry immediately".
+  // A number the sender got wrong is a broken header, never a date.
+  it.each([
+    ["negative", "-5"],
+    ["fractional", "1.5"],
+    ["explicitly signed", "+5"],
+    ["exponential", "1e3"],
+    ["hexadecimal", "0x10"],
+    ["leading point", ".5"],
+  ])("ignores a %s Retry-After rather than reading it as a date", (_label, raw) => {
+    expect(envelope(null, { headers: { "retry-after": raw } }).retryAfterMs).toBeUndefined();
+  });
+
+  it("ignores an empty Retry-After", () => {
+    expect(envelope(null, { headers: { "retry-after": "   " } }).retryAfterMs).toBeUndefined();
+  });
 });
 
 describe("location", () => {

@@ -17,15 +17,17 @@
  * 2. **Every timer is cleared in a `finally`.** A pending two-minute timer that
  *    keeps a Node process alive is the standard way this goes wrong, and it
  *    goes wrong in the test run rather than in production.
- * 3. **`Retry-After` is honoured when the server sends one.** Written `??`, not
- *    `||`: `Retry-After: 0` is a real instruction meaning "ask again now", and
- *    `||` would silently replace it with the default. Neither reference server
- *    sends the header at all (finding 0033), which is exactly why the handling
- *    has unit tests rather than contract tests.
+ * 3. **`Retry-After` is honoured when the server sends one**, down to a hard
+ *    {@link MIN_RETRY_AFTER_MS}. Written `??`, not `||`: `Retry-After: 0` is a
+ *    real instruction and `||` would silently replace it with the default,
+ *    which is a different bug from clamping it deliberately. Neither reference
+ *    server sends the header at all (finding 0033), which is exactly why the
+ *    handling has unit tests rather than contract tests.
  * 4. **Otherwise a bounded backoff** between {@link MIN_POLL_INTERVAL_MS} and
  *    {@link MAX_POLL_INTERVAL_MS}, so we neither hammer a server at 50 ms nor
- *    make a five-second job take thirty. A server-supplied value is clamped
- *    into the same range, and the clamping is recorded rather than hidden.
+ *    make a five-second job take thirty. A server-supplied value is held
+ *    between {@link MIN_RETRY_AFTER_MS} and the same ceiling, and every clamp
+ *    is recorded rather than hidden.
  * 5. **A total deadline separate from the caller's signal**, with its own error
  *    type. "The user closed the panel" and "the job never finished" are
  *    different facts about a service.
@@ -49,8 +51,26 @@ import { observe, redactUrl } from "../observations.js";
 import { readJobStatus } from "./get-job.js";
 import type { JobRequestOptions, JobStatus } from "./types.js";
 
-/** Do not hammer a server, however eager the caller or the `Retry-After`. */
+/** Do not hammer a server, however eager the caller. */
 export const MIN_POLL_INTERVAL_MS = 500;
+/**
+ * The floor under a server-supplied `Retry-After`, and the *only* thing that
+ * overrules one.
+ *
+ * Numeric `Retry-After` is in whole seconds, so the smallest non-zero value a
+ * server can express is one second. A 1000 ms minimum therefore overrides
+ * exactly two inputs — `Retry-After: 0` and an HTTP-date already in the past —
+ * and honours every legitimate non-zero instruction to the millisecond. It is
+ * a guard against "immediately", not a second opinion about pacing.
+ *
+ * Note how it sits against {@link MIN_POLL_INTERVAL_MS}, which is 500 ms: this
+ * minimum is *above* our own backoff floor, so a `Retry-After` can only ever
+ * lengthen a wait, never shorten one. If the backoff floor is ever raised above
+ * 1000 ms that stops being true and a server value between the two would be
+ * honoured below the floor — which is intended, but is no longer the case
+ * today and should not be assumed.
+ */
+export const MIN_RETRY_AFTER_MS = 1_000;
 /** Do not make a five-second job take thirty. */
 export const MAX_POLL_INTERVAL_MS = 10_000;
 /** Where the backoff starts, before it grows towards the ceiling. */
@@ -222,6 +242,7 @@ export async function pollJob(
       throwIfAborted(options.signal, statusUrl);
 
       let retryAfterMs: number | undefined;
+      let retryAfterRaw: string | undefined;
       try {
         // `readJobStatus` rather than `getJob`: the loop needs the response's
         // `Retry-After`, which is a fact about one HTTP response rather than
@@ -229,6 +250,10 @@ export async function pollJob(
         const polled = await readJobStatus(statusUrl, options);
         status = polled.status;
         retryAfterMs = polled.envelope.retryAfterMs;
+        // The raw header as well as the parsed value: when the two disagree —
+        // the header was present but unparseable — that difference *is* the
+        // observation, and the parsed value alone cannot express it.
+        retryAfterRaw = polled.envelope.headers.get("retry-after") ?? undefined;
       } catch (error) {
         // An abort belongs to the outer handler, which is the one place that
         // records it.
@@ -257,8 +282,9 @@ export async function pollJob(
         throw new JobPollTimeoutError(statusUrl, timeoutMs, pollCount, elapsed, status);
       }
 
-      // `??`, not `||`. A `Retry-After: 0` means "ask again now" and is a real
-      // instruction; `||` would discard it and substitute the backoff.
+      // `??`, not `||`. A `Retry-After: 0` is a real instruction and `||` would
+      // discard it as falsy — a different thing from clamping it to
+      // `MIN_RETRY_AFTER_MS`, which is a decision taken in the open below.
       if (retryAfterMs !== undefined) {
         retryAfterSeen = true;
         retryAfterHonoured = true;
@@ -266,6 +292,23 @@ export async function pollJob(
       const requested = retryAfterMs ?? interval;
       const wait = retryAfterMs === undefined ? clampOurs(requested) : clampServer(requested);
       if (wait !== requested) clamped = true;
+
+      // A header the server sent is recorded whatever we did with it, including
+      // the case where we did nothing because it did not parse. Silently
+      // falling back to the backoff would hide a malformed header behind
+      // perfectly reasonable-looking polling.
+      if (retryAfterRaw !== undefined) {
+        const ignored = retryAfterMs === undefined;
+        observe(sink, {
+          kind: "retry-after",
+          url: redactUrl(statusUrl),
+          raw: retryAfterRaw,
+          disposition: ignored ? "ignored" : wait === retryAfterMs ? "honoured" : "clamped",
+          parsedMs: retryAfterMs,
+          effectiveDelayMs: ignored ? undefined : wait,
+        });
+        if (ignored) retryAfterSeen = true;
+      }
 
       // Never sleep past the deadline: waiting ten seconds to discover we ran
       // out of time nine seconds ago is a worse report and a slower one.
@@ -305,22 +348,25 @@ function clampOurs(ms: number): number {
 }
 
 /**
- * A server-supplied `Retry-After`: the ceiling applies, the floor does not.
+ * A server-supplied `Retry-After`, held between {@link MIN_RETRY_AFTER_MS} and
+ * the ceiling.
  *
- * This is a deliberate departure from the brief, which said to clamp a
- * server-supplied value into the same range as our own backoff. The floor's
- * entire justification is "do not hammer a server that has not asked for it" —
- * and a server sending `Retry-After: 0` *has* asked for it, explicitly. Raising
- * its own instruction to 500 ms would be the client overruling the server on
- * the one question the header exists to answer.
+ * Task 5 let a server value through at 0 ms on the argument that a server
+ * sending `Retry-After: 0` has explicitly asked to be polled immediately. That
+ * argument is wrong about what the header can express: delta-seconds is in
+ * whole seconds, so `0` does not mean "in a moment", it means "now", and a loop
+ * that obeys it literally against a server answering instantly is a spin. Every
+ * value a server can actually use to request a short wait — one second and up —
+ * is still honoured exactly, so the minimum costs nothing a real server wanted.
  *
- * The ceiling is kept, because an hour-long `Retry-After` on a job a user is
+ * The ceiling is unchanged: an hour-long `Retry-After` on a job a user is
  * watching is a hung panel, and a clamped wait that is recorded is better than
- * a correct wait nobody sees. Every clamp sets `clamped` on the report.
+ * a correct wait nobody sees. Every clamp sets `clamped` on the report and
+ * emits a `retry-after` observation carrying the raw header.
  */
 function clampServer(ms: number): number {
   if (!Number.isFinite(ms)) return MAX_POLL_INTERVAL_MS;
-  return Math.min(MAX_POLL_INTERVAL_MS, Math.max(0, ms));
+  return Math.min(MAX_POLL_INTERVAL_MS, Math.max(MIN_RETRY_AFTER_MS, ms));
 }
 
 /**

@@ -26,48 +26,16 @@ import type { FetchLike } from "../http/fetch.js";
 import type { ProblemDetails } from "../http/problem.js";
 import type { Link } from "../links/types.js";
 import type { ObservationSink } from "../observations.js";
+import type { JobState } from "../vocabulary/job-status.js";
 
 /**
- * The OGC job status vocabulary, verbatim per the house naming rule.
- *
- * This is the vocabulary's home. `execution/classify-execution.ts` imports it
- * from here rather than keeping a second copy: a body whose `status` is one of
- * these is how that layer tells a job document from a result, and two lists
- * that must agree are one list.
+ * The status vocabulary itself lives one layer down, in
+ * `vocabulary/job-status.ts`, because `execution/` needs it too and a layer
+ * may not reach sideways into another to get it. Re-exported here so this
+ * module stays the one place the jobs layer imports its types from.
  */
-export type JobState = "accepted" | "running" | "successful" | "failed" | "dismissed";
-
-/** Membership test for {@link JobState}, case-insensitive as servers are inconsistent. */
-const JOB_STATES: ReadonlySet<string> = new Set<JobState>([
-  "accepted",
-  "running",
-  "successful",
-  "failed",
-  "dismissed",
-]);
-
-/**
- * The statuses a job cannot leave.
- *
- * `dismissed` is terminal even though both reference servers delete the job
- * outright rather than parking it in that state (finding 0035) — a server that
- * *does* keep it must not be polled forever.
- */
-const TERMINAL_STATES: ReadonlySet<string> = new Set<JobState>([
-  "successful",
-  "failed",
-  "dismissed",
-]);
-
-/** Is this string in the OGC job status vocabulary? */
-export function isJobState(value: string): value is JobState {
-  return JOB_STATES.has(value.toLowerCase());
-}
-
-/** Is this a status the job cannot leave? Unknown statuses are **not** terminal. */
-export function isTerminalState(value: string): boolean {
-  return TERMINAL_STATES.has(value.toLowerCase());
-}
+export type { JobState } from "../vocabulary/job-status.js";
+export { isJobState, isTerminalState } from "../vocabulary/job-status.js";
 
 export interface JobStatus {
   /** `jobID`, then `id`, then the last path segment of the URL it was read from. */

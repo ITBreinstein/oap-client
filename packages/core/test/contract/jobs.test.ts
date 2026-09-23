@@ -279,17 +279,44 @@ describe("the job list", () => {
     // Asserted directly against the server rather than through the client,
     // because the client deliberately offers no filter arguments. A filter that
     // is silently ignored is worse than no filter.
-    const all = await send(`${CORS}/jobs?f=json`, { signal: AbortSignal.timeout(10_000) });
-    const filtered = await send(`${CORS}/jobs?f=json&status=failed`, {
-      signal: AbortSignal.timeout(10_000),
-    });
+    //
+    // The proof is that the filtered response is *byte-for-byte the same page*
+    // as the unfiltered one — same jobs, same order — including for a
+    // `processID` that matches nothing on the server and a `status` no job in
+    // the page has. A filter that worked at all would have to return fewer
+    // jobs for at least one of those.
+    //
+    // Deliberately no dependence on the server's job history. An earlier
+    // version asserted that the response carried more than one distinct status,
+    // which is only true of a server that happens to have a failed job on this
+    // page — and the page cannot be steered. pygeoapi caps `limit` at ten,
+    // which the standard permits, but a job created seconds ago does not
+    // reliably appear on the first page at all: starting one and re-reading
+    // leaves the page unchanged. Recorded in finding 0038, which is also why
+    // this test creates no jobs to set up its own assertion.
+    const pageOf = async (query: string): Promise<string[]> => {
+      const response = await send(`${CORS}/jobs?f=json${query}`, {
+        signal: AbortSignal.timeout(10_000),
+      });
+      const body = (await response.json()) as { jobs: { jobID: string }[] };
+      return body.jobs.map((entry) => entry.jobID);
+    };
 
-    const allJobs = (await all.json()) as { jobs: unknown[] };
-    const filteredJobs = (await filtered.json()) as { jobs: { status: string }[] };
+    // The only precondition is that *some* job exists, which every earlier test
+    // in this file has already guaranteed. That is a far weaker thing to depend
+    // on than "a failed job is among the oldest ten", which is what the earlier
+    // version needed and could not arrange.
+    const unfiltered = await pageOf("");
+    expect(unfiltered.length).toBeGreaterThan(0);
 
-    expect(filteredJobs.jobs.length).toBe(allJobs.jobs.length);
-    // The proof that it was ignored rather than merely unselective.
-    expect(new Set(filteredJobs.jobs.map((entry) => entry.status)).size).toBeGreaterThan(1);
+    for (const query of [
+      "&status=failed",
+      "&status=dismissed",
+      "&processID=no-such-process-at-all",
+      "&processID=slow",
+    ]) {
+      expect(await pageOf(query)).toEqual(unfiltered);
+    }
   }, 60_000);
 });
 

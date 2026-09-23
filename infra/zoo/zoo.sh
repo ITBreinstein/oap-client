@@ -4,6 +4,7 @@
 # October. Read infra/zoo/README.md before changing anything here.
 #
 #   ./infra/zoo/zoo.sh up       clone at the pinned SHA, build, start on :5090
+#   ./infra/zoo/zoo.sh refresh  restart zoofpm: a fresh pool of async workers
 #   ./infra/zoo/zoo.sh down     stop and remove
 #   ./infra/zoo/zoo.sh ps       what is running
 #   ./infra/zoo/zoo.sh logs     follow zookernel
@@ -101,6 +102,40 @@ wait_ready() { # wait_ready <port> <service>
   return 1
 }
 
+# A ZOO deployment's asynchronous capacity decays with every job it runs and
+# does not recover. The count of `zoo_loader_fpm` workers falls at about one
+# per job — sequential or concurrent, it makes no difference — starting from
+# `[server] async_worker`, which is 20. At zero, jobs are still accepted and
+# then orphaned in `running` for ever. Measured, with numbers, in finding 0044;
+# reproduce with `infra/zoo/characterise-pool.mjs`. The process-level cause is
+# an open question, so do not repeat any mechanism you may have heard.
+#
+# So the interop lane restarts the worker container before it runs. This is a
+# workaround and it is worth being blunt about what it does not do: it does not
+# fix the defect, it resets the counter. A real deployment cannot restart
+# between users, which is exactly why the finding exists and why this is a lane
+# pretask rather than something buried in a test helper.
+#
+# Only zoofpm is restarted. zookernel, the database and the broker keep their
+# state, so job history survives and the lane stays comparable run to run.
+#
+# Tolerant on purpose. The interop lane never blocks a release and skips itself
+# when nothing is answering, so a laptop with Docker stopped must reach the
+# skip rather than fail here on the way to it.
+refresh_workers() {
+  if ! docker info >/dev/null 2>&1; then
+    echo "==> Docker is not running; leaving ZOO alone (the interop lane will skip)"
+    return 0
+  fi
+  if [ -z "$(compose ps -q zoofpm 2>/dev/null)" ]; then
+    echo "==> zoofpm is not up; leaving ZOO alone (run \`$0 up\` first)"
+    return 0
+  fi
+  echo "==> restarting zoofpm for a fresh pool of async workers (finding 0044)"
+  compose restart zoofpm
+  wait_ready 5090 zookernel
+}
+
 case "${1:-up}" in
   up)
     sync_checkout
@@ -113,8 +148,11 @@ case "${1:-up}" in
     wait_ready 5090 zookernel
     echo "==> http://localhost:5090/ogc-api/"
     ;;
+  refresh)
+    refresh_workers
+    ;;
   down) compose down -v --remove-orphans ;;
   ps) compose ps ;;
   logs) compose logs -f zookernel ;;
-  *) echo "usage: $0 {up|down|ps|logs}" >&2; exit 2 ;;
+  *) echo "usage: $0 {up|refresh|down|ps|logs}" >&2; exit 2 ;;
 esac

@@ -9,7 +9,7 @@
 // Also runs publint and attw against the tarball itself, which is what catches
 // a broken exports map or types that resolve for us but not for a consumer.
 import { execFileSync } from "node:child_process";
-import { copyFileSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -46,6 +46,22 @@ try {
   console.log(`  ${packed}`);
 
   step("package correctness (against the tarball)");
+  // The version lives in two places: package.json, and the VERSION constant
+  // src/index.ts mirrors by hand because packages/core type-checks with
+  // `types: []` and so cannot read a file. Nothing used to compare them — the
+  // unit test and the node consumer both only assert semver *shape* — so
+  // bumping one and not the other passed every lane.
+  {
+    const declared = JSON.parse(readFileSync(join(coreDir, "package.json"), "utf8")).version;
+    const source = readFileSync(join(coreDir, "src", "index.ts"), "utf8");
+    const mirrored = /export const VERSION: string = "([^"]+)"/.exec(source)?.[1];
+    if (mirrored !== declared) {
+      throw new Error(
+        `VERSION mismatch: package.json says ${declared}, src/index.ts says ${String(mirrored)}`,
+      );
+    }
+    console.log(`  version ${declared} mirrored correctly`);
+  }
   run("pnpm", ["exec", "publint", "run", tarball, "--strict"], repoRoot);
   console.log("  publint clean");
   // --profile esm-only encodes the decision rather than waiving a failure:
@@ -89,6 +105,10 @@ try {
   console.log("\n✔ smoke tests passed\n");
 } catch (error) {
   console.error(`\n✖ smoke tests failed\n`);
+  // stdout/stderr exist only for a failed subprocess. A check in this file
+  // throws a plain Error, and without this line its message was swallowed —
+  // the run said only that it had failed.
+  if (!error.stdout && !error.stderr) console.error(`  ${error.message}\n`);
   if (error.stdout) process.stderr.write(error.stdout);
   if (error.stderr) process.stderr.write(error.stderr);
   process.exitCode = 1;

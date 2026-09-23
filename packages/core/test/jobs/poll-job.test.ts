@@ -8,7 +8,11 @@
  *
  * Reduction tests this file backs:
  *  1. `retryAfterMs ?? default` → `retryAfterMs || default` → the
- *     `Retry-After: 0` test goes red. *(T2.3)*
+ *     `Retry-After: 0` test goes red. *(T2.3)* That test now runs with
+ *     `intervalMs: 4000` for a reason: once a zero is clamped up to
+ *     `MIN_RETRY_AFTER_MS`, an `intervalMs` left at its 1000 ms default would
+ *     produce the same 1000 ms wait under both operators and the reduction
+ *     would pass against the broken code. Four seconds keeps the two apart.
  *  2. moving the abort check to before the loop only → the mid-loop abort test
  *     goes red. *(T2.1)*
  *  3. dropping the `finally` in `sleep()` → the pending-timer tests go red.
@@ -16,7 +20,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { pollJob, waitForJob } from "../../src/jobs/poll-job.js";
+import { MIN_RETRY_AFTER_MS, pollJob, waitForJob } from "../../src/jobs/poll-job.js";
 import { JobPollTimeoutError } from "../../src/errors.js";
 import { AbortError } from "../../src/http/errors.js";
 import type { JobStatus } from "../../src/jobs/types.js";
@@ -94,23 +98,155 @@ describe("pacing", () => {
     expect(fake.calls).toHaveLength(2);
   });
 
-  it("honours Retry-After: 0 as *now*, not as the default interval — T2.3", async () => {
-    // The reduction test. `retryAfterMs || default` would read 0 as falsy and
-    // substitute the 1000 ms initial interval, so the second poll would not
-    // have happened yet at this point on the clock.
+  it("raises Retry-After: 0 to the 1 s minimum rather than polling immediately", async () => {
+    // Task 5 let a zero through at 0 ms. It no longer does: delta-seconds is in
+    // whole seconds, so `0` is the one value that cannot mean "shortly", and
+    // obeying it literally against a server answering instantly is a spin.
     const fake = scripted([
       () => json(jobBody("running"), 200, { "Retry-After": "0" }),
       () => json(jobBody("successful")),
     ]);
-    const promise = pollJob(JOB_URL, { fetch: fake.fetch });
+    const promise = pollJob(JOB_URL, { fetch: fake.fetch, intervalMs: 4_000 });
 
     await vi.advanceTimersByTimeAsync(0);
+    expect(fake.calls).toHaveLength(1);
+
+    // Not at 999 ms…
+    await vi.advanceTimersByTimeAsync(MIN_RETRY_AFTER_MS - 1);
+    expect(fake.calls).toHaveLength(1);
+    // …and exactly at 1000 ms.
+    await vi.advanceTimersByTimeAsync(1);
     const report = await promise;
 
     expect(fake.calls).toHaveLength(2);
     expect(report.outcome).toBe("terminal");
     expect(report.retryAfterSeen).toBe(true);
-    expect(report.retryAfterHonoured).toBe(true);
+    expect(report.clamped).toBe(true);
+  });
+
+  it("still reads a zero as an instruction and not as absent — T2.3", async () => {
+    // The reduction test, kept alive across the clamp. `retryAfterMs || interval`
+    // reads 0 as falsy and substitutes `intervalMs`, which is 4000 here — so the
+    // broken version would not have polled again by 1000 ms, and this goes red.
+    const fake = scripted([
+      () => json(jobBody("running"), 200, { "Retry-After": "0" }),
+      () => json(jobBody("successful")),
+    ]);
+    const promise = pollJob(JOB_URL, { fetch: fake.fetch, intervalMs: 4_000 });
+
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(MIN_RETRY_AFTER_MS);
+    await promise;
+
+    expect(fake.calls).toHaveLength(2);
+  });
+
+  it("honours Retry-After: 1 as exactly the minimum, with nothing to clamp", async () => {
+    const fake = scripted([
+      () => json(jobBody("running"), 200, { "Retry-After": "1" }),
+      () => json(jobBody("successful")),
+    ]);
+    const { sink, seen } = collect();
+    const promise = pollJob(JOB_URL, { fetch: fake.fetch, onObservation: sink });
+
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(999);
+    expect(fake.calls).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(1);
+    const report = await promise;
+
+    expect(fake.calls).toHaveLength(2);
+    // One second is the smallest thing a server can actually ask for, so it is
+    // honoured to the millisecond and the minimum never bites.
+    expect(report.clamped).toBe(false);
+
+    const record = seen.find((entry) => entry.kind === "retry-after");
+    expect(record).toMatchObject({
+      raw: "1",
+      disposition: "honoured",
+      parsedMs: 1_000,
+      effectiveDelayMs: 1_000,
+    });
+  });
+
+  it("converts a future HTTP-date and honours it", async () => {
+    vi.setSystemTime(new Date("2026-08-24T12:00:00.000Z"));
+    const fake = scripted([
+      () => json(jobBody("running"), 200, { "Retry-After": "Mon, 24 Aug 2026 12:00:03 GMT" }),
+      () => json(jobBody("successful")),
+    ]);
+    const { sink, seen } = collect();
+    const promise = pollJob(JOB_URL, { fetch: fake.fetch, onObservation: sink });
+
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(2_999);
+    expect(fake.calls).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(1);
+    await promise;
+
+    expect(fake.calls).toHaveLength(2);
+    expect(seen.find((entry) => entry.kind === "retry-after")).toMatchObject({
+      disposition: "honoured",
+      parsedMs: 3_000,
+      effectiveDelayMs: 3_000,
+    });
+  });
+
+  it("raises an already-elapsed HTTP-date to the minimum", async () => {
+    vi.setSystemTime(new Date("2026-08-24T12:00:00.000Z"));
+    const fake = scripted([
+      () => json(jobBody("running"), 200, { "Retry-After": "Mon, 24 Aug 2026 11:59:00 GMT" }),
+      () => json(jobBody("successful")),
+    ]);
+    const { sink, seen } = collect();
+    const promise = pollJob(JOB_URL, { fetch: fake.fetch, onObservation: sink });
+
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(999);
+    expect(fake.calls).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(1);
+    await promise;
+
+    expect(fake.calls).toHaveLength(2);
+    expect(seen.find((entry) => entry.kind === "retry-after")).toMatchObject({
+      disposition: "clamped",
+      parsedMs: 0,
+      effectiveDelayMs: MIN_RETRY_AFTER_MS,
+    });
+  });
+
+  it.each([
+    ["a negative delta", "-5"],
+    ["a fractional delta", "1.5"],
+    ["a signed delta", "+5"],
+    ["prose", "soon"],
+  ])("ignores %s and falls back to the backoff, recording the raw value", async (_label, raw) => {
+    // Finding 0045: until 2026-09-22 the first three of these fell through to
+    // `Date.parse`, which read them as dates in 2001 — already elapsed, so they
+    // clamped to 0 and were honoured as "poll immediately". The most aggressive
+    // possible reading of a header the server got wrong.
+    const fake = scripted([
+      () => json(jobBody("running"), 200, { "Retry-After": raw }),
+      () => json(jobBody("successful")),
+    ]);
+    const { sink, seen } = collect();
+    const promise = pollJob(JOB_URL, { fetch: fake.fetch, intervalMs: 4_000, onObservation: sink });
+
+    await vi.advanceTimersByTimeAsync(0);
+    // The backoff decides, so nothing happens before `intervalMs`.
+    await vi.advanceTimersByTimeAsync(3_999);
+    expect(fake.calls).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(1);
+    const report = await promise;
+
+    expect(fake.calls).toHaveLength(2);
+    expect(report.retryAfterHonoured).toBe(false);
+    expect(seen.find((entry) => entry.kind === "retry-after")).toMatchObject({
+      raw,
+      disposition: "ignored",
+      parsedMs: undefined,
+      effectiveDelayMs: undefined,
+    });
   });
 
   it("clamps an absurd Retry-After into the bounded range and records it", async () => {

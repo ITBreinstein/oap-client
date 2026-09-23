@@ -34,27 +34,26 @@ module.exports = {
     },
     {
       // The execution layer sits on the transport, the links, the process
-      // types, the errors and the observations — and on nothing else. Discovery
-      // and conformance are deliberately out of reach: execution navigates by a
-      // URL it was handed, and a dependency on the layer that *finds* that URL
-      // would make the operation impossible to test or reuse in isolation.
+      // types, the errors, the observations and the vocabulary — and on nothing
+      // else. Discovery and conformance are deliberately out of reach:
+      // execution navigates by a URL it was handed, and a dependency on the
+      // layer that *finds* that URL would make the operation impossible to test
+      // or reuse in isolation.
       //
-      // `jobs/types.ts` is reachable, and **only** that file — not the rest of
-      // the jobs layer. It owns the OGC job status vocabulary, which execution
-      // needs to tell a job document from a result and jobs needs to decide
-      // whether a job is terminal. Two copies of one list eventually disagree,
-      // so there is one, and it lives with the layer the vocabulary is named
-      // after. Allowing the single types module keeps the invariant the rule
-      // exists for: execution still cannot reach an *operation* in another
-      // layer, only a type — exactly as it already reaches `processes/types`.
+      // `jobs/` is out of reach too, and an earlier version of this rule let
+      // `jobs/types.ts` through by name so that `classifyExecution()` could
+      // borrow the OGC job status vocabulary. That exemption is gone: the thing
+      // crossing the boundary was `isJobState`, a *function*, so the edge was
+      // real at runtime and not merely a type reference. The vocabulary now
+      // lives below both layers in `src/vocabulary/`, which is where something
+      // two layers share belongs.
       name: "execution-sits-on-its-own-layers",
       severity: "error",
       from: { path: "^packages/core/src/execution" },
       to: {
         path: "^packages/core/src",
         pathNot: [
-          "^packages/core/src/(execution|http|links|processes)/",
-          "^packages/core/src/jobs/types\\.ts$",
+          "^packages/core/src/(execution|http|links|processes|vocabulary)/",
           "^packages/core/src/(errors|observations)\\.ts$",
         ],
       },
@@ -67,19 +66,37 @@ module.exports = {
       // `?f=json` negotiation policy, not a discovery operation, and a second
       // copy of it in this layer is how the two fall out of step.
       //
-      // Note what is absent: `execution`. The dependency runs the other way,
-      // and allowing both directions is how a cycle gets in.
+      // Note what is absent: `execution`. Nothing here imports it today, and
+      // nothing should — the shared job status vocabulary lives in
+      // `src/vocabulary/` precisely so neither layer has to reach for the
+      // other, and allowing both directions is how a cycle gets in.
       name: "jobs-sit-on-their-own-layers",
       severity: "error",
       from: { path: "^packages/core/src/jobs" },
       to: {
         path: "^packages/core/src",
         pathNot: [
-          "^packages/core/src/(jobs|http|links)/",
+          "^packages/core/src/(jobs|http|links|vocabulary)/",
           "^packages/core/src/discovery/negotiate\\.ts$",
           "^packages/core/src/(errors|observations)\\.ts$",
         ],
       },
+    },
+    {
+      // `src/vocabulary/` is what both `execution` and `jobs` are allowed to
+      // depend on, so it must depend on nobody. A module everyone may import
+      // that imports something itself is a cycle with extra steps, and the
+      // no-circular rule below would only catch it once the cycle closed.
+      //
+      // This is the rule that replaces the file-level exemption Task 5 added.
+      // It is strictly stronger: the exemption said "execution may reach one
+      // named file in another layer", which decays the moment that file grows
+      // an import. This says the shared module may reach nothing at all, which
+      // does not decay.
+      name: "vocabulary-imports-nothing",
+      severity: "error",
+      from: { path: "^packages/core/src/vocabulary" },
+      to: { path: "^packages/core/src", pathNot: "^packages/core/src/vocabulary/" },
     },
     { name: "no-circular", severity: "error", from: {}, to: { circular: true } },
     // pnpm makes an undeclared import unresolvable; make that a build failure
