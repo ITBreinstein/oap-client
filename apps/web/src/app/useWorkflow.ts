@@ -69,13 +69,19 @@ export interface WorkflowView {
 
 const NO_ERRORS: FieldErrors = new Map();
 
-function transportMessage(cause: unknown): WorkflowError {
+function transportMessage(cause: unknown, endpoint: EndpointRef): WorkflowError {
   if (cause instanceof TransportError && cause.crossOrigin === true) {
+    // What to do next depends on where the address came from. A configured
+    // endpoint is no way out: the relay carries background runs only, and
+    // never reads a server's pages for the browser (findings 0049, 0050).
+    const next =
+      endpoint.source === "configured"
+        ? "Being configured on the relay does not change that: the relay only starts background runs, and never reads a server's pages for this page. Choose another service, or ask this server's operator to enable CORS."
+        : "Choose another service, or ask this server's operator to enable CORS.";
     return {
       title:
         "This server doesn't allow access from a web page (no CORS headers). The attempt has been recorded.",
-      detail:
-        "A browser may only read another site's answers when that site sends Access-Control-Allow-Origin. Use one of the configured endpoints, or ask the server's operator to enable CORS.",
+      detail: `A browser may only read another site's answers when that site sends Access-Control-Allow-Origin. ${next}`,
     };
   }
   return {
@@ -177,7 +183,7 @@ export function useWorkflow(relayUrl: string | undefined): WorkflowView {
           outcome: cors ? "cors-blocked" : "failed",
           error: cause instanceof Error ? cause.name : typeof cause,
         });
-        dispatch({ type: "connect-failed", endpoint, error: transportMessage(cause) });
+        dispatch({ type: "connect-failed", endpoint, error: transportMessage(cause, endpoint) });
       }
     })();
   }, []);
