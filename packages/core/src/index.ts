@@ -235,4 +235,4 @@ export type {
  * and cannot read a file. `smoke/run.mjs` asserts the two agree — the
  * tests here only check the shape, so a half-done bump used to pass.
  */
-export const VERSION: string = "0.3.1";
+export const VERSION: string = "0.3.2";
