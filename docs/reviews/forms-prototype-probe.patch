@@ -1,0 +1,275 @@
+diff --git a/packages/core/test/forms/review-probe.test.ts b/packages/core/test/forms/review-probe.test.ts
+new file mode 100644
+index 0000000..295922f
+--- /dev/null
++++ b/packages/core/test/forms/review-probe.test.ts
+@@ -0,0 +1,269 @@
++/**
++ * Review probes for the forms prototype (feat/T3-prototype-interface, b737adf).
++ *
++ * Every test here asserts the behaviour the review concluded is correct, and
++ * every one of them FAILS against the prototype as written. That failure is the
++ * evidence for the verdict in docs/reviews/forms-prototype-review.md. The port
++ * in apps/web/test/forms/ carries each one as a regression test under the same
++ * id (R1…R12, N1…).
++ *
++ * Nothing on the prototype branch is changed: this file is applied to a scratch
++ * worktree only. See the review for how to reproduce.
++ */
++import { describe, expect, it } from "vitest";
++import { type Control, resolveFormPlan, toExecuteBody, toExecuteRequest } from "../../src/index.js";
++
++const CRS84 = "http://www.opengis.net/def/crs/OGC/1.3/CRS84";
++const CRS84H = "http://www.opengis.net/def/crs/OGC/0/CRS84h";
++
++function controlFor(schema: unknown, extra: Record<string, unknown> = {}): Control {
++  const [field] = resolveFormPlan({ id: "probe", inputs: { subject: { schema, ...extra } } }).fields;
++  if (field === undefined) throw new Error("no field");
++  return field.control;
++}
++
++function inputsFor(inputs: Record<string, unknown>, values: Record<string, unknown>): unknown {
++  return JSON.parse(
++    JSON.stringify(toExecuteBody(resolveFormPlan({ id: "probe", inputs }), values).inputs),
++  );
++}
++
++/** OGC 18-062r2 openapi/schemas/bbox.yaml, verbatim, plus the census's format hint. */
++const BBOX_YAML = {
++  type: "object",
++  format: "ogc-bbox",
++  required: ["bbox"],
++  properties: {
++    bbox: {
++      type: "array",
++      oneOf: [
++        { minItems: 4, maxItems: 4 },
++        { minItems: 6, maxItems: 6 },
++      ],
++      items: { type: "number" },
++    },
++    crs: { type: "string", format: "uri", default: CRS84, enum: [CRS84, CRS84H] },
++  },
++};
++
++describe("R1 — a multi-type schema gets a control narrower than the schema", () => {
++  it("does not offer a number field for type [string, number]", () => {
++    expect(controlFor({ type: ["string", "number"] }).kind).toBe("json");
++  });
++});
++
++describe("R2 — exclusive bounds", () => {
++  it("records OpenAPI 3.0's boolean exclusiveMinimum (the standard's own doubleInput)", () => {
++    expect(
++      controlFor({ type: "number", minimum: 0, maximum: 10, exclusiveMinimum: true }),
++    ).toMatchObject({ kind: "number", min: 0, minExclusive: true });
++  });
++
++  it("records JSON Schema 2019's numeric exclusiveMaximum", () => {
++    expect(controlFor({ type: "number", exclusiveMaximum: 1 })).toMatchObject({
++      kind: "number",
++      max: 1,
++      maxExclusive: true,
++    });
++  });
++});
++
++describe("R3 — const", () => {
++  it("offers the one permitted value rather than a free text field", () => {
++    expect(controlFor({ type: "string", const: "fixed" })).toEqual({
++      kind: "select",
++      options: [{ value: "fixed", label: "fixed" }],
++      default: "fixed",
++    });
++  });
++});
++
++describe("R4 — bbox dimensions", () => {
++  it("records that bbox.yaml accepts 4 or 6 coordinates", () => {
++    expect(controlFor(BBOX_YAML)).toMatchObject({ kind: "bbox", dimensions: [4, 6] });
++  });
++});
++
++describe("R5 — the CRS default", () => {
++  it("keeps the server's declared default when an enum is also present", () => {
++    const schema = {
++      format: "ogc-bbox",
++      properties: { crs: { type: "string", enum: ["urn:a", "urn:b"], default: "urn:b" } },
++    };
++    expect(controlFor(schema)).toMatchObject({ kind: "bbox", defaultCrs: "urn:b" });
++  });
++});
++
++describe("R6 — who builds the bbox wire object", () => {
++  const extent = { extent: { schema: BBOX_YAML } };
++
++  it("builds { bbox, crs } from the widget's coordinates and the chosen CRS", () => {
++    expect(inputsFor(extent, { extent: { coordinates: [3, 50.7, 7, 53.6], crs: CRS84 } })).toEqual(
++      { extent: { bbox: [3, 50.7, 7, 53.6], crs: CRS84 } },
++    );
++  });
++
++  it("swaps to latitude-first for an EPSG:4326 URI (ZOO's echo lists only that)", () => {
++    const zooEcho = {
++      c: {
++        schema: {
++          type: "object",
++          format: "ogc-bbox",
++          properties: {
++            bbox: { type: "array", items: { type: "number" } },
++            crs: { type: "string", enum: ["urn:ogc:def:crs:EPSG:6.6:4326"] },
++          },
++        },
++      },
++    };
++    expect(
++      inputsFor(zooEcho, {
++        c: { coordinates: [3, 50.7, 7, 53.6], crs: "urn:ogc:def:crs:EPSG:6.6:4326" },
++      }),
++    ).toEqual({ c: { bbox: [50.7, 3, 53.6, 7], crs: "urn:ogc:def:crs:EPSG:6.6:4326" } });
++  });
++});
++
++describe("R7 — media types live inside oneOf branches", () => {
++  const buffer = {
++    InputPolygon: {
++      schema: {
++        oneOf: [
++          {
++            type: "string",
++            contentEncoding: "UTF-8",
++            contentMediaType: "text/xml",
++            contentSchema: "http://fooa/gml/3.1.0/polygon.xsd",
++          },
++          { type: "object" },
++        ],
++      },
++    },
++  };
++
++  it("resolves ZOO's Buffer.InputPolygon to a complex control, not raw JSON", () => {
++    const [field] = resolveFormPlan({ id: "Buffer", inputs: buffer }).fields;
++    expect(field?.control.kind).toBe("complex");
++  });
++
++  it("qualifies the value with the chosen branch's media type and encoding", () => {
++    expect(inputsFor(buffer, { InputPolygon: { format: 0, value: "<gml:Polygon/>" } })).toEqual({
++      InputPolygon: { value: "<gml:Polygon/>", mediaType: "text/xml", encoding: "UTF-8" },
++    });
++  });
++});
++
++describe("R8 — the execute body", () => {
++  it("names the outputs, without which ZOO refuses the request (finding 0025)", () => {
++    const plan = resolveFormPlan({ id: "echo", inputs: { a: { schema: { type: "string" } } } });
++    const body: unknown = JSON.parse(String(toExecuteRequest(plan, { a: "x" }).body));
++    expect(body).toHaveProperty("outputs");
++  });
++});
++
++describe("R10 — an array input that also repeats", () => {
++  it("is a list of lists, because execute.yaml allows an array per occurrence", () => {
++    expect(
++      controlFor({ type: "array", items: { type: "number" } }, { maxOccurs: 3 }),
++    ).toMatchObject({ kind: "list", item: { kind: "list", item: { kind: "number" } } });
++  });
++});
++
++describe("R11 — loose bbox detection", () => {
++  it("does not mistake an inline GeoJSON Feature schema, which has a bbox member, for a bbox", () => {
++    // Shape of https://geojson.org/schema/Feature.json, trimmed.
++    const feature = {
++      type: "object",
++      required: ["type", "properties", "geometry"],
++      properties: {
++        type: { type: "string", enum: ["Feature"] },
++        id: { oneOf: [{ type: "number" }, { type: "string" }] },
++        properties: { oneOf: [{ type: "null" }, { type: "object" }] },
++        geometry: { oneOf: [{ type: "null" }, { type: "object" }] },
++        bbox: { type: "array", minItems: 4, items: { type: "number" } },
++      },
++    };
++    expect(controlFor(feature).kind).not.toBe("bbox");
++  });
++});
++
++describe("R12 — null in an enum", () => {
++  it("does not offer a 'null' option, which the encoder would drop anyway", () => {
++    const control = controlFor({ type: "string", enum: ["a", null], nullable: true });
++    expect(control).toEqual({ kind: "select", options: [{ value: "a", label: "a" }] });
++  });
++});
++
++describe("N1 — the standard's own bounding-box input", () => {
++  it("recognises allOf [ogc-bbox, $ref bbox.yaml] from the 1.0 ProcessDescription example", () => {
++    const control = controlFor({
++      allOf: [{ format: "ogc-bbox" }, { $ref: "../../openapi/schemas/bbox.yaml" }],
++    });
++    expect(control).toMatchObject({ kind: "bbox", crs: [CRS84, CRS84H], dimensions: [4, 6] });
++  });
++});
++
++describe("N2 — ZOO's SAGA booleans carry a string enum", () => {
++  it("follows the declared type, and says the schema contradicts itself", () => {
++    const plan = resolveFormPlan({
++      id: "SAGA.climate_tools.0",
++      inputs: {
++        COEFFICIENTS: {
++          minOccurs: 0,
++          schema: { type: "boolean", default: false, enum: ["true", "false"], nullable: true },
++        },
++      },
++    });
++    expect(plan.fields[0]?.control).toEqual({ kind: "checkbox", default: false });
++    expect(plan.diagnostics.map((d) => d.code)).toEqual(["contradictory-schema"]);
++  });
++});
++
++describe("N3 — qualifying a single-format string", () => {
++  it("sends a text/plain string as a string, which is what its schema says it is", () => {
++    // pygeoapi hands a qualified value to the processor unwrapped: see
++    // pygeoapi/execution/breinstein-inputs-qualified-not-unwrapped.http.
++    expect(
++      inputsFor(
++        { notes: { schema: { type: "string", contentMediaType: "text/plain" } } },
++        { notes: "first\nsecond" },
++      ),
++    ).toEqual({ notes: "first\nsecond" });
++  });
++});
++
++describe("N4 — objects on the wire", () => {
++  it("wraps a JSON object as { value }, since inputValueNoObject admits no bare object", () => {
++    // ZOO answers a bare object for a complex input with a 500:
++    // zoo-project/execution/echo-complex-bare-object-500.http.
++    const geometry = { type: "Point", coordinates: [5.1, 52.1] };
++    expect(
++      inputsFor({ area: { schema: { format: "geojson-geometry" } } }, { area: geometry }),
++    ).toEqual({ area: { value: geometry } });
++  });
++});
++
++describe("N5 — input ids that collide with Object.prototype", () => {
++  it("sends a value for an input whose id is __proto__", () => {
++    const description: unknown = JSON.parse(
++      '{"id":"probe","inputs":{"__proto__":{"schema":{"type":"string"}}}}',
++    );
++    const values = JSON.parse('{"__proto__":"x"}') as Record<string, unknown>;
++    const body = toExecuteBody(resolveFormPlan(description), values);
++    expect(JSON.parse(JSON.stringify(body.inputs))).toEqual(JSON.parse('{"__proto__":"x"}'));
++  });
++
++  it("sends nothing for a repeatable input named constructor that the user never filled", () => {
++    expect(inputsFor({ constructor: { maxOccurs: 3, schema: { type: "string" } } }, {})).toEqual(
++      {},
++    );
++  });
++});
++
++describe("N6 — never throws", () => {
++  it("survives an enum holding a cyclic object", () => {
++    const cyclic: Record<string, unknown> = {};
++    cyclic["self"] = cyclic;
++    expect(() => controlFor({ enum: [cyclic] })).not.toThrow();
++  });
++});
