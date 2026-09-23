@@ -1,0 +1,9 @@
+HTTP/1.1 200 Ok
+Date: Wed, 23 Sep 2026 11:28:40 GMT
+Server: Apache/2.4.29 (Ubuntu)
+X-Powered-By: ZOO-Project
+Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self';
+Content-Length: 1340
+Content-Type: application/json;charset=UTF-8
+
+{"RESULT":{"value":"<?xml version=\"1.0\" encoding=\"utf-8\" ?>\n<ogr:FeatureCollection\n     xmlns:xsi=\"http:\/\/www.w3.org\/2001\/XMLSchema-instance\"\n     xsi:schemaLocation=\"http:\/\/ogr.maptools.org\/ Output_RESULT_ed438ed6-b741-11f1-82ad-3a9d4c7adc78_0.xsd\"\n     xmlns:ogr=\"http:\/\/ogr.maptools.org\/\"\n     xmlns:gml=\"http:\/\/www.opengis.net\/gml\">\n  <gml:boundedBy>\n    <gml:Box>\n      <gml:coord><gml:X>0<\/gml:X><gml:Y>0<\/gml:Y><gml:Z>0<\/gml:Z><\/gml:coord>\n      <gml:coord><gml:X>1<\/gml:X><gml:Y>1<\/gml:Y><gml:Z>0<\/gml:Z><\/gml:coord>\n    <\/gml:Box>\n  <\/gml:boundedBy>\n                                                                                                                                \n  <gml:featureMember>\n    <ogr:Output_RESULT_ed438ed6_b741_11f1_82ad_3a9d4c7adc78_0 fid=\"Output_RESULT_ed438ed6_b741_11f1_82ad_3a9d4c7adc78_0.0\">\n      <ogr:geometryProperty><gml:Polygon><gml:outerBoundaryIs><gml:LinearRing><gml:coordinates>0,1,0 1,1,0 1,0,0 0,0,0 0,1,0<\/gml:coordinates><\/gml:LinearRing><\/gml:outerBoundaryIs><\/gml:Polygon><\/ogr:geometryProperty>\n      <ogr:Iteration>1<\/ogr:Iteration>\n      <ogr:Size>1<\/ogr:Size>\n    <\/ogr:Output_RESULT_ed438ed6_b741_11f1_82ad_3a9d4c7adc78_0>\n  <\/gml:featureMember>\n<\/ogr:FeatureCollection>\n","format":{"mediaType":"text\/xml"}}}

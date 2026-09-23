@@ -1,0 +1,9 @@
+HTTP/1.1 200 Ok
+Date: Wed, 23 Sep 2026 11:28:38 GMT
+Server: Apache/2.4.29 (Ubuntu)
+X-Powered-By: ZOO-Project
+Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self';
+Content-Length: 69
+Content-Type: application/json;charset=UTF-8
+
+{"c":{"bbox":[3,50.7,7,53.6],"crs":"urn:ogc:def:crs:EPSG:6.6:4326"}}

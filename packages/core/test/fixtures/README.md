@@ -67,6 +67,7 @@ the set is a handful of files and the server is one pinned image.
               execution/*.http                                         2026-09-01
               jobs/*.http                                              2026-09-16
               callbacks/*.http, execution/preflight-execute.http       2026-09-23
+              processes/ — fifteen more (see "Task 7's additions")    2026-09-23
 
 Re-capture with `./infra/zoo/capture-fixtures.sh`, and only when the pinned SHA
 in `infra/zoo/pinned.env` changes. Read the diff before committing it.
@@ -86,7 +87,7 @@ on this server carrying anything the form generator has not already seen.
 `SAGA.`/`OTB.`/`GRASS.` namespaces rather than hardcoding a list, so a service
 added to the fork is captured on the next run instead of being silently missed.
 
-**Six of those 46 are committed so far** — the ones listed below, captured
+**Six of those 46 were committed first** — the ones listed below, captured
 by hand while the shapes were being investigated. Running the script against a
 live `:5090` fills in the rest; nothing in the test suite depends on them yet.
 
@@ -107,6 +108,27 @@ capture failure.
 - `Gdal_Translate` — the **only** process of 703 with a live
   `maxOccurs: "unbounded"`, on its `GCP` input.
 - `longProcess` — for async polling, later.
+
+### Task 7's additions
+
+Fifteen more, chosen so that every schema shape the form generator meets on
+this server has at least one committed example — the census over all 701 is
+the evidence, these are the samples it is checked against:
+
+- **Every `oneOf` shape** (Z2): `IsValid` (two branches carrying
+  `contentSchema`), `Simplify` (one of those plus a bare object),
+  `EchoProcess` (one branch plus a bare object), `SAGA.pointcloud_tools.5` (a
+  single branch), `SAGA.table_tools.22` (two), `OTB.PixelValue` (three),
+  `SAGA.statistics_points.3` (two plus a bare object),
+  `OTB.ComputeOGRLayersFeaturesStatistics` (a bare object between encodings),
+  `SAGA.statistics_grid.12` (four — the commonest shape, 629 inputs), and
+  `GdalExtractProfile` and `display`, the only two whose branches are nothing
+  but bare objects.
+- **Validation** (Z5): `SAGA.garden_fractals.1`, the one process that runs here
+  with both an `enum` and a numeric range, and `HelloPy`, a required input.
+- **Booleans**: `SAGA.db_odbc.9`, a runnable example of the 457 booleans
+  declared with a string `enum` (finding 0056); `Gdal_Warp`, optional booleans
+  with no default.
 
 ## `*/execution/`
 
@@ -129,6 +151,29 @@ Captured 2026-09-01 against both servers, with `curl -isS -X POST` and
       echo-missing-input-500.http     rejected input reported as 500       0016
       echo-bbox.http                  the ogc-bbox input, executed         0023
       buffer-raw-gml.http             GML under Content-Type: application/json 0026
+
+    Task 7, 2026-09-23:
+
+    pygeoapi/execution/
+      breinstein-inputs-unvalidated.http          wrong type, range, enum, length,
+                                                  occurrences, undeclared: all 200 0054
+      breinstein-inputs-qualified-not-unwrapped.http
+                                                  a qualified value reaches the
+                                                  processor as an object         0052
+      breinstein-bbox-epsg4326-400.http           our process refusing a non-CRS84 box
+
+    zoo-project/execution/
+      echo-bbox-crs84-relabelled.http   CRS84 in, EPSG:4326 out, same numbers  0051
+      echo-bbox-three-coordinates.http  three numbers accepted as a bbox        0051
+      echo-complex-bare-object-500.http a bare object for a complex input → 500 0052
+      echo-complex-value-object.http    the same object as { value } works      0052
+      echo-href.http                    a by-reference input, fetched
+      echo-href-unreachable.http        an unreachable href: 200, value gone    0053
+      saga-fractals-above-maximum-accepted.http    MINSIZE 1000 of max 100: 200 0054
+      saga-fractals-unknown-enum-accepted.http     TYPE "Circles": 200          0054
+      saga-fractals-wrong-type-500.http            ANGLE "abc": HTML 500        0055
+      saga-fractals-in-range-500.http              ANGLE 90 of max 90: HTML 500 0055
+      hellopy-missing-required-400.http            the one check ZOO makes      0054
 
 `hello-world-*.http` carry a fresh job UUID and timestamp per capture, so they
 are read for shape and headers rather than compared byte-for-byte. Re-capture by

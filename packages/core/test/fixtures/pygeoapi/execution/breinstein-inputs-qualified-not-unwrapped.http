@@ -1,0 +1,19 @@
+HTTP/1.1 200 OK
+Server: gunicorn
+Date: Wed, 23 Sep 2026 11:28:46 GMT
+Connection: keep-alive
+Content-Type: application/json
+X-Powered-By: pygeoapi 0.21.0
+Content-Language: en-US
+Location: http://localhost:5080/jobs/f0dc8fe8-b741-11f1-a4ef-326d75bfe52c
+Access-Control-Allow-Origin: *
+Content-Length: 112
+
+{
+    "echo":{
+        "notes":{
+            "value":"a",
+            "mediaType":"text/plain"
+        }
+    }
+}

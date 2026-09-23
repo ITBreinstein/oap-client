@@ -1,0 +1,10 @@
+HTTP/1.1 400 Bad request
+Date: Wed, 23 Sep 2026 11:28:46 GMT
+Server: Apache/2.4.29 (Ubuntu)
+X-Powered-By: ZOO-Project
+Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self';
+Connection: close
+Transfer-Encoding: chunked
+Content-Type: application/json;charset=UTF-8
+
+{"title":"MissingParameterValue","type":"MissingParameterValue","detail":"The <a> argument was not specified in DataInputs but is required according to the ZOO ServicesProvider configuration file."}

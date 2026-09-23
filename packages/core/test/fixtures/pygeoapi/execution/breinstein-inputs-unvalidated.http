@@ -1,0 +1,26 @@
+HTTP/1.1 200 OK
+Server: gunicorn
+Date: Wed, 23 Sep 2026 11:28:46 GMT
+Connection: keep-alive
+Content-Type: application/json
+X-Powered-By: pygeoapi 0.21.0
+Content-Language: en-US
+Location: http://localhost:5080/jobs/f0d7fdb6-b741-11f1-a4ef-326d75bfe52c
+Access-Control-Allow-Origin: *
+Content-Length: 265
+
+{
+    "echo":{
+        "count":"abc",
+        "ratio":1000000000.0,
+        "colour":"purple",
+        "label":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "tags":[
+            "a",
+            "b",
+            "c",
+            "d"
+        ],
+        "bogus":1
+    }
+}

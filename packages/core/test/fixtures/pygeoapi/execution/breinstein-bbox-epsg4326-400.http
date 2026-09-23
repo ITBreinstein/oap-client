@@ -1,0 +1,16 @@
+HTTP/1.1 400 BAD REQUEST
+Server: gunicorn
+Date: Wed, 23 Sep 2026 11:28:46 GMT
+Connection: keep-alive
+Content-Type: application/json
+X-Powered-By: pygeoapi 0.21.0
+Content-Language: en-US
+Location: http://localhost:5080/jobs/f0e131d8-b741-11f1-b1b6-326d75bfe52c
+Access-Control-Allow-Origin: *
+Content-Length: 217
+
+{
+    "type":"InvalidParameterValue",
+    "code":"InvalidParameterValue",
+    "description":"Error executing process: The \"bbox\" input must be in CRS84; received crs \"http://www.opengis.net/def/crs/EPSG/0/4326\""
+}
