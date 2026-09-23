@@ -146,3 +146,68 @@ describe("send", () => {
     expect(error).toBeInstanceOf(AbortError);
   });
 });
+
+describe("send — the one retry, on a connection reset", () => {
+  /** What Node's fetch throws when a kept-alive socket was closed under it. */
+  function socketClosed(): TypeError {
+    const socket = Object.assign(new Error("other side closed"), { code: "UND_ERR_SOCKET" });
+    return new TypeError("fetch failed", { cause: socket });
+  }
+
+  function flaky(failures: Error[]) {
+    const calls: (string | undefined)[] = [];
+    const fetch = (_input: string, init?: RequestInit): Promise<Response> => {
+      calls.push(init?.method);
+      const failure = failures.shift();
+      return failure === undefined ? Promise.resolve(new Response("{}")) : Promise.reject(failure);
+    };
+    return { fetch, calls };
+  }
+
+  it("resends a GET once when the connection was reset", async () => {
+    const { fetch, calls } = flaky([socketClosed()]);
+    const env = await send(`${BASE}/jobs`, { fetch });
+    expect(env.status).toBe(200);
+    expect(calls).toHaveLength(2);
+  });
+
+  it("recognises ECONNRESET anywhere down the cause chain, and HEAD as resendable", async () => {
+    const reset = Object.assign(new Error("read ECONNRESET"), { code: "ECONNRESET" });
+    const { fetch, calls } = flaky([new TypeError("fetch failed", { cause: { cause: reset } })]);
+    await send(`${BASE}/jobs`, { fetch, method: "HEAD" });
+    expect(calls).toEqual(["HEAD", "HEAD"]);
+  });
+
+  it("resends only once — a second reset is a TransportError", async () => {
+    const { fetch, calls } = flaky([socketClosed(), socketClosed()]);
+    await expect(send(`${BASE}/jobs`, { fetch })).rejects.toBeInstanceOf(TransportError);
+    expect(calls).toHaveLength(2);
+  });
+
+  it.each(["POST", "DELETE", "PUT", "PATCH"])(
+    "never resends a %s — an execute would start a second job",
+    async (method) => {
+      const { fetch, calls } = flaky([socketClosed()]);
+      await expect(send(`${BASE}/processes/p/execution`, { fetch, method })).rejects.toBeInstanceOf(
+        TransportError,
+      );
+      expect(calls).toEqual([method]);
+    },
+  );
+
+  it("does not resend a failure that is not a reset — a browser's opaque TypeError included", async () => {
+    const { fetch, calls } = flaky([new TypeError("Failed to fetch")]);
+    await expect(send(`${BASE}/jobs`, { fetch })).rejects.toBeInstanceOf(TransportError);
+    expect(calls).toHaveLength(1);
+  });
+
+  it("does not resend a request the caller aborted", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const { fetch, calls } = flaky([socketClosed()]);
+    await expect(send(`${BASE}/jobs`, { fetch, signal: controller.signal })).rejects.toBeInstanceOf(
+      AbortError,
+    );
+    expect(calls).toHaveLength(1);
+  });
+});
