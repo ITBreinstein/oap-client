@@ -14,7 +14,7 @@
     "boundaries": "depcruise apps packages",
     "graph": "depcruise --output-type dot apps packages | dot -Tsvg > docs/architecture.svg",
     "test": "vitest run",
-    "test:contract": "vitest run --config packages/core/vitest.contract.config.ts",
+    "test:contract": "vitest run --config packages/core/vitest.contract.config.ts && vitest run --config apps/relay/vitest.contract.config.ts",
     "test:interop": "./infra/zoo/zoo.sh refresh && vitest run --config packages/core/vitest.interop.config.ts",
     "test:watchdog": "./infra/zoo/zoo.sh refresh && vitest run --config packages/core/vitest.watchdog.config.ts",
     "test:smoke": "node smoke/run.mjs",

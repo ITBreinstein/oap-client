@@ -1,0 +1,8 @@
+HTTP/1.1 200 OK
+Server: gunicorn
+Date: Wed, 23 Sep 2026 09:40:20 GMT
+Connection: keep-alive
+Content-Type: text/html; charset=utf-8
+Allow: OPTIONS, POST
+Content-Length: 0
+

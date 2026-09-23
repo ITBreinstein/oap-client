@@ -1,0 +1,27 @@
+{
+  "publicUrl": "http://host.docker.internal:8787",
+  "allowedOrigins": ["http://localhost:4173", "http://localhost:5173"],
+  "endpoints": [
+    {
+      "key": "pygeoapi-cors",
+      "baseUrl": "http://localhost:5080",
+      "executeRoute": "relay",
+      "callbacks": true,
+      "allowPrivateNetwork": true
+    },
+    {
+      "key": "pygeoapi-nocors",
+      "baseUrl": "http://localhost:5081",
+      "executeRoute": "relay",
+      "callbacks": false,
+      "allowPrivateNetwork": true
+    },
+    {
+      "key": "zoo",
+      "baseUrl": "http://localhost:5090/ogc-api",
+      "executeRoute": "relay",
+      "callbacks": false,
+      "allowPrivateNetwork": true
+    }
+  ]
+}

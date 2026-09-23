@@ -8,9 +8,36 @@ Every file in this repository that was derived from another project, however
 lightly. One row per file. Record the upstream commit SHA — "latest" is not a
 provenance record.
 
-| Our file     | Upstream project | Repo | Commit SHA | Upstream file | Licence | What we changed |
-| ------------ | ---------------- | ---- | ---------- | ------------- | ------- | --------------- |
-| _(none yet)_ |                  |      |            |               |         |                 |
+| Our file                                | Upstream project | Repo                                 | Commit SHA                                 | Upstream file                                                                                                    | Licence                 | What we changed                                                                                                                                                                                                                                                                                                                                                     |
+| --------------------------------------- | ---------------- | ------------------------------------ | ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/relay/src/address-guard.ts`       | GeoLibre         | https://github.com/opengeos/GeoLibre | `abf4badecf98a572dd1e4c0ad87f4f34f2275c2e` | `apps/geolibre-desktop/vite-proxy-guard.ts` (`isPrivateHost`, `isPrivateIPv4`, `isPrivateIPv6`, `guardedLookup`) | MIT, © 2026 Qiusheng Wu | Kept the blocked-range list and the lookup's validate-every-answer and reply-shape handling. Rebuilt the classification on `net.BlockList` instead of hand parsing (which missed the fully expanded IPv4-mapped spelling); added NAT64, 6to4, IPv6 documentation, site-local and multicast ranges; dropped the non-default-port rule, since our allowlist is exact. |
+| `apps/relay/test/address-guard.test.ts` | GeoLibre         | https://github.com/opengeos/GeoLibre | `abf4badecf98a572dd1e4c0ad87f4f34f2275c2e` | `tests/edge-proxy-redirect.test.ts` ("Vite proxy guard — validatePublicUrl", "assertResolvedPublicHost")         | MIT, © 2026 Qiusheng Wu | Ported the address cases to vitest against our API; added the spellings and ranges above and the connect-time lookup cases.                                                                                                                                                                                                                                         |
+
+GeoLibre's licence, as required by it for the two rows above:
+
+```
+MIT License
+
+Copyright (c) 2026 Qiusheng Wu
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
 
 Candidate upstreams for this work: `ogcapi-js`, `ogc-client`, GeoLibre.
 

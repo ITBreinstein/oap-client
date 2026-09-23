@@ -1,0 +1,12 @@
+HTTP/1.1 200 OK
+Server: gunicorn
+Date: Wed, 23 Sep 2026 09:40:20 GMT
+Connection: keep-alive
+Content-Type: text/html; charset=utf-8
+Allow: POST, OPTIONS
+Access-Control-Allow-Origin: http://localhost:4173
+Access-Control-Allow-Headers: content-type, prefer
+Access-Control-Allow-Methods: DELETE, GET, HEAD, OPTIONS, PATCH, POST, PUT
+Vary: Origin
+Content-Length: 0
+

@@ -1,0 +1,10 @@
+POST /cb/pygeoapi-failure-1790153283007/failed HTTP/1.1
+Host: host.docker.internal:9911
+User-Agent: python-requests/2.32.4
+Accept-Encoding: gzip, deflate
+Accept: */*
+Connection: keep-alive
+Content-Length: 2
+Content-Type: application/json
+
+{}

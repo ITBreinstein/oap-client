@@ -1,0 +1,10 @@
+POST /cb/pygeoapi-success-1790153263985/success HTTP/1.1
+Host: host.docker.internal:9911
+User-Agent: python-requests/2.32.4
+Accept-Encoding: gzip, deflate
+Accept: */*
+Connection: keep-alive
+Content-Length: 57
+Content-Type: application/json
+
+{"id": "slept", "value": {"seconds": 8.0, "message": ""}}

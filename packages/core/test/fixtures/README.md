@@ -15,6 +15,12 @@ is finding 0024, `Preference-Applied` is what proves the async preference was
 honoured rather than guessed, and a `Content-Type` that disagrees with its own
 body is finding 0026. A body-only capture would have lost all three.
 
+`callbacks/*.http` are the exception to "response": each is a **request** the
+server sent to a callback listener, reconstructed from the listener's raw
+headers — request line, every header in the order received, then the body.
+Findings 0047 and 0048. The two `*-unreachable.http` files beside them are
+ordinary `curl -i` captures of the job document left behind.
+
 A finding that names a fixture has to name a *rebuildable* server, which is why
 the versions are recorded here rather than left to a commit message.
 
@@ -27,6 +33,8 @@ the versions are recorded here rather than left to a commit message.
               execution/*.http                                        2026-09-01
               jobs/*.http                                             2026-09-16
               process-list.json  (re-captured; now carries `slow`)    2026-09-16
+              callbacks/*.http, jobs/job-list-{first,last}-page.http,
+              execution/preflight-execute-{cors,nocors}.http          2026-09-23
 
 Re-capture by hand against `http://localhost:5080`; there is no script, because
 the set is four files and the server is one pinned image.
@@ -48,6 +56,7 @@ the set is four files and the server is one pinned image.
               processes/Gdal_Translate.json                            2026-08-31
               execution/*.http                                         2026-09-01
               jobs/*.http                                              2026-09-16
+              callbacks/*.http, execution/preflight-execute.http       2026-09-23
 
 Re-capture with `./infra/zoo/capture-fixtures.sh`, and only when the pinned SHA
 in `infra/zoo/pinned.env` changes. Read the diff before committing it.

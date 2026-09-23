@@ -152,7 +152,10 @@ test.describe("job endpoints from a browser", () => {
     expect(result.location).toBeNull();
     expect(result.body.trim()).toBe("null");
     // That combination is what `AmbiguousExecutionResponseError` reports, and
-    // why `listJobs()` exists as the honest recovery — T8.
+    // why the relay's route B exists: e2e/relay-async.spec.ts runs the same
+    // execute through it and names the job. `listJobs()` reaches the job too,
+    // but only on the list's last page and without telling whose it is
+    // (findings 0038 and 0039).
   });
 
   test("no-CORS port: a browser cannot read a job status at all", async ({ page }) => {
@@ -171,7 +174,9 @@ test.describe("job endpoints from a browser", () => {
     const jobUrl = await startJob(NOCORS, 30);
 
     // :5081 answers `OPTIONS` with a 200 and no CORS headers whatsoever, so the
-    // browser never sends the DELETE. This is the case the relay exists for.
+    // browser never sends the DELETE. The relay does not help: it carries the
+    // execute and nothing else, by design, so this port is blocked
+    // for dismissal from a browser — finding 0049.
     const result = await probe(page, jobUrl, "DELETE");
 
     expect(result.ok).toBe(false);

@@ -1,0 +1,10 @@
+POST /cb/pygeoapi-success-1790153263985/in-progress HTTP/1.1
+Host: host.docker.internal:9911
+User-Agent: python-requests/2.32.4
+Accept-Encoding: gzip, deflate
+Accept: */*
+Connection: keep-alive
+Content-Length: 2
+Content-Type: application/json
+
+{}

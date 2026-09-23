@@ -1,0 +1,16 @@
+# Build contexts are the repository root (apps/relay/Dockerfile). Keep them
+# small and free of anything local.
+**/node_modules
+**/.tsbuild
+**/dist
+**/*.tsbuildinfo
+.git
+.playwright
+coverage
+observations
+infra/zoo/.checkout
+infra/zoo/.conf
+AGENTS.md
+CLAUDE.md
+CLAUDE.local.md
+*.local

@@ -1,0 +1,8 @@
+POST /cb/zoo-success-plain-1790153486310/success HTTP/1.1
+Host: host.docker.internal:9911
+User-Agent: ZooWPSClient
+Accept: */*
+Content-Type: application/json
+Content-Length: 42
+
+{"Result":"Long process run successfully"}

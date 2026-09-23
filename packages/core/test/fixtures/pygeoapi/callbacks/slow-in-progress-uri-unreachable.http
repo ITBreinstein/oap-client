@@ -1,0 +1,43 @@
+HTTP/1.1 200 OK
+Server: gunicorn
+Date: Wed, 23 Sep 2026 08:57:10 GMT
+Connection: keep-alive
+Content-Type: application/json
+X-Powered-By: pygeoapi 0.21.0
+Content-Language: en-US
+Access-Control-Allow-Origin: *
+Content-Length: 1269
+
+{
+    "type":"process",
+    "processID":"slow",
+    "jobID":"a9e1cc54-b72b-11f1-8818-0a4eb7d4f744",
+    "status":"accepted",
+    "message":"Job accepted and ready for execution",
+    "progress":5,
+    "parameters":null,
+    "created":"2026-09-23T08:49:18.684747Z",
+    "started":"2026-09-23T08:49:18.685547Z",
+    "finished":null,
+    "updated":"2026-09-23T08:49:18.685569Z",
+    "links":[
+        {
+            "href":"http://localhost:5080/jobs/a9e1cc54-b72b-11f1-8818-0a4eb7d4f744/results?f=html",
+            "rel":"http://www.opengis.net/def/rel/ogc/1.0/results",
+            "type":"text/html",
+            "title":"Results of job as HTML"
+        },
+        {
+            "href":"http://localhost:5080/jobs/a9e1cc54-b72b-11f1-8818-0a4eb7d4f744/results?f=json",
+            "rel":"http://www.opengis.net/def/rel/ogc/1.0/results",
+            "type":"application/json",
+            "title":"Results of job as JSON"
+        },
+        {
+            "href":"http://localhost:5080/jobs/a9e1cc54-b72b-11f1-8818-0a4eb7d4f744/results",
+            "rel":"http://www.opengis.net/def/rel/ogc/1.0/results",
+            "type":"application/octet-stream",
+            "title":"Results of job a9e1cc54-b72b-11f1-8818-0a4eb7d4f744 as application/octet-stream"
+        }
+    ]
+}

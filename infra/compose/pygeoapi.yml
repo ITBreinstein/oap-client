@@ -6,10 +6,16 @@
 # Both mount ../pygeoapi/plugins on PYTHONPATH so the repository's own
 # processors (currently `slow`) load as ordinary pygeoapi plugins without
 # rebuilding the image. See infra/README.md.
+#
+# Both can reach the host as `host.docker.internal`, which is where the relay's
+# callback receiver listens when it runs outside Docker (infra/relay/). Docker
+# Desktop provides the name on its own; Linux, and so CI, needs the mapping
+# below. It is harmless where the name already resolves.
 services:
   pygeoapi-cors:
     image: geopython/pygeoapi:0.21.0 # pin the digest in CI
     ports: ["5080:80"]
+    extra_hosts: ["host.docker.internal:host-gateway"]
     environment:
       PYTHONPATH: /pygeoapi/plugins
     volumes:
@@ -18,6 +24,7 @@ services:
   pygeoapi-nocors:
     image: geopython/pygeoapi:0.21.0
     ports: ["5081:80"]
+    extra_hosts: ["host.docker.internal:host-gateway"]
     environment:
       PYTHONPATH: /pygeoapi/plugins
     volumes:

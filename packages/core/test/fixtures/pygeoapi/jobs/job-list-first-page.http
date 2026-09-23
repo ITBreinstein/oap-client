@@ -1,0 +1,304 @@
+HTTP/1.1 200 OK
+Server: gunicorn
+Date: Wed, 23 Sep 2026 08:57:10 GMT
+Connection: keep-alive
+Content-Type: application/json
+X-Powered-By: pygeoapi 0.21.0
+Content-Language: en-US
+Access-Control-Allow-Origin: *
+Content-Length: 12246
+
+{
+    "jobs":[
+        {
+            "type":"process",
+            "processID":"hello-world",
+            "jobID":"e9a9fd22-b689-11f1-9b0e-5679d2ff388f",
+            "status":"successful",
+            "message":"Job complete",
+            "progress":100,
+            "parameters":null,
+            "created":"2026-09-22T13:31:27.220385Z",
+            "started":"2026-09-22T13:31:27.220425Z",
+            "finished":"2026-09-22T13:31:27.224524Z",
+            "updated":"2026-09-22T13:31:27.224556Z",
+            "links":[
+                {
+                    "href":"http://localhost:5080/jobs/e9a9fd22-b689-11f1-9b0e-5679d2ff388f/results?f=html",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/results",
+                    "type":"text/html",
+                    "title":"Results of job as HTML"
+                },
+                {
+                    "href":"http://localhost:5080/jobs/e9a9fd22-b689-11f1-9b0e-5679d2ff388f/results?f=json",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/results",
+                    "type":"application/json",
+                    "title":"Results of job as JSON"
+                }
+            ]
+        },
+        {
+            "type":"process",
+            "processID":"hello-world",
+            "jobID":"e9a79938-b689-11f1-9b0e-5679d2ff388f",
+            "status":"successful",
+            "message":"Job complete",
+            "progress":100,
+            "parameters":null,
+            "created":"2026-09-22T13:31:27.204672Z",
+            "started":"2026-09-22T13:31:27.204697Z",
+            "finished":"2026-09-22T13:31:27.208658Z",
+            "updated":"2026-09-22T13:31:27.208692Z",
+            "links":[
+                {
+                    "href":"http://localhost:5080/jobs/e9a79938-b689-11f1-9b0e-5679d2ff388f/results?f=html",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/results",
+                    "type":"text/html",
+                    "title":"Results of job as HTML"
+                },
+                {
+                    "href":"http://localhost:5080/jobs/e9a79938-b689-11f1-9b0e-5679d2ff388f/results?f=json",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/results",
+                    "type":"application/json",
+                    "title":"Results of job as JSON"
+                }
+            ]
+        },
+        {
+            "type":"process",
+            "processID":"hello-world",
+            "jobID":"e9a59a34-b689-11f1-9b0e-5679d2ff388f",
+            "status":"successful",
+            "message":"Job complete",
+            "progress":100,
+            "parameters":null,
+            "created":"2026-09-22T13:31:27.191640Z",
+            "started":"2026-09-22T13:31:27.191678Z",
+            "finished":"2026-09-22T13:31:27.197514Z",
+            "updated":"2026-09-22T13:31:27.197613Z",
+            "links":[
+                {
+                    "href":"http://localhost:5080/jobs/e9a59a34-b689-11f1-9b0e-5679d2ff388f/results?f=html",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/results",
+                    "type":"text/html",
+                    "title":"Results of job as HTML"
+                },
+                {
+                    "href":"http://localhost:5080/jobs/e9a59a34-b689-11f1-9b0e-5679d2ff388f/results?f=json",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/results",
+                    "type":"application/json",
+                    "title":"Results of job as JSON"
+                }
+            ]
+        },
+        {
+            "type":"process",
+            "processID":"hello-world",
+            "jobID":"e9a388c0-b689-11f1-9b0e-5679d2ff388f",
+            "status":"successful",
+            "message":"Job complete",
+            "progress":100,
+            "parameters":null,
+            "created":"2026-09-22T13:31:27.178084Z",
+            "started":"2026-09-22T13:31:27.178120Z",
+            "finished":"2026-09-22T13:31:27.182666Z",
+            "updated":"2026-09-22T13:31:27.182707Z",
+            "links":[
+                {
+                    "href":"http://localhost:5080/jobs/e9a388c0-b689-11f1-9b0e-5679d2ff388f/results?f=html",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/results",
+                    "type":"text/html",
+                    "title":"Results of job as HTML"
+                },
+                {
+                    "href":"http://localhost:5080/jobs/e9a388c0-b689-11f1-9b0e-5679d2ff388f/results?f=json",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/results",
+                    "type":"application/json",
+                    "title":"Results of job as JSON"
+                }
+            ]
+        },
+        {
+            "type":"process",
+            "processID":"hello-world",
+            "jobID":"e9a07306-b689-11f1-9b0e-5679d2ff388f",
+            "status":"successful",
+            "message":"Job complete",
+            "progress":100,
+            "parameters":null,
+            "created":"2026-09-22T13:31:27.157897Z",
+            "started":"2026-09-22T13:31:27.157957Z",
+            "finished":"2026-09-22T13:31:27.164486Z",
+            "updated":"2026-09-22T13:31:27.164642Z",
+            "links":[
+                {
+                    "href":"http://localhost:5080/jobs/e9a07306-b689-11f1-9b0e-5679d2ff388f/results?f=html",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/results",
+                    "type":"text/html",
+                    "title":"Results of job as HTML"
+                },
+                {
+                    "href":"http://localhost:5080/jobs/e9a07306-b689-11f1-9b0e-5679d2ff388f/results?f=json",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/results",
+                    "type":"application/json",
+                    "title":"Results of job as JSON"
+                }
+            ]
+        },
+        {
+            "type":"process",
+            "processID":"hello-world",
+            "jobID":"e996281a-b689-11f1-9b0e-5679d2ff388f",
+            "status":"successful",
+            "message":"Job complete",
+            "progress":100,
+            "parameters":null,
+            "created":"2026-09-22T13:31:27.090368Z",
+            "started":"2026-09-22T13:31:27.090398Z",
+            "finished":"2026-09-22T13:31:27.093158Z",
+            "updated":"2026-09-22T13:31:27.093179Z",
+            "links":[
+                {
+                    "href":"http://localhost:5080/jobs/e996281a-b689-11f1-9b0e-5679d2ff388f/results?f=html",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/results",
+                    "type":"text/html",
+                    "title":"Results of job as HTML"
+                },
+                {
+                    "href":"http://localhost:5080/jobs/e996281a-b689-11f1-9b0e-5679d2ff388f/results?f=json",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/results",
+                    "type":"application/json",
+                    "title":"Results of job as JSON"
+                }
+            ]
+        },
+        {
+            "type":"process",
+            "processID":"hello-world",
+            "jobID":"e9948668-b689-11f1-9b0e-5679d2ff388f",
+            "status":"successful",
+            "message":"Job complete",
+            "progress":100,
+            "parameters":null,
+            "created":"2026-09-22T13:31:27.079867Z",
+            "started":"2026-09-22T13:31:27.079915Z",
+            "finished":"2026-09-22T13:31:27.083829Z",
+            "updated":"2026-09-22T13:31:27.083855Z",
+            "links":[
+                {
+                    "href":"http://localhost:5080/jobs/e9948668-b689-11f1-9b0e-5679d2ff388f/results?f=html",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/results",
+                    "type":"text/html",
+                    "title":"Results of job as HTML"
+                },
+                {
+                    "href":"http://localhost:5080/jobs/e9948668-b689-11f1-9b0e-5679d2ff388f/results?f=json",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/results",
+                    "type":"application/json",
+                    "title":"Results of job as JSON"
+                }
+            ]
+        },
+        {
+            "type":"process",
+            "processID":"slow",
+            "jobID":"e98da938-b689-11f1-96e1-5679d2ff388f",
+            "status":"successful",
+            "message":"Job complete",
+            "progress":100,
+            "parameters":null,
+            "created":"2026-09-22T13:31:27.041538Z",
+            "started":"2026-09-22T13:31:27.041616Z",
+            "finished":"2026-09-22T13:31:33.135809Z",
+            "updated":"2026-09-22T13:31:33.135916Z",
+            "links":[
+                {
+                    "href":"http://localhost:5080/jobs/e98da938-b689-11f1-96e1-5679d2ff388f/results?f=html",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/results",
+                    "type":"text/html",
+                    "title":"Results of job as HTML"
+                },
+                {
+                    "href":"http://localhost:5080/jobs/e98da938-b689-11f1-96e1-5679d2ff388f/results?f=json",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/results",
+                    "type":"application/json",
+                    "title":"Results of job as JSON"
+                }
+            ]
+        },
+        {
+            "type":"process",
+            "processID":"hello-world",
+            "jobID":"e988b5a4-b689-11f1-9b0e-5679d2ff388f",
+            "status":"successful",
+            "message":"Job complete",
+            "progress":100,
+            "parameters":null,
+            "created":"2026-09-22T13:31:27.003498Z",
+            "started":"2026-09-22T13:31:27.004204Z",
+            "finished":"2026-09-22T13:31:27.068578Z",
+            "updated":"2026-09-22T13:31:27.068651Z",
+            "links":[
+                {
+                    "href":"http://localhost:5080/jobs/e988b5a4-b689-11f1-9b0e-5679d2ff388f/results?f=html",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/results",
+                    "type":"text/html",
+                    "title":"Results of job as HTML"
+                },
+                {
+                    "href":"http://localhost:5080/jobs/e988b5a4-b689-11f1-9b0e-5679d2ff388f/results?f=json",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/results",
+                    "type":"application/json",
+                    "title":"Results of job as JSON"
+                }
+            ]
+        },
+        {
+            "type":"process",
+            "processID":"hello-world",
+            "jobID":"e97acab6-b689-11f1-96e1-5679d2ff388f",
+            "status":"successful",
+            "message":"Job complete",
+            "progress":100,
+            "parameters":null,
+            "created":"2026-09-22T13:31:26.913396Z",
+            "started":"2026-09-22T13:31:26.913671Z",
+            "finished":"2026-09-22T13:31:26.968468Z",
+            "updated":"2026-09-22T13:31:26.968523Z",
+            "links":[
+                {
+                    "href":"http://localhost:5080/jobs/e97acab6-b689-11f1-96e1-5679d2ff388f/results?f=html",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/results",
+                    "type":"text/html",
+                    "title":"Results of job as HTML"
+                },
+                {
+                    "href":"http://localhost:5080/jobs/e97acab6-b689-11f1-96e1-5679d2ff388f/results?f=json",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/results",
+                    "type":"application/json",
+                    "title":"Results of job as JSON"
+                }
+            ]
+        }
+    ],
+    "links":[
+        {
+            "href":"http://localhost:5080/jobs?f=html",
+            "rel":"alternate",
+            "type":"text/html",
+            "title":"Jobs list as HTML"
+        },
+        {
+            "href":"http://localhost:5080/jobs?f=json",
+            "rel":"self",
+            "type":"application/json",
+            "title":"Jobs list as JSON"
+        },
+        {
+            "href":"http://localhost:5080/jobs?offset=10",
+            "rel":"next",
+            "type":"application/json",
+            "title":"Items (next)"
+        }
+    ]
+}
