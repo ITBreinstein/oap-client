@@ -4,6 +4,8 @@ import { configDefaults, defineConfig } from "vitest/config";
 
 export default defineConfig({
   plugins: [react()],
+  // MapLibre's worker is a module worker; see src/map/MapView.tsx.
+  worker: { format: "es" },
   resolve: {
     alias: {
       // Use core's source in dev and test; the published entry is dist/.

@@ -65,6 +65,18 @@ pnpm licenses list --json > /tmp/licenses.json
 
 and fold the result into the table below before each release.
 
-| Package       | Version | Licence | Used by |
-| ------------- | ------- | ------- | ------- |
-| _(generated)_ |         |         |         |
+| Package                          | Version | Licence      | Used by                                   |
+| -------------------------------- | ------- | ------------ | ----------------------------------------- |
+| `maplibre-gl`                    | 6.11.1  | BSD-3-Clause | `apps/web/src/map` only (boundary rule 3) |
+| `terra-draw`                     | 1.35.0  | MIT          | `apps/web/src/map` only (boundary rule 3) |
+| `terra-draw-maplibre-gl-adapter` | 1.4.1   | MIT          | `apps/web/src/map` only (boundary rule 3) |
+| _(the rest: generated)_          |         |              |                                           |
+
+## 4. Data the web app loads at run time
+
+Not code, and not bundled: fetched by the browser while the app runs, and
+credited on screen as its licence requires.
+
+| What                                                | From                                                                                                        | Licence               | Credited as                                                            |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | --------------------- | ---------------------------------------------------------------------- |
+| BRT-Achtergrondkaart, "standaard" (EPSG:3857 tiles) | PDOK, `https://service.pdok.nl/kadaster/brt-achtergrondkaart/wmts/v2_0/standaard/EPSG:3857/{z}/{x}/{y}.png` | CC BY 4.0, © Kadaster | "Kaartgegevens © Kadaster (BRT-Achtergrondkaart, CC BY 4.0), via PDOK" |

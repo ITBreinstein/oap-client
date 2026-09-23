@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { DeveloperPanel } from "./app/DeveloperPanel.js";
 import { activeDrawField, DrawContext, type DrawRequest, type DrawTarget } from "./app/draw.js";
 import { EndpointScreen } from "./app/EndpointScreen.js";
+import { MapPane } from "./app/MapPane.js";
 import { ProcessListScreen } from "./app/ProcessListScreen.js";
 import { ProcessScreen } from "./app/ProcessScreen.js";
 import { useWorkflow } from "./app/useWorkflow.js";
@@ -22,7 +23,7 @@ export function App() {
   const view = useWorkflow(relayUrl);
   const { state, commands } = view;
   const [developer] = useState(developerRequested);
-  const mapAvailable = false;
+  const [mapAvailable, setMapAvailable] = useState(false);
 
   // Drawing belongs to one field of one open process. It is recorded with the
   // process it was started for, so choosing another process — or leaving the
@@ -123,8 +124,12 @@ export function App() {
               open={developer}
             />
           </main>
-          {/* The map arrives with the map binding (S5). */}
-          <aside className="map-pane" aria-label="Map" />
+          <MapPane
+            state={state}
+            draw={draw}
+            setValue={commands.setValue}
+            onAvailable={setMapAvailable}
+          />
         </div>
       </div>
     </DrawContext.Provider>
