@@ -217,7 +217,12 @@ export function ProcessScreen(props: ProcessScreenProps) {
       )}
 
       {state.stage === "running" && (
-        <div className="running" role="status" aria-live="polite">
+        <div
+          className="running"
+          role="status"
+          aria-live="polite"
+          data-job-ref={state.run.mode === "async" ? state.run.jobRef : undefined}
+        >
           {state.run.mode === "sync" ? (
             <p>Running… waiting for the server's answer.</p>
           ) : (

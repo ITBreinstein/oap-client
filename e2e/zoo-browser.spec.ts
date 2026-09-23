@@ -33,7 +33,8 @@ async function answering(url: string): Promise<boolean> {
 test.describe("ZOO-Project from a browser", () => {
   test.beforeEach(async ({ page }) => {
     test.skip(!(await answering(`${ZOO}/`)), "ZOO :5090 is not answering");
-    await page.goto("/");
+    // The Task 6 job panel is a developer view now, open with ?developer.
+    await page.goto("/?developer");
   });
 
   test("cannot send an execute at all — the preflight has no CORS headers", async ({ page }) => {
