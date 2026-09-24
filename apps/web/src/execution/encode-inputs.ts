@@ -128,7 +128,10 @@ function chooseMediaType(
 ): string | undefined {
   if (override.mediaType !== undefined) return override.mediaType;
 
-  const declared = declaredMediaTypes(schema);
+  // Only the branches that could describe this value: a media type declared on
+  // a string branch says nothing about an object being sent to the same input.
+  const kind = isPlainObject(value) ? "object" : Array.isArray(value) ? "array" : typeof value;
+  const declared = declaredMediaTypes(schema, kind);
   if (declared.length === 1) return declared[0];
 
   if (isPlainObject(value) || Array.isArray(value)) {

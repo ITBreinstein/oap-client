@@ -83,14 +83,23 @@ export function hasFormat(schema: JsonSchema, format: string): boolean {
 /**
  * Media types the input advertises, deduped, in declaration order.
  *
+ * `forType` restricts the answer to branches that could describe the value
+ * being sent, and matters more than it looks. ZOO's `echo` input `b` is
+ * `oneOf: [{type: string, contentMediaType: text/xml}, {type: object}]` — one
+ * declared media type, belonging to the branch a JSON object is not. Ignoring
+ * which branch it came from labels a GeoJSON document `text/xml`.
+ *
  * Also reaches into `items`, because a repeated complex input declares its
  * content keywords on the item rather than on the array.
  */
-export function declaredMediaTypes(schema: JsonSchema): readonly string[] {
+export function declaredMediaTypes(schema: JsonSchema, forType?: string): readonly string[] {
   const found: string[] = [];
 
   const collect = (candidate: JsonSchema): void => {
     for (const branch of schemaBranches(candidate)) {
+      const branchType = asString(branch["type"]);
+      // A branch that names no type describes anything.
+      if (forType !== undefined && branchType !== undefined && branchType !== forType) continue;
       const mediaType = asString(branch["contentMediaType"]);
       if (mediaType !== undefined && !found.includes(mediaType)) found.push(mediaType);
     }
