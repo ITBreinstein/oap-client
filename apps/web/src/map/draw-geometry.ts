@@ -75,13 +75,22 @@ function modeForGeometry(type: string): string {
   return "polygon";
 }
 
-/**
- * Modes whose features are shapes the user placed.
- *
- * Everything else in a snapshot is Terra Draw's own furniture — selection
- * points, midpoints, the dots on a shape being drawn.
- */
 const DRAWN_MODES = new Set(["point", "linestring", "polygon", "rectangle"]);
+
+/**
+ * Terra Draw's own handles carry one of these, and share the `mode` of the
+ * shape they belong to — so the mode alone does not tell them apart.
+ *
+ * Its own `GUIDANCE_POINT_PROPERTY_KEYS` also lists `edited`, which is wrong
+ * here: that one is set on real shapes, true or false, when a user moves them.
+ */
+const HANDLE_PROPERTIES = [
+  "midPoint",
+  "selectionPoint",
+  "closingPoint",
+  "snappingPoint",
+  "coordinatePoint",
+] as const;
 
 /** What the toolbar needs to know to label and enable itself. */
 export interface DrawState {
@@ -144,15 +153,16 @@ export interface GeometryDraw {
  * selection state, an internal id. None of that belongs in a value handed to a
  * server, so only the geometry survives.
  */
-function toCollection(features: readonly Feature[]): FeatureCollection {
+/** Exported for tests: what leaves the binding, given a Terra Draw snapshot. */
+export function toCollection(features: readonly Feature[]): FeatureCollection {
   return {
     type: "FeatureCollection",
     features: features
-      // Terra Draw renders its own handles as Point features — selection
-      // points, midpoints, the coordinate dots on a polygon being drawn. They
-      // are indistinguishable from a placed point except by the mode that owns
-      // them, so filter on that rather than on geometry type.
-      .filter((feature) => DRAWN_MODES.has(String(feature.properties?.["mode"] ?? "")))
+      .filter((feature) => {
+        const properties = feature.properties ?? {};
+        if (HANDLE_PROPERTIES.some((key) => properties[key] === true)) return false;
+        return DRAWN_MODES.has(String(properties["mode"] ?? ""));
+      })
       .map((feature) => ({
         type: "Feature",
         geometry: feature.geometry,
