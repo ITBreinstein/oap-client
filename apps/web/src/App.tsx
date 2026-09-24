@@ -5,6 +5,8 @@ import {
   parseDescription,
 } from "@breinstein/oap-client";
 import { type ReactElement, useCallback, useEffect, useState } from "react";
+import { RunButton } from "./execution/RunButton.js";
+import { createObservationLog } from "./execution/observations.js";
 import { ProcessInputs, defaultValues } from "./inputs/ProcessInputs.js";
 
 /**
@@ -51,6 +53,17 @@ export function App(): ReactElement {
   const [error, setError] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [values, setValues] = useState<Record<string, unknown>>({});
+  /**
+   * The collection this process was found in, for `execute` to resolve against.
+   *
+   * A fallback only: the plan carries the description, so the core prefers the
+   * `execute` link the server advertises over any path built from this.
+   */
+  const [processesUrl, setProcessesUrl] = useState<string | undefined>(undefined);
+  // Created once: the sink is captured inside `execute`'s promise chain, and a
+  // per-render array would be appended to after the render that owned it had
+  // gone.
+  const [observations] = useState(createObservationLog);
 
   useEffect(() => {
     // Abort on unmount, and whenever a second load starts before the first
@@ -69,6 +82,7 @@ export function App(): ReactElement {
           documentUrl: document.envelope.url,
         });
         setProcess(described);
+        setProcessesUrl(new URL("../", document.envelope.url).toString());
         // Seed the schema defaults the controls are about to display, so the
         // form holds what it shows.
         setValues(defaultValues(described.inputs));
@@ -94,6 +108,7 @@ export function App(): ReactElement {
   const load = useCallback((next: string) => {
     setError(undefined);
     setProcess(undefined);
+    setProcessesUrl(undefined);
     setValues({});
     setLoading(true);
     setRequest((previous) => ({ url: next, attempt: previous.attempt + 1 }));
@@ -171,6 +186,18 @@ export function App(): ReactElement {
             vanish from this dump, which is the point: an empty control means
             the input is absent, not that it is empty.
           */}
+          {processesUrl !== undefined && (
+            <RunButton
+              // Remounts when the process changes, which aborts a run in
+              // flight rather than letting it report against the next form.
+              key={process.id}
+              processesUrl={processesUrl}
+              description={process}
+              values={values}
+              onObservation={observations.sink}
+            />
+          )}
+
           <h3>Entered values</h3>
           <pre data-testid="entered-values">{JSON.stringify(values, null, 2)}</pre>
         </section>
