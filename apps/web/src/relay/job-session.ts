@@ -15,6 +15,7 @@ import {
   createClient,
   getJob,
   type Client,
+  type FetchLike,
   type ExecuteOutputSelection,
   type Execution,
   type ProcessDescription,
@@ -24,7 +25,15 @@ import type { RelayEndpoint } from "./contract.js";
 import { openDoorbells, type DoorbellStream, type StreamState } from "./doorbells.js";
 import { JobReconciler, type TrackedJob } from "./reconciler.js";
 import { createRelayClient, type RelayClient } from "./relay-client.js";
+import { createRelayFetch } from "./relay-fetch.js";
 import { createRoutedFetch } from "./routed-fetch.js";
+
+/**
+ * How this page reads one endpoint, decided per connection: `direct` always
+ * first, `relay` only after a CORS failure the user confirmed the fallback for.
+ * Never remembered past the page: reconnecting starts direct again.
+ */
+export type Reads = "direct" | "relay";
 
 export interface JobRow extends TrackedJob {
   readonly endpointKey: string;
@@ -44,8 +53,11 @@ export interface JobSession {
    * observations and sending through the same route choice as `run`. For
    * everything but an asynchronous execute: discovery, the process list and
    * descriptions, a synchronous run, results and dismissal.
+   *
+   * `reads: "relay"` sends all of that through the relay's read route, and is
+   * ignored for an endpoint the relay does not offer it for.
    */
-  client(endpoint: RelayEndpoint): Client;
+  client(endpoint: RelayEndpoint, reads?: Reads): Client;
   /**
    * Start one asynchronous execution. Resolves once the job is known, or refused.
    * Pass the description and the core uses its `execute` link and checks arity.
@@ -56,9 +68,10 @@ export interface JobSession {
     inputs: Record<string, unknown>,
     outputs: Record<string, unknown>,
     description?: ProcessDescription,
+    reads?: Reads,
   ): Promise<Execution>;
   /** Start reconciling a job the caller found some other way — a sync run the server made async. */
-  track(endpoint: RelayEndpoint, statusUrl: string): void;
+  track(endpoint: RelayEndpoint, statusUrl: string, reads?: Reads): void;
   /** Add an observation the web app made itself (T4). */
   record(observation: WebObservation): void;
   subscribe(listener: (snapshot: JobSessionSnapshot) => void): () => void;
@@ -119,7 +132,15 @@ export function createJobSession(relayUrl: string | undefined): JobSession {
 
   let relayState: JobSessionSnapshot["relay"] = relay === undefined ? "off" : "connecting";
   let observations: WebObservation[] = [];
-  const meta = new Map<string, { endpointKey: string; route: "direct" | "relay" | undefined }>();
+  const meta = new Map<
+    string,
+    {
+      endpointKey: string;
+      route: "direct" | "relay" | undefined;
+      /** The read route's wrapper, when this job's endpoint is read through the relay. */
+      read: FetchLike | undefined;
+    }
+  >();
   const listeners = new Set<(snapshot: JobSessionSnapshot) => void>();
 
   const snapshot = (): JobSessionSnapshot => ({
@@ -141,7 +162,14 @@ export function createJobSession(relayUrl: string | undefined): JobSession {
   };
 
   const reconciler = new JobReconciler({
-    readJob: (statusUrl, signal) => getJob(statusUrl, { signal, onObservation: observe }),
+    readJob: (statusUrl, signal) => {
+      const read = meta.get(statusUrl)?.read;
+      return getJob(statusUrl, {
+        signal,
+        onObservation: observe,
+        ...(read === undefined ? {} : { fetch: read }),
+      });
+    },
     onChange: publish,
   });
 
@@ -162,21 +190,47 @@ export function createJobSession(relayUrl: string | undefined): JobSession {
           },
         });
 
+  /** The read route's wrapper, only when asked for and only where the relay offers it. */
+  const readFetch = (endpoint: RelayEndpoint, reads: Reads): FetchLike | undefined =>
+    reads === "relay" &&
+    endpoint.readRoute === "relay" &&
+    relay !== undefined &&
+    doorbells !== undefined
+      ? createRelayFetch({
+          relay,
+          endpointKey: endpoint.key,
+          baseUrl: endpoint.baseUrl,
+          session: doorbells,
+        })
+      : undefined;
+
   return {
     async endpoints() {
       return relay === undefined ? [] : relay.endpoints();
     },
 
-    client(endpoint) {
+    client(endpoint, reads = "direct") {
+      const read = readFetch(endpoint, reads);
       return createClient({
         baseUrl: endpoint.baseUrl,
         onObservation: observe,
-        fetch: createRoutedFetch({ endpoint, relay, session: doorbells, onRoute: observe }),
+        fetch: createRoutedFetch({
+          endpoint,
+          relay,
+          session: doorbells,
+          onRoute: observe,
+          ...(read === undefined ? {} : { fetch: read, reads: "relay" }),
+        }),
       });
     },
 
-    track(endpoint, statusUrl) {
-      meta.set(statusUrl, { endpointKey: endpoint.key, route: "direct" });
+    track(endpoint, statusUrl, reads = "direct") {
+      const read = readFetch(endpoint, reads);
+      meta.set(statusUrl, {
+        endpointKey: endpoint.key,
+        route: read === undefined ? "direct" : "relay",
+        read,
+      });
       reconciler.track(statusUrl);
     },
 
@@ -184,9 +238,10 @@ export function createJobSession(relayUrl: string | undefined): JobSession {
       observe(observation);
     },
 
-    async run(endpoint, processId, inputs, outputs, description) {
+    async run(endpoint, processId, inputs, outputs, description, reads = "direct") {
       const refs = new Map<string, string>();
       let route: "direct" | "relay" | undefined;
+      const read = readFetch(endpoint, reads);
       const client = createClient({
         baseUrl: endpoint.baseUrl,
         onObservation: observe,
@@ -194,6 +249,7 @@ export function createJobSession(relayUrl: string | undefined): JobSession {
           endpoint,
           relay,
           session: doorbells,
+          ...(read === undefined ? {} : { fetch: read, reads: "relay" }),
           onRoute: (observation) => {
             route = observation.route;
             observe(observation);
@@ -211,7 +267,7 @@ export function createJobSession(relayUrl: string | undefined): JobSession {
       });
       if (execution.kind === "job") {
         const { statusUrl } = execution.job;
-        meta.set(statusUrl, { endpointKey: endpoint.key, route });
+        meta.set(statusUrl, { endpointKey: endpoint.key, route, read });
         reconciler.track(statusUrl, refs.get(statusUrl));
       }
       return execution;

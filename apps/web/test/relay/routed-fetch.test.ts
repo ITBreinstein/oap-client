@@ -21,6 +21,7 @@ const RELAYED: RelayEndpoint = {
   key: "ogc",
   baseUrl: BASE,
   executeRoute: "relay",
+  readRoute: "direct",
   callbacks: true,
 };
 const DIRECT: RelayEndpoint = { ...RELAYED, executeRoute: "direct" };
@@ -51,6 +52,7 @@ function fakeRelay(answers: (RelayedExecute | Error)[]): RelayClient & { calls: 
     endpoints: () => Promise.resolve([]),
     createSession: () => Promise.resolve({ token: "s", expiresAt: 0 }),
     openEvents: () => Promise.reject(new Error("not used")),
+    forward: () => Promise.reject(new Error("not used")),
     execute: (endpointKey, processId, body, session) => {
       calls.push({ endpointKey, processId, body, session });
       const answer = answers.shift() ?? new Error("no more answers");
@@ -170,6 +172,64 @@ describe("createRoutedFetch", () => {
     expect(relay.calls).toEqual([]);
     expect(direct.calls).toEqual([`${BASE}/processes/echo/execution`]);
     expect(routes[0]).toMatchObject({ route: "direct", requestedMode: "sync", outcome: "sent" });
+  });
+
+  it("sends a synchronous execute to the relay raw once the read route was confirmed", async () => {
+    const relay = fakeRelay([]);
+    const sent: { path: string; init: RequestInit }[] = [];
+    relay.forward = (path, init) => {
+      sent.push({ path, init });
+      return Promise.resolve(
+        new Response('{"id":"x","value":1}', {
+          status: 200,
+          headers: { "Content-Type": "application/json", "X-Relay": "1" },
+        }),
+      );
+    };
+    const direct = directFetch();
+    const routes: ExecuteRouteObservation[] = [];
+    const routed = createRoutedFetch({
+      endpoint: { ...RELAYED, readRoute: "relay" },
+      relay,
+      fetch: direct.impl,
+      reads: "relay",
+      onRoute: (observation) => routes.push(observation),
+    });
+
+    const execution = await execute(`${BASE}/processes`, "echo", { inputs: {}, fetch: routed });
+
+    expect(execution.kind).toBe("immediate");
+    expect(direct.calls).toEqual([]);
+    expect(relay.calls).toEqual([]);
+    expect(sent.map((call) => call.path)).toEqual(["/execute/ogc/echo"]);
+    expect(new Headers(sent[0]?.init.headers).get("Prefer")).toBeNull();
+    expect(routes[0]).toMatchObject({ route: "relay", requestedMode: "sync", outcome: "sent" });
+  });
+
+  it("records a relay refusal of a synchronous execute, and never falls back to direct", async () => {
+    const relay = fakeRelay([]);
+    relay.forward = () =>
+      Promise.resolve(
+        new Response("{}", {
+          status: 502,
+          headers: { "X-Relay": "1", "X-Relay-Error": "timeout" },
+        }),
+      );
+    const direct = directFetch();
+    const routes: ExecuteRouteObservation[] = [];
+    const routed = createRoutedFetch({
+      endpoint: { ...RELAYED, readRoute: "relay" },
+      relay,
+      fetch: direct.impl,
+      reads: "relay",
+      onRoute: (observation) => routes.push(observation),
+    });
+
+    await expect(
+      execute(`${BASE}/processes`, "echo", { inputs: {}, fetch: routed }),
+    ).rejects.toThrow();
+    expect(direct.calls).toEqual([]);
+    expect(routes[0]).toMatchObject({ route: "relay", outcome: "relay-failed", reason: "timeout" });
   });
 
   it("sends everything straight through for a direct-route endpoint, and without a relay", async () => {

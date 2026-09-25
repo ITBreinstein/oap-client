@@ -13,12 +13,25 @@
 
 export type ExecuteRoute = "direct" | "relay";
 
+/**
+ * Whether the relay *may* carry this endpoint's reads. A permission, not a
+ * route: the page still goes direct first, and uses it only after a CORS
+ * failure and the user's confirmation.
+ */
+export type ReadRoute = "direct" | "relay";
+
 export interface RelayEndpoint {
   readonly key: string;
   readonly baseUrl: string;
   readonly executeRoute: ExecuteRoute;
+  readonly readRoute: ReadRoute;
   readonly callbacks: boolean;
 }
+
+/** On every response the relay sends. Missing: the relay did not send it. */
+export const RELAY_MARKER = "X-Relay";
+/** On every response the relay generated itself: its refusals and its own 502s. */
+export const RELAY_ERROR = "X-Relay-Error";
 
 export interface SessionGrant {
   readonly token: string;
@@ -69,7 +82,10 @@ export function parseEndpoints(value: unknown): RelayEndpoint[] {
   return value["endpoints"].map((entry: unknown) => {
     if (!isRecord(entry)) throw new RelayContractError("endpoint");
     const { key, baseUrl, executeRoute, callbacks } = entry;
+    // Absent from a relay older than the read route, which never offers it.
+    const readRoute = entry["readRoute"] ?? "direct";
     if (
+      (readRoute !== "direct" && readRoute !== "relay") ||
       typeof key !== "string" ||
       typeof baseUrl !== "string" ||
       (executeRoute !== "direct" && executeRoute !== "relay") ||
@@ -77,7 +93,7 @@ export function parseEndpoints(value: unknown): RelayEndpoint[] {
     ) {
       throw new RelayContractError("endpoint");
     }
-    return { key, baseUrl, executeRoute, callbacks };
+    return { key, baseUrl, executeRoute, readRoute, callbacks };
   });
 }
 

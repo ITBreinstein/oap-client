@@ -50,6 +50,7 @@ function fakeRelay() {
     baseUrl: "http://relay.test",
     endpoints: () => Promise.resolve([]),
     execute: () => Promise.reject(new Error("not used")),
+    forward: () => Promise.reject(new Error("not used")),
     createSession: () => {
       if (down) return Promise.reject(new TypeError("relay unreachable"));
       issued += 1;

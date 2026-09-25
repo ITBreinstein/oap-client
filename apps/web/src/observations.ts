@@ -16,6 +16,7 @@
 import { redactUrl, type Observation } from "@breinstein/oap-client";
 import type { EncodeNote } from "./forms/encode.js";
 import type { Diagnostic, DiagnosticCode } from "./forms/plan.js";
+import type { RelayOutcome } from "./relay/relay-fetch.js";
 import type { ExecuteRouteObservation } from "./relay/routed-fetch.js";
 
 /**
@@ -41,22 +42,49 @@ export interface FormObservation {
   readonly crs: string | undefined;
 }
 
-/** How connecting to an endpoint went, and where the address came from (T8). */
+/**
+ * One attempt to connect to an endpoint, from the direct request to whatever
+ * route was finally used. One record per attempt, written once the attempt has
+ * settled: connected, failed, declined, or tried through the relay.
+ *
+ * The direct half is always there, which is what keeps a server that needed
+ * the relay recorded as unusable from a web page.
+ */
 export interface EndpointAccessObservation {
   readonly kind: "endpoint-access";
   readonly endpoint: string;
+  /** The relay's key for a configured endpoint; `undefined` for a typed address. */
+  readonly endpointKey: string | undefined;
   /** Configured on the relay, or typed into the page. */
   readonly source: "configured" | "typed";
+  /** When the attempt started, ISO 8601. */
+  readonly at: string;
   /**
+   * The **direct** attempt, always made first:
+   *
    * - `connected`: the landing page and the process list were read.
    * - `cors-blocked`: the request never produced a readable response, from a
    *   page on another origin — what a missing `Access-Control-Allow-Origin`
-   *   looks like from inside a browser (findings 0049, 0050).
+   *   looks like from inside a browser (findings 0049, 0050). A server that is
+   *   down looks the same; a relay attempt that reaches it tells them apart.
    * - `failed`: any other failure; `error` names its class.
    */
   readonly outcome: "connected" | "cors-blocked" | "failed";
-  /** The error's class name. Never its message, which may carry a URL. */
+  /** The direct error's class name. Never its message, which may carry a URL. */
   readonly error: string | undefined;
+  /** Whether the relay offers its read route for this endpoint at all. */
+  readonly relayConfigured: boolean;
+  /** Whether the user clicked "Use relay". Nothing is sent through it otherwise. */
+  readonly userConfirmedRelay: boolean;
+  /**
+   * The relay attempt, when there was one. `other-failure` means the server's
+   * own answer came back and could not be used, so the server was up.
+   */
+  readonly relayOutcome: RelayOutcome | undefined;
+  /** The relay's reason code, verbatim (`timeout`, `blocked-address`, …), or ours. */
+  readonly relayReasonCode: string | undefined;
+  /** `relay` only when the relay attempt succeeded; `none` when nothing connected. */
+  readonly routeUsed: "direct" | "relay" | "none";
 }
 
 /**
