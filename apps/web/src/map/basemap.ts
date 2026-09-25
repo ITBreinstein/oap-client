@@ -49,3 +49,14 @@ export const SELECTED_INPUT_STYLES = {
   midPointColor: INPUT_STYLE.fill,
   midPointOutlineColor: INPUT_STYLE.outline,
 } as const;
+
+/**
+ * A result's colours: the blue end, so it cannot be mistaken for the amber
+ * input it is shown beside.
+ */
+export const RESULT_STYLE = {
+  fill: "#2563eb",
+  fillOpacity: 0.3,
+  outline: "#1d4ed8",
+  outlineWidth: 3,
+} as const;

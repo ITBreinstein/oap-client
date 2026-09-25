@@ -3,8 +3,9 @@
  *
  * Deliberately minimal in Task 7: JSON is shown pretty-printed, text is shown
  * as text and never rendered as HTML, and everything else is offered as a
- * download with its media type, file name and size. GeoJSON on the map,
- * images and collection references are Task 8, which adds arms to
+ * download with its media type, file name and size. GeoJSON is also put on
+ * the map, from the JSON it is shown as (`plottable.ts`). Images and
+ * collection references are Task 8, which adds arms to
  * {@link RenderableResult} rather than changing these.
  *
  * Built on the core's envelope and its readers: nothing here reads a stream

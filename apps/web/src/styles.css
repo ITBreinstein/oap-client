@@ -148,6 +148,26 @@ body {
   flex-basis: 100%;
 }
 
+/* The map's own colours (map/basemap.ts): the same on a light and a dark page. */
+.map-legend .swatch {
+  display: inline-block;
+  width: 0.9rem;
+  height: 0.9rem;
+  margin-right: 0.15rem;
+  vertical-align: -0.1rem;
+  border-radius: 2px;
+}
+
+.map-legend .swatch-result {
+  background: rgb(37 99 235 / 30%);
+  border: 2px solid #1d4ed8;
+}
+
+.map-legend .swatch-input {
+  background: rgb(217 119 6 / 12%);
+  border: 2px dashed #b45309;
+}
+
 @media (max-width: 52rem) {
   .layout {
     grid-template-columns: 1fr;

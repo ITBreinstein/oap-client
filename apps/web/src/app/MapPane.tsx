@@ -10,6 +10,10 @@
  *   the axes on the way out (T9). Nothing here reprojects.
  * - a geometry field, or a complex field's JSON-object format: shapes, turned
  *   into GeoJSON text in the wrapper and geometry types the plan allows.
+ *
+ * While a run is under way and once its result is in, nothing is drawn: the
+ * map shows what was sent — every geometry the inputs hold — and, once it is
+ * in, every result that is GeoJSON (`results/plottable.ts`).
  */
 
 import { drawableCrs, isDrawableCrs } from "../forms/crs.js";
@@ -26,6 +30,8 @@ import type { FieldPlan } from "../forms/plan.js";
 import type { Bbox } from "../map/bbox.js";
 import type { MapShape, Tool } from "../map/geometry-engine.js";
 import { MapView } from "../map/MapView.js";
+import type { ShownShapes } from "../map/shape-layers.js";
+import { plottedShapes } from "../results/plottable.js";
 import type { GeometryDrawProps } from "../map/useGeometryDraw.js";
 import type { DrawTarget } from "./draw.js";
 import type { Workflow } from "./workflow.js";
@@ -96,6 +102,21 @@ function toolsFor(target: GeometryTarget): Tool[] {
   return types.includes("Polygon") ? [...types, "Rectangle"] : [...types];
 }
 
+/** What a run sent and, once it is in, what came back: the map's part of it. */
+function shownFor(state: Workflow): readonly ShownShapes[] {
+  if (state.stage !== "running" && state.stage !== "result") return [];
+  const input = state.plan.fields.flatMap((field) => {
+    const current = Object.hasOwn(state.values, field.id) ? state.values[field.id] : undefined;
+    const binding = shapeBinding(field, current);
+    return binding === undefined ? [] : shapesOfText(binding.text);
+  });
+  const result = state.stage === "result" ? plottedShapes(state.results) : [];
+  return [
+    { role: "input", shapes: input },
+    { role: "result", shapes: result },
+  ];
+}
+
 const INACTIVE: GeometryDrawProps = {
   active: false,
   tools: [],
@@ -147,11 +168,16 @@ export function MapPane({
           },
         };
 
+  const shown = shownFor(state);
+  const drawnInput = shown.some((set) => set.role === "input" && set.shapes.length > 0);
+  const plotted = shown.some((set) => set.role === "result" && set.shapes.length > 0);
+
   return (
     <aside className="map-pane" aria-label="Map">
       <MapView
         onAvailable={onAvailable}
         geometry={geometry}
+        shown={shown}
         draw={{
           active: field !== undefined && control !== undefined,
           value: toBbox(current),
@@ -174,6 +200,23 @@ export function MapPane({
       {field !== undefined && control !== undefined && (
         <p className="map-hint" role="status">
           Drawing “{field.title}”: drag a rectangle on the map. Drag it or its corners to adjust.
+        </p>
+      )}
+      {(drawnInput || plotted) && (
+        <p className="map-hint map-legend" role="status" data-testid="map-legend">
+          {plotted && (
+            <span>
+              <span className="swatch swatch-result" aria-hidden="true" /> The result
+            </span>
+          )}
+          {plotted && drawnInput && " beside "}
+          {drawnInput && (
+            <span>
+              <span className="swatch swatch-input" aria-hidden="true" />{" "}
+              {plotted ? "the input you sent" : "The input you sent"}
+            </span>
+          )}
+          .
         </p>
       )}
     </aside>

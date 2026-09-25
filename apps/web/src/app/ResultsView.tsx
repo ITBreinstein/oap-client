@@ -2,11 +2,13 @@
  * The results (T10): each output separately. JSON pretty-printed and
  * collapsible, text as text — in a `<pre>`, never as markup — and everything
  * else as a download with its media type, file name and size. Every result can
- * be downloaded, shown or not.
+ * be downloaded, shown or not. A result that is GeoJSON is also on the map
+ * (`MapPane`), and says so.
  */
 
 import { useId, useState } from "react";
 import { saveBlob } from "./save.js";
+import { plotStatus } from "../results/plottable.js";
 import type { RenderableResult } from "../results/renderable.js";
 
 function sizeLabel(bytes: number): string {
@@ -60,8 +62,21 @@ function ResultItem({
 }) {
   const [blob] = useState(() => blobOf(result));
   const filename = filenameOf(result, processId);
+  const plot = plotStatus(result).kind;
   return (
-    <article className="result" data-output-id={result.outputId} data-kind={result.kind}>
+    <article
+      className="result"
+      data-output-id={result.outputId}
+      data-kind={result.kind}
+      data-plotted={plot === "plotted" ? "true" : undefined}
+    >
+      {plot === "plotted" && <p className="muted">GeoJSON: shown on the map in blue.</p>}
+      {plot === "projected" && (
+        <p className="muted">
+          GeoJSON, but its coordinates are not longitude and latitude, so it is not shown on the
+          map.
+        </p>
+      )}
       {result.kind === "json" && (
         <details open>
           <summary>
