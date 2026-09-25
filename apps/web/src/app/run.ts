@@ -8,10 +8,11 @@ import {
   ProcessesError,
   type ExecuteOutputSelection,
   type ProcessDescription,
+  type ProcessList,
 } from "@breinstein/oap-client";
 import { toExecuteBody, type EncodeNote, type FormValues } from "../forms/encode.js";
 import type { FormPlan } from "../forms/plan.js";
-import type { EndpointRef, WorkflowError } from "./workflow.js";
+import type { EndpointRef, ListFilter, WorkflowError } from "./workflow.js";
 import type { RelayEndpoint } from "../relay/contract.js";
 
 /**
@@ -75,6 +76,31 @@ export function relayEndpointFor(endpoint: EndpointRef): RelayEndpoint {
         readRoute: "direct",
         callbacks: false,
       };
+}
+
+/**
+ * The list the page shows. For a configured endpoint that names its processes,
+ * only those, in the server's order, and a note of what was left out, so the
+ * screen can say so. Anything else is shown whole.
+ */
+export function listedProcesses(
+  endpoint: EndpointRef,
+  list: ProcessList,
+): { readonly processes: ProcessList; readonly listFilter: ListFilter | undefined } {
+  if (endpoint.source !== "configured" || endpoint.processes === undefined) {
+    return { processes: list, listFilter: undefined };
+  }
+  const wanted = new Set(endpoint.processes);
+  const kept = list.processes.filter((summary) => wanted.has(summary.id));
+  const present = new Set(list.processes.map((summary) => summary.id));
+  return {
+    processes: { ...list, processes: kept },
+    listFilter: {
+      shown: kept.length,
+      total: list.processes.length,
+      missing: endpoint.processes.filter((id) => !present.has(id)),
+    },
+  };
 }
 
 /** A typed address, tidied: trimmed, trailing slashes dropped. Undefined if it is no URL. */

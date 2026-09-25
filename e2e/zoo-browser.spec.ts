@@ -104,10 +104,13 @@ test.describe("ZOO-Project from a browser", () => {
     await page.getByRole("button", { name: "Use relay" }).click();
     await expect(page.getByTestId("relay-banner")).toBeVisible({ timeout: 30_000 });
 
-    // Several ZOO processes are titled "Echo input"; the one with id `echo`.
+    // The relay's CI config lists only the 46 processes defined in the fork's
+    // own repository, so the page says how many it left out.
+    await expect(page.getByTestId("list-filter")).toContainText(/^46 of the \d+ processes/);
+    // Several listed processes are titled "Echo input"; pick one by its id.
     await page
       .getByRole("listitem")
-      .filter({ has: page.locator("code", { hasText: /^echo$/ }) })
+      .filter({ has: page.locator("code", { hasText: /^EchoProcess$/ }) })
       .getByRole("button", { name: "Echo input", exact: true })
       .click();
     await page
@@ -120,9 +123,12 @@ test.describe("ZOO-Project from a browser", () => {
     await page.getByRole("textbox", { name: "East (maximum longitude)" }).fill("4.9");
     await page.getByRole("textbox", { name: "North (maximum latitude)" }).fill("52.4");
     await page.getByRole("button", { name: "Run", exact: true }).click();
-    await expect(page.locator('[data-output-id="a"]')).toContainText("through the relay", {
-      timeout: 30_000,
-    });
+    await expect(page.locator('[data-output-id="literalOutput"]')).toContainText(
+      "through the relay",
+      {
+        timeout: 30_000,
+      },
+    );
 
     // ZOO stays recorded as unusable from a web page: the direct failure is on
     // the same record as the relay attempt that worked.

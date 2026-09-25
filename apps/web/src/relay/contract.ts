@@ -26,6 +26,8 @@ export interface RelayEndpoint {
   readonly executeRoute: ExecuteRoute;
   readonly readRoute: ReadRoute;
   readonly callbacks: boolean;
+  /** The process ids to list for this endpoint, when its configuration names some. */
+  readonly processes?: readonly string[] | undefined;
 }
 
 /** On every response the relay sends. Missing: the relay did not send it. */
@@ -93,7 +95,23 @@ export function parseEndpoints(value: unknown): RelayEndpoint[] {
     ) {
       throw new RelayContractError("endpoint");
     }
-    return { key, baseUrl, executeRoute, readRoute, callbacks };
+    const processes = entry["processes"];
+    if (
+      processes !== undefined &&
+      (!Array.isArray(processes) || !processes.every((id) => typeof id === "string"))
+    ) {
+      throw new RelayContractError("endpoint");
+    }
+    return {
+      key,
+      baseUrl,
+      executeRoute,
+      readRoute,
+      callbacks,
+      ...(processes === undefined
+        ? {}
+        : { processes: processes.filter((id) => typeof id === "string") }),
+    };
   });
 }
 

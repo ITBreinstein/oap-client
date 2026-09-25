@@ -3,12 +3,14 @@
 import type { ProcessList, ProcessSummary, ServiceDescription } from "@breinstein/oap-client";
 import { useId, useState } from "react";
 import { ErrorMessage } from "./ErrorMessage.js";
-import type { EndpointRef, WorkflowError } from "./workflow.js";
+import type { EndpointRef, ListFilter, WorkflowError } from "./workflow.js";
 
 export interface ProcessListScreenProps {
   readonly endpoint: EndpointRef;
   readonly service: ServiceDescription;
   readonly processes: ProcessList;
+  /** Set when this service's configuration lists only some of its processes. */
+  readonly listFilter?: ListFilter | undefined;
   readonly opening: string | undefined;
   readonly error: WorkflowError | undefined;
   readonly onOpen: (summary: ProcessSummary) => void;
@@ -16,7 +18,7 @@ export interface ProcessListScreenProps {
 }
 
 export function ProcessListScreen(props: ProcessListScreenProps) {
-  const { endpoint, service, processes, opening, error, onOpen, onDisconnect } = props;
+  const { endpoint, service, processes, listFilter, opening, error, onOpen, onDisconnect } = props;
   const base = useId();
   const [filter, setFilter] = useState("");
   const needle = filter.trim().toLowerCase();
@@ -40,6 +42,13 @@ export function ProcessListScreen(props: ProcessListScreenProps) {
         Processes
       </h2>
       {service.description !== undefined && <p className="help">{service.description}</p>}
+      {listFilter !== undefined && (
+        <p className="muted" data-testid="list-filter">
+          {`${String(listFilter.shown)} of the ${String(listFilter.total)} processes this server lists, as configured for this service.`}
+          {listFilter.missing.length > 0 &&
+            ` Configured but not on the server: ${listFilter.missing.join(", ")}.`}
+        </p>
+      )}
       <p className="muted">
         {processes.processes.length === 1
           ? "1 process"

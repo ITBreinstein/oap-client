@@ -23,6 +23,12 @@
  * confirmed it. It requires `executeRoute: "relay"`: a browser that cannot
  * read the server cannot read an execute's answer either.
  *
+ * `processes` narrows what the web app *lists* for an endpoint, for a
+ * deployment that carries far more than the demo needs. It is a presentation
+ * choice made in configuration, so no code has to name a server. It is not
+ * access control: the relay forwards nothing on the strength of it, and the
+ * page still reads the whole list and records its size.
+ *
  * `callbacks` is opt-in, and off unless the file says otherwise. Against
  * pygeoapi 0.21.0 a callback that cannot be delivered stalls the job or turns a
  * successful one into `failed` (finding 0047), so sending subscriber URLs makes
@@ -43,6 +49,10 @@ export interface EndpointConfig {
   readonly baseUrl: string;
   readonly executeRoute: ExecuteRoute;
   readonly readRoute: ReadRoute;
+  /**
+   * The process ids the web app lists for this endpoint. Absent: all of them.
+   */
+  readonly processes?: readonly string[] | undefined;
   /** Whether the relay registers callbacks for jobs it starts here. */
   readonly callbacks: boolean;
   /**
@@ -109,6 +119,26 @@ export class ConfigError extends Error {
 }
 
 const ENDPOINT_KEY = /^[a-z0-9][a-z0-9-]{0,62}$/;
+
+/** As the execute route accepts them: ZOO's `OTB.BandMath` included, nothing URL-shaped. */
+const PROCESS_ID = /^[A-Za-z0-9_][A-Za-z0-9._~-]{0,127}$/;
+
+function readProcessIds(record: Record<string, unknown>, path: string): string[] | undefined {
+  const value = record["processes"];
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value) || value.length === 0) {
+    throw new ConfigError(`${path}.processes`, "must be a non-empty array of process ids");
+  }
+  const ids: string[] = [];
+  for (const [index, entry] of value.entries()) {
+    if (typeof entry !== "string" || !PROCESS_ID.test(entry)) {
+      throw new ConfigError(`${path}.processes[${String(index)}]`, "is not a process id");
+    }
+    if (ids.includes(entry)) throw new ConfigError(`${path}.processes`, `repeat id ${entry}`);
+    ids.push(entry);
+  }
+  return ids;
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -195,6 +225,7 @@ function parseEndpoint(value: unknown, path: string): EndpointConfig {
     baseUrl: normaliseHttpUrl(readString(value, "baseUrl", path), `${path}.baseUrl`),
     executeRoute: route,
     readRoute,
+    processes: readProcessIds(value, path),
     callbacks: readBoolean(value, "callbacks", path, false),
     allowPrivateNetwork: readBoolean(value, "allowPrivateNetwork", path, false),
   };

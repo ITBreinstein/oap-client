@@ -35,6 +35,16 @@ stays unusable from a browser, relay or not (finding 0049).
 
 The client works without the relay: every job is still found by polling.
 
+One more per-endpoint setting is not a decision about routes at all:
+`processes`, an optional list of process ids, narrows what the web app _lists_
+for that endpoint. It exists for a deployment that carries far more than the
+demo needs. `zoo` in `infra/relay/ci.json` lists only the 46 processes whose definitions
+are in the Gouwe-Gozer fork's own repository (its `zoo-project/zoo-services`,
+including the two its compose file mounts as `org.n52.javaps.test.*`), out of 703. The rest, SAGA and OTB among them, come with the upstream base image. It is not
+access control: the relay forwards nothing on the strength of it, and the
+page still reads the whole list, records its size, and says how many it
+left out.
+
 ## Running it
 
 ```bash
@@ -73,7 +83,7 @@ All three are made in the config, before any request exists.
 | Route                                     | Caller     | Answers                                                                                                   |
 | ----------------------------------------- | ---------- | --------------------------------------------------------------------------------------------------------- |
 | `GET /healthz`                            | operator   | `{ "ok": true }`                                                                                          |
-| `GET /endpoints`                          | browser    | each endpoint's `key`, `baseUrl`, `executeRoute`, `readRoute`, `callbacks`                                |
+| `GET /endpoints`                          | browser    | each endpoint's `key`, `baseUrl`, `executeRoute`, `readRoute`, `callbacks`, and `processes` when set      |
 | `POST /sessions`                          | browser    | `201 { token, expiresAt }` — the session token                                                            |
 | `GET /sessions/events`                    | browser    | `text/event-stream`: `ready`, then `job` events `{ "ref" }`                                               |
 | `POST /execute/{endpointKey}/{processId}` | browser    | `{ upstream: { status, location, contentType, preferenceApplied, body }, registration: { ref } \| null }` |

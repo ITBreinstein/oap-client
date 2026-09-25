@@ -220,6 +220,24 @@ describe("GET /endpoints", () => {
   });
 });
 
+describe("GET /endpoints with a process list", () => {
+  it("passes the configured process ids through, and nothing when there are none", async () => {
+    const app = createApp({
+      config: parseConfig({
+        endpoints: [
+          { key: "zoo", baseUrl: "http://ogc.test", processes: ["hellojs", "Buffer"] },
+          { key: "all", baseUrl: "http://ogc.test" },
+        ],
+      }),
+    });
+    const body: unknown = await (await app.request("/endpoints")).json();
+    expect(body).toMatchObject({
+      endpoints: [{ key: "zoo", processes: ["hellojs", "Buffer"] }, { key: "all" }],
+    });
+    expect(JSON.stringify(body)).not.toContain('"processes":null');
+  });
+});
+
 describe("CORS", () => {
   it("allows exactly the configured origin, without credentials", async () => {
     const { app } = harness();

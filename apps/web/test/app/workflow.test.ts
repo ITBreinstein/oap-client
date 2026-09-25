@@ -6,12 +6,19 @@
 import {
   unknownCapabilities,
   type ProcessList,
+  type ProcessSummary,
   type ServiceDescription,
 } from "@breinstein/oap-client";
 import { describe, expect, it } from "vitest";
 import { initialValues } from "../../src/forms/defaults.js";
 import { resolveFormPlan } from "../../src/forms/resolve.js";
-import { outputSelection, runError, runRequest, typedEndpoint } from "../../src/app/run.js";
+import {
+  listedProcesses,
+  outputSelection,
+  runError,
+  runRequest,
+  typedEndpoint,
+} from "../../src/app/run.js";
 import {
   INITIAL_WORKFLOW,
   workflowReducer,
@@ -344,5 +351,36 @@ describe("runError", () => {
     const plan = resolveFormPlan(inputsProcess);
     const error = runError(new Error("socket closed"), plan);
     expect(error).toEqual({ title: "The request did not complete.", detail: "socket closed" });
+  });
+});
+
+describe("listedProcesses", () => {
+  const summary = (id: string): ProcessSummary => ({ ...inputsProcess, id });
+  const list: ProcessList = {
+    processes: [summary("Buffer"), summary("SAGA.x"), summary("hellojs"), summary("OTB.y")],
+    links: [],
+    pageCount: 1,
+    truncated: false,
+  };
+  const zoo: EndpointRef = {
+    source: "configured",
+    key: "zoo",
+    baseUrl: "http://localhost:5090/ogc-api",
+    executeRoute: "relay",
+    readRoute: "relay",
+    callbacks: false,
+    processes: ["hellojs", "Buffer", "NotThere"],
+  };
+
+  it("keeps the configured ids, in the server's order, and says what it left out", () => {
+    const { processes, listFilter } = listedProcesses(zoo, list);
+    expect(processes.processes.map((entry) => entry.id)).toEqual(["Buffer", "hellojs"]);
+    expect(listFilter).toEqual({ shown: 2, total: 4, missing: ["NotThere"] });
+  });
+
+  it("shows everything for an endpoint that names no processes, and for a typed one", () => {
+    const all: EndpointRef = { ...zoo, processes: undefined };
+    expect(listedProcesses(all, list)).toEqual({ processes: list, listFilter: undefined });
+    expect(listedProcesses(endpoint, list)).toEqual({ processes: list, listFilter: undefined });
   });
 });

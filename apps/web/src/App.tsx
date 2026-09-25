@@ -76,6 +76,7 @@ export function App() {
           endpoint={state.endpoint}
           service={state.service}
           processes={state.processes}
+          listFilter={state.listFilter}
           opening={state.opening}
           error={state.error}
           onOpen={commands.openProcess}

@@ -83,6 +83,17 @@ describe("parseConfig", () => {
     expect(() => parseConfig({ endpoints: [], limits: { readTimeoutMs: 0 } })).toThrow(/limits/);
   });
 
+  it("takes an optional list of process ids to show, and checks each one", () => {
+    expect(parseConfig({ endpoints: [endpoint] }).endpoints[0]?.processes).toBeUndefined();
+    expect(
+      parseConfig({ endpoints: [{ ...endpoint, processes: ["hellojs", "OTB.BandMath"] }] })
+        .endpoints[0]?.processes,
+    ).toEqual(["hellojs", "OTB.BandMath"]);
+    for (const processes of [[], "hellojs", ["../x"], [""], [1], ["a", "a"]]) {
+      expect(() => parseConfig({ endpoints: [{ ...endpoint, processes }] })).toThrow(/processes/);
+    }
+  });
+
   it("accepts only exact origins", () => {
     expect(
       parseConfig({ endpoints: [], allowedOrigins: ["http://localhost:4173"] }).allowedOrigins,

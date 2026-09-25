@@ -48,6 +48,12 @@ docker compose -f infra/compose/pygeoapi.yml up -d --wait   # :5080 with CORS, :
    directly**: the relay only accepts the keys it was configured with, and is
    not a general proxy.
 
+A configured endpoint may also name the `processes` to list. The process list
+then shows only those, in the server's order, under a line such as "46 of the
+703 processes this server lists, as configured for this service", followed by
+any configured ids the server lacks. In CI, `zoo` lists the 46 processes defined
+in the Gouwe-Gozer fork's own repository.
+
 Which of the reference servers a page can read at all, measured in Chromium on
 2026-09-23 (Task 7, Z1):
 

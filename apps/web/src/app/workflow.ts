@@ -40,6 +40,8 @@ export type EndpointRef =
       /** Whether the relay may carry this endpoint's reads, once the user confirmed. */
       readonly readRoute: "direct" | "relay";
       readonly callbacks: boolean;
+      /** Configured: list only these process ids. Absent: list them all. */
+      readonly processes?: readonly string[] | undefined;
     }
   | { readonly source: "typed"; readonly baseUrl: string };
 
@@ -61,7 +63,19 @@ interface Connected {
    */
   readonly route: "direct" | "relay";
   readonly service: ServiceDescription;
+  /** What the page lists: the server's list, narrowed when configured to be. */
   readonly processes: ProcessList;
+  /** Set when the configuration narrowed the list, so the screen can say so. */
+  readonly listFilter?: ListFilter | undefined;
+}
+
+/** How a configured process list narrowed what the server offers. */
+export interface ListFilter {
+  readonly shown: number;
+  /** What the server listed, before narrowing. */
+  readonly total: number;
+  /** Configured ids the server does not have. */
+  readonly missing: readonly string[];
 }
 
 interface ProcessOpen extends Connected {
@@ -118,6 +132,7 @@ export type WorkflowAction =
       readonly route: "direct" | "relay";
       readonly service: ServiceDescription;
       readonly processes: ProcessList;
+      readonly listFilter?: ListFilter | undefined;
     }
   | {
       readonly type: "relay-offered";
@@ -167,6 +182,7 @@ function connectedPart(state: Connected): Connected {
     route: state.route,
     service: state.service,
     processes: state.processes,
+    listFilter: state.listFilter,
   };
 }
 
@@ -201,6 +217,7 @@ export function workflowReducer(state: Workflow, action: WorkflowAction): Workfl
             route: action.route,
             service: action.service,
             processes: action.processes,
+            listFilter: action.listFilter,
           }
         : state;
 

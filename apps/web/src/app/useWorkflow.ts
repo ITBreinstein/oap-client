@@ -40,7 +40,13 @@ import {
   type RelayAttempt,
 } from "./route-decision.js";
 import { toRenderable } from "../results/renderable.js";
-import { declaredMediaTypes, relayEndpointFor, runError, runRequest } from "./run.js";
+import {
+  declaredMediaTypes,
+  listedProcesses,
+  relayEndpointFor,
+  runError,
+  runRequest,
+} from "./run.js";
 import {
   INITIAL_WORKFLOW,
   workflowReducer,
@@ -223,7 +229,7 @@ export function useWorkflow(relayUrl: string | undefined): WorkflowView {
       void (async () => {
         try {
           const service = await connection.inspect();
-          const processes = await connection.listProcesses();
+          const listed = listedProcesses(endpoint, await connection.listProcesses());
           client.current = { endpoint, client: connection, reads: "direct" };
           active.record(
             accessRecord({
@@ -234,7 +240,7 @@ export function useWorkflow(relayUrl: string | undefined): WorkflowView {
               directError: undefined,
             }),
           );
-          dispatch({ type: "connected", endpoint, route: "direct", service, processes });
+          dispatch({ type: "connected", endpoint, route: "direct", service, ...listed });
         } catch (cause) {
           const direct = directFailure(cause);
           const facts = { endpoint, at, relayAvailable, direct, directError: errorName(cause) };
@@ -263,10 +269,10 @@ export function useWorkflow(relayUrl: string | undefined): WorkflowView {
     void (async () => {
       try {
         const service = await connection.inspect();
-        const processes = await connection.listProcesses();
+        const listed = listedProcesses(endpoint, await connection.listProcesses());
         client.current = { endpoint, client: connection, reads: "relay" };
         active.record(accessRecord({ ...facts, confirmed: true, relay: relayAttempt(undefined) }));
-        dispatch({ type: "connected", endpoint, route: "relay", service, processes });
+        dispatch({ type: "connected", endpoint, route: "relay", service, ...listed });
       } catch (cause) {
         const attempt = relayAttempt(cause);
         active.record(accessRecord({ ...facts, confirmed: true, relay: attempt }));
