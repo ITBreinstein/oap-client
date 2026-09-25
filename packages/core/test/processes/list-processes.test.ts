@@ -61,6 +61,12 @@ describe("listProcesses on a single page", () => {
       "breinstein-png",
       "breinstein-rotate",
       "breinstein-aerial",
+      "breinstein-async-only",
+      "breinstein-sync-only",
+      "breinstein-fail-late",
+      "breinstein-dates",
+      "breinstein-feature-area",
+      "breinstein-buildings",
     ]);
     expect(list.pageCount).toBe(1);
     expect(list.truncated).toBe(false);

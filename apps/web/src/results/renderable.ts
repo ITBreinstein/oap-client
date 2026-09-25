@@ -32,6 +32,11 @@ export type RenderableResult =
       readonly filename?: string | undefined;
       /** Why this was not shown: not text, or too large to show. */
       readonly reason: "not-text" | "too-large";
+      /**
+       * The parsed value, when this is JSON too large to show: not shown, but
+       * still read, so GeoJSON can go on the map (`plottable.ts`).
+       */
+      readonly json?: unknown;
     };
 
 /**
@@ -190,6 +195,7 @@ function withinLimit(result: RenderableResult, limit: number, processId: string)
     mediaType,
     filename: defaultFilename(processId, result.outputId, mediaType),
     reason: "too-large",
+    ...(result.kind === "json" ? { json: result.value } : {}),
   };
 }
 
@@ -200,7 +206,10 @@ export async function toRenderable(
   const limit = options.displayLimitBytes ?? DEFAULT_DISPLAY_LIMIT_BYTES;
   const single = options.outputIds.length === 1 ? (options.outputIds[0] ?? "result") : "result";
   const { mediaType } = envelope;
-  const download = async (reason: "not-text" | "too-large"): Promise<RenderableResult[]> => [
+  const download = async (
+    reason: "not-text" | "too-large",
+    json?: unknown,
+  ): Promise<RenderableResult[]> => [
     {
       kind: "download",
       outputId: single,
@@ -208,6 +217,7 @@ export async function toRenderable(
       mediaType,
       filename: envelope.filename ?? defaultFilename(options.processId, single, mediaType),
       reason,
+      ...(json === undefined ? {} : { json }),
     },
   ];
 
@@ -234,7 +244,7 @@ export async function toRenderable(
         withinLimit(fromEntry(id, entry, options), limit, options.processId),
       );
     }
-    if (tooLarge) return download("too-large");
+    if (tooLarge) return download("too-large", value);
     return [{ kind: "json", outputId: single, value }];
   }
 

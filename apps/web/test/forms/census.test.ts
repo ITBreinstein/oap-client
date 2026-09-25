@@ -70,18 +70,18 @@ describe("census over the committed fixtures", () => {
         "controls": {
           "bbox": 3,
           "checkbox": 6,
-          "complex": 14,
-          "geometry": 3,
+          "complex": 15,
+          "geometry": 4,
           "list:text": 4,
-          "number": 14,
+          "number": 17,
           "select": 4,
-          "text": 22,
+          "text": 27,
         },
-        "descriptions": 27,
+        "descriptions": 33,
         "diagnostics": {
           "contradictory-schema": 1,
         },
-        "inputs": 70,
+        "inputs": 80,
       }
     `);
   });

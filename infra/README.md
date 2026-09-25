@@ -165,6 +165,44 @@ answering. The standard cannot say that `bbox` is the extent of `image`; the
 output descriptions say so in words, and the web client's pairing of the two
 is its own reading (`apps/web/src/results/plottable.ts`).
 
+### The coverage processes
+
+Six more, added together (2026-09-25), each for something the client handles
+but no process on the pinned server had exercised. Same rule as above: they
+echo, reshape, fail or fetch, and compute as little as they can.
+
+| Process                                         | Closes                                                              | Inputs → outputs                                                                                                                     |
+| ----------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `breinstein-async-only`, `breinstein-sync-only` | one execution mode                                                  | `slow`, declaring `["async-execute"]` or `["sync-execute"]` only                                                                     |
+| `breinstein-fail-late`                          | a job seen running, then failed                                     | `seconds`, `message` → always fails, after `seconds`, with `message`                                                                 |
+| `breinstein-dates`                              | `format: "date"` and `"date-time"` inputs                           | a date and an optional RFC 3339 instant → what was understood: weekday, ISO week, the instant in UTC                                 |
+| `breinstein-feature-area`                       | an input by reference; a FeatureCollection in and out; a CSV output | a FeatureCollection, inline or as a URL → the features with `area_m2` (geodesic, `pyproj`) as GeoJSON, and a CSV table               |
+| `breinstein-buildings`                          | a large GeoJSON result; an output by reference                      | a polygon of at most 1 km → the buildings in it from PDOK's BAG OGC API Features, or a link to the query when asked for by reference |
+
+What they turned up, measured against 0.21.0:
+
+- **pygeoapi describes every process with the server's execution modes**, not
+  the process's: both single-mode processes are described as
+  `["sync-execute", "async-execute"]`, and every process as
+  `outputTransmission: ["value"]` (finding 0059). The execution does read the
+  process's own modes for an asynchronous request. So the browser test puts back
+  what each process declares before the page sees the description; no pygeoapi
+  process can advertise one mode.
+- **pygeoapi passes an input reference to the process unresolved**, as
+  `{"href": …}` (finding 0058). `breinstein-feature-area` fetches it itself —
+  http or https, 30 seconds, 10 MB — and says in its output where the features
+  came from.
+- **The process list stops at ten.** With thirteen processes, the eleventh on
+  was not listed: `limits.max_items` defaults to 10, there is no `next` link,
+  and `offset` is ignored (finding 0018, corrected). Both configurations now set
+  `limits` to 50.
+- A failed job's message is prefixed `InvalidParameterValue: Error executing
+process:` whatever the failure was.
+
+`breinstein-aerial`, `breinstein-feature-area` given a URL, and
+`breinstein-buildings` reach the network; the contract lane never runs them,
+and their browser tests skip when PDOK is not answering.
+
 ## Re-creating the stack after a config change
 
 `up -d` alone will not pick up a change to a mounted config or a new plugin

@@ -1,0 +1,100 @@
+{
+    "version":"1.0.0",
+    "id":"breinstein-dates",
+    "title":"Dates and times",
+    "description":"Takes a date and, optionally, an instant, and says back what it understood: the weekday and ISO week of the date, and the instant in UTC with the offset it was given.",
+    "jobControlOptions":[
+        "sync-execute",
+        "async-execute"
+    ],
+    "keywords":[
+        "date",
+        "time",
+        "testbed"
+    ],
+    "links":[
+        {
+            "type":"text/html",
+            "rel":"about",
+            "title":"information",
+            "href":"https://example.org/process",
+            "hreflang":"en-US"
+        },
+        {
+            "type":"application/json",
+            "rel":"self",
+            "href":"http://localhost:5080/processes/breinstein-dates?f=json",
+            "title":"Process description as JSON",
+            "hreflang":"en-US"
+        },
+        {
+            "type":"text/html",
+            "rel":"alternate",
+            "href":"http://localhost:5080/processes/breinstein-dates?f=html",
+            "title":"Process description as HTML",
+            "hreflang":"en-US"
+        },
+        {
+            "type":"text/html",
+            "rel":"http://www.opengis.net/def/rel/ogc/1.0/job-list",
+            "href":"http://localhost:5080/jobs?f=html",
+            "title":"Jobs list as HTML",
+            "hreflang":"en-US"
+        },
+        {
+            "type":"application/json",
+            "rel":"http://www.opengis.net/def/rel/ogc/1.0/job-list",
+            "href":"http://localhost:5080/jobs?f=json",
+            "title":"Jobs list as JSON",
+            "hreflang":"en-US"
+        },
+        {
+            "type":"application/json",
+            "rel":"http://www.opengis.net/def/rel/ogc/1.0/execute",
+            "href":"http://localhost:5080/processes/breinstein-dates/execution?f=json",
+            "title":"Execution for this process as JSON",
+            "hreflang":"en-US"
+        }
+    ],
+    "inputs":{
+        "day":{
+            "title":"Day",
+            "description":"A calendar date, as YYYY-MM-DD.",
+            "schema":{
+                "type":"string",
+                "format":"date"
+            },
+            "minOccurs":1,
+            "maxOccurs":1
+        },
+        "moment":{
+            "title":"Moment",
+            "description":"Optional; an instant with its offset, as RFC 3339 (2026-09-25T14:30:00+02:00).",
+            "schema":{
+                "type":"string",
+                "format":"date-time"
+            },
+            "minOccurs":0,
+            "maxOccurs":1
+        }
+    },
+    "outputs":{
+        "understood":{
+            "title":"Understood",
+            "description":"The date and instant as the process read them.",
+            "schema":{
+                "type":"object",
+                "contentMediaType":"application/json"
+            }
+        }
+    },
+    "example":{
+        "inputs":{
+            "day":"2026-11-03",
+            "moment":"2026-11-03T09:00:00+01:00"
+        }
+    },
+    "outputTransmission":[
+        "value"
+    ]
+}

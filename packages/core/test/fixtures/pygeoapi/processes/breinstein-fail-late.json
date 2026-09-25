@@ -1,0 +1,102 @@
+{
+    "version":"1.0.0",
+    "id":"breinstein-fail-late",
+    "title":"Process that fails after a while",
+    "description":"Runs for a number of seconds and then fails with a message, so a client can be watched going from a running job to a failed one. It never succeeds.",
+    "jobControlOptions":[
+        "sync-execute",
+        "async-execute"
+    ],
+    "keywords":[
+        "failure",
+        "async",
+        "testbed"
+    ],
+    "links":[
+        {
+            "type":"text/html",
+            "rel":"about",
+            "title":"information",
+            "href":"https://example.org/process",
+            "hreflang":"en-US"
+        },
+        {
+            "type":"application/json",
+            "rel":"self",
+            "href":"http://localhost:5080/processes/breinstein-fail-late?f=json",
+            "title":"Process description as JSON",
+            "hreflang":"en-US"
+        },
+        {
+            "type":"text/html",
+            "rel":"alternate",
+            "href":"http://localhost:5080/processes/breinstein-fail-late?f=html",
+            "title":"Process description as HTML",
+            "hreflang":"en-US"
+        },
+        {
+            "type":"text/html",
+            "rel":"http://www.opengis.net/def/rel/ogc/1.0/job-list",
+            "href":"http://localhost:5080/jobs?f=html",
+            "title":"Jobs list as HTML",
+            "hreflang":"en-US"
+        },
+        {
+            "type":"application/json",
+            "rel":"http://www.opengis.net/def/rel/ogc/1.0/job-list",
+            "href":"http://localhost:5080/jobs?f=json",
+            "title":"Jobs list as JSON",
+            "hreflang":"en-US"
+        },
+        {
+            "type":"application/json",
+            "rel":"http://www.opengis.net/def/rel/ogc/1.0/execute",
+            "href":"http://localhost:5080/processes/breinstein-fail-late/execution?f=json",
+            "title":"Execution for this process as JSON",
+            "hreflang":"en-US"
+        }
+    ],
+    "inputs":{
+        "seconds":{
+            "title":"Seconds",
+            "description":"How long to run before failing, 0 to 60.",
+            "schema":{
+                "type":"number",
+                "minimum":0,
+                "maximum":60,
+                "default":3
+            },
+            "minOccurs":0,
+            "maxOccurs":1
+        },
+        "message":{
+            "title":"Message",
+            "description":"What the failure says.",
+            "schema":{
+                "type":"string",
+                "default":"Failed on purpose, after running for a while."
+            },
+            "minOccurs":0,
+            "maxOccurs":1
+        }
+    },
+    "outputs":{
+        "never":{
+            "title":"Never produced",
+            "description":"The process always fails; this output exists because a description needs one.",
+            "schema":{
+                "type":"object",
+                "contentMediaType":"application/json"
+            }
+        }
+    },
+    "example":{
+        "inputs":{
+            "seconds":3,
+            "message":"Out of coffee"
+        }
+    },
+    "outputTransmission":[
+        "value"
+    ]
+}

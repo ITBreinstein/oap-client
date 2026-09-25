@@ -1,0 +1,107 @@
+{
+    "version":"1.0.0",
+    "id":"breinstein-async-only",
+    "title":"Slow process, background only",
+    "description":"Sleeps for a configurable number of seconds and then returns a small JSON output, as \"slow\" does. Declares asynchronous execution only, so a client has no choice to offer.",
+    "jobControlOptions":[
+        "sync-execute",
+        "async-execute"
+    ],
+    "keywords":[
+        "slow",
+        "sleep",
+        "execution mode",
+        "testbed"
+    ],
+    "links":[
+        {
+            "type":"text/html",
+            "rel":"about",
+            "title":"information",
+            "href":"https://example.org/process",
+            "hreflang":"en-US"
+        },
+        {
+            "type":"application/json",
+            "rel":"self",
+            "href":"http://localhost:5080/processes/breinstein-async-only?f=json",
+            "title":"Process description as JSON",
+            "hreflang":"en-US"
+        },
+        {
+            "type":"text/html",
+            "rel":"alternate",
+            "href":"http://localhost:5080/processes/breinstein-async-only?f=html",
+            "title":"Process description as HTML",
+            "hreflang":"en-US"
+        },
+        {
+            "type":"text/html",
+            "rel":"http://www.opengis.net/def/rel/ogc/1.0/job-list",
+            "href":"http://localhost:5080/jobs?f=html",
+            "title":"Jobs list as HTML",
+            "hreflang":"en-US"
+        },
+        {
+            "type":"application/json",
+            "rel":"http://www.opengis.net/def/rel/ogc/1.0/job-list",
+            "href":"http://localhost:5080/jobs?f=json",
+            "title":"Jobs list as JSON",
+            "hreflang":"en-US"
+        },
+        {
+            "type":"application/json",
+            "rel":"http://www.opengis.net/def/rel/ogc/1.0/execute",
+            "href":"http://localhost:5080/processes/breinstein-async-only/execution?f=json",
+            "title":"Execution for this process as JSON",
+            "hreflang":"en-US"
+        }
+    ],
+    "inputs":{
+        "seconds":{
+            "title":"Seconds",
+            "description":"How long to sleep before producing the output. Clamped to the range 0..600.",
+            "schema":{
+                "type":"number",
+                "minimum":0,
+                "maximum":600,
+                "default":5
+            },
+            "minOccurs":0,
+            "maxOccurs":1,
+            "keywords":[
+                "duration"
+            ]
+        },
+        "message":{
+            "title":"Message",
+            "description":"An optional string echoed back in the output.",
+            "schema":{
+                "type":"string"
+            },
+            "minOccurs":0,
+            "maxOccurs":1,
+            "keywords":[
+                "message"
+            ]
+        }
+    },
+    "outputs":{
+        "slept":{
+            "title":"Slept",
+            "description":"How long the process actually slept, and the echoed message.",
+            "schema":{
+                "type":"object",
+                "contentMediaType":"application/json"
+            }
+        }
+    },
+    "example":{
+        "inputs":{
+            "seconds":1
+        }
+    },
+    "outputTransmission":[
+        "value"
+    ]
+}
