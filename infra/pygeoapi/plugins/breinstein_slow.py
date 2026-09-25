@@ -14,8 +14,9 @@
 # ZOO-Project's `longProcess` gives a second opinion, but the interop lane
 # never blocks a release, so it cannot be the deterministic lane.
 #
-# This is the first of the four coverage-gap processes on the backlog; the
-# others are non-JSON output, multiple outputs, and a bbox input.
+# This is the first of the four coverage-gap processes; the others are
+# breinstein_bbox (a bbox input), breinstein_inputs (every form control and
+# multiple outputs) and breinstein_png (non-JSON output).
 #
 # Deliberately not specific to any use case: it sleeps and echoes, so that
 # nothing in the client can ever be tuned to what it computes. See the

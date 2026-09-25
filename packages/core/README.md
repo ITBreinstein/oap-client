@@ -6,10 +6,19 @@ A runtime-neutral [OGC API - Processes](https://ogcapi.ogc.org/processes/) clien
 and descriptions, synchronous and asynchronous execution, job status, polling,
 results retrieval, dismissal, and the job list.
 
-**Not yet shipped:** execution callbacks (the `subscriber` member) and the relay
-that receives them. Polling is the baseline and works everywhere; callbacks are
-an optimisation on top of it, and the client is designed to stay useful with the
-relay switched off.
+**Callbacks are not the core's.** It never sends a `subscriber` member itself.
+Callbacks reach a browser through the repository's relay
+([apps/relay](https://github.com/ITBreinstein/oap-client/tree/main/apps/relay)), which adds `subscriber` to the asynchronous
+executes it carries and passes the callbacks on to the page as doorbells.
+Polling is the baseline and works everywhere; callbacks are an optimisation on
+top of it, and the client is designed to stay useful with the relay switched
+off.
+
+**Not in this package:** generating a form from a process description, drawing
+a bounding box, and rendering results. Those live in the web app
+([apps/web](https://github.com/ITBreinstein/oap-client/tree/main/apps/web)) — the form layer in `apps/web/src/forms/` is kept
+free of React and the map so that it can move here, or to a subpath export,
+once its shape has settled.
 
 ```bash
 pnpm add @breinstein/oap-client

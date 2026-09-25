@@ -52,3 +52,24 @@ resources:
     type: process
     processor:
       name: breinstein_slow.SlowProcessor
+  # The three remaining coverage-gap processes, one hole each. Sources and
+  # rationale: infra/pygeoapi/plugins/breinstein_*.py, documented in
+  # infra/README.md. All three echo or reshape their inputs and compute nothing.
+  #
+  # A bounding-box input shaped as the census found them (format: ogc-bbox),
+  # returned as a GeoJSON Feature.
+  breinstein-bbox:
+    type: process
+    processor:
+      name: breinstein_bbox.BboxProcessor
+  # One input of every kind the form generator renders, and two outputs; echoes
+  # what it received so a browser test can assert on what arrived.
+  breinstein-inputs:
+    type: process
+    processor:
+      name: breinstein_inputs.InputsProcessor
+  # A non-JSON output: a small generated image/png.
+  breinstein-png:
+    type: process
+    processor:
+      name: breinstein_png.PngProcessor

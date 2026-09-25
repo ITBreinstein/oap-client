@@ -1,0 +1,105 @@
+{
+  "method": "POST",
+  "url": "{{baseUrl}}/processes/SAGA.shapes_polygons.5/execution",
+  "headers": {
+    "Accept": "application/json",
+    "Content-Type": "application/json"
+  },
+  "body": {
+    "inputs": {
+      "POLYGONS": {
+        "value": {
+          "type": "FeatureCollection",
+          "features": [
+            {
+              "type": "Feature",
+              "id": "group_a_1",
+              "properties": {
+                "group": "A",
+                "value": 2
+              },
+              "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                  [
+                    [
+                      4.744,
+                      52.628
+                    ],
+                    [
+                      4.75,
+                      52.628
+                    ],
+                    [
+                      4.75,
+                      52.636
+                    ],
+                    [
+                      4.744,
+                      52.636
+                    ],
+                    [
+                      4.744,
+                      52.628
+                    ]
+                  ]
+                ]
+              }
+            },
+            {
+              "type": "Feature",
+              "id": "group_a_2",
+              "properties": {
+                "group": "A",
+                "value": 3
+              },
+              "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                  [
+                    [
+                      4.75,
+                      52.628
+                    ],
+                    [
+                      4.756,
+                      52.628
+                    ],
+                    [
+                      4.756,
+                      52.636
+                    ],
+                    [
+                      4.75,
+                      52.636
+                    ],
+                    [
+                      4.75,
+                      52.628
+                    ]
+                  ]
+                ]
+              }
+            }
+          ]
+        },
+        "format": {
+          "mediaType": "application/json"
+        }
+      },
+      "STAT_AVG": true,
+      "STAT_SUM": false,
+      "BND_KEEP": false,
+      "MIN_AREA": 0
+    },
+    "outputs": {
+      "DISSOLVED": {
+        "format": {
+          "mediaType": "application/json"
+        },
+        "transmissionMode": "value"
+      }
+    },
+    "response": "document"
+  }
+}

@@ -1,0 +1,397 @@
+{
+  "status": 200,
+  "headers": {
+    "Date": "Fri, 28 Aug 2026 13:37:08 GMT",
+    "Server": "Apache/2.4.29 (Ubuntu)",
+    "X-Powered-By": "ZOO-Project",
+    "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self';",
+    "Link": "<https://www.opengis.net/dev/profile/OGC/0/ogc-process-description>; rel=\"profile\"",
+    "Content-Length": "4922",
+    "Connection": "close",
+    "Content-Type": "application/json;charset=UTF-8"
+  },
+  "final_url": "{{baseUrl}}/processes/SAGA.pointcloud_tools.4",
+  "body": {
+    "id": "SAGA.pointcloud_tools.4",
+    "title": "Point Cloud to Grid",
+    "description": "Point Cloud to Grid",
+    "mutable": false,
+    "version": "1.0.0",
+    "jobControlOptions": [
+      "sync-execute",
+      "async-execute",
+      "dismiss"
+    ],
+    "outputTransmission": [
+      "value",
+      "reference"
+    ],
+    "links": [
+      {
+        "rel": "http://www.opengis.net/def/rel/ogc/1.0/execute",
+        "type": "application/json",
+        "title": "Execute End Point",
+        "href": "{{baseUrl}}/processes/SAGA.pointcloud_tools.4/execution"
+      },
+      {
+        "rel": "alternate",
+        "type": "text/html",
+        "title": "Execute End Point",
+        "href": "{{baseUrl}}/processes/SAGA.pointcloud_tools.4/execution.html"
+      }
+    ],
+    "inputs": {
+      "POINTS": {
+        "title": "Points",
+        "description": "Points",
+        "extended-schema": {
+          "oneOf": [
+            {
+              "allOf": [
+                {
+                  "$ref": "http://zoo-project.org/dl/link.json"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "enum": [
+                        "application/x-ogc-lasf"
+                      ]
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "type": "object",
+              "required": [
+                "value"
+              ],
+              "properties": {
+                "value": {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "contentEncoding": "base64",
+                      "contentMediaType": "application/x-ogc-lasf"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "schema": {
+          "oneOf": [
+            {
+              "type": "string",
+              "contentEncoding": "base64",
+              "contentMediaType": "application/x-ogc-lasf"
+            }
+          ]
+        },
+        "raw_schema1": "true"
+      },
+      "OUTPUT": {
+        "title": "Output",
+        "description": "Output",
+        "minOccurs": 0,
+        "schema": {
+          "type": "string",
+          "default": "only z",
+          "enum": [
+            "only z",
+            "all attributes"
+          ],
+          "nullable": true
+        }
+      },
+      "AGGREGATION": {
+        "title": "Aggregation",
+        "description": "Aggregation",
+        "minOccurs": 0,
+        "schema": {
+          "type": "string",
+          "default": "first value",
+          "enum": [
+            "first value",
+            "last value",
+            "mean value",
+            "lowest z",
+            "highest z"
+          ],
+          "nullable": true
+        }
+      },
+      "CELLSIZE": {
+        "title": "Cellsize",
+        "description": "Cellsize",
+        "minOccurs": 0,
+        "schema": {
+          "type": "number",
+          "default": 1,
+          "format": "float",
+          "nullable": true
+        }
+      }
+    },
+    "outputs": {
+      "GRID": {
+        "title": "Z Value",
+        "description": "Z Value",
+        "extended-schema": {
+          "oneOf": [
+            {
+              "allOf": [
+                {
+                  "$ref": "http://zoo-project.org/dl/link.json"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "enum": [
+                        "image/tiff",
+                        "application/x-ogc-envi",
+                        "application/x-ogc-aaigrid",
+                        "image/png"
+                      ]
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "type": "object",
+              "required": [
+                "value"
+              ],
+              "properties": {
+                "value": {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "contentEncoding": "base64",
+                      "contentMediaType": "image/tiff"
+                    },
+                    {
+                      "type": "string",
+                      "contentEncoding": "base64",
+                      "contentMediaType": "application/x-ogc-envi"
+                    },
+                    {
+                      "type": "string",
+                      "contentEncoding": "base64",
+                      "contentMediaType": "application/x-ogc-aaigrid"
+                    },
+                    {
+                      "type": "string",
+                      "contentEncoding": "base64",
+                      "contentMediaType": "image/png"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "schema": {
+          "oneOf": [
+            {
+              "type": "string",
+              "contentEncoding": "base64",
+              "contentMediaType": "image/tiff"
+            },
+            {
+              "type": "string",
+              "contentEncoding": "base64",
+              "contentMediaType": "application/x-ogc-envi"
+            },
+            {
+              "type": "string",
+              "contentEncoding": "base64",
+              "contentMediaType": "application/x-ogc-aaigrid"
+            },
+            {
+              "type": "string",
+              "contentEncoding": "base64",
+              "contentMediaType": "image/png"
+            }
+          ]
+        },
+        "raw_schema1": "true"
+      },
+      "COUNT": {
+        "title": "Number of Points in Cell",
+        "description": "Number of Points in Cell",
+        "extended-schema": {
+          "oneOf": [
+            {
+              "allOf": [
+                {
+                  "$ref": "http://zoo-project.org/dl/link.json"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "enum": [
+                        "image/tiff",
+                        "application/x-ogc-envi",
+                        "application/x-ogc-aaigrid",
+                        "image/png"
+                      ]
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "type": "object",
+              "required": [
+                "value"
+              ],
+              "properties": {
+                "value": {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "contentEncoding": "base64",
+                      "contentMediaType": "image/tiff"
+                    },
+                    {
+                      "type": "string",
+                      "contentEncoding": "base64",
+                      "contentMediaType": "application/x-ogc-envi"
+                    },
+                    {
+                      "type": "string",
+                      "contentEncoding": "base64",
+                      "contentMediaType": "application/x-ogc-aaigrid"
+                    },
+                    {
+                      "type": "string",
+                      "contentEncoding": "base64",
+                      "contentMediaType": "image/png"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "schema": {
+          "oneOf": [
+            {
+              "type": "string",
+              "contentEncoding": "base64",
+              "contentMediaType": "image/tiff"
+            },
+            {
+              "type": "string",
+              "contentEncoding": "base64",
+              "contentMediaType": "application/x-ogc-envi"
+            },
+            {
+              "type": "string",
+              "contentEncoding": "base64",
+              "contentMediaType": "application/x-ogc-aaigrid"
+            },
+            {
+              "type": "string",
+              "contentEncoding": "base64",
+              "contentMediaType": "image/png"
+            }
+          ]
+        },
+        "raw_schema1": "true"
+      },
+      "GRIDS": {
+        "title": "Attributes",
+        "description": "Attributes",
+        "extended-schema": {
+          "oneOf": [
+            {
+              "allOf": [
+                {
+                  "$ref": "http://zoo-project.org/dl/link.json"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "enum": [
+                        "image/tiff",
+                        "application/x-ogc-envi",
+                        "application/x-ogc-aaigrid",
+                        "image/png"
+                      ]
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "type": "object",
+              "required": [
+                "value"
+              ],
+              "properties": {
+                "value": {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "contentEncoding": "base64",
+                      "contentMediaType": "image/tiff"
+                    },
+                    {
+                      "type": "string",
+                      "contentEncoding": "base64",
+                      "contentMediaType": "application/x-ogc-envi"
+                    },
+                    {
+                      "type": "string",
+                      "contentEncoding": "base64",
+                      "contentMediaType": "application/x-ogc-aaigrid"
+                    },
+                    {
+                      "type": "string",
+                      "contentEncoding": "base64",
+                      "contentMediaType": "image/png"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "schema": {
+          "oneOf": [
+            {
+              "type": "string",
+              "contentEncoding": "base64",
+              "contentMediaType": "image/tiff"
+            },
+            {
+              "type": "string",
+              "contentEncoding": "base64",
+              "contentMediaType": "application/x-ogc-envi"
+            },
+            {
+              "type": "string",
+              "contentEncoding": "base64",
+              "contentMediaType": "application/x-ogc-aaigrid"
+            },
+            {
+              "type": "string",
+              "contentEncoding": "base64",
+              "contentMediaType": "image/png"
+            }
+          ]
+        },
+        "raw_schema1": "true"
+      }
+    }
+  }
+}

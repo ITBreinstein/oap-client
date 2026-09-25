@@ -1,0 +1,199 @@
+{
+  "status": 200,
+  "headers": {
+    "Content-Type": "application/json",
+    "X-Powered-By": "pygeoapi 0.25.dev0",
+    "Content-Language": "en-US",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Expose-Headers": "*"
+  },
+  "final_url": "{{baseUrl}}/processes/climada-simple-example-denmark-process",
+  "body": {
+    "version": "0.1.0",
+    "id": "climada-simple-example-denmark-process",
+    "title": "CLIMADA simple example for Denmark",
+    "description": "A simple example process on how to use CLIMADA in Denmark to calculate the impact of storm events.",
+    "jobControlOptions": [
+      "sync-execute",
+      "async-execute"
+    ],
+    "outputTransmission": [
+      "value",
+      "reference"
+    ],
+    "keywords": [
+      "directed",
+      "climada",
+      "simple example"
+    ],
+    "links": [
+      {
+        "type": "text/html",
+        "rel": "about",
+        "title": "information",
+        "href": "https://github.com/CLIMADA-project/climada_python",
+        "hreflang": "en-US"
+      },
+      {
+        "type": "application/json",
+        "rel": "self",
+        "href": "http://localhost:5000/processes/climada-simple-example-denmark-process?f=json",
+        "title": "Process description as JSON",
+        "hreflang": "en-US"
+      },
+      {
+        "type": "text/html",
+        "rel": "alternate",
+        "href": "http://localhost:5000/processes/climada-simple-example-denmark-process?f=html",
+        "title": "Process description as HTML",
+        "hreflang": "en-US"
+      },
+      {
+        "type": "text/html",
+        "rel": "http://www.opengis.net/def/rel/ogc/1.0/job-list",
+        "href": "http://localhost:5000/jobs?f=html",
+        "title": "Jobs list as HTML",
+        "hreflang": "en-US"
+      },
+      {
+        "type": "application/json",
+        "rel": "http://www.opengis.net/def/rel/ogc/1.0/job-list",
+        "href": "http://localhost:5000/jobs?f=json",
+        "title": "Jobs list as JSON",
+        "hreflang": "en-US"
+      },
+      {
+        "type": "application/json",
+        "rel": "http://www.opengis.net/def/rel/ogc/1.0/execute",
+        "href": "http://localhost:5000/processes/climada-simple-example-denmark-process/execution?f=json",
+        "title": "Execution for this process as JSON",
+        "hreflang": "en-US"
+      }
+    ],
+    "inputs": {
+      "intensity": {
+        "title": "intensity",
+        "description": "mandatory; the intensity steps used for defining the impact function",
+        "schema": {
+          "type": "array"
+        },
+        "minOccurs": 1,
+        "maxOccurs": 1,
+        "metadata": null,
+        "keywords": [
+          "intensity"
+        ]
+      },
+      "climate_scenario": {
+        "title": "climate_scenario",
+        "description": "optional; climate scenario",
+        "schema": {
+          "type": "string"
+        },
+        "minOccurs": 0,
+        "maxOccurs": 1,
+        "metadata": null,
+        "keywords": [
+          "climate_scenario"
+        ]
+      },
+      "data_source": {
+        "title": "data_source",
+        "description": "optional; data source",
+        "schema": {
+          "type": "string"
+        },
+        "minOccurs": 0,
+        "maxOccurs": 1,
+        "metadata": null,
+        "keywords": [
+          "data_source"
+        ]
+      },
+      "gcm": {
+        "title": "GCM",
+        "description": "optional; Global Climate Model (GCM) to use",
+        "schema": {
+          "type": "string"
+        },
+        "minOccurs": 0,
+        "maxOccurs": 1,
+        "metadata": null,
+        "keywords": [
+          "gcm"
+        ]
+      },
+      "mdd": {
+        "title": "mdd",
+        "description": "optional; mean damage (impact) degree",
+        "schema": {
+          "type": "array"
+        },
+        "minOccurs": 0,
+        "maxOccurs": 1,
+        "metadata": null,
+        "keywords": [
+          "mdd"
+        ]
+      },
+      "paa": {
+        "title": "paa",
+        "description": "optional; percentage of affected assets (exposures)",
+        "schema": {
+          "type": "array"
+        },
+        "minOccurs": 0,
+        "maxOccurs": 1,
+        "metadata": null,
+        "keywords": [
+          "paa"
+        ]
+      },
+      "nearest_neighbor_threshold": {
+        "title": "nearest_neighbor_threshold",
+        "description": "optional; nearest neighbor threshold",
+        "schema": {
+          "type": "number"
+        },
+        "minOccurs": 0,
+        "maxOccurs": 1,
+        "metadata": null,
+        "keywords": [
+          "nearest_neighbor_threshold"
+        ]
+      },
+      "return_periods": {
+        "title": "return_periods",
+        "description": "optional; return periods",
+        "schema": {
+          "type": "array"
+        },
+        "minOccurs": 0,
+        "maxOccurs": 1,
+        "metadata": null,
+        "keywords": [
+          "return_periods"
+        ]
+      }
+    },
+    "outputs": {
+      "impact": {
+        "title": "impact",
+        "description": "Calculated impact",
+        "schema": {
+          "type": "object",
+          "contentMediaType": "text/csv"
+        }
+      }
+    },
+    "example": {
+      "inputs": {
+        "intensity": [
+          0,
+          30,
+          80
+        ]
+      }
+    }
+  }
+}

@@ -32,7 +32,8 @@ async function start(
   inputs: string,
   outputs = "{}",
 ) {
-  await page.goto("/");
+  // The Task 6 job panel is a developer view now, open with ?developer.
+  await page.goto("/?developer");
   await expect(page.getByTestId("relay-state")).toContainText("open");
   await page.getByTestId("endpoint").selectOption(endpoint);
   await page.getByTestId("process-id").fill(processId);
@@ -69,7 +70,8 @@ test.describe("asynchronous execution from a browser", () => {
   test("the same server without the relay: the job starts and cannot be named (finding 0039)", async ({
     page,
   }) => {
-    await page.goto("/");
+    // The Task 6 job panel is a developer view now, open with ?developer.
+    await page.goto("/?developer");
     await page.getByTestId("endpoint").selectOption("manual");
     await page.getByTestId("manual-base").fill(PYGEOAPI);
     await page.getByTestId("process-id").fill("slow");

@@ -6,3 +6,7 @@ docs/architecture.svg
 # destroy the evidence: the point is that they are byte-for-byte what the
 # server sent, so a diff after re-capturing means the server changed.
 packages/core/test/fixtures/
+
+# Requests servers accepted, copied verbatim from another repository; see the
+# README beside them. The same reasoning as above.
+apps/web/test/fixtures/forms/*/

@@ -33,6 +33,20 @@ module.exports = {
       to: { path: "^packages/core" },
     },
     {
+      // The generated-forms layer is a promised extension point, and its next
+      // home may be the core or a `forms` subpath export. It stays movable only
+      // while it depends on nothing but itself and the core: no React, no map,
+      // and nothing else in the web app — not the relay, not the workflow, not
+      // the screens. Task 7, T1.
+      name: "form-plan-is-framework-free",
+      severity: "error",
+      from: { path: "^apps/web/src/forms/" },
+      to: {
+        path: "(node_modules/(react|react-dom|maplibre-gl|terra-draw)|^apps/)",
+        pathNot: "^apps/web/src/forms/",
+      },
+    },
+    {
       // The execution layer sits on the transport, the links, the process
       // types, the errors, the observations and the vocabulary — and on nothing
       // else. Discovery and conformance are deliberately out of reach:
