@@ -43,6 +43,18 @@ the versions are recorded here rather than left to a commit message.
               process-list.json  (re-captured; now carries all six)   2026-09-25
               processes/breinstein-aerial.json,
               process-list.json  (re-captured; now carries all seven) 2026-09-25
+              processes/breinstein-{async-only,sync-only,fail-late,
+                dates,feature-area,buildings}.json,
+              process-list.json  (re-captured; all thirteen, after
+                raising `limits` — finding 0018)                      2026-09-25
+              process-list-capped-at-ten.http,
+              process-list-limit-2-offset-2.http  (thirteen
+                processes, default `limits`; finding 0018)            2026-09-25
+              processes/breinstein-sync-only-description.http,
+              execution/breinstein-{sync-only-asked-async,
+                async-only-asked-sync}.http  (finding 0059)           2026-09-25
+              execution/breinstein-inputs-href-not-resolved.http
+                (finding 0058)                                        2026-09-25
 
 The `breinstein-*` descriptions are processes this repository adds to the
 pinned image (see `infra/README.md`). They are the only descriptions a browser

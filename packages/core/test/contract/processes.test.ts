@@ -76,13 +76,16 @@ describe("listProcesses against pygeoapi", () => {
     expect(self?.href).toBe(`${CORS}/processes/hello-world?f=json`);
   });
 
-  it("ignores limit and offset — pygeoapi 0.21.0 does not paginate /processes", async () => {
-    // Recorded rather than worked around: finding 0018.
+  it("reads limit but ignores offset, and never links a next page (finding 0018)", async () => {
+    // Recorded rather than worked around: finding 0018. `limit` cuts the list
+    // and nothing says so; our configuration raises the server's cap of ten
+    // (`limits`), so without a limit the whole list comes back.
     const paged = await client.listProcesses({ limit: 1 });
     const offset = await (
       await send(`${CORS}/processes?offset=99`, { headers: { Accept: "application/json" } })
     ).json();
 
+    expect(paged.processes).toHaveLength(1);
     expect(paged.pageCount).toBe(1);
     expect(paged.truncated).toBe(false);
     expect(paged.links.some((link) => link.rel === "next")).toBe(false);

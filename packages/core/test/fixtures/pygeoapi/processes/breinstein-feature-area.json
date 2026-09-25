@@ -1,0 +1,150 @@
+{
+    "version":"1.0.0",
+    "id":"breinstein-feature-area",
+    "title":"Area of each feature",
+    "description":"Takes a GeoJSON FeatureCollection, inline or as a URL to fetch, and returns the same features with their geodesic area in square metres added, as GeoJSON and as a CSV table.",
+    "jobControlOptions":[
+        "sync-execute",
+        "async-execute"
+    ],
+    "keywords":[
+        "geojson",
+        "feature collection",
+        "area",
+        "csv",
+        "testbed"
+    ],
+    "links":[
+        {
+            "type":"text/html",
+            "rel":"about",
+            "title":"information",
+            "href":"https://example.org/process",
+            "hreflang":"en-US"
+        },
+        {
+            "type":"application/json",
+            "rel":"self",
+            "href":"http://localhost:5080/processes/breinstein-feature-area?f=json",
+            "title":"Process description as JSON",
+            "hreflang":"en-US"
+        },
+        {
+            "type":"text/html",
+            "rel":"alternate",
+            "href":"http://localhost:5080/processes/breinstein-feature-area?f=html",
+            "title":"Process description as HTML",
+            "hreflang":"en-US"
+        },
+        {
+            "type":"text/html",
+            "rel":"http://www.opengis.net/def/rel/ogc/1.0/job-list",
+            "href":"http://localhost:5080/jobs?f=html",
+            "title":"Jobs list as HTML",
+            "hreflang":"en-US"
+        },
+        {
+            "type":"application/json",
+            "rel":"http://www.opengis.net/def/rel/ogc/1.0/job-list",
+            "href":"http://localhost:5080/jobs?f=json",
+            "title":"Jobs list as JSON",
+            "hreflang":"en-US"
+        },
+        {
+            "type":"application/json",
+            "rel":"http://www.opengis.net/def/rel/ogc/1.0/execute",
+            "href":"http://localhost:5080/processes/breinstein-feature-area/execution?f=json",
+            "title":"Execution for this process as JSON",
+            "hreflang":"en-US"
+        }
+    ],
+    "inputs":{
+        "features":{
+            "title":"Features",
+            "description":"A GeoJSON FeatureCollection in longitude and latitude: inline, or a URL the process fetches (at most 10 MB and 10 000 features).",
+            "schema":{
+                "oneOf":[
+                    {
+                        "type":"object"
+                    },
+                    {
+                        "type":"string",
+                        "contentMediaType":"application/geo+json"
+                    }
+                ]
+            },
+            "minOccurs":1,
+            "maxOccurs":1,
+            "keywords":[
+                "geojson"
+            ]
+        }
+    },
+    "outputs":{
+        "features":{
+            "title":"Features with their area",
+            "description":"The input features, each with \"area_m2\" added to its properties (null for a geometry with no area), and \"source\" saying where they came from.",
+            "schema":{
+                "type":"object",
+                "contentMediaType":"application/geo+json"
+            }
+        },
+        "table":{
+            "title":"Table",
+            "description":"One row per feature: its number, its id, its geometry type, its area, and every property; a property that is not a single value is written as JSON.",
+            "schema":{
+                "type":"string",
+                "contentMediaType":"text/csv"
+            }
+        }
+    },
+    "example":{
+        "inputs":{
+            "features":{
+                "value":{
+                    "type":"FeatureCollection",
+                    "features":[
+                        {
+                            "type":"Feature",
+                            "id":"block",
+                            "properties":{
+                                "name":"a block in Utrecht"
+                            },
+                            "geometry":{
+                                "type":"Polygon",
+                                "coordinates":[
+                                    [
+                                        [
+                                            5.118,
+                                            52.089
+                                        ],
+                                        [
+                                            5.124,
+                                            52.089
+                                        ],
+                                        [
+                                            5.124,
+                                            52.093
+                                        ],
+                                        [
+                                            5.118,
+                                            52.093
+                                        ],
+                                        [
+                                            5.118,
+                                            52.089
+                                        ]
+                                    ]
+                                ]
+                            }
+                        }
+                    ]
+                },
+                "mediaType":"application/geo+json"
+            }
+        }
+    },
+    "outputTransmission":[
+        "value"
+    ]
+}

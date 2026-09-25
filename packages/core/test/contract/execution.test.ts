@@ -267,3 +267,59 @@ describe("content negotiation on the execution endpoint", () => {
     }
   });
 });
+
+describe("what pygeoapi does with what a process declares", () => {
+  it("describes a synchronous-only process as runnable both ways — finding 0059", async () => {
+    const syncOnly = await client.getProcess("breinstein-sync-only");
+    expect(syncOnly.execution.declared).toEqual(["sync-execute", "async-execute"]);
+  });
+
+  it("runs a synchronous-only process synchronously when asked for a job, and says so", async () => {
+    const syncOnly = await client.getProcess("breinstein-sync-only");
+    const before = executions().length;
+    const execution = await client.execute("breinstein-sync-only", {
+      inputs: { seconds: 0 },
+      mode: "async",
+      description: syncOnly,
+    });
+
+    expect(execution.kind).toBe("immediate");
+    const record = executions()[before];
+    expect(record?.status).toBe(200);
+    expect(record?.preferenceApplied).toBe("ignored");
+    expect(record?.preferenceAppliedHeader).toBe(true);
+  });
+
+  it("runs an asynchronous-only process synchronously when no mode is asked for", async () => {
+    const asyncOnly = await client.getProcess("breinstein-async-only");
+    const execution = await client.execute("breinstein-async-only", {
+      inputs: { seconds: 0 },
+      description: asyncOnly,
+    });
+    expect(execution.kind).toBe("immediate");
+  });
+
+  it("hands an input reference to the process unresolved — finding 0058", async () => {
+    const inputs = await client.getProcess("breinstein-inputs");
+    const reference = { href: "https://example.invalid/area.geojson" };
+    const execution = await client.execute("breinstein-inputs", {
+      inputs: {
+        label: "x",
+        notes: "n",
+        count: 1,
+        ratio: 0.5,
+        colour: "red",
+        enabled: true,
+        tags: ["t"],
+        area: reference,
+      },
+      outputs: { echo: {} },
+      mode: "sync",
+      description: inputs,
+    });
+
+    if (execution.kind !== "immediate") throw new Error("expected an immediate result");
+    const echoed = (await execution.response.json()) as { echo?: { area?: unknown } };
+    expect(echoed.echo?.area).toEqual(reference);
+  });
+});

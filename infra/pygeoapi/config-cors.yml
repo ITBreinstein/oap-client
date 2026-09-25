@@ -8,6 +8,13 @@ server:
   cors: true
   pretty_print: true
   limit: 10
+  # `limit` above is no longer read (pygeoapi logs a warning). `limits` is: the
+  # process list is cut at `max_items`, 10 by default, with no `next` link and
+  # `offset` ignored, so an eleventh process is never listed (finding 0018).
+  # Raised so every process here is listed; the finding describes the default.
+  limits:
+    default_items: 50
+    max_items: 50
   map:
     url: https://tile.openstreetmap.org/{z}/{x}/{y}.png
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -87,3 +94,40 @@ resources:
     type: process
     processor:
       name: breinstein_aerial.AerialProcessor
+  # The two execution modes on their own: `slow`, declaring asynchronous only,
+  # and synchronous only. Source and rationale:
+  # infra/pygeoapi/plugins/breinstein_modes.py, documented in infra/README.md.
+  breinstein-async-only:
+    type: process
+    processor:
+      name: breinstein_modes.AsyncOnlyProcessor
+  breinstein-sync-only:
+    type: process
+    processor:
+      name: breinstein_modes.SyncOnlyProcessor
+  # A job seen running first and failed afterwards. Source and rationale:
+  # infra/pygeoapi/plugins/breinstein_fail_late.py.
+  breinstein-fail-late:
+    type: process
+    processor:
+      name: breinstein_fail_late.FailLateProcessor
+  # A date and a date-time input. Source and rationale:
+  # infra/pygeoapi/plugins/breinstein_dates.py.
+  breinstein-dates:
+    type: process
+    processor:
+      name: breinstein_dates.DatesProcessor
+  # A FeatureCollection in, by value or by reference, and the features with
+  # their area out as GeoJSON and CSV. Fetches a reference, so it can need the
+  # network. Source and rationale: infra/pygeoapi/plugins/breinstein_feature_area.py.
+  breinstein-feature-area:
+    type: process
+    processor:
+      name: breinstein_feature_area.FeatureAreaProcessor
+  # A polygon in, the buildings in it out, from PDOK's BAG; inline or by
+  # reference. Needs the network. Source and rationale:
+  # infra/pygeoapi/plugins/breinstein_buildings.py.
+  breinstein-buildings:
+    type: process
+    processor:
+      name: breinstein_buildings.BuildingsProcessor

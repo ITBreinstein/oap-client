@@ -1,0 +1,18 @@
+HTTP/1.1 200 OK
+Server: gunicorn
+Date: Fri, 25 Sep 2026 13:53:08 GMT
+Connection: keep-alive
+Content-Type: application/json
+X-Powered-By: pygeoapi 0.21.0
+Content-Language: en-US
+Location: http://localhost:5080/jobs/7053af3e-b8e8-11f1-b7df-326a97c9ba62
+Access-Control-Allow-Origin: *
+Content-Length: 85
+
+{
+    "id":"slept",
+    "value":{
+        "seconds":0.0,
+        "message":""
+    }
+}

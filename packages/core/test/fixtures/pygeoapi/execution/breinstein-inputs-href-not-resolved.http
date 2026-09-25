@@ -1,0 +1,28 @@
+HTTP/1.1 200 OK
+Server: gunicorn
+Date: Fri, 25 Sep 2026 13:54:52 GMT
+Connection: keep-alive
+Content-Type: application/json
+X-Powered-By: pygeoapi 0.21.0
+Content-Language: en-US
+Location: http://localhost:5080/jobs/ae8ef1c8-b8e8-11f1-afa5-420029103952
+Access-Control-Allow-Origin: *
+Content-Length: 374
+
+{
+    "echo":{
+        "label":"x",
+        "notes":"n",
+        "count":1,
+        "ratio":0.5,
+        "colour":"red",
+        "enabled":true,
+        "tags":[
+            "t"
+        ],
+        "area":{
+            "href":"https://schemas.opengis.net/ogcapi/features/part1/1.0/openapi/schemas/geometryGeoJSON.yaml",
+            "type":"application/yaml"
+        }
+    }
+}

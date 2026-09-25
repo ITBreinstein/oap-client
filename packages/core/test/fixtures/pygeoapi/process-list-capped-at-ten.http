@@ -1,3 +1,13 @@
+HTTP/1.1 200 OK
+Server: gunicorn
+Date: Fri, 25 Sep 2026 13:52:25 GMT
+Connection: keep-alive
+Content-Type: application/json
+X-Powered-By: pygeoapi 0.21.0
+Content-Language: en-US
+Access-Control-Allow-Origin: *
+Content-Length: 25971
+
 {
     "processes":[
         {
@@ -621,194 +631,6 @@
             ],
             "outputTransmission":[
                 "value"
-            ]
-        },
-        {
-            "version":"1.0.0",
-            "id":"breinstein-dates",
-            "title":"Dates and times",
-            "description":"Takes a date and, optionally, an instant, and says back what it understood: the weekday and ISO week of the date, and the instant in UTC with the offset it was given.",
-            "jobControlOptions":[
-                "sync-execute",
-                "async-execute"
-            ],
-            "keywords":[
-                "date",
-                "time",
-                "testbed"
-            ],
-            "links":[
-                {
-                    "type":"text/html",
-                    "rel":"about",
-                    "title":"information",
-                    "href":"https://example.org/process",
-                    "hreflang":"en-US"
-                },
-                {
-                    "type":"application/json",
-                    "rel":"self",
-                    "href":"http://localhost:5080/processes/breinstein-dates?f=json",
-                    "title":"Process description as JSON",
-                    "hreflang":"en-US"
-                },
-                {
-                    "type":"text/html",
-                    "rel":"alternate",
-                    "href":"http://localhost:5080/processes/breinstein-dates?f=html",
-                    "title":"Process description as HTML",
-                    "hreflang":"en-US"
-                },
-                {
-                    "type":"text/html",
-                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/job-list",
-                    "href":"http://localhost:5080/jobs?f=html",
-                    "title":"Jobs list as HTML",
-                    "hreflang":"en-US"
-                },
-                {
-                    "type":"application/json",
-                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/job-list",
-                    "href":"http://localhost:5080/jobs?f=json",
-                    "title":"Jobs list as JSON",
-                    "hreflang":"en-US"
-                },
-                {
-                    "type":"application/json",
-                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/execute",
-                    "href":"http://localhost:5080/processes/breinstein-dates/execution?f=json",
-                    "title":"Execution for this process as JSON",
-                    "hreflang":"en-US"
-                }
-            ],
-            "outputTransmission":[
-                "value"
-            ]
-        },
-        {
-            "version":"1.0.0",
-            "id":"breinstein-feature-area",
-            "title":"Area of each feature",
-            "description":"Takes a GeoJSON FeatureCollection, inline or as a URL to fetch, and returns the same features with their geodesic area in square metres added, as GeoJSON and as a CSV table.",
-            "jobControlOptions":[
-                "sync-execute",
-                "async-execute"
-            ],
-            "keywords":[
-                "geojson",
-                "feature collection",
-                "area",
-                "csv",
-                "testbed"
-            ],
-            "links":[
-                {
-                    "type":"text/html",
-                    "rel":"about",
-                    "title":"information",
-                    "href":"https://example.org/process",
-                    "hreflang":"en-US"
-                },
-                {
-                    "type":"application/json",
-                    "rel":"self",
-                    "href":"http://localhost:5080/processes/breinstein-feature-area?f=json",
-                    "title":"Process description as JSON",
-                    "hreflang":"en-US"
-                },
-                {
-                    "type":"text/html",
-                    "rel":"alternate",
-                    "href":"http://localhost:5080/processes/breinstein-feature-area?f=html",
-                    "title":"Process description as HTML",
-                    "hreflang":"en-US"
-                },
-                {
-                    "type":"text/html",
-                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/job-list",
-                    "href":"http://localhost:5080/jobs?f=html",
-                    "title":"Jobs list as HTML",
-                    "hreflang":"en-US"
-                },
-                {
-                    "type":"application/json",
-                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/job-list",
-                    "href":"http://localhost:5080/jobs?f=json",
-                    "title":"Jobs list as JSON",
-                    "hreflang":"en-US"
-                },
-                {
-                    "type":"application/json",
-                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/execute",
-                    "href":"http://localhost:5080/processes/breinstein-feature-area/execution?f=json",
-                    "title":"Execution for this process as JSON",
-                    "hreflang":"en-US"
-                }
-            ],
-            "outputTransmission":[
-                "value"
-            ]
-        },
-        {
-            "version":"1.0.0",
-            "id":"breinstein-buildings",
-            "title":"Buildings in an area",
-            "description":"Takes one GeoJSON polygon in the Netherlands and returns the buildings that intersect it, as GeoJSON, or as a link to the query when asked for by reference. Buildings: Kadaster, BAG, open data, via PDOK OGC API Features.",
-            "jobControlOptions":[
-                "sync-execute",
-                "async-execute"
-            ],
-            "outputTransmission":[
-                "value"
-            ],
-            "keywords":[
-                "geojson",
-                "buildings",
-                "BAG",
-                "testbed"
-            ],
-            "links":[
-                {
-                    "type":"application/json",
-                    "rel":"related",
-                    "title":"The source: PDOK BAG OGC API Features, collection \"pand\"",
-                    "href":"https://api.pdok.nl/kadaster/bag/ogc/v2/collections/pand"
-                },
-                {
-                    "type":"application/json",
-                    "rel":"self",
-                    "href":"http://localhost:5080/processes/breinstein-buildings?f=json",
-                    "title":"Process description as JSON",
-                    "hreflang":"en-US"
-                },
-                {
-                    "type":"text/html",
-                    "rel":"alternate",
-                    "href":"http://localhost:5080/processes/breinstein-buildings?f=html",
-                    "title":"Process description as HTML",
-                    "hreflang":"en-US"
-                },
-                {
-                    "type":"text/html",
-                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/job-list",
-                    "href":"http://localhost:5080/jobs?f=html",
-                    "title":"Jobs list as HTML",
-                    "hreflang":"en-US"
-                },
-                {
-                    "type":"application/json",
-                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/job-list",
-                    "href":"http://localhost:5080/jobs?f=json",
-                    "title":"Jobs list as JSON",
-                    "hreflang":"en-US"
-                },
-                {
-                    "type":"application/json",
-                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/execute",
-                    "href":"http://localhost:5080/processes/breinstein-buildings/execution?f=json",
-                    "title":"Execution for this process as JSON",
-                    "hreflang":"en-US"
-                }
             ]
         }
     ],
