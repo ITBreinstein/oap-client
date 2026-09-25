@@ -479,6 +479,24 @@ exists, `AmbiguousExecutionResponseError` names the status, whether `Location` w
 present, the media type and every body relation found — because a guess here
 produces a job handle pointing nowhere, which fails later and somewhere else.
 
+### Whether the server did what was asked is recorded, not assumed
+
+`Prefer: respond-async` is a preference, so the `execution` observation records
+what became of it in `preferenceApplied`:
+
+- `honoured`: asked for async and got `201`/`202` with a readable `Location`,
+  or asked for sync and got the result with no job attached.
+- `ignored`: asked for async and got the result.
+- `ambiguous`: the answer does not settle it. Asked for async and got a job
+  whose `Location` could not be read (hidden cross-origin, or not sent). Or
+  asked for sync, which sends no `Prefer` at all, and got a job anyway, or the
+  result with a `Location` beside it, as pygeoapi does on every sync run.
+
+`preferenceAppliedHeader` says whether a `Preference-Applied` header could be
+read, which cross-origin needs the server to expose. A job that cannot be
+reached is still recorded, with `outcome: "error"`, before
+`AmbiguousExecutionResponseError` is thrown.
+
 ### Timeouts and aborts stay separable
 
 `timeoutMs` and your `signal` can both cancel the request, and the resulting

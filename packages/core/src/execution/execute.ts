@@ -17,10 +17,11 @@ import { requireOk } from "../http/classify.js";
 import type { ResponseEnvelope } from "../http/envelope.js";
 import { AbortError, ProcessesError } from "../http/errors.js";
 import { send } from "../http/transport.js";
-import { ExecutionTimeoutError } from "../errors.js";
+import { AmbiguousExecutionResponseError, ExecutionTimeoutError } from "../errors.js";
 import { observe, redactUrl } from "../observations.js";
 import { buildRequest } from "./build-request.js";
 import { classifyExecution, gatherEvidence } from "./classify-execution.js";
+import { preferenceOutcome } from "./preference.js";
 import { DEFAULT_EXECUTE_TIMEOUT_MS, type Execution, type ExecuteOptions } from "./types.js";
 
 /**
@@ -123,6 +124,8 @@ export async function execute(
       elapsedMs: Date.now() - startedAt,
       resultKind: undefined,
       disagreedWithRequestedMode: false,
+      preferenceApplied: undefined,
+      preferenceAppliedHeader: undefined,
       discoveredVia: undefined,
       locationPresent: false,
       jobIdKnown: false,
@@ -141,6 +144,7 @@ export async function execute(
   }
 
   const elapsedMs = Date.now() - startedAt;
+  const preferenceAppliedHeader = envelope.headers.has("preference-applied");
 
   try {
     // T5. The classifier decides; we do not read the status ourselves. Finding
@@ -160,6 +164,8 @@ export async function execute(
       elapsedMs,
       resultKind: undefined,
       disagreedWithRequestedMode: false,
+      preferenceApplied: undefined,
+      preferenceAppliedHeader,
       discoveredVia: undefined,
       locationPresent: envelope.locationRaw !== undefined,
       jobIdKnown: false,
@@ -170,7 +176,38 @@ export async function execute(
   }
 
   const evidence = await gatherEvidence(envelope, sink);
-  const execution = classifyExecution(envelope, evidence, requestedMode);
+  let execution: Execution;
+  try {
+    execution = classifyExecution(envelope, evidence, requestedMode);
+  } catch (cause) {
+    // A job was created and cannot be reached — pygeoapi's async 201 from a
+    // browser, whose `Location` is hidden and whose body is `null` (finding
+    // 0039). The server did answer, so this is recorded like any other answer
+    // rather than lost with the throw.
+    if (cause instanceof AmbiguousExecutionResponseError) {
+      observe(sink, {
+        ...base,
+        outcome: "error",
+        status: envelope.status,
+        mediaType: envelope.mediaType,
+        elapsedMs,
+        resultKind: undefined,
+        disagreedWithRequestedMode: requestedMode === "sync",
+        preferenceApplied: preferenceOutcome(requestedMode, {
+          kind: "unreachable-job",
+          status: envelope.status,
+          locationPresent: evidence.locationPresent,
+        }),
+        preferenceAppliedHeader,
+        discoveredVia: undefined,
+        locationPresent: evidence.locationPresent,
+        jobIdKnown: false,
+        problemPresent: false,
+        unrecognisedKeys: evidence.unrecognisedKeys,
+      });
+    }
+    throw cause;
+  }
   const asked = requestedMode === "async" ? "job" : "immediate";
 
   observe(sink, {
@@ -184,6 +221,12 @@ export async function execute(
     // thing, got the other. Recordable only because both facts survive on the
     // union.
     disagreedWithRequestedMode: execution.kind !== asked,
+    preferenceApplied: preferenceOutcome(requestedMode, {
+      kind: execution.kind,
+      status: envelope.status,
+      locationPresent: evidence.locationPresent,
+    }),
+    preferenceAppliedHeader,
     discoveredVia: execution.kind === "job" ? execution.job.discoveredVia : undefined,
     locationPresent: evidence.locationPresent,
     jobIdKnown: execution.kind === "job" && execution.job.jobId !== undefined,

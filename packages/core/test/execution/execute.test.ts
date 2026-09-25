@@ -369,6 +369,105 @@ describe("the observation", () => {
     expect(record.jobIdKnown).toBe(true);
   });
 
+  it.each([
+    [
+      "sync answered with the result",
+      "sync" as const,
+      json({ id: "echo", value: "Hello!" }),
+      "honoured",
+      false,
+    ],
+    [
+      "sync answered with the result and a Location, as pygeoapi does",
+      "sync" as const,
+      json({ id: "echo", value: "Hello!" }, 200, { Location: "/oapi/jobs/1" }),
+      "ambiguous",
+      false,
+    ],
+    [
+      "async answered 201 with Location and Preference-Applied",
+      "async" as const,
+      json(null, 201, { Location: "/oapi/jobs/1", "Preference-Applied": "respond-async" }),
+      "honoured",
+      true,
+    ],
+    [
+      "async answered with the result",
+      "async" as const,
+      json({ id: "echo", value: "Hello!" }),
+      "ignored",
+      false,
+    ],
+    [
+      "async answered 201, named from the body only",
+      "async" as const,
+      json(
+        { jobID: "8f2c", status: "accepted", links: [{ rel: "monitor", href: "/oapi/jobs/8f2c" }] },
+        201,
+      ),
+      "ambiguous",
+      false,
+    ],
+  ])(
+    "records whether the preference was applied: %s",
+    async (_, mode, response, applied, header) => {
+      const fake = fakeFetch(response);
+      const { sink, seen } = collect();
+
+      await execute(LIST, "hello-world", {
+        inputs: {},
+        mode,
+        fetch: fake.fetch,
+        onObservation: sink,
+      });
+
+      const record = executionRecord(seen);
+      expect(record.preferenceApplied).toBe(applied);
+      expect(record.preferenceAppliedHeader).toBe(header);
+    },
+  );
+
+  it("records a job it cannot reach as ambiguous, before throwing", async () => {
+    // pygeoapi's async 201 from a browser: Location hidden, body null (finding
+    // 0039). The server answered, so the answer is recorded.
+    const fake = fakeFetch(json(null, 201, { "Preference-Applied": "respond-async" }));
+    const { sink, seen } = collect();
+
+    await expect(
+      execute(LIST, "hello-world", {
+        inputs: {},
+        mode: "async",
+        fetch: fake.fetch,
+        onObservation: sink,
+      }),
+    ).rejects.toThrow(AmbiguousExecutionResponseError);
+
+    const record = executionRecord(seen);
+    expect(record.outcome).toBe("error");
+    expect(record.status).toBe(201);
+    expect(record.preferenceApplied).toBe("ambiguous");
+    expect(record.preferenceAppliedHeader).toBe(true);
+    expect(record.locationPresent).toBe(false);
+  });
+
+  it("judges no preference on a refusal, and knows no header without a response", async () => {
+    const refused = fakeFetch(json({ type: "about:blank", title: "Bad", status: 400 }, 400));
+    const first = collect();
+    await expect(
+      execute(LIST, "hello-world", { inputs: {}, fetch: refused.fetch, onObservation: first.sink }),
+    ).rejects.toThrow(ProcessesError);
+    expect(executionRecord(first.seen).preferenceApplied).toBeUndefined();
+    expect(executionRecord(first.seen).preferenceAppliedHeader).toBe(false);
+
+    const dead = (): Promise<Response> => Promise.reject(new TypeError("Failed to fetch"));
+    const second = collect();
+    await expect(
+      execute(LIST, "hello-world", { inputs: {}, fetch: dead, onObservation: second.sink }),
+    ).rejects.toThrow();
+    expect(executionRecord(second.seen).preferenceApplied).toBeUndefined();
+    expect(executionRecord(second.seen).preferenceAppliedHeader).toBeUndefined();
+  });
+
   it("records a transport failure with no status, and still reports elapsed time", async () => {
     const dead = (): Promise<Response> => Promise.reject(new TypeError("Failed to fetch"));
     const { sink, seen } = collect();
