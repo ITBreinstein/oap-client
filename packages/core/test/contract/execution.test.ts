@@ -113,6 +113,10 @@ describe("sync execution against pygeoapi", () => {
     expect(record?.route).toBe("advertised-link");
     expect(record?.elapsedMs).toBeGreaterThanOrEqual(0);
     expect(record?.locationPresent).toBe(true);
+    // The result, with a job's Location beside it (finding 0024): sync sends no
+    // Prefer, so there is no preference this could have honoured cleanly.
+    expect(record?.preferenceApplied).toBe("ambiguous");
+    expect(record?.preferenceAppliedHeader).toBe(false);
   });
 });
 
@@ -129,6 +133,20 @@ describe("async execution against pygeoapi", () => {
     expect(execution.job.discoveredVia).toBe("location-header");
     expect(execution.job.statusUrl).toMatch(/^http:\/\/localhost:5080\/jobs\//);
     expect(execution.job.jobId).toBeDefined();
+  });
+
+  it("honours Prefer: respond-async, and says so in Preference-Applied", async () => {
+    const before = executions().length;
+    await client.execute("hello-world", {
+      inputs: { name: "plugfest" },
+      mode: "async",
+      description: helloWorld,
+    });
+
+    const record = executions()[before];
+    expect(record?.status).toBe(201);
+    expect(record?.preferenceApplied).toBe("honoured");
+    expect(record?.preferenceAppliedHeader).toBe(true);
   });
 
   it("has no body link to fall back on, because the 201 body is null — finding 0004", async () => {

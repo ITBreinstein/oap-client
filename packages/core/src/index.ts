@@ -224,6 +224,7 @@ export type {
   ObservationKind,
   ObservationSink,
   PollLoopOutcome,
+  PreferenceOutcome,
   RetryAfterDisposition,
   SkippedLinkReason,
 } from "./observations.js";

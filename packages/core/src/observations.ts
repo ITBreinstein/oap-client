@@ -43,6 +43,21 @@ export type PollLoopOutcome = "terminal" | "timeout" | "aborted" | "error" | "di
 export type ExecutionOutcome = "immediate" | "job" | "error" | "transport-failure";
 
 /**
+ * What the server did with the execution mode the client asked for, read off
+ * the response the client could actually see.
+ *
+ * - `honoured`: asked async and got `201`/`202` with a readable `Location`, or
+ *   asked sync and got the result with no job attached.
+ * - `ignored`: asked async and got the result itself.
+ * - `ambiguous`: the answer does not settle it. Asked async and got a job the
+ *   client could not name from `Location` — hidden cross-origin (finding
+ *   0039), or never sent. Or asked sync, which sends no `Prefer` at all, and
+ *   got a job anyway, or the result with a `Location` beside it (pygeoapi does
+ *   this on every sync run; finding 0024).
+ */
+export type PreferenceOutcome = "honoured" | "ignored" | "ambiguous";
+
+/**
  * What the poll loop did with one `Retry-After` header.
  *
  * `ignored` is the interesting one: it means the server sent something that is
@@ -220,6 +235,18 @@ export type Observation =
       readonly resultKind: "immediate" | "job" | undefined;
       /** Asked sync and got a job, or the reverse. A finding when true. */
       readonly disagreedWithRequestedMode: boolean;
+      /**
+       * The requested mode against what came back. `undefined` when there was
+       * no answer to judge: a transport failure or a refusal.
+       */
+      readonly preferenceApplied: PreferenceOutcome | undefined;
+      /**
+       * Whether the response carried a `Preference-Applied` header the client
+       * could read. `undefined` when no response arrived. Cross-origin it is
+       * readable only if the server exposes it, so `false` from a browser
+       * means "not sent, or hidden".
+       */
+      readonly preferenceAppliedHeader: boolean | undefined;
       /** Which route reached the job. Undefined unless one was created. */
       readonly discoveredVia: "location-header" | "body-link" | undefined;
       /**
