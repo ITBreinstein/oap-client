@@ -2,7 +2,7 @@ import { send, type SendOptions } from "./http/transport.js";
 import type { ResponseEnvelope } from "./http/envelope.js";
 import { type FetchLike, resolveFetch } from "./http/fetch.js";
 import { inspect, type InspectOptions, type ServiceDescription } from "./discovery/inspect.js";
-import { AbortError } from "./http/errors.js";
+import { AbortError, ProcessesError, TransportError } from "./http/errors.js";
 import { findLink } from "./links/find.js";
 import { observe, redactUrl, type ObservationSink } from "./observations.js";
 import { listProcesses, type ListProcessesOptions } from "./processes/list-processes.js";
@@ -210,8 +210,52 @@ function processesFallback(landingUrl: string): string {
   return new URL("processes", base).toString();
 }
 
-function isAbort(error: unknown): boolean {
-  return error instanceof AbortError || (error instanceof Error && error.name === "AbortError");
+/**
+ * Discovery failed without the server having said anything: no response at
+ * all, or a 5xx. Worth asking again next time, unlike an answer that was
+ * simply not a usable landing page, which will be the same answer tomorrow.
+ */
+/** A discovered URL, and whether it is a guess made because the landing page could not be reached. */
+interface Discovered {
+  readonly url: string;
+  readonly transient: boolean;
+}
+
+function isTransient(error: unknown): boolean {
+  return (
+    error instanceof TransportError || (error instanceof ProcessesError && error.status >= 500)
+  );
+}
+
+/**
+ * `start()`'s promise, or an {@link AbortError} as soon as `signal` aborts —
+ * whichever comes first. The shared work behind the promise carries on for
+ * any other caller waiting on it; only this caller stops waiting.
+ */
+function untilAborted<T>(
+  start: () => Promise<T>,
+  signal: AbortSignal | undefined,
+  url: URL,
+): Promise<T> {
+  if (signal === undefined) return start();
+  if (signal.aborted) return Promise.reject(new AbortError(url.toString()));
+  const promise = start();
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = (): void => {
+      reject(new AbortError(url.toString()));
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+    promise.then(
+      (value) => {
+        signal.removeEventListener("abort", onAbort);
+        resolve(value);
+      },
+      (error: unknown) => {
+        signal.removeEventListener("abort", onAbort);
+        reject(error instanceof Error ? error : new Error(String(error)));
+      },
+    );
+  });
 }
 
 export function createClient(options: ClientOptions): Client {
@@ -236,23 +280,25 @@ export function createClient(options: ClientOptions): Client {
    * URL, for one base URL, that cannot change for the life of this object, and
    * remembering it is what stops every `listProcesses()` costing two extra
    * requests. The *promise* is memoised so two concurrent calls share one
-   * discovery, and it is dropped again on rejection so a cancelled or failed
-   * first call cannot poison the client.
+   * discovery.
+   *
+   * The shared discovery takes no caller's signal: one caller cancelling must
+   * not fail another that shares it. Each caller honours its own signal at the
+   * call site, through {@link untilAborted}. And a guess made because the
+   * landing page could not be *reached* is not remembered — see
+   * {@link isTransient} — so a network blip does not pin the client to the
+   * guess over a link the server does advertise.
    */
   let processesUrl: Promise<string> | undefined;
 
-  function discoverProcessesUrl(
-    sink: ObservationSink | undefined,
-    signal: AbortSignal | undefined,
-  ): Promise<string> {
+  function discoverProcessesUrl(sink: ObservationSink | undefined): Promise<string> {
     if (processesUrl !== undefined) return processesUrl;
 
-    const pending = (async (): Promise<string> => {
+    const discovery = (async (): Promise<Discovered> => {
       const landing = baseUrl.toString();
       try {
         const service = await inspect(baseUrl, {
           ...transport,
-          ...(signal === undefined ? {} : { signal }),
           ...(sink === undefined ? {} : { onObservation: sink }),
         });
         const advertised = findLink(service.links, "processes");
@@ -262,48 +308,42 @@ export function createClient(options: ClientOptions): Client {
             source: "advertised",
             url: redactUrl(advertised.href),
           });
-          return advertised.href;
+          return { url: advertised.href, transient: false };
         }
         const guessed = processesFallback(service.url);
         observe(sink, { kind: "processes-link", source: "path-fallback", url: redactUrl(guessed) });
-        return guessed;
+        return { url: guessed, transient: false };
       } catch (error) {
-        if (isAbort(error)) throw error;
         // A landing page we cannot read does not mean `/processes` is unreachable
         // — a service may serve HTML at its root and JSON below it. Degrade to
         // the guess and record it, rather than refusing to list at all.
         const guessed = processesFallback(landing);
         observe(sink, { kind: "processes-link", source: "path-fallback", url: redactUrl(guessed) });
-        return guessed;
+        return { url: guessed, transient: isTransient(error) };
       }
     })();
 
+    const pending = discovery.then(({ url }) => url);
     processesUrl = pending;
-    pending.catch(() => {
+    const forget = (): void => {
       if (processesUrl === pending) processesUrl = undefined;
-    });
+    };
+    discovery.then(({ transient }) => {
+      if (transient) forget();
+    }, forget);
     return pending;
   }
 
   /**
-   * The resolved job-list URL, remembered per client.
-   *
-   * Deliberately **not** the same shape as `discoverProcessesUrl` above, which
-   * carries a defect this one avoids: that function bakes the *first* caller's
-   * `signal` into the memoised promise, so two concurrent calls share one
-   * discovery and whichever caller cancels first makes the other fail with an
-   * `AbortError` it never asked for. It is pre-existing and out of this task's
-   * scope to change, but it is not worth copying.
-   *
-   * Here the shared discovery takes no caller signal at all. It cannot fail —
-   * every error degrades to the path fallback — so there is nothing for one
-   * caller's cancellation to poison, and each caller still honours its own
-   * signal at the call site below.
+   * The resolved job-list URL, remembered per client, on the same terms as
+   * {@link discoverProcessesUrl}.
    */
   let jobsUrl: Promise<string> | undefined;
 
   function discoverJobsUrl(sink: ObservationSink | undefined): Promise<string> {
-    jobsUrl ??= (async (): Promise<string> => {
+    if (jobsUrl !== undefined) return jobsUrl;
+
+    const discovery = (async (): Promise<Discovered> => {
       const landing = baseUrl.toString();
       try {
         const service = await inspect(baseUrl, {
@@ -317,21 +357,30 @@ export function createClient(options: ClientOptions): Client {
             source: "advertised",
             url: redactUrl(advertised.href),
           });
-          return advertised.href;
+          return { url: advertised.href, transient: false };
         }
         // Both reference servers advertise the link, so reaching this is itself
         // worth recording — see finding 0006 for the server that advertises the
         // link while declaring no matching conformance class.
         const guessed = jobsFallback(service.url);
         observe(sink, { kind: "job-list-link", source: "path-fallback", url: redactUrl(guessed) });
-        return guessed;
-      } catch {
+        return { url: guessed, transient: false };
+      } catch (error) {
         const guessed = jobsFallback(landing);
         observe(sink, { kind: "job-list-link", source: "path-fallback", url: redactUrl(guessed) });
-        return guessed;
+        return { url: guessed, transient: isTransient(error) };
       }
     })();
-    return jobsUrl;
+
+    const pending = discovery.then(({ url }) => url);
+    jobsUrl = pending;
+    const forget = (): void => {
+      if (jobsUrl === pending) jobsUrl = undefined;
+    };
+    discovery.then(({ transient }) => {
+      if (transient) forget();
+    }, forget);
+    return pending;
   }
 
   /**
@@ -364,7 +413,7 @@ export function createClient(options: ClientOptions): Client {
     },
     async listProcesses(listOptions: ListRequestOptions = {}): Promise<ProcessList> {
       const sink = listOptions.onObservation ?? options.onObservation;
-      const url = await discoverProcessesUrl(sink, listOptions.signal);
+      const url = await untilAborted(() => discoverProcessesUrl(sink), listOptions.signal, baseUrl);
       return listProcesses(url, {
         ...transport,
         ...listOptions,
@@ -376,7 +425,7 @@ export function createClient(options: ClientOptions): Client {
       getOptions: GetProcessRequestOptions = {},
     ): Promise<ProcessDescription> {
       const sink = getOptions.onObservation ?? options.onObservation;
-      const url = await discoverProcessesUrl(sink, getOptions.signal);
+      const url = await untilAborted(() => discoverProcessesUrl(sink), getOptions.signal, baseUrl);
       return getProcess(url, processId, {
         ...transport,
         ...getOptions,
@@ -391,7 +440,11 @@ export function createClient(options: ClientOptions): Client {
       // Only needed for the constructed-path fallback; a description carrying
       // an `execute` link makes this discovery free on the second call and
       // irrelevant on the first.
-      const url = await discoverProcessesUrl(sink, executeOptions.signal);
+      const url = await untilAborted(
+        () => discoverProcessesUrl(sink),
+        executeOptions.signal,
+        baseUrl,
+      );
       return execute(url, processId, {
         ...transport,
         ...executeOptions,

@@ -272,12 +272,14 @@ describe("getJob()", () => {
     // `problem.ts`'s test. That is luck, not design, and this pins the
     // behaviour if a third server is less lucky.
     //
-    // `type` is URI-shaped, which `looksLikeProblem()` accepts at any status,
-    // so `classify()` calls this an `exception` at 200 — and `getJob()` must
-    // still hand back a JobStatus rather than throwing the job away.
+    // `type` is URI-shaped and there is a `detail`, which `looksLikeProblem()`
+    // accepts at any status, so `classify()` calls this an `exception` at 200
+    // — and `getJob()` must still hand back a JobStatus rather than throwing
+    // the job away.
     const body = {
       type: "https://example.test/errors/process-failed",
       title: "The process failed",
+      detail: "the process raised",
       status: "failed",
       jobID: "problem-shaped",
       message: "it went wrong",

@@ -61,7 +61,11 @@ function stringOrUndefined(value: unknown): string | undefined {
  *    response is a failure either way, so the only question is whether we can
  *    name it;
  * 3. `type` is URI-shaped (`about:blank`, `https://…`, `urn:…`, `/errors/…`) —
- *    which RFC 7807 requires and `"process"` is not;
+ *    which RFC 7807 requires and `"process"` is not — *and* the body carries a
+ *    `detail` or claims a failing numeric `status`. A URI-shaped `type` alone
+ *    is not enough: a process result is free to carry one (`"urn:…"`,
+ *    `"EPSG:4326"`), and on a synchronous execute this test decides whether
+ *    the result is handed over or thrown away as an exception;
  * 4. the body itself claims a failing numeric `status` alongside a `title`.
  *
  * 1, 3 and 4 are what catch a **200 carrying a problem document** — a real
@@ -76,10 +80,14 @@ function looksLikeProblem(record: Record<string, unknown>, context: ProblemConte
   if (type === undefined && title === undefined) return false;
 
   if (context.wireStatus >= 400) return true;
-  if (type !== undefined && URI_SHAPED.test(type)) return true;
 
   const claimed = record["status"];
-  return title !== undefined && typeof claimed === "number" && claimed >= 400;
+  const claimsFailure = typeof claimed === "number" && claimed >= 400;
+  if (type !== undefined && URI_SHAPED.test(type)) {
+    if (typeof record["detail"] === "string" || claimsFailure) return true;
+  }
+
+  return title !== undefined && claimsFailure;
 }
 
 /** Reads a parsed JSON body as a problem document, or returns undefined. */

@@ -45,6 +45,7 @@
  * and a loop that sleeps between polls has none to apply.
  */
 
+import { withDeadline } from "../http/deadline.js";
 import { AbortError } from "../http/errors.js";
 import { JobNotFoundError, JobPollTimeoutError } from "../errors.js";
 import { observe, redactUrl } from "../observations.js";
@@ -243,11 +244,15 @@ export async function pollJob(
 
       let retryAfterMs: number | undefined;
       let retryAfterRaw: string | undefined;
+      // The total deadline also covers a read in flight. Checked only between
+      // polls, a status request that never answers — and a browser `fetch` has
+      // no timeout of its own — would hold the loop past it indefinitely.
+      const deadline = withDeadline(options.signal, timeoutMs - (Date.now() - startedAt));
       try {
         // `readJobStatus` rather than `getJob`: the loop needs the response's
         // `Retry-After`, which is a fact about one HTTP response rather than
         // about the job, and so has no place on `JobStatus`.
-        const polled = await readJobStatus(statusUrl, options);
+        const polled = await readJobStatus(statusUrl, { ...options, signal: deadline.signal });
         status = polled.status;
         retryAfterMs = polled.envelope.retryAfterMs;
         // The raw header as well as the parsed value: when the two disagree —
@@ -255,6 +260,19 @@ export async function pollJob(
         // observation, and the parsed value alone cannot express it.
         retryAfterRaw = polled.envelope.headers.get("retry-after") ?? undefined;
       } catch (error) {
+        // Our deadline, not the caller's signal: the same ending as a deadline
+        // that passes between polls.
+        if (deadline.timedOut() && isAbort(error)) {
+          finish("timeout");
+          throw new JobPollTimeoutError(
+            statusUrl,
+            timeoutMs,
+            pollCount,
+            Date.now() - startedAt,
+            status,
+            { cause: error },
+          );
+        }
         // An abort belongs to the outer handler, which is the one place that
         // records it.
         if (isAbort(error)) throw error;
@@ -267,6 +285,8 @@ export async function pollJob(
         }
         finish("error");
         throw error;
+      } finally {
+        deadline.dispose();
       }
 
       pollCount += 1;
@@ -375,12 +395,26 @@ function clampServer(ms: number): number {
  * Resolves for `failed` and `dismissed` too — it does **not** throw, for the T1
  * reason. Whether a failed job is an error is the caller's decision, and the
  * server's own explanation is on the status it hands back.
+ *
+ * Throws {@link JobPollTimeoutError} when polling stopped at `maxPolls` with the
+ * job still not terminal. `pollJob` reports that as a `timeout` outcome; this
+ * function promises a final status, and a `running` one is not.
  */
 export async function waitForJob(
   statusUrl: string,
   options: PollJobOptions = {},
 ): Promise<JobStatus> {
   const result = await pollJob(statusUrl, options);
+  if (result.outcome === "timeout" && result.status?.terminal !== true) {
+    throw new JobPollTimeoutError(
+      statusUrl,
+      options.timeoutMs ?? DEFAULT_POLL_TIMEOUT_MS,
+      result.pollCount,
+      result.elapsedMs,
+      result.status,
+      { pollCap: Math.max(1, options.maxPolls ?? DEFAULT_MAX_POLLS) },
+    );
+  }
   if (result.status !== undefined) return result.status;
   // Only reachable when the job was dismissed before any poll completed.
   throw new JobNotFoundError(statusUrl);

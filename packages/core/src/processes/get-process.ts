@@ -31,6 +31,7 @@
 import { fetchJson, type FetchJsonOptions } from "../discovery/negotiate.js";
 import { ProcessNotFoundError } from "../errors.js";
 import { ProcessesError } from "../http/errors.js";
+import { encodePathSegment } from "../http/path-segment.js";
 import { findLink } from "../links/find.js";
 import { observe, redactUrl, type ObservationSink } from "../observations.js";
 import { parseDescription } from "./parse-description.js";
@@ -71,7 +72,7 @@ export function processUrlFor(processesUrl: string, processId: string): string {
   if (!base.pathname.endsWith("/")) base.pathname = `${base.pathname}/`;
   base.search = "";
   base.hash = "";
-  return new URL(encodeURIComponent(processId), base).toString();
+  return new URL(encodePathSegment(processId), base).toString();
 }
 
 /** Which URL to ask, and how we got it. */

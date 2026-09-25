@@ -7,6 +7,7 @@
  * test — see T1 — because the live version of that test crashes a server.
  */
 
+import { encodePathSegment } from "../http/path-segment.js";
 import { findLink } from "../links/find.js";
 import type { ProcessDescription, ResolutionRoute } from "../processes/types.js";
 import type {
@@ -67,7 +68,7 @@ export function executionUrlFor(processesUrl: string, processId: string): string
   if (!base.pathname.endsWith("/")) base.pathname = `${base.pathname}/`;
   base.search = "";
   base.hash = "";
-  return new URL(`${encodeURIComponent(processId)}/execution`, base).toString();
+  return new URL(`${encodePathSegment(processId)}/execution`, base).toString();
 }
 
 /**

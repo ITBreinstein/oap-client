@@ -304,6 +304,11 @@ export class JobPollTimeoutError extends Error {
   readonly elapsedMs: number;
   /** The last status read, or undefined if no poll ever completed. */
   readonly lastStatus: JobStatus | undefined;
+  /**
+   * Set when polling stopped at `maxPolls` rather than at the deadline — what
+   * `waitForJob` throws for a status that never became terminal.
+   */
+  readonly pollCap: number | undefined;
 
   constructor(
     url: string,
@@ -311,20 +316,26 @@ export class JobPollTimeoutError extends Error {
     pollCount: number,
     elapsedMs: number,
     lastStatus: JobStatus | undefined,
-    options?: { cause?: unknown },
+    options?: { cause?: unknown; pollCap?: number | undefined },
   ) {
     const seen =
       lastStatus === undefined
         ? "no status was ever read"
         : `last status was "${lastStatus.rawStatus}"`;
+    const pollCap = options?.pollCap;
     super(
-      `Job at ${url} did not reach a terminal status within ${String(timeoutMs)} ms ` +
-        `(${String(pollCount)} polls over ${String(elapsedMs)} ms; ${seen}). ` +
-        `Raise timeoutMs if the process is genuinely this slow.`,
-      options,
+      pollCap === undefined
+        ? `Job at ${url} did not reach a terminal status within ${String(timeoutMs)} ms ` +
+            `(${String(pollCount)} polls over ${String(elapsedMs)} ms; ${seen}). ` +
+            `Raise timeoutMs if the process is genuinely this slow.`
+        : `Job at ${url} did not reach a terminal status within ${String(pollCap)} polls ` +
+            `(${String(elapsedMs)} ms; ${seen}). A status this client does not recognise ` +
+            `is treated as still running; raise maxPolls if the process is genuinely this slow.`,
+      options?.cause === undefined ? undefined : { cause: options.cause },
     );
     this.url = url;
     this.timeoutMs = timeoutMs;
+    this.pollCap = pollCap;
     this.pollCount = pollCount;
     this.elapsedMs = elapsedMs;
     this.lastStatus = lastStatus;

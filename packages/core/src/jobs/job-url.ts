@@ -15,6 +15,8 @@
  * still carries its query lands the guess one level too high.
  */
 
+import { encodePathSegment } from "../http/path-segment.js";
+
 /** An absolute http(s) URL, as opposed to a bare job id. */
 export function isAbsoluteUrl(value: string): boolean {
   try {
@@ -44,7 +46,7 @@ function asDirectory(base: string): URL {
  * {@link JobHandle} already has the absolute URL the server itself gave out.
  */
 export function jobUrlFor(jobsUrl: string, jobId: string): string {
-  return new URL(encodeURIComponent(jobId), asDirectory(jobsUrl)).toString();
+  return new URL(encodePathSegment(jobId), asDirectory(jobsUrl)).toString();
 }
 
 /**

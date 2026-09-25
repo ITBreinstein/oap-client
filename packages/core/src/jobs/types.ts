@@ -38,7 +38,11 @@ export type { JobState } from "../vocabulary/job-status.js";
 export { isJobState, isTerminalState } from "../vocabulary/job-status.js";
 
 export interface JobStatus {
-  /** `jobID`, then `id`, then the last path segment of the URL it was read from. */
+  /**
+   * `jobID`, then `id`, then the last path segment of the URL it was read from
+   * — except for a job-list entry, whose URL is the list's: there it is `""`,
+   * with a `no-job-id` warning.
+   */
   readonly jobId: string;
   /**
    * The status, lowercased and matched against the OGC vocabulary.
