@@ -24,16 +24,27 @@ import type { CensusProgress } from "./useWorkflow.js";
 /** Enough to see what just happened; the download has the rest. */
 const SHOWN = 50;
 
-function download(observations: readonly SessionObservation[], endpoint?: string): void {
+function download(
+  observations: readonly SessionObservation[],
+  dropped: number,
+  endpoint?: string,
+): void {
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const host = endpoint === undefined ? undefined : endpoint.replace(/^[a-z]+:\/\//, "");
+  const host =
+    endpoint === undefined ? undefined : endpoint.replace(/^[a-z]+:\/\//, "").replace(/\/$/, "");
   const name =
     host === undefined
       ? `oap-client-observations-${stamp}.json`
       : `oap-client-observations-${host.replace(/[^A-Za-z0-9.-]+/g, "_")}-${stamp}.json`;
-  const blob = new Blob([observationExport(observations, VERSION, undefined, endpoint)], {
-    type: "application/json",
-  });
+  const blob = new Blob(
+    [
+      observationExport(observations, VERSION, {
+        dropped,
+        ...(endpoint === undefined ? {} : { endpoint }),
+      }),
+    ],
+    { type: "application/json" },
+  );
   saveBlob(blob, name);
 }
 
@@ -45,12 +56,15 @@ function censusMessage(census: CensusProgress): string {
 
 export function DeveloperPanel({
   observations,
+  dropped,
   relayUrl,
   open,
   census,
   onDescribeAll,
 }: {
   readonly observations: readonly SessionObservation[];
+  /** How many the session dropped to stay under its cap. */
+  readonly dropped: number;
   readonly relayUrl: string | undefined;
   readonly open: boolean;
   readonly census: CensusProgress | undefined;
@@ -74,6 +88,12 @@ export function DeveloperPanel({
       <p>
         {observations.length} observations this session, {forms} from form generation.
       </p>
+      {dropped > 0 && (
+        <p role="alert">
+          {dropped} older observations were dropped to keep the page's memory bounded. The downloads
+          are incomplete, and say so.
+        </p>
+      )}
       <p className="developer-filters">
         <label htmlFor={endpointId}>Observations from</label>
         <select
@@ -112,7 +132,7 @@ export function DeveloperPanel({
           type="button"
           className="secondary"
           onClick={() => {
-            download(observations);
+            download(observations, dropped);
           }}
         >
           Download session observations
@@ -122,7 +142,7 @@ export function DeveloperPanel({
             type="button"
             className="secondary"
             onClick={() => {
-              download(observations, endpoint);
+              download(observations, dropped, endpoint);
             }}
           >
             Download this endpoint's observations

@@ -45,6 +45,8 @@ export interface JobSessionSnapshot {
   readonly relay: "off" | StreamState;
   readonly jobs: readonly JobRow[];
   readonly observations: readonly SessionObservation[];
+  /** Observations dropped from the front to keep the cap; 0 until it is reached. */
+  readonly droppedObservations: number;
 }
 
 export interface JobSession {
@@ -83,10 +85,13 @@ export interface JobSession {
 }
 
 /**
- * Enough for a long demo session, bounded so a page left open for a day does
- * not grow without limit. The export button writes whatever is kept.
+ * Enough for a long demo session and a process census of a large catalogue,
+ * bounded so a page left open for a day does not grow without limit. ZOO's
+ * census alone leaves well over a thousand, the first cap, and pushed every
+ * earlier endpoint's observations out without a trace. What is dropped is now
+ * counted, and the count travels with the export.
  */
-const OBSERVATIONS_KEPT = 1_000;
+const OBSERVATIONS_KEPT = 20_000;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -136,6 +141,7 @@ export function createJobSession(relayUrl: string | undefined): JobSession {
 
   let relayState: JobSessionSnapshot["relay"] = relay === undefined ? "off" : "connecting";
   let observations: SessionObservation[] = [];
+  let dropped = 0;
   const meta = new Map<
     string,
     {
@@ -157,6 +163,7 @@ export function createJobSession(relayUrl: string | undefined): JobSession {
       route: meta.get(job.statusUrl)?.route,
     })),
     observations,
+    droppedObservations: dropped,
   });
   const publish = (): void => {
     const current = snapshot();
@@ -169,6 +176,7 @@ export function createJobSession(relayUrl: string | undefined): JobSession {
     (baseUrl: string) =>
     (observation: WebObservation): void => {
       const entry = { endpoint: redactUrl(baseUrl), observation };
+      if (observations.length >= OBSERVATIONS_KEPT) dropped += 1;
       observations = [...observations.slice(1 - OBSERVATIONS_KEPT), entry];
       publish();
     };

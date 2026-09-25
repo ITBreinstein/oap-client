@@ -156,13 +156,17 @@ export function kindCounts(
  * What the download buttons write. With `endpoint`, only that endpoint's
  * observations, and the file names it: one file per endpoint is what the
  * interoperability matrix is built from. Without it, the whole session.
+ *
+ * `droppedObservations` is the session's, since which endpoint a dropped one
+ * belonged to is gone with it. Present only when something was dropped, so a
+ * file that has it is known to be incomplete.
  */
 export function observationExport(
   entries: readonly SessionObservation[],
   coreVersion: string,
-  now: Date = new Date(),
-  endpoint?: string,
+  options: { readonly now?: Date; readonly endpoint?: string; readonly dropped?: number } = {},
 ): string {
+  const { now = new Date(), endpoint, dropped = 0 } = options;
   const observations = entries
     .filter((entry) => endpoint === undefined || entry.endpoint === endpoint)
     .map((entry) => entry.observation);
@@ -171,6 +175,7 @@ export function observationExport(
       exportedAt: now.toISOString(),
       coreVersion,
       ...(endpoint === undefined ? {} : { endpoint }),
+      ...(dropped === 0 ? {} : { droppedObservations: dropped }),
       observations,
     },
     null,

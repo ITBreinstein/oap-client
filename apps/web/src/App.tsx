@@ -125,6 +125,7 @@ export function App() {
             )}
             <DeveloperPanel
               observations={view.snapshot?.observations ?? []}
+              dropped={view.snapshot?.droppedObservations ?? 0}
               relayUrl={relayUrl}
               open={developer}
               census={view.census}

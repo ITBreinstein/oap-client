@@ -57,7 +57,10 @@ describe("kindCounts", () => {
 
 describe("observationExport", () => {
   it("writes the whole session as a flat list, with no endpoint", () => {
-    const exported = JSON.parse(observationExport(session, "0.4.0", at)) as Record<string, unknown>;
+    const exported = JSON.parse(observationExport(session, "0.4.0", { now: at })) as Record<
+      string,
+      unknown
+    >;
     expect(exported).toEqual({
       exportedAt: "2026-09-25T12:00:00.000Z",
       coreVersion: "0.4.0",
@@ -66,15 +69,21 @@ describe("observationExport", () => {
   });
 
   it("writes one endpoint's observations, including those that carry no URL, and names it", () => {
-    const exported = JSON.parse(observationExport(session, "0.4.0", at, cors)) as Record<
-      string,
-      unknown
-    >;
+    const exported = JSON.parse(
+      observationExport(session, "0.4.0", { now: at, endpoint: cors }),
+    ) as Record<string, unknown>;
     expect(exported).toEqual({
       exportedAt: "2026-09-25T12:00:00.000Z",
       coreVersion: "0.4.0",
       endpoint: cors,
       observations: [capabilities.observation, form(cors, "hello-world").observation],
     });
+  });
+
+  it("says when the session dropped observations, so the file is known to be incomplete", () => {
+    const exported = JSON.parse(
+      observationExport(session, "0.4.0", { now: at, endpoint: zoo, dropped: 3 }),
+    ) as Record<string, unknown>;
+    expect(exported["droppedObservations"]).toBe(3);
   });
 });
