@@ -101,7 +101,7 @@ the job last long enough to _observe_, but the vocabulary and the progress
 numbers are pygeoapi's. A genuinely `running` job with moving progress only
 exists on ZOO, and the interop lane is where that is asserted.
 
-### `breinstein-bbox`, `breinstein-inputs`, `breinstein-png`, `breinstein-rotate`
+### `breinstein-bbox`, `breinstein-inputs`, `breinstein-png`, `breinstein-rotate`, `breinstein-aerial`
 
 ```yaml
 breinstein-bbox:
@@ -111,7 +111,8 @@ breinstein-bbox:
 ```
 
 …and the same for `breinstein_inputs.InputsProcessor`,
-`breinstein_png.PngProcessor` and `breinstein_rotate.RotateProcessor`. The
+`breinstein_png.PngProcessor`, `breinstein_rotate.RotateProcessor` and
+`breinstein_aerial.AerialProcessor`. The
 coverage-gap processes that were left on the backlog after `slow`, one hole
 each. `:5080` is the only server a browser
 can reach (findings 0049, 0050), so without them the web client's generated form
@@ -123,6 +124,7 @@ had nothing to be tested against but two string inputs.
 | `breinstein-inputs` | every form control, multiple outputs | a bounded string, a multi-line string, a bounded integer, a number with a default, an enum, a boolean, a string repeatable three times, one optional string, one optional GeoJSON geometry → `echo` (JSON) and `summary` (text) |
 | `breinstein-png`    | a non-JSON output                    | one bounded integer → an `image/png` of that size                                                                                                                                                                               |
 | `breinstein-rotate` | a geometry in and a geometry out     | one GeoJSON `Polygon` (`format: "geojson-polygon"`) → the same polygon turned 90° counter-clockwise about the centre of its bounding box, as seen on a map, `application/geo+json`                                              |
+| `breinstein-aerial` | an image of a place                  | one GeoJSON `Polygon` in the Netherlands, at most 25 km across → `image`, the current aerial photograph of its bounding box (JPEG, base64 in a qualified value), and `bbox`, that box in CRS84, as one results map              |
 
 Same rule as `slow`: each one **echoes or reshapes its inputs and computes
 nothing**. Four details are deliberate:
@@ -151,6 +153,17 @@ nothing**. Four details are deliberate:
 
 `breinstein-png` builds its PNG with `zlib` and `struct` only, so the pinned
 image needs no extra package.
+
+`breinstein-aerial` is the one that reaches the network. It asks PDOK's `luchtfotorgb` WMS
+(layer `Actueel_orthoHR`, Beeldmateriaal Nederland's current aerial photograph,
+open data, no key) for the polygon's bounding box in EPSG:3857, so the four
+corners it returns in CRS84 place the picture on a web map without resampling.
+It refuses an area outside the layer's coverage or wider than 25 km rather than
+answering with a blank or useless picture. Because it needs the network, the
+contract lane never runs it, and its browser test skips when PDOK is not
+answering. The standard cannot say that `bbox` is the extent of `image`; the
+output descriptions say so in words, and the web client's pairing of the two
+is its own reading (`apps/web/src/results/plottable.ts`).
 
 ## Re-creating the stack after a config change
 

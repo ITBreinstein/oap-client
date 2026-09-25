@@ -38,13 +38,15 @@ CI; ZOO-Project is a second implementation with nothing in common but the
 standard, and it reports without blocking — see [infra/README.md](infra/README.md)
 and [infra/zoo/README.md](infra/zoo/README.md).
 
-The pinned pygeoapi also carries five processors of our own, mounted from
+The pinned pygeoapi also carries six processors of our own, mounted from
 [infra/pygeoapi/plugins](infra/pygeoapi/plugins) without rebuilding the image:
 `slow`, because the stock image's only process finishes before the first poll
-returns, and `breinstein-bbox`, `breinstein-inputs`, `breinstein-png` and
-`breinstein-rotate`, which give the generated form a bounding box, every control
-kind, multiple outputs, a non-JSON output and a geometry in with a geometry out
-to be tested against. See [infra/README.md](infra/README.md).
+returns, and `breinstein-bbox`, `breinstein-inputs`, `breinstein-png`,
+`breinstein-rotate` and `breinstein-aerial`, which give the generated form a
+bounding box, every control kind, multiple outputs, a non-JSON output, a
+geometry in with a geometry out, and an image of a place to be tested against.
+`breinstein-aerial` fetches PDOK's aerial photograph, so it is the one that needs
+the network. See [infra/README.md](infra/README.md).
 
 ## Boundaries
 

@@ -41,6 +41,8 @@ the versions are recorded here rather than left to a commit message.
                 carries the optional geometry input `area`)          2026-09-25
               processes/breinstein-rotate.json,
               process-list.json  (re-captured; now carries all six)   2026-09-25
+              processes/breinstein-aerial.json,
+              process-list.json  (re-captured; now carries all seven) 2026-09-25
 
 The `breinstein-*` descriptions are processes this repository adds to the
 pinned image (see `infra/README.md`). They are the only descriptions a browser

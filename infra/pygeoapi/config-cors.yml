@@ -80,3 +80,10 @@ resources:
     type: process
     processor:
       name: breinstein_rotate.RotateProcessor
+  # A GeoJSON polygon in, the aerial photograph of its bounding box and that
+  # box out; fetched from PDOK, so it needs the network. Source and rationale:
+  # infra/pygeoapi/plugins/breinstein_aerial.py, documented in infra/README.md.
+  breinstein-aerial:
+    type: process
+    processor:
+      name: breinstein_aerial.AerialProcessor
