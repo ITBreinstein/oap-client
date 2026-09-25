@@ -1,14 +1,15 @@
 # oap-client
 
 Breinstein's OGC API - Processes client: a runtime-neutral protocol core, a web
-interface, and a small relay that names asynchronous jobs a browser cannot and
-relays job callbacks as doorbells.
+interface, and a small relay that names asynchronous jobs a browser cannot,
+relays job callbacks as doorbells, and — for configured servers that send no
+CORS headers, once the user has confirmed it — forwards the browser's reads.
 
-| Workspace                      | What it is                                                       |
-| ------------------------------ | ---------------------------------------------------------------- |
-| [packages/core](packages/core) | `@breinstein/oap-client` — the published, framework-free client  |
-| [apps/web](apps/web)           | Vite + React interface (static output)                           |
-| [apps/relay](apps/relay)       | Hono relay: async job identity and callback doorbells — no proxy |
+| Workspace                      | What it is                                                                                            |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------- |
+| [packages/core](packages/core) | `@breinstein/oap-client` — the published, framework-free client                                       |
+| [apps/web](apps/web)           | Vite + React interface (static output)                                                                |
+| [apps/relay](apps/relay)       | Hono relay: async job identity, callback doorbells, and a read route for configured CORS-less servers |
 
 ## Getting started
 

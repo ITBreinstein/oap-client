@@ -17,9 +17,18 @@
       "allowPrivateNetwork": true
     },
     {
+      "key": "pygeoapi-nocors-relay",
+      "baseUrl": "http://localhost:5081",
+      "executeRoute": "relay",
+      "readRoute": "relay",
+      "callbacks": false,
+      "allowPrivateNetwork": true
+    },
+    {
       "key": "zoo",
       "baseUrl": "http://localhost:5090/ogc-api",
       "executeRoute": "relay",
+      "readRoute": "relay",
       "callbacks": false,
       "allowPrivateNetwork": true
     }

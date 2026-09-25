@@ -10,10 +10,15 @@
  *    OGC server's callbacks and rings a doorbell on the browser's event stream:
  *    "something happened to job X", never what.
  *
- * It is not a proxy. It does not forward reads, results or dismissals, and it
- * never tells the browser a job's state. The browser polls the OGC server for
- * that, on every doorbell, on every stream reconnect, and on its own schedule
- * when the relay is switched off entirely.
+ * 3. **Read a server that sends no CORS headers** (phase 3, finding 0050) —
+ *    only for endpoints configured with `readRoute: "relay"`, only under their
+ *    `baseUrl`, and only after the user confirmed the fallback in the web app.
+ *
+ * It is not a general proxy: it never takes a URL from the browser, and an
+ * endpoint without `readRoute: "relay"` gets nothing forwarded but its
+ * asynchronous executes. It never tells the browser a job's state from its
+ * callbacks; the browser polls for that, on every doorbell, on every stream
+ * reconnect, and on its own schedule when the relay is switched off.
  *
  * ## Routes
  *
@@ -24,7 +29,12 @@
  * | `POST /sessions`                        | browser     | none            |
  * | `GET /sessions/events`                  | browser     | session token   |
  * | `POST /execute/{endpointKey}/{process}` | browser     | session, optional |
+ * | `GET /read/{endpointKey}/{path*}`       | browser     | session token   |
+ * | `DELETE /read/{endpointKey}/jobs/{id}`  | browser     | session token   |
  * | `POST /callbacks/{token}/{kind}`        | OGC server  | callback token  |
+ *
+ * Every response carries `X-Relay: 1`; every response the relay generates
+ * itself, rather than forwards, also carries `X-Relay-Error: <code>`.
  */
 
 import { Hono, type Context } from "hono";
@@ -33,9 +43,17 @@ import { cors } from "hono/cors";
 import { streamSSE } from "hono/streaming";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { parseConfig, type EndpointConfig, type RelayConfig } from "./config.js";
+import {
+  forward as forwardUpstream,
+  isJobResource,
+  resolveReadTarget,
+  type ForwardedResponse,
+  type ForwardRequest,
+} from "./forward.js";
 import { RelayState, systemClock, type Clock, type RingOutcome } from "./state.js";
 import { isWellFormedSecretToken } from "./tokens.js";
 import {
+  executionUrl,
   postExecute,
   systemSchedule,
   UpstreamError,
@@ -78,11 +96,39 @@ export type RelayEvent =
     }
   | { readonly kind: "stream"; readonly change: "opened" | "closed" };
 
+/**
+ * One line per forwarded request on the read route, and per synchronous
+ * execute forwarded for a read-route endpoint. Redacted at creation: the path
+ * relative to the endpoint's base, and the *names* of query parameters, never
+ * their values. No body, no token, no header.
+ */
+export interface AuditLine {
+  readonly audit: "read-route";
+  readonly endpointKey: string;
+  readonly method: "GET" | "DELETE" | "POST";
+  readonly path: string;
+  readonly queryNames: readonly string[];
+  /** Undefined when no response arrived. */
+  readonly upstreamStatus: number | undefined;
+  /** Why no response arrived, or why the body was broken off. */
+  readonly failure: UpstreamFailure | undefined;
+  readonly redirectsFollowed: number;
+  readonly bytes: number;
+  readonly ms: number;
+  readonly capHit: "bytes" | "duration" | undefined;
+}
+
 export type UpstreamCall = (
   endpoint: EndpointConfig,
   processId: string,
   body: string,
 ) => Promise<UpstreamResponse>;
+
+/** The read route's outbound request. `forward` with the configured limits by default. */
+export type ForwardCall = (
+  endpoint: EndpointConfig,
+  request: ForwardRequest,
+) => Promise<ForwardedResponse>;
 
 export interface AppOptions {
   readonly config?: RelayConfig | undefined;
@@ -95,21 +141,86 @@ export interface AppOptions {
   /** Comment line on each open stream this often, so proxies keep it open. */
   readonly heartbeatMs?: number | undefined;
   readonly onEvent?: ((event: RelayEvent) => void) | undefined;
+  readonly forward?: ForwardCall | undefined;
+  /** Where audit lines go. One JSON line on stdout by default. */
+  readonly onAudit?: ((line: AuditLine) => void) | undefined;
+}
+
+/** `[a-z0-9-]`, as the config allows. Checked again here because it is placed in a path prefix. */
+const ENDPOINT_KEY = /^[a-z0-9][a-z0-9-]{0,62}$/;
+
+const NULL_BODY_STATUSES: ReadonlySet<number> = new Set([101, 204, 205, 304]);
+
+function queryNames(search: string): string[] {
+  return [...new Set(new URLSearchParams(search).keys())].sort();
+}
+
+/** The redacted half of an audit line that is known before anything is sent. */
+function auditBase(
+  endpoint: EndpointConfig,
+  request: ForwardRequest,
+): Pick<AuditLine, "audit" | "endpointKey" | "method" | "path" | "queryNames"> {
+  const basePath = new URL(endpoint.baseUrl).pathname.replace(/\/+$/, "");
+  return {
+    audit: "read-route",
+    endpointKey: endpoint.key,
+    method: request.method,
+    path: request.url.pathname.slice(basePath.length) || "/",
+    queryNames: queryNames(request.url.search),
+  };
 }
 
 export const DEFAULT_HEARTBEAT_MS = 15_000;
 
-/** An RFC 9457 problem document. `detail` is always ours, never echoed input. */
+/**
+ * On every response the relay sends, forwarded or its own. A response without
+ * it did not come from the relay — in a public deployment, a reverse proxy in
+ * front of it answers 502 or 504 by itself when the relay is down — and the
+ * web app must not read that as the OGC server's answer.
+ */
+export const RELAY_MARKER = "X-Relay";
+
+/**
+ * On every response the relay generates itself rather than forwards: its
+ * refusals and its own failures. The value is a code, never a message. The web
+ * app turns such a response into an error instead of handing it to the core
+ * as though the OGC server had said it.
+ */
+export const RELAY_ERROR = "X-Relay-Error";
+
+/** What a browser may read off a forwarded response: the evidence, and the two markers. */
+export const EXPOSED_HEADERS = [
+  "Content-Type",
+  "Content-Length",
+  "Content-Crs",
+  "Content-Disposition",
+  "Location",
+  "Retry-After",
+  "Link",
+  "Preference-Applied",
+  RELAY_MARKER,
+  RELAY_ERROR,
+];
+
+/**
+ * An RFC 9457 problem document, marked as the relay's own. `detail` is always
+ * ours, never echoed input.
+ */
 function problem(
   c: Context,
   status: ContentfulStatusCode,
   title: string,
+  code: string,
   detail?: string,
 ): Response {
   return c.json(
     { type: "about:blank", title, status, ...(detail === undefined ? {} : { detail }) },
     status,
-    { "Content-Type": "application/problem+json", "Cache-Control": "no-store" },
+    {
+      "Content-Type": "application/problem+json",
+      "Cache-Control": "no-store",
+      [RELAY_ERROR]: code,
+    },
   );
 }
 
@@ -142,6 +253,21 @@ export function createApp(options: AppOptions = {}): Hono {
         timeoutMs: config.limits.upstreamTimeoutMs,
         maxResponseBytes: config.limits.maxUpstreamResponseBytes,
       }));
+  const forward: ForwardCall =
+    options.forward ??
+    ((endpoint, request) =>
+      forwardUpstream(endpoint, request, {
+        timeoutMs: config.limits.readTimeoutMs,
+        maxResponseBytes: config.limits.maxReadResponseBytes,
+      }));
+  const audit = (line: AuditLine): void => {
+    try {
+      if (options.onAudit === undefined) console.log(JSON.stringify(line));
+      else options.onAudit(line);
+    } catch {
+      // An audit sink must not be able to break a read.
+    }
+  };
   const schedule = options.schedule ?? systemSchedule;
   const heartbeatMs = options.heartbeatMs ?? DEFAULT_HEARTBEAT_MS;
   const emit = (event: RelayEvent): void => {
@@ -156,12 +282,19 @@ export function createApp(options: AppOptions = {}): Hono {
 
   const app = new Hono();
 
+  // First, so it wraps everything below — CORS preflights, refusals, the
+  // not-found and error handlers, forwarded responses.
+  app.use("*", async (c, next) => {
+    await next();
+    c.res.headers.set(RELAY_MARKER, "1");
+  });
+
   app.onError((error, c) => {
     // The name only: a message can carry a URL, and a URL can carry a token.
     console.error(`relay: unhandled ${error.name}`);
-    return problem(c, 500, "Internal Server Error");
+    return problem(c, 500, "Internal Server Error", "internal-error");
   });
-  app.notFound((c) => problem(c, 404, "Not Found"));
+  app.notFound((c) => problem(c, 404, "Not Found", "not-found"));
 
   app.get("/healthz", (c) => c.json({ ok: true }));
 
@@ -177,7 +310,135 @@ export function createApp(options: AppOptions = {}): Hono {
   app.use("/endpoints", browserCors);
   app.use("/sessions", browserCors);
   app.use("/sessions/*", browserCors);
-  app.use("/execute/*", browserCors);
+
+  // The routes that can hand back an OGC server's answer. They expose the
+  // evidence headers, so the core sees what it would see from a server that
+  // sends perfect CORS headers, and accept the request headers the read route
+  // forwards.
+  const forwardingCors = cors({
+    origin: (origin) => (allowedOrigins.has(origin) ? origin : null),
+    allowMethods: ["GET", "POST", "DELETE", "OPTIONS"],
+    allowHeaders: ["Content-Type", "Authorization", "Prefer", "Accept-Language"],
+    exposeHeaders: EXPOSED_HEADERS,
+    credentials: false,
+    maxAge: 600,
+  });
+  app.use("/execute/*", forwardingCors);
+  app.use("/read/*", forwardingCors);
+
+  /** The relay's `Response` for a forwarded answer, and its audit line once the body is done. */
+  const relayForwarded = (
+    endpoint: EndpointConfig,
+    request: ForwardRequest,
+    started: number,
+    forwarded: ForwardedResponse,
+  ): Response => {
+    void forwarded.done.then((done) => {
+      audit({
+        ...auditBase(endpoint, request),
+        upstreamStatus: forwarded.status,
+        failure:
+          done.capHit === "bytes"
+            ? "response-too-large"
+            : done.capHit === "duration"
+              ? "timeout"
+              : undefined,
+        redirectsFollowed: forwarded.redirectsFollowed,
+        bytes: done.bytes,
+        ms: clock.now() - started,
+        capHit: done.capHit,
+      });
+    });
+    const headers = new Headers(forwarded.headers);
+    headers.set("Cache-Control", "no-store");
+    return new Response(NULL_BODY_STATUSES.has(forwarded.status) ? null : forwarded.body, {
+      status: forwarded.status,
+      headers,
+    });
+  };
+
+  /** The relay's own 502 for an exchange that produced no response. */
+  const upstreamFailed = (
+    c: Context,
+    endpoint: EndpointConfig,
+    request: ForwardRequest,
+    started: number,
+    error: unknown,
+  ): Response => {
+    const reason: UpstreamFailure =
+      error instanceof UpstreamError ? error.reason : "connection-failed";
+    audit({
+      ...auditBase(endpoint, request),
+      upstreamStatus: undefined,
+      failure: reason,
+      redirectsFollowed: 0,
+      bytes: 0,
+      ms: clock.now() - started,
+      capHit:
+        reason === "response-too-large" ? "bytes" : reason === "timeout" ? "duration" : undefined,
+    });
+    return c.json({ type: "about:blank", title: "Bad Gateway", status: 502, reason }, 502, {
+      "Content-Type": "application/problem+json",
+      "Cache-Control": "no-store",
+      [RELAY_ERROR]: reason,
+    });
+  };
+
+  // The read route (phase 3; finding 0050). Only for endpoints configured for
+  // it, only under their base, and only with a live session. The web app sends
+  // nothing here until the server failed directly and the user confirmed.
+  const read = async (c: Context, method: "GET" | "DELETE"): Promise<Response> => {
+    const endpoint = endpoints.get(c.req.param("endpointKey") ?? "");
+    if (endpoint === undefined || !ENDPOINT_KEY.test(endpoint.key)) {
+      return problem(c, 404, "Not Found", "unknown-endpoint", "unknown endpoint");
+    }
+    if (endpoint.readRoute !== "relay") {
+      return problem(
+        c,
+        403,
+        "Forbidden",
+        "read-route-off",
+        "this endpoint is not configured for the read route",
+      );
+    }
+    const token = bearerToken(c.req.header("Authorization"));
+    if (token === undefined || !isWellFormedSecretToken(token) || !state.touchSession(token)) {
+      return problem(c, 401, "Unauthorized", "unknown-session", "unknown session");
+    }
+
+    const own = new URL(c.req.url);
+    const prefix = `/read/${endpoint.key}`;
+    const rest = own.pathname.slice(prefix.length);
+    if (!own.pathname.startsWith(prefix) || (rest !== "" && !rest.startsWith("/"))) {
+      return problem(c, 404, "Not Found", "not-found");
+    }
+    const target = resolveReadTarget(endpoint, rest, own.search);
+    if (typeof target === "string") return problem(c, 400, "Bad Request", target);
+    if (method === "DELETE" && !isJobResource(endpoint, target)) {
+      return problem(
+        c,
+        405,
+        "Method Not Allowed",
+        "delete-not-a-job",
+        "DELETE is forwarded for a job only",
+      );
+    }
+
+    const request: ForwardRequest = { method, url: target, headers: c.req.raw.headers };
+    const started = clock.now();
+    // Only the exchange is in the try: a fault of ours after the server
+    // answered is the error handler's 500, not the server's 502.
+    let forwarded: ForwardedResponse;
+    try {
+      forwarded = await forward(endpoint, request);
+    } catch (error) {
+      return upstreamFailed(c, endpoint, request, started, error);
+    }
+    return relayForwarded(endpoint, request, started, forwarded);
+  };
+  app.get("/read/:endpointKey", (c) => read(c, "GET"));
+  app.get("/read/:endpointKey/*", (c) => read(c, "GET"));
+  app.delete("/read/:endpointKey/*", (c) => read(c, "DELETE"));
 
   app.get("/endpoints", (c) =>
     c.json({
@@ -185,6 +446,7 @@ export function createApp(options: AppOptions = {}): Hono {
         key: endpoint.key,
         baseUrl: endpoint.baseUrl,
         executeRoute: endpoint.executeRoute,
+        readRoute: endpoint.readRoute,
         callbacks: endpoint.callbacks,
       })),
     }),
@@ -192,14 +454,15 @@ export function createApp(options: AppOptions = {}): Hono {
 
   app.post("/sessions", (c) => {
     const session = state.createSession();
-    if (session === undefined) return problem(c, 503, "Service Unavailable", "session capacity");
+    if (session === undefined)
+      return problem(c, 503, "Service Unavailable", "session-capacity", "session capacity");
     return c.json(session, 201, { "Cache-Control": "no-store" });
   });
 
   app.get("/sessions/events", (c) => {
     const token = bearerToken(c.req.header("Authorization"));
     if (token === undefined || !isWellFormedSecretToken(token)) {
-      return problem(c, 401, "Unauthorized", "unknown session");
+      return problem(c, 401, "Unauthorized", "unknown-session", "unknown session");
     }
 
     // Subscribe before streaming, so a doorbell rung between the check and the
@@ -213,7 +476,8 @@ export function createApp(options: AppOptions = {}): Hono {
       pending.add(ref);
       wake?.();
     });
-    if (unsubscribe === undefined) return problem(c, 401, "Unauthorized", "unknown session");
+    if (unsubscribe === undefined)
+      return problem(c, 401, "Unauthorized", "unknown-session", "unknown session");
 
     c.header("Cache-Control", "no-store");
     return streamSSE(c, async (stream) => {
@@ -273,32 +537,53 @@ export function createApp(options: AppOptions = {}): Hono {
     "/execute/:endpointKey/:processId",
     bodyLimit({
       maxSize: config.limits.maxExecuteBodyBytes,
-      onError: (c) => problem(c, 413, "Content Too Large"),
+      onError: (c) => problem(c, 413, "Content Too Large", "body-too-large"),
     }),
     async (c) => {
       const endpoint = endpoints.get(c.req.param("endpointKey"));
-      if (endpoint === undefined) return problem(c, 404, "Not Found", "unknown endpoint");
+      if (endpoint === undefined)
+        return problem(c, 404, "Not Found", "unknown-endpoint", "unknown endpoint");
       if (endpoint.executeRoute !== "relay") {
-        return problem(c, 409, "Conflict", "this endpoint is executed directly, not via the relay");
+        return problem(
+          c,
+          409,
+          "Conflict",
+          "execute-direct",
+          "this endpoint is executed directly, not via the relay",
+        );
       }
       const processId = c.req.param("processId");
-      if (!PROCESS_ID.test(processId)) return problem(c, 400, "Bad Request", "invalid process id");
+      if (!PROCESS_ID.test(processId))
+        return problem(c, 400, "Bad Request", "invalid-process-id", "invalid process id");
 
       const mediaType = c.req.header("Content-Type")?.split(";")[0]?.trim().toLowerCase();
       if (mediaType !== "application/json") {
-        return problem(c, 415, "Unsupported Media Type", "send application/json");
+        return problem(
+          c,
+          415,
+          "Unsupported Media Type",
+          "unsupported-media-type",
+          "send application/json",
+        );
       }
       let parsed: unknown;
       try {
         parsed = JSON.parse(await c.req.text());
       } catch {
-        return problem(c, 400, "Bad Request", "body is not JSON");
+        return problem(c, 400, "Bad Request", "body-not-json", "body is not JSON");
       }
-      if (!isPlainObject(parsed)) return problem(c, 400, "Bad Request", "body must be an object");
+      if (!isPlainObject(parsed))
+        return problem(c, 400, "Bad Request", "body-not-object", "body must be an object");
       if ("subscriber" in parsed) {
         // Callback URLs are the relay's to mint. Accepting the browser's would
         // make the OGC server post wherever a page asked it to.
-        return problem(c, 400, "Bad Request", "subscriber is set by the relay");
+        return problem(
+          c,
+          400,
+          "Bad Request",
+          "subscriber-refused",
+          "subscriber is set by the relay",
+        );
       }
 
       // A session is optional: without one the job simply has no doorbell,
@@ -312,8 +597,44 @@ export function createApp(options: AppOptions = {}): Hono {
           !isWellFormedSecretToken(sessionToken) ||
           !state.touchSession(sessionToken)
         ) {
-          return problem(c, 401, "Unauthorized", "unknown session");
+          return problem(c, 401, "Unauthorized", "unknown-session", "unknown session");
         }
+      }
+
+      // A synchronous execute for a read-route endpoint: its answer is the
+      // result itself, which the browser cannot read from this server, so it
+      // is forwarded raw like a read — the browser's own `Prefer`, streamed
+      // back under the read route's caps. No callbacks: nothing to ring for.
+      const prefer = c.req.header("Prefer") ?? "";
+      if (endpoint.readRoute === "relay" && !/\brespond-async\b/i.test(prefer)) {
+        const request: ForwardRequest = {
+          method: "POST",
+          url: executionUrl(endpoint, processId),
+          headers: c.req.raw.headers,
+          body: JSON.stringify(parsed),
+        };
+        const started = clock.now();
+        let forwarded: ForwardedResponse;
+        try {
+          forwarded = await forward(endpoint, request);
+        } catch (error) {
+          emit({
+            kind: "execute",
+            endpointKey: endpoint.key,
+            outcome: error instanceof UpstreamError ? error.reason : "connection-failed",
+            upstreamStatus: undefined,
+            registered: false,
+          });
+          return upstreamFailed(c, endpoint, request, started, error);
+        }
+        emit({
+          kind: "execute",
+          endpointKey: endpoint.key,
+          outcome: "relayed",
+          upstreamStatus: forwarded.status,
+          registered: false,
+        });
+        return relayForwarded(endpoint, request, started, forwarded);
       }
 
       let ref: string | undefined;
@@ -321,10 +642,16 @@ export function createApp(options: AppOptions = {}): Hono {
       if (endpoint.callbacks && sessionToken !== undefined && config.publicUrl !== undefined) {
         const registration = state.register(sessionToken, endpoint.key);
         if (registration === "unknown-session") {
-          return problem(c, 401, "Unauthorized", "unknown session");
+          return problem(c, 401, "Unauthorized", "unknown-session", "unknown session");
         }
         if (registration === "at-capacity") {
-          return problem(c, 429, "Too Many Requests", "registration capacity for this session");
+          return problem(
+            c,
+            429,
+            "Too Many Requests",
+            "registration-capacity",
+            "registration capacity for this session",
+          );
         }
         ref = registration.ref;
         const base = `${config.publicUrl}/callbacks/${registration.callbackToken}`;
@@ -355,6 +682,7 @@ export function createApp(options: AppOptions = {}): Hono {
         return c.json({ type: "about:blank", title: "Bad Gateway", status: 502, reason }, 502, {
           "Content-Type": "application/problem+json",
           "Cache-Control": "no-store",
+          [RELAY_ERROR]: reason,
         });
       }
 
