@@ -71,17 +71,17 @@ describe("census over the committed fixtures", () => {
           "bbox": 3,
           "checkbox": 6,
           "complex": 14,
-          "geometry": 1,
+          "geometry": 2,
           "list:text": 4,
           "number": 14,
           "select": 4,
           "text": 22,
         },
-        "descriptions": 25,
+        "descriptions": 26,
         "diagnostics": {
           "contradictory-schema": 1,
         },
-        "inputs": 68,
+        "inputs": 69,
       }
     `);
   });

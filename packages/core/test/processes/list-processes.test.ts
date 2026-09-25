@@ -51,14 +51,15 @@ describe("listProcesses on a single page", () => {
     const list = await listProcesses(LIST);
 
     // Task 5 registered `slow` on the pinned server so that asynchronous
-    // polling could be tested at all, and Task 7 the three coverage-gap
-    // processes the form generator needs — see infra/README.md.
+    // polling could be tested at all, and Task 7 the coverage-gap processes
+    // the form generator needs — see infra/README.md.
     expect(list.processes.map((process) => process.id)).toEqual([
       "hello-world",
       "slow",
       "breinstein-bbox",
       "breinstein-inputs",
       "breinstein-png",
+      "breinstein-rotate",
     ]);
     expect(list.pageCount).toBe(1);
     expect(list.truncated).toBe(false);

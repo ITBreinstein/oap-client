@@ -39,8 +39,10 @@ the versions are recorded here rather than left to a commit message.
               process-list.json  (re-captured; now carries all five)  2026-09-23
               processes/breinstein-inputs.json (re-captured; now
                 carries the optional geometry input `area`)          2026-09-25
+              processes/breinstein-rotate.json,
+              process-list.json  (re-captured; now carries all six)   2026-09-25
 
-The three `breinstein-*` descriptions are processes this repository adds to the
+The `breinstein-*` descriptions are processes this repository adds to the
 pinned image (see `infra/README.md`). They are the only descriptions a browser
 can fetch live — `:5080` is the one server with CORS — so they are what the web
 client's generated form is tested against, in Vitest from these files and in
