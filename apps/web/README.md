@@ -108,7 +108,9 @@ extent, so with two images or two boxes nothing is placed.
 
 The display limit (512 kB) applies to each output of a results document on its
 own, so a base64 image carried in one does not push the JSON beside it into a
-download. Collection references are Task 8.
+download. JSON over the limit is offered as a download but still read, so
+GeoJSON too large to show — a few hundred buildings is already a megabyte — is
+still drawn on the map. Collection references are Task 8.
 
 ## Generated forms — [`src/forms/`](src/forms)
 

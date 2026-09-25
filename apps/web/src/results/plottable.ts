@@ -3,7 +3,8 @@
  *
  * A result is plotted when its value is GeoJSON — a FeatureCollection, a
  * Feature, a bare geometry or a GeometryCollection — in longitude and
- * latitude. Recognised by what the value is, not by the media type the server
+ * latitude, whether it is shown or is too large to show and offered as a
+ * download. Recognised by what the value is, not by the media type the server
  * put on it: pygeoapi labels GeoJSON `application/geo+json`, ZOO's geometry
  * services send it as `application/json`, and either way it is the same
  * document. Nothing here knows a process.
@@ -43,9 +44,17 @@ function inDegrees(shape: Shape): boolean {
   return positions.every(([x = 0, y = 0]) => Math.abs(x) <= 180 && Math.abs(y) <= 90);
 }
 
+/** The JSON a result holds: shown, or read and too large to show. */
+function jsonOf(result: RenderableResult): unknown {
+  if (result.kind === "json") return result.value;
+  if (result.kind === "download") return result.json;
+  return undefined;
+}
+
 export function plotStatus(result: RenderableResult): PlotStatus {
-  if (result.kind !== "json") return { kind: "not-geojson" };
-  const shapes = shapesIn(result.value);
+  const value = jsonOf(result);
+  if (value === undefined) return { kind: "not-geojson" };
+  const shapes = shapesIn(value);
   if (shapes === undefined || shapes.length === 0) return { kind: "not-geojson" };
   if (!shapes.every(inDegrees)) return { kind: "projected" };
   return { kind: "plotted", shapes };

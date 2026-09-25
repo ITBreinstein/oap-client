@@ -65,6 +65,18 @@ describe("plotStatus", () => {
     expect(plotStatus(text).kind).toBe("not-geojson");
   });
 
+  it("plots GeoJSON that was too large to show and is offered as a download", () => {
+    const tooLarge: RenderableResult = {
+      kind: "download",
+      outputId: "buildings",
+      blob: new Blob([]),
+      mediaType: "application/geo+json",
+      reason: "too-large",
+      json: { type: "Polygon", coordinates: square },
+    };
+    expect(plotStatus(tooLarge).kind).toBe("plotted");
+  });
+
   it("says a geometry in projected coordinates is not plotted, rather than misplacing it", () => {
     const rd = { type: "Point", coordinates: [155000, 463000] };
     expect(plotStatus(json("rd", rd))).toEqual({ kind: "projected" });

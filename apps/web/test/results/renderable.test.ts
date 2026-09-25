@@ -110,6 +110,15 @@ describe("toRenderable", () => {
     expect(result).toMatchObject({ kind: "download", reason: "too-large" });
   });
 
+  it("keeps the parsed value of JSON too large to show, so GeoJSON can still be plotted", async () => {
+    const collection = { type: "FeatureCollection", features: [], padding: "x".repeat(100) };
+    const [result] = await toRenderable(
+      envelope(JSON.stringify(collection), { "Content-Type": "application/geo+json" }),
+      { outputIds: ["buildings"], processId: "p", displayLimitBytes: 50 },
+    );
+    expect(result).toMatchObject({ kind: "download", reason: "too-large", json: collection });
+  });
+
   it("applies the display limit to each output, so a base64 image does not hide its neighbour", async () => {
     const body = JSON.stringify({
       image: { value: btoa("x".repeat(300)), mediaType: "image/jpeg", encoding: "base64" },
