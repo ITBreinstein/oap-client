@@ -133,7 +133,8 @@ async function readRequest(
 ): Promise<{ readonly path: string; readonly init: RequestInit; readonly token: string }> {
   const target = new URL(input);
   // The core must never reach, through the relay, a server the relay is not
-  // configured for: a result link to another host stays a direct request.
+  // configured for: a link to another host, or outside the base path, is
+  // refused here rather than carried.
   if (!isUnder(target, options.baseUrl)) {
     throw new RelayRouteError("relay-refused", "outside-base");
   }

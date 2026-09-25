@@ -8,6 +8,7 @@
  * built on the same `JobSession` and replaces this.
  */
 
+import { isAbsoluteUrl } from "@breinstein/oap-client";
 import { useEffect, useRef, useState, type SyntheticEvent } from "react";
 import type { RelayEndpoint } from "../relay/contract.js";
 import {
@@ -216,7 +217,12 @@ export function AsyncJobPanel({ relayUrl }: { readonly relayUrl: string | undefi
               data-doorbells={job.doorbells}
             >
               <td>
-                <a href={job.statusUrl}>{job.status?.jobId ?? job.statusUrl}</a>
+                {isAbsoluteUrl(job.statusUrl) ? (
+                  <a href={job.statusUrl}>{job.status?.jobId ?? job.statusUrl}</a>
+                ) : (
+                  // The server chose this URL. Only an http(s) one becomes a link.
+                  (job.status?.jobId ?? job.statusUrl)
+                )}
               </td>
               <td>{job.endpointKey}</td>
               <td>{job.route ?? "?"}</td>

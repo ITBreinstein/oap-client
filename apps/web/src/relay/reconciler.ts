@@ -48,11 +48,18 @@ export interface ReconcilerOptions {
   readonly maxIntervalMs?: number | undefined;
   /** How long an early poll waits for more doorbells to fold into it. */
   readonly coalesceMs?: number | undefined;
+  /**
+   * How long one status read may take before it is given up and tried again
+   * later. A browser `fetch` has no timeout of its own, and a read that never
+   * answers would otherwise hold the job, doorbells and all, for good.
+   */
+  readonly readTimeoutMs?: number | undefined;
 }
 
 export const BASELINE_MS = 2_000;
 export const MAX_INTERVAL_MS = 15_000;
 export const COALESCE_MS = 250;
+export const READ_TIMEOUT_MS = 30_000;
 
 interface Entry {
   job: TrackedJob;
@@ -71,6 +78,7 @@ export class JobReconciler {
   readonly #baselineMs: number;
   readonly #maxIntervalMs: number;
   readonly #coalesceMs: number;
+  readonly #readTimeoutMs: number;
   readonly #entries = new Map<string, Entry>();
   readonly #byRef = new Map<string, string>();
   readonly #abort = new AbortController();
@@ -81,6 +89,7 @@ export class JobReconciler {
     this.#baselineMs = options.baselineMs ?? BASELINE_MS;
     this.#maxIntervalMs = options.maxIntervalMs ?? MAX_INTERVAL_MS;
     this.#coalesceMs = options.coalesceMs ?? COALESCE_MS;
+    this.#readTimeoutMs = options.readTimeoutMs ?? READ_TIMEOUT_MS;
   }
 
   /** Start reconciling a job. Polls straight away. */
@@ -188,8 +197,20 @@ export class JobReconciler {
     entry.cancelTimer = undefined;
     entry.timerKind = undefined;
     entry.inFlight = true;
+    // Ended by dispose() or by the read timeout, whichever comes first.
+    const read = new AbortController();
+    const onDispose = (): void => {
+      read.abort();
+    };
+    this.#abort.signal.addEventListener("abort", onDispose, { once: true });
+    // On an object: set from a callback, which a `let` would hide from the checker.
+    const timeout = { fired: false };
+    const cancelTimeout = this.#schedule(() => {
+      timeout.fired = true;
+      read.abort();
+    }, this.#readTimeoutMs);
     try {
-      const status = await this.#options.readJob(entry.job.statusUrl, this.#abort.signal);
+      const status = await this.#options.readJob(entry.job.statusUrl, read.signal);
       if (this.#aborted()) return;
       this.#update(entry, {
         status,
@@ -206,10 +227,16 @@ export class JobReconciler {
         // know more than we did. Keep the last status and try again later.
         this.#update(entry, {
           polls: entry.job.polls + 1,
-          lastError: error instanceof Error ? error.message : String(error),
+          lastError: timeout.fired
+            ? `no answer within ${String(Math.round(this.#readTimeoutMs / 1000))} s`
+            : error instanceof Error
+              ? error.message
+              : String(error),
         });
       }
     } finally {
+      cancelTimeout();
+      this.#abort.signal.removeEventListener("abort", onDispose);
       entry.inFlight = false;
     }
     // No timer can be armed while a poll is in flight — an early request

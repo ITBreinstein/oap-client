@@ -229,4 +229,39 @@ describe("JobReconciler", () => {
     expect(waits).toEqual([2_000, 3_000, 4_500, 6_750, 8_000]);
     instance.dispose();
   });
+
+  it("gives up on a status read that never answers, and tries again later", async () => {
+    // A browser fetch has no timeout. Without one here, a hung read would keep
+    // the job in flight for good, and every doorbell after it would be lost.
+    let reads = 0;
+    const readJob = (url: string, signal?: AbortSignal): Promise<JobStatus> => {
+      reads += 1;
+      if (reads > 1) return Promise.resolve(status("successful", url));
+      return new Promise((_resolve, reject) => {
+        signal?.addEventListener("abort", () => {
+          reject(new DOMException("aborted", "AbortError"));
+        });
+      });
+    };
+    const timers = manualSchedule();
+    const instance = new JobReconciler({
+      readJob,
+      onChange: () => undefined,
+      schedule: timers.schedule,
+      baselineMs: 2_000,
+      readTimeoutMs: 10_000,
+    });
+    const current = () => instance.jobs().find((job) => job.statusUrl === JOB);
+    instance.track(JOB);
+    await settle();
+
+    await timers.advance(10_000);
+    expect(current()?.lastError).toBe("no answer within 10 s");
+
+    await timers.advance(2_000);
+    expect(reads).toBe(2);
+    expect(current()?.status?.status).toBe("successful");
+    expect(current()?.settled).toBe(true);
+    instance.dispose();
+  });
 });

@@ -7,7 +7,7 @@
 
 import type { JobState, JobStatus } from "@breinstein/oap-client";
 import { describe, expect, it } from "vitest";
-import { openDoorbells, readEventStream } from "../../src/relay/doorbells.js";
+import { openDoorbells, readEventStream, SILENCE_MS } from "../../src/relay/doorbells.js";
 import { JobReconciler } from "../../src/relay/reconciler.js";
 import type { RelayClient } from "../../src/relay/relay-client.js";
 import { manualSchedule, settle, status } from "./harness.js";
@@ -107,6 +107,20 @@ describe("readEventStream", () => {
       ["job", '{"ref":\n"a"}'],
       ["message", "plain"],
     ]);
+  });
+
+  it("does not read a CRLF split across two chunks as a blank line", async () => {
+    const stream = controlledStream();
+    const events: [string, string][] = [];
+    const done = readEventStream(stream.response.body ?? new ReadableStream(), (event, data) =>
+      events.push([event, data]),
+    );
+    stream.send("event: job\r");
+    stream.send('\ndata: {"ref":"a"}\r');
+    stream.send("\n\r\n");
+    stream.end();
+    await done;
+    expect(events).toEqual([["job", '{"ref":"a"}']]);
   });
 });
 
@@ -214,7 +228,62 @@ describe("openDoorbells", () => {
 
     expect(relay.opened).toEqual(["session-1", "session-2"]);
     expect(opens.at(-1)).toEqual({ reconnect: true, sessionRenewed: true });
-    expect(timers.pending()).toEqual([]);
+    // No backoff wait: the one timer is the open stream's silence watchdog.
+    expect(timers.pending()).toEqual([SILENCE_MS]);
+    doorbells.close();
+  });
+
+  it("shares one renewal between callers that ask at the same time", async () => {
+    const relay = fakeRelay();
+    const timers = manualSchedule();
+    const doorbells = openDoorbells({
+      relay: relay.relay,
+      schedule: timers.schedule,
+      onDoorbell: () => undefined,
+      onOpen: () => undefined,
+    });
+    await settle();
+    relay.latest().send("event: ready\ndata: {}\n\n");
+    await settle();
+
+    // A relay restart fails every request in flight with unknown-session.
+    const tokens = await Promise.all([doorbells.renew(), doorbells.renew(), doorbells.renew()]);
+    await settle();
+
+    expect(tokens).toEqual(["session-2", "session-2", "session-2"]);
+    expect(relay.opened).toEqual(["session-1", "session-2"]);
+    doorbells.close();
+  });
+
+  it("drops a stream that has gone silent and reconnects, so the caller reconciles", async () => {
+    const relay = fakeRelay();
+    const timers = manualSchedule();
+    const opens: { reconnect: boolean }[] = [];
+    const doorbells = openDoorbells({
+      relay: relay.relay,
+      schedule: timers.schedule,
+      onDoorbell: () => undefined,
+      onOpen: (info) => opens.push(info),
+      initialBackoffMs: 1_000,
+      silenceMs: 45_000,
+    });
+    await settle();
+    relay.latest().send("event: ready\ndata: {}\n\n");
+    await settle();
+
+    // A keepalive resets the watchdog; silence after it does not.
+    await timers.advance(40_000);
+    relay.latest().send(": keepalive\n\n");
+    await settle();
+    await timers.advance(40_000);
+    expect(relay.opened).toEqual(["session-1"]);
+
+    await timers.advance(5_000 + 1_000);
+    relay.latest().send("event: ready\ndata: {}\n\n");
+    await settle();
+
+    expect(relay.opened).toEqual(["session-1", "session-1"]);
+    expect(opens.at(-1)).toEqual({ reconnect: true, sessionRenewed: false });
     doorbells.close();
   });
 });
