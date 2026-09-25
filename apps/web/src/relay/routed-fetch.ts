@@ -34,7 +34,7 @@
  */
 
 import type { FetchLike } from "@breinstein/oap-client";
-import type { RelayedExecute, RelayEndpoint } from "./contract.js";
+import { RELAY_ERROR, RELAY_MARKER, type RelayedExecute, type RelayEndpoint } from "./contract.js";
 import { fromRelay, RelayRouteError } from "./relay-fetch.js";
 import { RelayError, type RelayClient } from "./relay-client.js";
 
@@ -146,27 +146,39 @@ export function createRoutedFetch(options: RoutedFetchOptions): FetchLike {
         throw new TypeError("the relay route carries JSON text bodies only");
       }
       const processId = decodeURIComponent(match[1]);
+      const path = `/execute/${encodeURIComponent(endpoint.key)}/${encodeURIComponent(processId)}`;
+      // A read in all but method, so it carries the session as a read does.
+      const sendSync = async (token: string): Promise<Response> => {
+        try {
+          return await relay.forward(path, {
+            method: "POST",
+            // No Prefer: that is what makes this a synchronous execute.
+            headers: {
+              "Content-Type": "application/json",
+              Accept: headerValue(init, "Accept") ?? "*/*",
+              Authorization: `Bearer ${token}`,
+            },
+            body,
+            ...(init?.signal === undefined || init.signal === null ? {} : { signal: init.signal }),
+          });
+        } catch (cause) {
+          if (init?.signal?.aborted === true) throw cause;
+          throw new RelayRouteError("relay-unreachable", "unreachable");
+        }
+      };
       let response: Response;
       try {
-        let answer: Response;
-        try {
-          answer = await relay.forward(
-            `/execute/${encodeURIComponent(endpoint.key)}/${encodeURIComponent(processId)}`,
-            {
-              method: "POST",
-              // No Prefer: that is what makes this a synchronous execute.
-              headers: {
-                "Content-Type": "application/json",
-                Accept: headerValue(init, "Accept") ?? "*/*",
-              },
-              body,
-              ...(init?.signal === undefined || init.signal === null
-                ? {}
-                : { signal: init.signal }),
-            },
-          );
-        } catch {
-          throw new RelayRouteError("relay-unreachable", "unreachable");
+        const token = options.session?.current() ?? (await options.session?.renew());
+        if (token === undefined) throw new RelayRouteError("relay-unreachable", "no-session");
+        let answer = await sendSync(token);
+        // A relay restart forgets sessions. It refused before sending anything
+        // upstream, so asking again on a new session cannot run the process twice.
+        if (
+          answer.headers.has(RELAY_MARKER) &&
+          answer.headers.get(RELAY_ERROR) === "unknown-session"
+        ) {
+          const renewed = await options.session?.renew();
+          if (renewed !== undefined) answer = await sendSync(renewed);
         }
         response = fromRelay(answer);
       } catch (error) {

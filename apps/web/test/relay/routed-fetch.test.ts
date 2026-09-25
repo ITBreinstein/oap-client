@@ -191,6 +191,7 @@ describe("createRoutedFetch", () => {
     const routed = createRoutedFetch({
       endpoint: { ...RELAYED, readRoute: "relay" },
       relay,
+      session: sessions(["s1"]),
       fetch: direct.impl,
       reads: "relay",
       onRoute: (observation) => routes.push(observation),
@@ -203,7 +204,41 @@ describe("createRoutedFetch", () => {
     expect(relay.calls).toEqual([]);
     expect(sent.map((call) => call.path)).toEqual(["/execute/ogc/echo"]);
     expect(new Headers(sent[0]?.init.headers).get("Prefer")).toBeNull();
+    // A read in all but method: it carries the session, as the read route does.
+    expect(new Headers(sent[0]?.init.headers).get("Authorization")).toBe("Bearer s1");
     expect(routes[0]).toMatchObject({ route: "relay", requestedMode: "sync", outcome: "sent" });
+  });
+
+  it("renews a session the relay forgot and sends the synchronous execute once more", async () => {
+    const relay = fakeRelay([]);
+    const tokens: (string | null)[] = [];
+    relay.forward = (_path, init) => {
+      tokens.push(new Headers(init.headers).get("Authorization"));
+      return Promise.resolve(
+        tokens.length === 1
+          ? new Response("{}", {
+              status: 401,
+              headers: { "X-Relay": "1", "X-Relay-Error": "unknown-session" },
+            })
+          : new Response('{"id":"x","value":1}', {
+              status: 200,
+              headers: { "Content-Type": "application/json", "X-Relay": "1" },
+            }),
+      );
+    };
+    const source = sessions(["old", "new"]);
+    const routed = createRoutedFetch({
+      endpoint: { ...RELAYED, readRoute: "relay" },
+      relay,
+      session: source,
+      reads: "relay",
+    });
+
+    const execution = await execute(`${BASE}/processes`, "echo", { inputs: {}, fetch: routed });
+
+    expect(execution.kind).toBe("immediate");
+    expect(tokens).toEqual(["Bearer old", "Bearer new"]);
+    expect(source.renewals).toBe(1);
   });
 
   it("records a relay refusal of a synchronous execute, and never falls back to direct", async () => {
@@ -220,6 +255,7 @@ describe("createRoutedFetch", () => {
     const routed = createRoutedFetch({
       endpoint: { ...RELAYED, readRoute: "relay" },
       relay,
+      session: sessions(["s1"]),
       fetch: direct.impl,
       reads: "relay",
       onRoute: (observation) => routes.push(observation),

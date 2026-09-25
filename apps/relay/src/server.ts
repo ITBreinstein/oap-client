@@ -22,6 +22,9 @@ import { parseConfig } from "./config.js";
 import { RelayState, systemClock } from "./state.js";
 
 const SWEEP_INTERVAL_MS = 60_000;
+const IDLE_SOCKET_TIMEOUT_MS = 60_000;
+/** Lets the relay's own deadline fire, and answer, before the socket's does. */
+const DEADLINE_MARGIN_MS = 10_000;
 
 const configPath = process.env["RELAY_CONFIG"];
 const rawConfig: unknown =
@@ -44,8 +47,15 @@ const server = serve({
   ...(hostname === undefined ? {} : { hostname }),
 });
 // A slow sender cannot hold a socket for ever. Callback bodies are never read,
-// but Node drains them after we answer, and this bounds that too.
-server.setTimeout(60_000);
+// but Node drains them after we answer, and this bounds that too. It is an
+// idle timeout, and a forwarded request sends the browser nothing until the
+// server answers, so it stays above the relay's own upstream deadlines: below
+// them, a slow synchronous execute would be cut off here first, and the page
+// would read that as the relay being down.
+server.setTimeout(
+  Math.max(IDLE_SOCKET_TIMEOUT_MS, config.limits.readTimeoutMs, config.limits.upstreamTimeoutMs) +
+    DEADLINE_MARGIN_MS,
+);
 
 const sweeper = setInterval(() => state.sweep(), SWEEP_INTERVAL_MS);
 sweeper.unref();

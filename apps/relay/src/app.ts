@@ -28,10 +28,13 @@
  * | `GET /endpoints`                        | browser     | none            |
  * | `POST /sessions`                        | browser     | none            |
  * | `GET /sessions/events`                  | browser     | session token   |
- * | `POST /execute/{endpointKey}/{process}` | browser     | session, optional |
+ * | `POST /execute/{endpointKey}/{process}` | browser     | session¹        |
  * | `GET /read/{endpointKey}/{path*}`       | browser     | session token   |
  * | `DELETE /read/{endpointKey}/jobs/{id}`  | browser     | session token   |
  * | `POST /callbacks/{token}/{kind}`        | OGC server  | callback token  |
+ *
+ * ¹ Optional for an asynchronous execute; required for a synchronous one on a
+ * read-route endpoint, which is a read in all but method.
  *
  * Every response carries `X-Relay: 1`; every response the relay generates
  * itself, rather than forwards, also carries `X-Relay-Error: <code>`.
@@ -364,7 +367,7 @@ export function createApp(options: AppOptions = {}): Hono {
       ...auditBase(endpoint, request),
       upstreamStatus: undefined,
       failure: reason,
-      redirectsFollowed: 0,
+      redirectsFollowed: error instanceof UpstreamError ? error.redirectsFollowed : 0,
       bytes: 0,
       ms: clock.now() - started,
       capHit:
@@ -601,6 +604,10 @@ export function createApp(options: AppOptions = {}): Hono {
       // back under the read route's caps. No callbacks: nothing to ring for.
       const prefer = c.req.header("Prefer") ?? "";
       if (endpoint.readRoute === "relay" && !/\brespond-async\b/i.test(prefer)) {
+        // A read in all but method, so it needs a session as the read route does.
+        if (sessionToken === undefined) {
+          return problem(c, 401, "Unauthorized", "unknown-session", "unknown session");
+        }
         const request: ForwardRequest = {
           method: "POST",
           url: executionUrl(endpoint, processId),

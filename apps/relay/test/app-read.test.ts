@@ -428,9 +428,14 @@ describe("POST /execute for a read-route endpoint", () => {
   it("forwards a synchronous execute raw, and hands back the result itself", async () => {
     const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a]);
     const h = harness(() => Promise.resolve(answer(200, png, { "Content-Type": "image/png" })));
+    const token = await session(h.app);
     const response = await h.app.request("/execute/zoo/echo", {
       method: "POST",
-      headers: { "Content-Type": "application/json", Origin: ORIGIN },
+      headers: {
+        "Content-Type": "application/json",
+        Origin: ORIGIN,
+        Authorization: `Bearer ${token}`,
+      },
       body,
     });
     expect(response.status).toBe(200);
@@ -442,6 +447,19 @@ describe("POST /execute for a read-route endpoint", () => {
     expect(h.executed).toEqual([]);
     await Promise.resolve();
     expect(h.audits[0]).toMatchObject({ method: "POST", path: "/processes/echo/execution" });
+  });
+
+  it("refuses a synchronous execute without a session, as a read, before forwarding", async () => {
+    const h = harness();
+    const response = await h.app.request("/execute/zoo/echo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+    });
+    expect(response.status).toBe(401);
+    expect(response.headers.get("X-Relay-Error")).toBe("unknown-session");
+    expect(h.forwarded).toEqual([]);
+    expect(h.executed).toEqual([]);
   });
 
   it("sends an asynchronous execute the way it always has", async () => {

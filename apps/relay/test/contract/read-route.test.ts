@@ -130,7 +130,11 @@ describe("the read route against pygeoapi without CORS", () => {
     if (!up) context.skip();
     const response = await fetch(`${base}/execute/pygeoapi-nocors-relay/hello-world`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Origin: ORIGIN },
+      headers: {
+        "Content-Type": "application/json",
+        Origin: ORIGIN,
+        Authorization: `Bearer ${await session()}`,
+      },
       body: JSON.stringify({ inputs: { name: "relay" } }),
     });
     expect(response.status).toBe(200);

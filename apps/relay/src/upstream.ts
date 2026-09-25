@@ -50,6 +50,12 @@ export interface UpstreamResponse {
 export type UpstreamFailure =
   | "blocked-address"
   | "timeout"
+  /**
+   * A redirect the relay does not follow: any on an execute, and on the read
+   * route any that is not a `GET` under `baseUrl`. Answered as the relay's own
+   * failure because a browser `fetch` cannot be handed a 3xx without following
+   * it, and following it would leave the relay.
+   */
   | "redirect-refused"
   /** Read route: more redirects under `baseUrl` than it follows. */
   | "redirect-limit"
@@ -58,11 +64,17 @@ export type UpstreamFailure =
 
 export class UpstreamError extends Error {
   readonly reason: UpstreamFailure;
+  /** Read route: the redirects followed before the exchange failed, for the audit line. */
+  readonly redirectsFollowed: number;
 
-  constructor(reason: UpstreamFailure, options?: ErrorOptions) {
+  constructor(
+    reason: UpstreamFailure,
+    options?: ErrorOptions & { readonly redirectsFollowed?: number | undefined },
+  ) {
     super(`upstream exchange failed: ${reason}`, options);
     this.name = "UpstreamError";
     this.reason = reason;
+    this.redirectsFollowed = options?.redirectsFollowed ?? 0;
   }
 }
 

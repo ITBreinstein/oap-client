@@ -130,7 +130,8 @@ generates itself, rather than forwards, also carries `X-Relay-Error: <code>`:
 its refusals (`unknown-endpoint`, `read-route-off`, `unknown-session`,
 `absolute-url`, `dot-segment`, `encoded-separator`, `delete-not-a-job`, …) and
 its own `502`s (`timeout`, `connection-failed`, `blocked-address`,
-`response-too-large`, `redirect-limit`). Both are exposed to the page.
+`response-too-large`, `redirect-limit`, `redirect-refused`). Both are exposed
+to the page.
 
 The web app reads them in that order. A response without `X-Relay` never came
 from the relay: a reverse proxy in front of it answers `502` or `504` by itself
@@ -148,7 +149,8 @@ For `readRoute: "relay"` endpoints only, with a live session:
   (any spelling), and encoded `/` or `\` are refused, and the result must still
   be under `baseUrl` after normalisation.
 - **Methods:** `GET`; `DELETE` only on `{baseUrl}/jobs/{id}`; and the
-  synchronous execute `POST`, built by `/execute`.
+  synchronous execute `POST`, built by `/execute`, which then also needs a
+  live session.
 - **Headers out:** `Accept`, `Accept-Language`, `Prefer`, `Content-Type` from the
   browser, and the relay's own `User-Agent`. Nothing else: no cookie, no
   authorization, no origin.
@@ -158,8 +160,10 @@ For `readRoute: "relay"` endpoints only, with a live session:
   rewritten; absolute links under `baseUrl` stay as they are, and the web app
   maps them back onto this route.
 - **Redirects:** followed by hand for `GET` only, while the target is still
-  under `baseUrl`, at most three times. Any other redirect is handed back as the
-  server sent it.
+  under `baseUrl`, at most three times. Any other redirect is the relay's own
+  `502 redirect-refused`, never handed back: a browser `fetch` cannot take a
+  3xx without following it, and the page would then blame the relay for what
+  the server did.
 - **Address:** every hop goes through the address check below, on a fresh
   connection.
 - **Size and time:** the body is streamed, not buffered, up to
@@ -197,8 +201,10 @@ Known gaps, not hidden:
 
 - **No rate limiting.** Anyone can create sessions and send executes through
   the relay; CORS only restrains browsers. Sessions are capped (10 000) and
-  expire after an idle hour, but a session with an open stream never idles, so
-  someone holding many streams open can use up the cap. Executes are only as
+  expire after an idle hour. At the cap, a new session takes the place of the
+  least recently used one without an open stream, so creating sessions alone
+  cannot lock pages out; but a session with an open stream is never evicted,
+  so someone holding many streams open can still use up the cap. Executes are only as
   limited as the allowlisted servers are. Put the relay behind a reverse proxy
   with per-client limits on `POST /sessions`, `GET /sessions/events` and
   `POST /execute`, or add them here, before it faces the internet.

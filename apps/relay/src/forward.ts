@@ -16,8 +16,10 @@
  * - **Headers back:** only {@link RETURNED_RESPONSE_HEADERS} — the evidence the
  *   core reads — and nothing inside a body is rewritten.
  * - **Redirects:** followed by hand, for `GET` only, and only to a target still
- *   under `baseUrl`, at most {@link MAX_REDIRECTS} times. Anything else is
- *   handed back as the server sent it.
+ *   under `baseUrl`, at most {@link MAX_REDIRECTS} times. Any other redirect is
+ *   the relay's own `redirect-refused`, never handed back: the page's `fetch`
+ *   cannot take a 3xx without following it, and would then report the relay
+ *   as unreachable when it was the server that redirected.
  * - **Address:** every hop connects through `guardedLookup`, on a fresh
  *   socket, unless the endpoint is configured for a private network.
  * - **Size and time:** the body is streamed, never buffered, under a byte cap
@@ -39,7 +41,7 @@ import {
   type Resolver,
 } from "./address-guard.js";
 import type { EndpointConfig } from "./config.js";
-import { systemSchedule, UpstreamError, type Schedule } from "./upstream.js";
+import { systemSchedule, UpstreamError, type Schedule, type UpstreamFailure } from "./upstream.js";
 
 /** Request headers the browser may send upstream. Everything else is dropped. */
 export const FORWARDED_REQUEST_HEADERS = [
@@ -234,8 +236,10 @@ export function forward(
   }, options.timeoutMs);
 
   const hop = (url: URL, redirectsFollowed: number): Promise<ForwardedResponse> => {
+    const upstreamError = (reason: UpstreamFailure, cause?: unknown): UpstreamError =>
+      new UpstreamError(reason, { redirectsFollowed, ...(cause === undefined ? {} : { cause }) });
     if (!endpoint.allowPrivateNetwork && isBlockedHost(url.hostname)) {
-      return Promise.reject(new UpstreamError("blocked-address"));
+      return Promise.reject(upstreamError("blocked-address"));
     }
     const transport = url.protocol === "https:" ? https : http;
 
@@ -256,13 +260,13 @@ export function forward(
       });
 
       onDeadline = () => {
-        fail(new UpstreamError("timeout"));
+        fail(upstreamError("timeout"));
         outgoing.destroy();
       };
 
       outgoing.on("error", (cause: NodeJS.ErrnoException) => {
         const blocked = cause.code === "ENOTFOUND" && cause.message.startsWith("refused:");
-        fail(new UpstreamError(blocked ? "blocked-address" : "connection-failed", { cause }));
+        fail(upstreamError(blocked ? "blocked-address" : "connection-failed", cause));
       });
 
       outgoing.on("response", (response) => {
@@ -272,26 +276,31 @@ export function forward(
         }
         const status = response.statusCode ?? 0;
 
-        if (REDIRECT_STATUSES.has(status) && request.method === "GET") {
+        if (REDIRECT_STATUSES.has(status)) {
+          response.resume();
           const location = firstHeader(response.headers.location);
           const target = location === undefined ? undefined : safeUrl(location, url);
-          if (target !== undefined && isUnderBase(target, endpoint.baseUrl)) {
-            response.resume();
-            settled = true;
-            if (redirectsFollowed >= MAX_REDIRECTS) {
-              rejectPromise(new UpstreamError("redirect-limit"));
-              return;
-            }
-            hop(target, redirectsFollowed + 1).then(resolvePromise, rejectPromise);
+          if (
+            request.method !== "GET" ||
+            target === undefined ||
+            !isUnderBase(target, endpoint.baseUrl)
+          ) {
+            fail(upstreamError("redirect-refused"));
             return;
           }
-          // Off the base: handed back as sent, never followed.
+          settled = true;
+          if (redirectsFollowed >= MAX_REDIRECTS) {
+            rejectPromise(upstreamError("redirect-limit"));
+            return;
+          }
+          hop(target, redirectsFollowed + 1).then(resolvePromise, rejectPromise);
+          return;
         }
 
         const declared = Number(response.headers["content-length"]);
         if (Number.isFinite(declared) && declared > options.maxResponseBytes) {
           response.destroy();
-          fail(new UpstreamError("response-too-large"));
+          fail(upstreamError("response-too-large"));
           return;
         }
 

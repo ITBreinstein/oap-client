@@ -366,46 +366,52 @@ describe("forward", () => {
     expect(seen.at(-1)?.url).toBe("/api/hop");
   });
 
-  it("hands back a redirect off the base unchanged, and does not follow it", async () => {
+  it("refuses a redirect off the base as its own failure, and does not follow it", async () => {
+    // Handed back, the page's fetch would follow it or fail, and either way
+    // the relay would look unreachable when it was the server that redirected.
     handlers.set("/api/away", (_request, response) => {
       response.writeHead(302, { Location: "http://evil.example/steal" }).end();
     });
     const asked: string[] = [];
-    const forwarded = await forward(endpoint(), get("/away"), {
-      ...limits,
-      lookup: loopbackLookup(asked),
-    });
-    await new Response(forwarded.body).text();
-    expect(forwarded.status).toBe(302);
-    expect(forwarded.headers.get("location")).toBe("http://evil.example/steal");
-    expect(forwarded.redirectsFollowed).toBe(0);
+    const reason = await failure(
+      forward(endpoint(), get("/away"), { ...limits, lookup: loopbackLookup(asked) }),
+    );
+    expect(reason).toBe("redirect-refused");
     expect(asked).toEqual([HOST]);
   });
 
-  it(`stops after ${String(MAX_REDIRECTS)} redirects`, async () => {
+  it(`stops after ${String(MAX_REDIRECTS)} redirects, and says how many it followed`, async () => {
     handlers.set("/api/loop", (_request, response) => {
       response.writeHead(307, { Location: "/api/loop" }).end();
     });
     const asked: string[] = [];
-    const reason = await failure(
-      forward(endpoint(), get("/loop"), { ...limits, lookup: loopbackLookup(asked) }),
-    );
-    expect(reason).toBe("redirect-limit");
+    const error: unknown = await forward(endpoint(), get("/loop"), {
+      ...limits,
+      lookup: loopbackLookup(asked),
+    }).catch((cause: unknown) => cause);
+    expect(error).toBeInstanceOf(UpstreamError);
+    expect(error).toMatchObject({ reason: "redirect-limit", redirectsFollowed: MAX_REDIRECTS });
     expect(asked).toHaveLength(MAX_REDIRECTS + 1);
   });
 
-  it("does not follow a redirect for a DELETE", async () => {
-    handlers.set("/api/jobs/9", (_request, response) => {
-      response.writeHead(307, { Location: "/api/jobs/10" }).end();
-    });
-    const forwarded = await forward(
-      endpoint(),
-      { method: "DELETE", url: new URL(`${base()}/jobs/9`), headers: new Headers() },
-      { ...limits, lookup: loopbackLookup([]) },
-    );
-    expect(forwarded.status).toBe(307);
-    expect(seen.at(-1)?.method).toBe("DELETE");
-  });
+  it.each(["DELETE", "POST"] as const)(
+    "refuses a redirect for a %s, and does not follow it",
+    async (method) => {
+      handlers.set("/api/jobs/9", (_request, response) => {
+        response.writeHead(307, { Location: "/api/jobs/10" }).end();
+      });
+      const reason = await failure(
+        forward(
+          endpoint(),
+          { method, url: new URL(`${base()}/jobs/9`), headers: new Headers(), body: "{}" },
+          { ...limits, lookup: loopbackLookup([]) },
+        ),
+      );
+      expect(reason).toBe("redirect-refused");
+      expect(seen.at(-1)?.method).toBe(method);
+      expect(seen.some((request) => request.url === "/api/jobs/10")).toBe(false);
+    },
+  );
 
   it("refuses a blocked host literal without connecting", async () => {
     const asked: string[] = [];

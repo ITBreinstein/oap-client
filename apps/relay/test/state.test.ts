@@ -94,15 +94,32 @@ describe("sessions", () => {
     expect(state.touchSession(session.token)).toBe(true);
   });
 
-  it("refuses a new session at the cap, after trying a sweep", () => {
+  it("makes room at the cap by evicting the least recently used session without a stream", () => {
     const clock = manualClock();
     const state = stateWith(clock, { maxSessions: 2 });
-    expect(state.createSession()).toBeDefined();
-    expect(state.createSession()).toBeDefined();
-    expect(state.createSession()).toBeUndefined();
+    const first = state.createSession();
+    clock.advance(MINUTE);
+    const second = state.createSession();
+    if (first === undefined || second === undefined) throw new Error("expected sessions");
+    clock.advance(MINUTE);
+    expect(state.touchSession(first.token)).toBe(true);
 
-    clock.advance(10 * MINUTE);
     expect(state.createSession()).toBeDefined();
+    expect(state.touchSession(second.token)).toBe(false);
+    expect(state.touchSession(first.token)).toBe(true);
+    expect(state.counts().sessions).toBe(2);
+  });
+
+  it("never evicts a session with an open stream, and refuses when every one has one", () => {
+    const clock = manualClock();
+    const state = stateWith(clock, { maxSessions: 2 });
+    for (let index = 0; index < 2; index += 1) {
+      const session = state.createSession();
+      if (session === undefined) throw new Error("expected a session");
+      state.listen(session.token, () => undefined);
+    }
+    expect(state.createSession()).toBeUndefined();
+    expect(state.counts().sessions).toBe(2);
   });
 });
 
