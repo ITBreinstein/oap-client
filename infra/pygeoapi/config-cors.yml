@@ -52,7 +52,7 @@ resources:
     type: process
     processor:
       name: breinstein_slow.SlowProcessor
-  # The three remaining coverage-gap processes, one hole each. Sources and
+  # Three of the remaining coverage-gap processes, one hole each. Sources and
   # rationale: infra/pygeoapi/plugins/breinstein_*.py, documented in
   # infra/README.md. All three echo or reshape their inputs and compute nothing.
   #
@@ -73,3 +73,10 @@ resources:
     type: process
     processor:
       name: breinstein_png.PngProcessor
+  # A GeoJSON polygon in, the same polygon rotated a quarter turn out. Source
+  # and rationale: infra/pygeoapi/plugins/breinstein_rotate.py, documented in
+  # infra/README.md.
+  breinstein-rotate:
+    type: process
+    processor:
+      name: breinstein_rotate.RotateProcessor

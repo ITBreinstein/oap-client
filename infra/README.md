@@ -101,7 +101,7 @@ the job last long enough to _observe_, but the vocabulary and the progress
 numbers are pygeoapi's. A genuinely `running` job with moving progress only
 exists on ZOO, and the interop lane is where that is asserted.
 
-### `breinstein-bbox`, `breinstein-inputs`, `breinstein-png`
+### `breinstein-bbox`, `breinstein-inputs`, `breinstein-png`, `breinstein-rotate`
 
 ```yaml
 breinstein-bbox:
@@ -110,9 +110,10 @@ breinstein-bbox:
     name: breinstein_bbox.BboxProcessor
 ```
 
-…and the same for `breinstein_inputs.InputsProcessor` and
-`breinstein_png.PngProcessor`. The three coverage-gap processes that were left
-on the backlog after `slow`, one hole each. `:5080` is the only server a browser
+…and the same for `breinstein_inputs.InputsProcessor`,
+`breinstein_png.PngProcessor` and `breinstein_rotate.RotateProcessor`. The
+coverage-gap processes that were left on the backlog after `slow`, one hole
+each. `:5080` is the only server a browser
 can reach (findings 0049, 0050), so without them the web client's generated form
 had nothing to be tested against but two string inputs.
 
@@ -121,9 +122,10 @@ had nothing to be tested against but two string inputs.
 | `breinstein-bbox`   | a bounding-box input                 | one `format: "ogc-bbox"` object (`properties.bbox`, four numbers, and `properties.crs`, CRS84 only) → the box as a GeoJSON `Feature` polygon, `application/geo+json`                                                            |
 | `breinstein-inputs` | every form control, multiple outputs | a bounded string, a multi-line string, a bounded integer, a number with a default, an enum, a boolean, a string repeatable three times, one optional string, one optional GeoJSON geometry → `echo` (JSON) and `summary` (text) |
 | `breinstein-png`    | a non-JSON output                    | one bounded integer → an `image/png` of that size                                                                                                                                                                               |
+| `breinstein-rotate` | a geometry in and a geometry out     | one GeoJSON `Polygon` (`format: "geojson-polygon"`) → the same polygon turned 90° counter-clockwise about the centre of its bounding box, as seen on a map, `application/geo+json`                                              |
 
 Same rule as `slow`: each one **echoes or reshapes its inputs and computes
-nothing**. Three details are deliberate:
+nothing**. Four details are deliberate:
 
 - **`breinstein-bbox` refuses any CRS but CRS84** rather than reprojecting.
   Reprojection would be the process doing geography, and whether a client
@@ -134,6 +136,15 @@ nothing**. Three details are deliberate:
   asserts on what arrived rather than on what the client believes it sent.
   Its multi-line input is `type: "string"` with `contentMediaType: "text/plain"`:
   JSON Schema has no multi-line keyword, and this is the nearest standard one.
+- **`breinstein-rotate` turns the polygon as it looks on a map.** Longitude is
+  scaled by the cosine of the centre's latitude before the turn and back after
+  it; turned in raw degrees, a shape in the Netherlands comes back stretched to
+  more than twice its height. That is a local approximation, not a geodesic
+  rotation, and it is the one piece of arithmetic in these processes. The turn
+  is only there so the output is plainly not the input, and it stays exact
+  where a test needs it: four turns give the input back. It takes the polygon
+  from a qualified value's `value`, because pygeoapi hands the process the
+  wrapper (finding 0052), and it refuses a Feature rather than unwrapping it.
 - **Two outputs travel as one JSON results map** (`{ "echo": …, "summary": … }`)
   because a pygeoapi processor returns one media type and one payload. Ask for
   `summary` alone and it comes back raw as `text/plain`.

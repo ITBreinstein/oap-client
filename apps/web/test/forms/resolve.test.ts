@@ -224,6 +224,22 @@ describe("real descriptions", () => {
     expect(plan.diagnostics).toEqual([]);
   });
 
+  it("reads breinstein-rotate's geojson-polygon format as a bare Polygon geometry", () => {
+    const plan = resolveFormPlan(fixtureProcess("pygeoapi/breinstein-rotate"));
+    expect(plan.fields.map((field) => [field.id, field.control, field.required])).toEqual([
+      [
+        "polygon",
+        expect.objectContaining({
+          kind: "geometry",
+          wrapper: "geometry",
+          geometryTypes: ["Polygon"],
+        }),
+        true,
+      ],
+    ]);
+    expect(plan.diagnostics).toEqual([]);
+  });
+
   it("wraps Ogr2Ogr's maxOccurs: 1024 and Gdal_Translate's 'unbounded' as lists", () => {
     const ogr = resolveFormPlan(fixtureProcess("zoo-project/Ogr2Ogr"));
     const gdal = resolveFormPlan(fixtureProcess("zoo-project/Gdal_Translate"));
