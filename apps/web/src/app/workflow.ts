@@ -37,6 +37,8 @@ export type EndpointRef =
       readonly key: string;
       readonly baseUrl: string;
       readonly executeRoute: "direct" | "relay";
+      /** Whether the relay may carry this endpoint's reads, once the user confirmed. */
+      readonly readRoute: "direct" | "relay";
       readonly callbacks: boolean;
     }
   | { readonly source: "typed"; readonly baseUrl: string };
@@ -53,6 +55,11 @@ export interface WorkflowError {
 
 interface Connected {
   readonly endpoint: EndpointRef;
+  /**
+   * How this page reads the server for this connection: `direct`, or through
+   * the relay after the user confirmed it. Shown as a banner the whole time.
+   */
+  readonly route: "direct" | "relay";
   readonly service: ServiceDescription;
   readonly processes: ProcessList;
 }
@@ -73,6 +80,15 @@ export type Workflow =
   | {
       readonly stage: "choose-endpoint";
       readonly connecting?: EndpointRef | undefined;
+      /** Set while an attempt through the relay, confirmed by the user, is under way. */
+      readonly viaRelay?: true | undefined;
+      /**
+       * The direct attempt failed as CORS does, and the relay offers this
+       * endpoint its read route: the question is on screen. Only the user's
+       * answer leaves this state.
+       */
+      readonly offer?:
+        { readonly endpoint: EndpointRef; readonly error: WorkflowError } | undefined;
       readonly error?: WorkflowError | undefined;
     }
   | (Connected & {
@@ -99,9 +115,17 @@ export type WorkflowAction =
   | {
       readonly type: "connected";
       readonly endpoint: EndpointRef;
+      readonly route: "direct" | "relay";
       readonly service: ServiceDescription;
       readonly processes: ProcessList;
     }
+  | {
+      readonly type: "relay-offered";
+      readonly endpoint: EndpointRef;
+      readonly error: WorkflowError;
+    }
+  | { readonly type: "relay-confirmed" }
+  | { readonly type: "relay-declined" }
   | {
       readonly type: "connect-failed";
       readonly endpoint: EndpointRef;
@@ -138,7 +162,12 @@ function sameEndpoint(a: EndpointRef | undefined, b: EndpointRef): boolean {
 }
 
 function connectedPart(state: Connected): Connected {
-  return { endpoint: state.endpoint, service: state.service, processes: state.processes };
+  return {
+    endpoint: state.endpoint,
+    route: state.route,
+    service: state.service,
+    processes: state.processes,
+  };
 }
 
 function openPart(state: ProcessOpen): ProcessOpen {
@@ -155,15 +184,21 @@ function openPart(state: ProcessOpen): ProcessOpen {
 export function workflowReducer(state: Workflow, action: WorkflowAction): Workflow {
   switch (action.type) {
     case "connect":
-      return state.stage === "choose-endpoint"
+      // Not while the question is open: it must be answered, and recorded.
+      return state.stage === "choose-endpoint" && state.offer === undefined
         ? { stage: "choose-endpoint", connecting: action.endpoint }
         : state;
 
     case "connected":
-      return state.stage === "choose-endpoint" && sameEndpoint(state.connecting, action.endpoint)
+      // The relay route only after "Use relay"; a direct answer only to a
+      // direct attempt. A late answer from the other route is ignored.
+      return state.stage === "choose-endpoint" &&
+        sameEndpoint(state.connecting, action.endpoint) &&
+        (action.route === "relay") === (state.viaRelay === true)
         ? {
             stage: "connected",
             endpoint: action.endpoint,
+            route: action.route,
             service: action.service,
             processes: action.processes,
           }
@@ -172,6 +207,23 @@ export function workflowReducer(state: Workflow, action: WorkflowAction): Workfl
     case "connect-failed":
       return state.stage === "choose-endpoint" && sameEndpoint(state.connecting, action.endpoint)
         ? { stage: "choose-endpoint", error: action.error }
+        : state;
+
+    case "relay-offered":
+      return state.stage === "choose-endpoint" &&
+        state.viaRelay !== true &&
+        sameEndpoint(state.connecting, action.endpoint)
+        ? { stage: "choose-endpoint", offer: { endpoint: action.endpoint, error: action.error } }
+        : state;
+
+    case "relay-confirmed":
+      return state.stage === "choose-endpoint" && state.offer !== undefined
+        ? { stage: "choose-endpoint", connecting: state.offer.endpoint, viaRelay: true }
+        : state;
+
+    case "relay-declined":
+      return state.stage === "choose-endpoint" && state.offer !== undefined
+        ? { stage: "choose-endpoint", error: state.offer.error }
         : state;
 
     case "disconnect":

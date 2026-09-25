@@ -65,9 +65,16 @@ export function relayEndpointFor(endpoint: EndpointRef): RelayEndpoint {
         key: endpoint.key,
         baseUrl: endpoint.baseUrl,
         executeRoute: endpoint.executeRoute,
+        readRoute: endpoint.readRoute,
         callbacks: endpoint.callbacks,
       }
-    : { key: "typed", baseUrl: endpoint.baseUrl, executeRoute: "direct", callbacks: false };
+    : {
+        key: "typed",
+        baseUrl: endpoint.baseUrl,
+        executeRoute: "direct",
+        readRoute: "direct",
+        callbacks: false,
+      };
 }
 
 /** A typed address, tidied: trimmed, trailing slashes dropped. Undefined if it is no URL. */

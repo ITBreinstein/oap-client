@@ -44,7 +44,7 @@ function reduce(state: Workflow, ...actions: WorkflowAction[]): Workflow {
 const connected = reduce(
   INITIAL_WORKFLOW,
   { type: "connect", endpoint },
-  { type: "connected", endpoint, service, processes },
+  { type: "connected", endpoint, route: "direct", service, processes },
 );
 const open = reduce(connected, { type: "open-process", processId: "breinstein-inputs" }, loaded());
 const running = reduce(open, { type: "run-started", mode: "sync" });
@@ -137,6 +137,122 @@ describe("workflowReducer: the legal path", () => {
   });
 });
 
+describe("workflowReducer: the relay offer", () => {
+  const zoo: EndpointRef = {
+    source: "configured",
+    key: "zoo",
+    baseUrl: "http://localhost:5090/ogc-api",
+    executeRoute: "relay",
+    readRoute: "relay",
+    callbacks: false,
+  };
+  const blocked = { title: "This server doesn't allow access from a web page." };
+  const connecting = reduce(INITIAL_WORKFLOW, { type: "connect", endpoint: zoo });
+  const offered = reduce(connecting, { type: "relay-offered", endpoint: zoo, error: blocked });
+
+  it("holds the question open until it is answered", () => {
+    expect(offered).toEqual({ stage: "choose-endpoint", offer: { endpoint: zoo, error: blocked } });
+    // Nothing else moves it: not a new connection, not a stray answer.
+    expect(workflowReducer(offered, { type: "connect", endpoint })).toBe(offered);
+    expect(
+      workflowReducer(offered, {
+        type: "connected",
+        endpoint: zoo,
+        route: "direct",
+        service,
+        processes,
+      }),
+    ).toBe(offered);
+    expect(
+      workflowReducer(offered, {
+        type: "connected",
+        endpoint: zoo,
+        route: "relay",
+        service,
+        processes,
+      }),
+    ).toBe(offered);
+  });
+
+  it("tries the relay only after the user confirmed, and shows it", () => {
+    const confirmed = reduce(offered, { type: "relay-confirmed" });
+    expect(confirmed).toEqual({ stage: "choose-endpoint", connecting: zoo, viaRelay: true });
+    const through = reduce(confirmed, {
+      type: "connected",
+      endpoint: zoo,
+      route: "relay",
+      service,
+      processes,
+    });
+    expect(through).toMatchObject({ stage: "connected", route: "relay" });
+  });
+
+  it("shows the direct failure when the user declines", () => {
+    expect(reduce(offered, { type: "relay-declined" })).toEqual({
+      stage: "choose-endpoint",
+      error: blocked,
+    });
+  });
+
+  it("reports a relay attempt that failed, and never connects it as direct", () => {
+    const confirmed = reduce(offered, { type: "relay-confirmed" });
+    expect(
+      workflowReducer(confirmed, {
+        type: "connected",
+        endpoint: zoo,
+        route: "direct",
+        service,
+        processes,
+      }),
+    ).toBe(confirmed);
+    expect(
+      reduce(confirmed, { type: "connect-failed", endpoint: zoo, error: { title: "relay down" } }),
+    ).toEqual({ stage: "choose-endpoint", error: { title: "relay down" } });
+  });
+
+  it("has no way to the relay route without an offer and a confirmation", () => {
+    // A direct attempt cannot be answered as a relay one...
+    expect(
+      workflowReducer(connecting, {
+        type: "connected",
+        endpoint: zoo,
+        route: "relay",
+        service,
+        processes,
+      }),
+    ).toBe(connecting);
+    // ...and a confirmation with no question open does nothing.
+    expect(workflowReducer(connecting, { type: "relay-confirmed" })).toBe(connecting);
+    expect(workflowReducer(INITIAL_WORKFLOW, { type: "relay-confirmed" })).toBe(INITIAL_WORKFLOW);
+    // An offer after the relay was already chosen is refused too.
+    const confirmed = reduce(offered, { type: "relay-confirmed" });
+    expect(
+      workflowReducer(confirmed, { type: "relay-offered", endpoint: zoo, error: blocked }),
+    ).toBe(confirmed);
+  });
+
+  it("keeps the route on every stage after connecting", () => {
+    const through = reduce(
+      offered,
+      { type: "relay-confirmed" },
+      {
+        type: "connected",
+        endpoint: zoo,
+        route: "relay",
+        service,
+        processes,
+      },
+    );
+    const opened = reduce(
+      through,
+      { type: "open-process", processId: "breinstein-inputs" },
+      loaded(),
+    );
+    expect(opened).toMatchObject({ stage: "process", route: "relay" });
+    expect(reduce(opened, { type: "back-to-list" })).toMatchObject({ route: "relay" });
+  });
+});
+
 describe("workflowReducer: what it refuses", () => {
   it.each<[string, Workflow, WorkflowAction]>([
     ["a result without a run", result, { type: "results", results: [] }],
@@ -157,6 +273,7 @@ describe("workflowReducer: what it refuses", () => {
       {
         type: "connected",
         endpoint: { source: "typed", baseUrl: "http://elsewhere" },
+        route: "direct",
         service,
         processes,
       },

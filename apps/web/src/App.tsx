@@ -6,6 +6,7 @@ import { EndpointScreen } from "./app/EndpointScreen.js";
 import { MapPane } from "./app/MapPane.js";
 import { ProcessListScreen } from "./app/ProcessListScreen.js";
 import { ProcessScreen } from "./app/ProcessScreen.js";
+import { RelayBanner, RelayOffer } from "./app/RelayRoute.js";
 import { useWorkflow } from "./app/useWorkflow.js";
 
 const configuredRelay = import.meta.env.VITE_RELAY_URL;
@@ -117,7 +118,11 @@ export function App() {
         </header>
         <div className="layout">
           <main className="panel" ref={panel}>
+            {state.stage !== "choose-endpoint" && state.route === "relay" && <RelayBanner />}
             {screen}
+            {state.stage === "choose-endpoint" && state.offer !== undefined && (
+              <RelayOffer onConfirm={commands.confirmRelay} onDecline={commands.declineRelay} />
+            )}
             <DeveloperPanel
               observations={view.snapshot?.observations ?? []}
               relayUrl={relayUrl}
