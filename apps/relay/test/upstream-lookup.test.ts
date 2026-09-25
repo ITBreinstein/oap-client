@@ -23,6 +23,7 @@ describe("postExecute's connect-time address check", () => {
       key: "rebound",
       baseUrl: "http://ogc.rebind.test",
       executeRoute: "relay",
+      readRoute: "direct",
       callbacks: false,
       allowPrivateNetwork: false,
     };

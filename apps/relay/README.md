@@ -1,6 +1,6 @@
 # @breinstein/relay
 
-A small Hono service that does two things a browser cannot do against the
+A small Hono service that does three things a browser cannot do against the
 reference OGC API - Processes servers, and nothing else.
 
 1. **Names the job a browser just started.** Cross-origin, a browser cannot
@@ -14,10 +14,26 @@ reference OGC API - Processes servers, and nothing else.
    over a server-sent event stream. Never _what_ happened: the browser reads
    the job's status from the server itself.
 
-It is **not a proxy**. It forwards no reads, no results and no dismissals. A
-server that sends no CORS headers at all — pygeoapi on `:5081`, ZOO — stays
-unusable from a browser with the relay running (findings 0049 and 0050).
-And the client works without it: every job is still found by polling.
+3. **Reads a server that sends no CORS headers**, for endpoints configured
+   with `readRoute: "relay"` only. ZOO sends none at all, so a web page cannot
+   read even its landing page (finding 0050). For such an endpoint the relay
+   forwards `GET` under its `baseUrl`, `DELETE` on one job, and synchronous
+   executes, and hands back the server's answer with the headers the core
+   reads as evidence.
+
+It is **not a general proxy**. It never takes a URL from the browser, only a
+path relative to a configured endpoint's `baseUrl`, and it forwards reads only
+for endpoints configured with `readRoute: "relay"`. The web app never sends
+one unprompted: it always tries the server directly first, and offers the read
+route only after a CORS failure, and only once the user has confirmed it. The
+direct failure is still recorded. So the matrix still says the server cannot
+be used from a web page, and the page shows it is reaching the server through
+the relay. This is phase 3 of the plan: a proxy added only after a server had
+been shown to need one (finding 0050), not a change of course. Without
+`readRoute`, a server with no CORS headers — pygeoapi on `:5081` in CI —
+stays unusable from a browser, relay or not (finding 0049).
+
+The client works without the relay: every job is still found by polling.
 
 ## Running it
 
@@ -31,15 +47,21 @@ docker build -f apps/relay/Dockerfile -t oap-relay .                           #
 Configuration is one JSON file; see [infra/relay/](../../infra/relay/) for the
 CI config and a public-demo template, and `src/config.ts` for every field.
 
-## The two per-endpoint decisions
+## The three per-endpoint decisions
 
-Both are made in the config, before any request exists.
+All three are made in the config, before any request exists.
 
 - **`executeRoute`** — `direct` or `relay`. Chosen per endpoint and never by
   trying one route and falling back to the other: execute is not idempotent,
   and a direct attempt the browser could not read has already created a job.
-  Only asynchronous executes take the relay route; a synchronous result is the
-  response body, which a browser can read wherever the server allows CORS.
+  Only asynchronous executes take the relay route, unless the endpoint also has
+  `readRoute: "relay"`: a synchronous result is the response body, which a
+  browser can read wherever the server allows CORS, and cannot anywhere else.
+- **`readRoute`** — `direct` (default) or `relay`. With `relay`, the read route
+  below is open for this endpoint, and synchronous executes are forwarded raw.
+  Requires `executeRoute: "relay"`: a browser that cannot read the server
+  cannot read an execute's answer either. It is a permission, not a switch:
+  the web app still goes direct first and asks the user before using it.
 - **`callbacks`** — off unless set. Against pygeoapi 0.21.0, a callback the
   server cannot deliver stalls the job in `accepted` or rewrites a
   `successful` one to `failed` (finding 0047), so with callbacks on, the
@@ -51,10 +73,13 @@ Both are made in the config, before any request exists.
 | Route                                     | Caller     | Answers                                                                                                   |
 | ----------------------------------------- | ---------- | --------------------------------------------------------------------------------------------------------- |
 | `GET /healthz`                            | operator   | `{ "ok": true }`                                                                                          |
-| `GET /endpoints`                          | browser    | each endpoint's `key`, `baseUrl`, `executeRoute`, `callbacks`                                             |
+| `GET /endpoints`                          | browser    | each endpoint's `key`, `baseUrl`, `executeRoute`, `readRoute`, `callbacks`                                |
 | `POST /sessions`                          | browser    | `201 { token, expiresAt }` — the session token                                                            |
 | `GET /sessions/events`                    | browser    | `text/event-stream`: `ready`, then `job` events `{ "ref" }`                                               |
 | `POST /execute/{endpointKey}/{processId}` | browser    | `{ upstream: { status, location, contentType, preferenceApplied, body }, registration: { ref } \| null }` |
+|                                           |            | — or, for a `readRoute: "relay"` endpoint and no `Prefer: respond-async`: the server's answer, raw        |
+| `GET /read/{endpointKey}/{path*}`         | browser    | the server's answer to `GET {baseUrl}/{path}?{query}`, raw; session token required                        |
+| `DELETE /read/{endpointKey}/jobs/{id}`    | browser    | the server's answer to dismissing that job, raw; session token required                                   |
 | `POST /callbacks/{token}/{kind}`          | OGC server | `200`, or `404` for a token it does not know                                                              |
 
 The browser side of this contract lives in
@@ -88,9 +113,60 @@ must stay reachable while callbacks are on — a restart window is a window in
 which pygeoapi jobs can be damaged. The relay-restart contract test asserts the
 job's status on the server, not only in the browser.
 
+### Markers: whose answer is this?
+
+Every response the relay sends carries `X-Relay: 1`. Every response it
+generates itself, rather than forwards, also carries `X-Relay-Error: <code>`:
+its refusals (`unknown-endpoint`, `read-route-off`, `unknown-session`,
+`absolute-url`, `dot-segment`, `encoded-separator`, `delete-not-a-job`, …) and
+its own `502`s (`timeout`, `connection-failed`, `blocked-address`,
+`response-too-large`, `redirect-limit`). Both are exposed to the page.
+
+The web app reads them in that order. A response without `X-Relay` never came
+from the relay: a reverse proxy in front of it answers `502` or `504` by itself
+when the relay is down. A response with `X-Relay-Error` is the relay speaking,
+not the OGC server. Only a response with `X-Relay` and without `X-Relay-Error`
+is the server's own answer — its `404` and `500` included — and only that
+reaches the core.
+
+### Outbound: the read route
+
+For `readRoute: "relay"` endpoints only, with a live session:
+
+- **URL:** the endpoint's `baseUrl`, plus the path the browser sent relative to
+  it, plus the query string verbatim. Absolute URLs, `.` and `..` segments
+  (any spelling), and encoded `/` or `\` are refused, and the result must still
+  be under `baseUrl` after normalisation.
+- **Methods:** `GET`; `DELETE` only on `{baseUrl}/jobs/{id}`; and the
+  synchronous execute `POST`, built by `/execute`.
+- **Headers out:** `Accept`, `Accept-Language`, `Prefer`, `Content-Type` from the
+  browser, and the relay's own `User-Agent`. Nothing else: no cookie, no
+  authorization, no origin.
+- **Headers back:** `Content-Type`, `Content-Length`, `Content-Crs`,
+  `Content-Disposition`, `Location`, `Retry-After`, `Link`,
+  `Preference-Applied`, unchanged, and none other. Nothing inside a body is
+  rewritten; absolute links under `baseUrl` stay as they are, and the web app
+  maps them back onto this route.
+- **Redirects:** followed by hand for `GET` only, while the target is still
+  under `baseUrl`, at most three times. Any other redirect is handed back as the
+  server sent it.
+- **Address:** every hop goes through the address check below, on a fresh
+  connection.
+- **Size and time:** the body is streamed, not buffered, up to
+  `limits.maxReadResponseBytes` (50 MB) and within `limits.readTimeoutMs`
+  (120 s) for the whole exchange. A cap hit before the status line is a `502`
+  naming it. A cap hit while the body is streaming cannot change the status any
+  more, so the stream is broken off, and the browser sees a failed read rather
+  than a short body passed off as whole.
+- **Audit:** one JSON line on stdout per forwarded request —
+  `{ audit, endpointKey, method, path, queryNames, upstreamStatus, failure,
+redirectsFollowed, bytes, ms, capHit }`. The path is relative to the base,
+  and only the query's parameter _names_ are kept. Never a value, a body, a
+  token or a header.
+
 ### Outbound: the execute request
 
-The only request the relay sends, and everything about it is fixed:
+The asynchronous execute. Everything about it is fixed:
 
 - `POST`, to `{baseUrl}/processes/{processId}/execution`, the base from the
   allowlist and the id restricted to `[A-Za-z0-9._~-]`.

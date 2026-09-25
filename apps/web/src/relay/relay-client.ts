@@ -108,6 +108,10 @@ export function createRelayClient(baseUrl: string, fetchImpl: FetchLike = fetch)
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            // Said out loud, because the relay reads it: for an endpoint with
+            // the read route, an execute without it is a synchronous one and is
+            // answered raw, not with this envelope.
+            Prefer: "respond-async",
             ...(sessionToken === undefined ? {} : { Authorization: `Bearer ${sessionToken}` }),
           },
           body,

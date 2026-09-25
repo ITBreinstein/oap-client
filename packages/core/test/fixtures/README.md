@@ -55,6 +55,8 @@ the versions are recorded here rather than left to a commit message.
                 async-only-asked-sync}.http  (finding 0059)           2026-09-25
               execution/breinstein-inputs-href-not-resolved.http
                 (finding 0058)                                        2026-09-25
+              execution/preflight-execute-reflected-headers.http
+                (finding 0057)                                        2026-09-25
 
 The `breinstein-*` descriptions are processes this repository adds to the
 pinned image (see `infra/README.md`). They are the only descriptions a browser

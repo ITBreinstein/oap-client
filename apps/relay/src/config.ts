@@ -15,6 +15,14 @@
  * browser could not read has already created a job, and a relay retry would
  * create a second one and orphan the first.
  *
+ * `readRoute` is opt-in too, and off unless the file says otherwise. With
+ * `"relay"` the relay forwards the browser's reads of that one endpoint —
+ * `GET` under its `baseUrl`, `DELETE` on a job, and synchronous executes — for
+ * a server that sends no CORS headers (finding 0050). The web app still tries
+ * the server directly first, and only takes this route after the user
+ * confirmed it. It requires `executeRoute: "relay"`: a browser that cannot
+ * read the server cannot read an execute's answer either.
+ *
  * `callbacks` is opt-in, and off unless the file says otherwise. Against
  * pygeoapi 0.21.0 a callback that cannot be delivered stalls the job or turns a
  * successful one into `failed` (finding 0047), so sending subscriber URLs makes
@@ -25,12 +33,16 @@
 /** How the browser's execute request reaches this endpoint. */
 export type ExecuteRoute = "direct" | "relay";
 
+/** Whether the relay may forward the browser's reads of this endpoint. */
+export type ReadRoute = "direct" | "relay";
+
 export interface EndpointConfig {
   /** Stable identifier the browser names the endpoint by. Never a URL. */
   readonly key: string;
   /** The OGC API landing page, without a trailing slash. */
   readonly baseUrl: string;
   readonly executeRoute: ExecuteRoute;
+  readonly readRoute: ReadRoute;
   /** Whether the relay registers callbacks for jobs it starts here. */
   readonly callbacks: boolean;
   /**
@@ -51,6 +63,13 @@ export interface RelayLimits {
   readonly upstreamTimeoutMs: number;
   readonly maxSessions: number;
   readonly maxRegistrationsPerSession: number;
+  /**
+   * Largest body the read route passes back — reads and synchronous executes.
+   * Streamed, not buffered, so this bounds traffic rather than memory.
+   */
+  readonly maxReadResponseBytes: number;
+  /** Deadline for one read-route exchange, connect to last byte. */
+  readonly readTimeoutMs: number;
 }
 
 export interface RelayConfig {
@@ -75,6 +94,8 @@ export const DEFAULT_LIMITS: RelayLimits = {
   upstreamTimeoutMs: 30_000,
   maxSessions: 10_000,
   maxRegistrationsPerSession: 100,
+  maxReadResponseBytes: 50 * 1024 * 1024,
+  readTimeoutMs: 120_000,
 };
 
 export const DEFAULT_REGISTRATION_TTL_MS = 24 * 60 * 60 * 1000;
@@ -162,10 +183,18 @@ function parseEndpoint(value: unknown, path: string): EndpointConfig {
   if (route !== "direct" && route !== "relay") {
     throw new ConfigError(`${path}.executeRoute`, 'must be "direct" or "relay"');
   }
+  const readRoute = value["readRoute"] ?? "direct";
+  if (readRoute !== "direct" && readRoute !== "relay") {
+    throw new ConfigError(`${path}.readRoute`, 'must be "direct" or "relay"');
+  }
+  if (readRoute === "relay" && route !== "relay") {
+    throw new ConfigError(`${path}.readRoute`, 'may be "relay" only with executeRoute "relay"');
+  }
   return {
     key,
     baseUrl: normaliseHttpUrl(readString(value, "baseUrl", path), `${path}.baseUrl`),
     executeRoute: route,
+    readRoute,
     callbacks: readBoolean(value, "callbacks", path, false),
     allowPrivateNetwork: readBoolean(value, "allowPrivateNetwork", path, false),
   };
@@ -246,6 +275,18 @@ export function parseConfig(input: unknown): RelayConfig {
       "maxRegistrationsPerSession",
       "limits",
       DEFAULT_LIMITS.maxRegistrationsPerSession,
+    ),
+    maxReadResponseBytes: readPositiveInteger(
+      rawLimits,
+      "maxReadResponseBytes",
+      "limits",
+      DEFAULT_LIMITS.maxReadResponseBytes,
+    ),
+    readTimeoutMs: readPositiveInteger(
+      rawLimits,
+      "readTimeoutMs",
+      "limits",
+      DEFAULT_LIMITS.readTimeoutMs,
     ),
   };
 

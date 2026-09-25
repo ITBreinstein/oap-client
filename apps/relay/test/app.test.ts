@@ -198,15 +198,23 @@ describe("GET /endpoints", () => {
           key: "with-callbacks",
           baseUrl: "http://ogc.test",
           executeRoute: "relay",
+          readRoute: "direct",
           callbacks: true,
         },
         {
           key: "no-callbacks",
           baseUrl: "http://ogc.test",
           executeRoute: "relay",
+          readRoute: "direct",
           callbacks: false,
         },
-        { key: "direct", baseUrl: "http://ogc.test", executeRoute: "direct", callbacks: false },
+        {
+          key: "direct",
+          baseUrl: "http://ogc.test",
+          executeRoute: "direct",
+          readRoute: "direct",
+          callbacks: false,
+        },
       ],
     });
   });

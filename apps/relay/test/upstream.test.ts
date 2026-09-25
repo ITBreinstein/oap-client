@@ -26,6 +26,7 @@ const endpoint: EndpointConfig = {
   key: "ogc",
   baseUrl: "http://ogc.example/api",
   executeRoute: "relay",
+  readRoute: "direct",
   callbacks: false,
   // msw answers before any lookup happens; see the file comment.
   allowPrivateNetwork: true,

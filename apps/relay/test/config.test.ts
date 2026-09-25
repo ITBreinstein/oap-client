@@ -11,6 +11,7 @@ describe("parseConfig", () => {
         key: "pygeoapi",
         baseUrl: "http://localhost:5080",
         executeRoute: "direct",
+        readRoute: "direct",
         callbacks: false,
         allowPrivateNetwork: false,
       },
@@ -52,6 +53,34 @@ describe("parseConfig", () => {
     expect(() => parseConfig({ endpoints: [{ ...endpoint, executeRoute: "fallback" }] })).toThrow(
       /executeRoute/,
     );
+  });
+
+  it("accepts the read route only on an endpoint whose executes take the relay too", () => {
+    expect(
+      parseConfig({ endpoints: [{ ...endpoint, executeRoute: "relay", readRoute: "relay" }] })
+        .endpoints[0]?.readRoute,
+    ).toBe("relay");
+    expect(() =>
+      parseConfig({ endpoints: [{ ...endpoint, executeRoute: "direct", readRoute: "relay" }] }),
+    ).toThrow(/readRoute/);
+    expect(() => parseConfig({ endpoints: [{ ...endpoint, readRoute: "relay" }] })).toThrow(
+      /readRoute/,
+    );
+    expect(() =>
+      parseConfig({ endpoints: [{ ...endpoint, executeRoute: "relay", readRoute: "proxy" }] }),
+    ).toThrow(/readRoute/);
+  });
+
+  it("caps the read route at 50 MB and 120 s unless told otherwise", () => {
+    const { limits } = parseConfig({ endpoints: [] });
+    expect(limits.maxReadResponseBytes).toBe(50 * 1024 * 1024);
+    expect(limits.readTimeoutMs).toBe(120_000);
+    const set = parseConfig({
+      endpoints: [],
+      limits: { maxReadResponseBytes: 1_000, readTimeoutMs: 5_000 },
+    }).limits;
+    expect([set.maxReadResponseBytes, set.readTimeoutMs]).toEqual([1_000, 5_000]);
+    expect(() => parseConfig({ endpoints: [], limits: { readTimeoutMs: 0 } })).toThrow(/limits/);
   });
 
   it("accepts only exact origins", () => {
