@@ -110,6 +110,39 @@ describe("toRenderable", () => {
     expect(result).toMatchObject({ kind: "download", reason: "too-large" });
   });
 
+  it("applies the display limit to each output, so a base64 image does not hide its neighbour", async () => {
+    const body = JSON.stringify({
+      image: { value: btoa("x".repeat(300)), mediaType: "image/jpeg", encoding: "base64" },
+      bbox: { bbox: [5.1, 52.08, 5.14, 52.1] },
+    });
+    const results = await toRenderable(envelope(body, { "Content-Type": "application/json" }), {
+      outputIds: ["image", "bbox"],
+      processId: "p",
+      displayLimitBytes: 200,
+    });
+    expect(results.map((result) => [result.outputId, result.kind])).toEqual([
+      ["image", "download"],
+      ["bbox", "json"],
+    ]);
+  });
+
+  it("offers one output of a results document that is too large to show as a download", async () => {
+    const body = JSON.stringify({ echo: { big: "x".repeat(100) }, summary: "short" });
+    const results = await toRenderable(envelope(body, { "Content-Type": "application/json" }), {
+      outputIds: ["echo", "summary"],
+      processId: "p",
+      displayLimitBytes: 50,
+    });
+    expect(results[0]).toMatchObject({
+      kind: "download",
+      outputId: "echo",
+      reason: "too-large",
+      mediaType: "application/json",
+      filename: "p-echo.json",
+    });
+    expect(results[1]).toMatchObject({ kind: "text", outputId: "summary", value: "short" });
+  });
+
   it("shows a body labelled JSON that is not JSON as text (finding 0026)", async () => {
     const results = await toRenderable(
       envelope("<gml:Polygon/>", { "Content-Type": "application/json" }),

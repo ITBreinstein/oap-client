@@ -34,7 +34,12 @@ export type RenderableResult =
       readonly reason: "not-text" | "too-large";
     };
 
-/** Above this, JSON and text are offered as a download instead of shown. */
+/**
+ * Above this, JSON and text are offered as a download instead of shown. It
+ * applies to what would be shown: each output of a results document on its
+ * own, so an image carried in it as base64 — shown as a picture, never as
+ * text — does not push the JSON beside it out of view.
+ */
 export const DEFAULT_DISPLAY_LIMIT_BYTES = 512 * 1024;
 
 export interface RenderOptions {
@@ -168,6 +173,26 @@ function splitResults(
   return keys.map((key) => [key, value[key]]);
 }
 
+function byteLength(text: string): number {
+  return new TextEncoder().encode(text).byteLength;
+}
+
+/** One output of a results document, made a download when it is too large to show. */
+function withinLimit(result: RenderableResult, limit: number, processId: string): RenderableResult {
+  if (result.kind === "download") return result;
+  const text = result.kind === "json" ? JSON.stringify(result.value, null, 2) : result.value;
+  if (byteLength(text) <= limit) return result;
+  const mediaType = result.kind === "json" ? "application/json" : result.mediaType;
+  return {
+    kind: "download",
+    outputId: result.outputId,
+    blob: new Blob([text], { type: mediaType }),
+    mediaType,
+    filename: defaultFilename(processId, result.outputId, mediaType),
+    reason: "too-large",
+  };
+}
+
 export async function toRenderable(
   envelope: ResponseEnvelope,
   options: RenderOptions,
@@ -190,7 +215,7 @@ export async function toRenderable(
   if (!envelope.isJson && !isTextual(mediaType)) return download("not-text");
 
   const text = await envelope.text();
-  if (new TextEncoder().encode(text).byteLength > limit) return download("too-large");
+  const tooLarge = byteLength(text) > limit;
 
   if (envelope.isJson) {
     let value: unknown;
@@ -198,14 +223,22 @@ export async function toRenderable(
       value = await envelope.json();
     } catch {
       // Labelled JSON and is not (ZOO does this, finding 0026): show the text.
+      if (tooLarge) return download("too-large");
       return [
         { kind: "text", outputId: single, value: text, mediaType: mediaType ?? "text/plain" },
       ];
     }
     const entries = splitResults(value, options.outputIds);
-    if (entries !== undefined) return entries.map(([id, entry]) => fromEntry(id, entry, options));
+    if (entries !== undefined) {
+      return entries.map(([id, entry]) =>
+        withinLimit(fromEntry(id, entry, options), limit, options.processId),
+      );
+    }
+    if (tooLarge) return download("too-large");
     return [{ kind: "json", outputId: single, value }];
   }
+
+  if (tooLarge) return download("too-large");
 
   return [{ kind: "text", outputId: single, value: text, mediaType: mediaType ?? "text/plain" }];
 }
