@@ -1,8 +1,10 @@
 /**
- * Shapes shown on the map and not drawn: a result, and the input it came from.
+ * Shapes shown on the map and not drawn: a result, and the input it came from;
+ * and an image result, placed over the area it covers.
  *
  * One GeoJSON source and a layer per role and geometry kind, added to the map
- * the page already has. Nothing here can be edited or selected; that is the
+ * the page already has, and beneath them an image source and its raster
+ * layer when there is an image, so the drawn outline stays on top of it. Nothing here can be edited or selected; that is the
  * draw mode's job, and the two never run at once (the form is closed while a
  * result is shown).
  *
@@ -27,9 +29,17 @@ export interface ShownShapes {
   readonly shapes: readonly MapShape[];
 }
 
+/** An image and the area it covers, west, south, east, north in CRS84. */
+export interface ShownImage {
+  readonly url: string;
+  readonly bounds: readonly [number, number, number, number];
+}
+
 export interface ShapeLayers {
   /** Show these instead of whatever is shown. An empty list clears the map. */
   show(sets: readonly ShownShapes[]): void;
+  /** Show this image instead of whatever image is shown; undefined removes it. */
+  showImage(image: ShownImage | undefined): void;
   /** Called once the layers are on the map, which waits for its style to load. */
   onReady(listener: () => void): void;
   /** Remove the layers and the source. */
@@ -39,6 +49,7 @@ export interface ShapeLayers {
 export type CreateShapeLayers = (map: MapLibreMap) => ShapeLayers;
 
 const SOURCE = "oap-shown";
+const IMAGE = "oap-shown-image";
 
 function geometryOf(shape: MapShape): GeoJSON.Geometry {
   switch (shape.type) {
@@ -116,6 +127,7 @@ const LAYERS = [...layersFor("input"), ...layersFor("result")];
 
 export const createMapLibreShapeLayers: CreateShapeLayers = (map) => {
   let data = featureCollectionOf([]);
+  let image: ShownImage | undefined;
   let added = false;
   let stopped = false;
   let ready: (() => void) | undefined;
@@ -137,10 +149,39 @@ export const createMapLibreShapeLayers: CreateShapeLayers = (map) => {
       return;
     }
     added = true;
+    placeImage();
     ready?.();
   };
 
+  const removeImage = () => {
+    if (map.getLayer(IMAGE) !== undefined) map.removeLayer(IMAGE);
+    if (map.getSource(IMAGE) !== undefined) map.removeSource(IMAGE);
+  };
+
+  // An image source cannot be given a new picture and a new place at once, so
+  // a new image replaces the old source and layer.
+  const placeImage = () => {
+    removeImage();
+    if (image === undefined) return;
+    const [west, south, east, north] = image.bounds;
+    map.addSource(IMAGE, {
+      type: "image",
+      url: image.url,
+      coordinates: [
+        [west, north],
+        [east, north],
+        [east, south],
+        [west, south],
+      ],
+    });
+    map.addLayer(
+      { id: IMAGE, type: "raster", source: IMAGE, paint: { "raster-fade-duration": 0 } },
+      LAYERS[0]?.id,
+    );
+  };
+
   const removeAll = () => {
+    removeImage();
     for (const layer of [...LAYERS].reverse()) {
       if (map.getLayer(layer.id) !== undefined) map.removeLayer(layer.id);
     }
@@ -153,6 +194,11 @@ export const createMapLibreShapeLayers: CreateShapeLayers = (map) => {
     show: (sets) => {
       data = featureCollectionOf(sets);
       if (added) void map.getSource<GeoJSONSource>(SOURCE)?.setData(data);
+    },
+    showImage: (next) => {
+      if (next?.url === image?.url && next?.bounds.join() === image?.bounds.join()) return;
+      image = next;
+      if (added) placeImage();
     },
     onReady: (listener) => {
       ready = listener;

@@ -29,7 +29,7 @@ import {
 } from "./basemap.js";
 import type { CreateDrawEngine } from "./draw-engine.js";
 import type { CreateGeometryEngine, Tool } from "./geometry-engine.js";
-import type { CreateShapeLayers, ShownShapes } from "./shape-layers.js";
+import type { CreateShapeLayers, ShownImage, ShownShapes } from "./shape-layers.js";
 import { useBoundingBoxDraw, type BboxDrawProps } from "./useBoundingBoxDraw.js";
 import { useGeometryDraw, type GeometryDrawProps } from "./useGeometryDraw.js";
 import { useShownShapes } from "./useShownShapes.js";
@@ -104,6 +104,8 @@ export interface MapViewProps {
   readonly geometry?: GeometryDrawProps | undefined;
   /** Shapes to show and not edit: a result, and its input. */
   readonly shown?: readonly ShownShapes[] | undefined;
+  /** An image result, over the area it covers. */
+  readonly image?: ShownImage | undefined;
   /** Whether the map started, so the form can offer "Draw on the map" or not. */
   readonly onAvailable?: ((available: boolean) => void) | undefined;
   readonly createMap?: CreateMap | undefined;
@@ -118,6 +120,7 @@ export function MapView({
   draw,
   geometry = NO_GEOMETRY,
   shown = NOTHING_SHOWN,
+  image,
   onAvailable,
   createMap = createPdokMap,
   createEngine,
@@ -158,7 +161,7 @@ export function MapView({
 
   useBoundingBoxDraw(map, draw, createEngine);
   const shapes = useGeometryDraw(map, geometry, createGeometryEngine);
-  const { resultShapes } = useShownShapes(map, shown, createShapeLayers);
+  const { resultShapes, resultImage } = useShownShapes(map, shown, image, createShapeLayers);
   const drawingShapes = geometry.active && map !== undefined;
 
   return (
@@ -208,6 +211,7 @@ export function MapView({
         }
         data-drawing={draw.active || geometry.active ? "true" : "false"}
         data-result-shapes={resultShapes}
+        data-result-image={resultImage ? "true" : "false"}
       />
       {failure !== undefined && (
         <p className="map-failure">

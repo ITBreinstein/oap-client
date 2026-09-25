@@ -8,16 +8,20 @@ import { createMapLibreShapeLayers, featureCollectionOf } from "../../src/map/sh
 
 /** Enough of a MapLibre map for the layers: sources, layers and `styledata`. */
 function fakeMap({ loaded }: { loaded: boolean }) {
-  const sources = new Map<string, { data: unknown; setData: (data: unknown) => Promise<void> }>();
+  const sources = new Map<
+    string,
+    { data?: unknown; spec: unknown; setData: (data: unknown) => Promise<void> }
+  >();
   const layers: string[] = [];
   const waiting: (() => void)[] = [];
   const map = {
     loaded,
     sources,
     layers,
-    addSource(id: string, spec: { data: unknown }) {
+    addSource(id: string, spec: { data?: unknown }) {
       if (!map.loaded) throw new Error("Style is not done loading.");
       const source = {
+        spec,
         data: spec.data,
         setData: (data: unknown) => {
           source.data = data;
@@ -26,8 +30,10 @@ function fakeMap({ loaded }: { loaded: boolean }) {
       };
       sources.set(id, source);
     },
-    addLayer(layer: { id: string }) {
-      layers.push(layer.id);
+    addLayer(layer: { id: string }, beforeId?: string) {
+      const at = beforeId === undefined ? -1 : layers.indexOf(beforeId);
+      if (at < 0) layers.push(layer.id);
+      else layers.splice(at, 0, layer.id);
     },
     getLayer: (id: string) => (layers.includes(id) ? { id } : undefined),
     getSource: (id: string) => sources.get(id),
@@ -129,5 +135,38 @@ describe("createMapLibreShapeLayers", () => {
     createMapLibreShapeLayers(loadingMap as never).stop();
     loadingMap.styleLoads();
     expect(loadingMap.sources.size).toBe(0);
+  });
+
+  it("places an image beneath the shapes, at its four corners", () => {
+    const map = fakeMap({ loaded: true });
+    const layers = createMapLibreShapeLayers(map as never);
+    layers.showImage({ url: "data:image/jpeg;base64,AA==", bounds: [5.1, 52.08, 5.14, 52.1] });
+    expect(map.layers[0]).toBe("oap-shown-image");
+    expect(map.sources.get("oap-shown-image")?.spec).toEqual({
+      type: "image",
+      url: "data:image/jpeg;base64,AA==",
+      coordinates: [
+        [5.1, 52.1],
+        [5.14, 52.1],
+        [5.14, 52.08],
+        [5.1, 52.08],
+      ],
+    });
+  });
+
+  it("replaces an image, removes it, and waits for the style before placing one", () => {
+    const map = fakeMap({ loaded: false });
+    const layers = createMapLibreShapeLayers(map as never);
+    layers.showImage({ url: "data:first", bounds: [5, 52, 5.1, 52.1] });
+    layers.showImage({ url: "data:second", bounds: [5, 52, 5.1, 52.1] });
+    expect(map.sources.has("oap-shown-image")).toBe(false);
+
+    map.styleLoads();
+    expect(map.sources.get("oap-shown-image")?.spec).toMatchObject({ url: "data:second" });
+    expect(map.layers.filter((id) => id === "oap-shown-image")).toHaveLength(1);
+
+    layers.showImage(undefined);
+    expect(map.sources.has("oap-shown-image")).toBe(false);
+    expect(map.layers).not.toContain("oap-shown-image");
   });
 });

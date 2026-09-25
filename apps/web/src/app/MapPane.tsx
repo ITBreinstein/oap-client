@@ -13,7 +13,8 @@
  *
  * While a run is under way and once its result is in, nothing is drawn: the
  * map shows what was sent — every geometry the inputs hold — and, once it is
- * in, every result that is GeoJSON (`results/plottable.ts`).
+ * in, every result that is GeoJSON, and an image result over the area a box
+ * beside it gives (`results/plottable.ts`).
  */
 
 import { drawableCrs, isDrawableCrs } from "../forms/crs.js";
@@ -31,9 +32,10 @@ import type { Bbox } from "../map/bbox.js";
 import type { MapShape, Tool } from "../map/geometry-engine.js";
 import { MapView } from "../map/MapView.js";
 import type { ShownShapes } from "../map/shape-layers.js";
-import { plottedShapes } from "../results/plottable.js";
+import { mapImage, plottedShapes } from "../results/plottable.js";
 import type { GeometryDrawProps } from "../map/useGeometryDraw.js";
 import type { DrawTarget } from "./draw.js";
+import { useDataUrl } from "./useDataUrl.js";
 import type { Workflow } from "./workflow.js";
 
 function toBbox(value: unknown): Bbox | undefined {
@@ -169,8 +171,15 @@ export function MapPane({
         };
 
   const shown = shownFor(state);
+  const placed = state.stage === "result" ? mapImage(state.results) : undefined;
+  const imageUrl = useDataUrl(placed?.blob);
+  const image =
+    placed === undefined || imageUrl === undefined
+      ? undefined
+      : { url: imageUrl, bounds: placed.bounds };
   const drawnInput = shown.some((set) => set.role === "input" && set.shapes.length > 0);
-  const plotted = shown.some((set) => set.role === "result" && set.shapes.length > 0);
+  const plotted =
+    image !== undefined || shown.some((set) => set.role === "result" && set.shapes.length > 0);
 
   return (
     <aside className="map-pane" aria-label="Map">
@@ -178,6 +187,7 @@ export function MapPane({
         onAvailable={onAvailable}
         geometry={geometry}
         shown={shown}
+        image={image}
         draw={{
           active: field !== undefined && control !== undefined,
           value: toBbox(current),
@@ -206,7 +216,13 @@ export function MapPane({
         <p className="map-hint map-legend" role="status" data-testid="map-legend">
           {plotted && (
             <span>
-              <span className="swatch swatch-result" aria-hidden="true" /> The result
+              {image === undefined ? (
+                <>
+                  <span className="swatch swatch-result" aria-hidden="true" /> The result
+                </>
+              ) : (
+                <>The result’s image</>
+              )}
             </span>
           )}
           {plotted && drawnInput && " beside "}
