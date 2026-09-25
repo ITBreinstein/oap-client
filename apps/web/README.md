@@ -90,7 +90,15 @@ Running:
 Results (T10): JSON is shown pretty-printed and collapsible, text is shown as
 text and never rendered as markup, and everything else is offered as a download
 with its media type, file name and size. Each output is shown separately.
-GeoJSON on the map, images and collection references are Task 8.
+
+A result that is GeoJSON — a FeatureCollection, a Feature or a bare geometry,
+in longitude and latitude — is also drawn on the map in blue, beside the
+geometry inputs it was sent, in the drawn input's amber and dashed; the map
+moves to show both. It is recognised by what it is, not by its media type:
+pygeoapi labels GeoJSON `application/geo+json`, ZOO's geometry services send
+it as `application/json`. GeoJSON in projected coordinates is not drawn, and
+the result says why ([`src/results/plottable.ts`](src/results/plottable.ts)).
+Images and collection references are Task 8.
 
 ## Generated forms — [`src/forms/`](src/forms)
 
@@ -169,8 +177,8 @@ rectangle, or click two corners, then move or resize it. A GeoJSON field's puts
 a toolbar on the map with the tools its input allows — point, line, area, box —
 and **Delete selected**; a finished shape is selected so it can be adjusted, and
 Terra Draw's own corner and midpoint handles are kept out of the value (Sam's
-fix). The drawn input is amber, so nothing Task 8 shows as a result can be
-mistaken for it. The draw mode is removed when the field stops drawing, when
+fix). The drawn input is amber, so a result, which is blue, cannot be mistaken
+for it. The draw mode is removed when the field stops drawing, when
 another process is chosen, when a run starts, and on unmount.
 
 Only this directory may import `maplibre-gl` or `terra-draw`, and it imports
@@ -215,5 +223,5 @@ process description, so any change to a matcher shows up as a reviewed diff.
 - A choice of output format, or a media type for GeoJSON beyond what the
   description declares.
 - Reprojection, and a choice of basemap.
-- Results on the map, images and collection references (Task 8).
+- Images and collection references among the results (Task 8).
 - The bundle is one chunk of about 1.4 MB, most of it MapLibre.

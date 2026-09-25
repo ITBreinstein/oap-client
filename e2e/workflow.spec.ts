@@ -338,7 +338,7 @@ test.describe("the workflow in a browser", () => {
     });
   });
 
-  test("sends a polygon to a geometry-in, geometry-out process, and gets it back turned", async ({
+  test("draws a polygon, runs a geometry-in, geometry-out process, and plots the result", async ({
     page,
   }) => {
     await connectTyped(page, PYGEOAPI);
@@ -346,20 +346,28 @@ test.describe("the workflow in a browser", () => {
 
     const polygon = page.locator('[data-input-id="polygon"]');
     await expect(polygon).toHaveAttribute("data-control", "geometry");
-    // Two wide, one high, about (5.2, 52.1).
-    const ring = [
-      [5.1, 52.05],
-      [5.3, 52.05],
-      [5.3, 52.15],
-      [5.1, 52.15],
-      [5.1, 52.05],
-    ];
-    await polygon.getByLabel("Or load a GeoJSON file").setInputFiles({
-      name: "strip.geojson",
-      mimeType: "application/geo+json",
-      buffer: Buffer.from(JSON.stringify({ type: "Polygon", coordinates: [ring] })),
-    });
-    await expect(polygon.getByRole("textbox", { name: "GeoJSON" })).not.toHaveValue("");
+    await polygon.getByRole("button", { name: "Draw on the map" }).click();
+    await page
+      .getByRole("toolbar", { name: "Drawing tools" })
+      .getByRole("button", { name: "Add area" })
+      .click();
+
+    const canvas = page.locator(".map-canvas canvas").first();
+    const box = await canvas.boundingBox();
+    if (box === null) throw new Error("the map has no size");
+    const at = (x: number, y: number) => ({ x: box.x + box.width * x, y: box.y + box.height * y });
+    // A wide, low triangle over the middle of the Netherlands, closed on its first corner.
+    for (const corner of [at(0.35, 0.5), at(0.65, 0.5), at(0.5, 0.58), at(0.35, 0.5)]) {
+      await page.mouse.click(corner.x, corner.y);
+      await page.waitForTimeout(150);
+    }
+    const geojson = polygon.getByRole("textbox", { name: "GeoJSON" });
+    await expect(geojson).not.toHaveValue("");
+    const drawn = JSON.parse(await geojson.inputValue()) as {
+      type: string;
+      coordinates: number[][][];
+    };
+    expect(drawn.type).toBe("Polygon");
 
     const exchange = page.waitForResponse(
       (candidate) =>
@@ -369,20 +377,34 @@ test.describe("the workflow in a browser", () => {
     await page.getByRole("button", { name: "Run", exact: true }).click();
     const response = await exchange;
     const sent = response.request().postDataJSON() as { inputs: { polygon: unknown } };
-    expect(sent.inputs.polygon).toEqual({ value: { type: "Polygon", coordinates: [ring] } });
+    expect(sent.inputs.polygon).toEqual({ value: drawn });
 
-    // A quarter turn counter-clockwise about (5.2, 52.1), as seen on a map:
-    // longitude scaled by cos(52.1°) before the turn and back after it.
+    // A quarter turn counter-clockwise about the centre of the drawn bounding
+    // box, as seen on a map: longitude scaled by cos(latitude) and back.
     expect(response.headers()["content-type"]).toBe("application/geo+json");
     const rotated = (await response.json()) as { type: string; coordinates: number[][][] };
     expect(rotated.type).toBe("Polygon");
-    const k = Math.cos((52.1 * Math.PI) / 180);
+    const ring = drawn.coordinates[0] ?? [];
+    const xs = ring.map(([x = NaN]) => x);
+    const ys = ring.map(([, y = NaN]) => y);
+    const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+    const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+    const k = Math.cos((cy * Math.PI) / 180);
     ring.forEach(([x = NaN, y = NaN], index) => {
       const [rx = NaN, ry = NaN] = rotated.coordinates[0]?.[index] ?? [];
-      expect(rx).toBeCloseTo(5.2 - (y - 52.1) / k, 9);
-      expect(ry).toBeCloseTo(52.1 + (x - 5.2) * k, 9);
+      expect(rx).toBeCloseTo(cx - (y - cy) / k, 9);
+      expect(ry).toBeCloseTo(cy + (x - cx) * k, 9);
     });
-    await expect(page.getByRole("heading", { name: "Result" })).toBeVisible();
+
+    // The result is on the map, beside the input it came from.
+    await expect(page.locator('[data-output-id="rotated"]')).toHaveAttribute(
+      "data-plotted",
+      "true",
+    );
+    await expect(page.locator(".map-canvas")).toHaveAttribute("data-result-shapes", "1");
+    await expect(page.getByTestId("map-legend")).toHaveText(
+      "The result beside the input you sent.",
+    );
   });
 
   test("shows the raw JSON editor, with its reason, for an input it cannot handle, and still runs", async ({

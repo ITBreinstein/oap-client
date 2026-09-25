@@ -1,6 +1,8 @@
 /**
  * The map (S5): MapLibre over PDOK's BRT-Achtergrondkaart, and drawing when a
- * form field asks for it — a bounding box, or shapes for a GeoJSON input.
+ * form field asks for it — a bounding box, or shapes for a GeoJSON input. Once
+ * a run is done, it shows the GeoJSON in the result beside the input it came
+ * from.
  *
  * Knows geometry, not the protocol (`map-binding-knows-no-protocol`): it is
  * handed four numbers or some shapes, and hands the same back. When the map
@@ -27,8 +29,10 @@ import {
 } from "./basemap.js";
 import type { CreateDrawEngine } from "./draw-engine.js";
 import type { CreateGeometryEngine, Tool } from "./geometry-engine.js";
+import type { CreateShapeLayers, ShownShapes } from "./shape-layers.js";
 import { useBoundingBoxDraw, type BboxDrawProps } from "./useBoundingBoxDraw.js";
 import { useGeometryDraw, type GeometryDrawProps } from "./useGeometryDraw.js";
+import { useShownShapes } from "./useShownShapes.js";
 
 /** Toolbar wording, in the user's terms rather than GeoJSON's (Sam's). */
 const TOOL_LABELS: Readonly<Record<Tool, string>> = {
@@ -98,20 +102,27 @@ export interface MapViewProps {
   readonly draw: BboxDrawProps;
   /** GeoJSON drawing for one form field; absent or inactive when nothing is drawing. */
   readonly geometry?: GeometryDrawProps | undefined;
+  /** Shapes to show and not edit: a result, and its input. */
+  readonly shown?: readonly ShownShapes[] | undefined;
   /** Whether the map started, so the form can offer "Draw on the map" or not. */
   readonly onAvailable?: ((available: boolean) => void) | undefined;
   readonly createMap?: CreateMap | undefined;
   readonly createEngine?: CreateDrawEngine | undefined;
   readonly createGeometryEngine?: CreateGeometryEngine | undefined;
+  readonly createShapeLayers?: CreateShapeLayers | undefined;
 }
+
+const NOTHING_SHOWN: readonly ShownShapes[] = [];
 
 export function MapView({
   draw,
   geometry = NO_GEOMETRY,
+  shown = NOTHING_SHOWN,
   onAvailable,
   createMap = createPdokMap,
   createEngine,
   createGeometryEngine,
+  createShapeLayers,
 }: MapViewProps) {
   const [map, setMap] = useState<MapLibreMap | undefined>();
   const [failure, setFailure] = useState<string | undefined>();
@@ -147,6 +158,7 @@ export function MapView({
 
   useBoundingBoxDraw(map, draw, createEngine);
   const shapes = useGeometryDraw(map, geometry, createGeometryEngine);
+  const { resultShapes } = useShownShapes(map, shown, createShapeLayers);
   const drawingShapes = geometry.active && map !== undefined;
 
   return (
@@ -195,6 +207,7 @@ export function MapView({
               : "Map of the Netherlands (BRT-Achtergrondkaart)"
         }
         data-drawing={draw.active || geometry.active ? "true" : "false"}
+        data-result-shapes={resultShapes}
       />
       {failure !== undefined && (
         <p className="map-failure">
