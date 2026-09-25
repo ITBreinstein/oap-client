@@ -14,6 +14,7 @@ import {
   redactUrl,
   type Client,
   type ExecutionMode,
+  type ProcessDescription,
   type ProcessSummary,
 } from "@breinstein/oap-client";
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
@@ -64,6 +65,25 @@ export interface WorkflowCommands {
   readonly run: () => void;
   readonly cancelJob: () => void;
   readonly edit: () => void;
+  /**
+   * The process census: describe every listed process once, through the
+   * connection's route, so the session's observations cover the whole
+   * catalogue and not only the processes someone happened to open.
+   */
+  readonly describeAll: () => void;
+}
+
+/**
+ * How far the census has got. Failed descriptions leave no observation of
+ * their own — the matrix reads them as listed but not described — so they are
+ * only counted here.
+ */
+export interface CensusProgress {
+  readonly endpoint: string;
+  readonly total: number;
+  readonly described: number;
+  readonly failed: number;
+  readonly running: boolean;
 }
 
 export interface WorkflowView {
@@ -78,6 +98,7 @@ export interface WorkflowView {
   readonly jobNotice: string | undefined;
   /** Whether Cancel job was advertised, and by whom (T6). */
   readonly dismissAdvertisedBy: "process" | "service" | "observed-earlier" | "nothing";
+  readonly census: CensusProgress | undefined;
 }
 
 const NO_ERRORS: FieldErrors = new Map();
@@ -149,6 +170,26 @@ function projectedOnly(plan: FormPlan): { inputId: string; crs: string }[] {
   });
 }
 
+/** What form generation made of one description, as observations. */
+function formObservationsOf(
+  endpoint: string,
+  process: ProcessDescription,
+  plan: FormPlan,
+): FormObservation[] {
+  return [
+    ...formObservationsFor(endpoint, process.id, plan.diagnostics),
+    ...projectedOnly(plan).map(({ inputId, crs }) => ({
+      kind: "form" as const,
+      endpoint: redactUrl(endpoint),
+      processId: process.id,
+      inputId,
+      code: "bbox-projected-crs-only" as const,
+      keyword: undefined,
+      crs,
+    })),
+  ];
+}
+
 export function useWorkflow(relayUrl: string | undefined): WorkflowView {
   const [state, dispatch] = useReducer(workflowReducer, INITIAL_WORKFLOW);
   const [snapshot, setSnapshot] = useState<JobSessionSnapshot | undefined>();
@@ -172,6 +213,7 @@ export function useWorkflow(relayUrl: string | undefined): WorkflowView {
   const recorded = useRef(new Set<string>());
   /** The job whose results are being fetched, so a snapshot burst fetches once. */
   const fetching = useRef<string | undefined>(undefined);
+  const [census, setCensus] = useState<CensusProgress | undefined>();
 
   useEffect(() => {
     const created = createJobSession(relayUrl);
@@ -205,7 +247,7 @@ export function useWorkflow(relayUrl: string | undefined): WorkflowView {
       const key = JSON.stringify(observation);
       if (recorded.current.has(key)) continue;
       recorded.current.add(key);
-      session.current?.record(observation);
+      session.current?.record(observation.endpoint, observation);
     }
   }, []);
 
@@ -226,6 +268,7 @@ export function useWorkflow(relayUrl: string | undefined): WorkflowView {
           const processes = await connection.listProcesses();
           client.current = { endpoint, client: connection, reads: "direct" };
           active.record(
+            endpoint.baseUrl,
             accessRecord({
               endpoint,
               at,
@@ -244,7 +287,7 @@ export function useWorkflow(relayUrl: string | undefined): WorkflowView {
             dispatch({ type: "relay-offered", endpoint, error });
             return;
           }
-          active.record(accessRecord(facts));
+          active.record(endpoint.baseUrl, accessRecord(facts));
           dispatch({ type: "connect-failed", endpoint, error });
         }
       })();
@@ -265,11 +308,17 @@ export function useWorkflow(relayUrl: string | undefined): WorkflowView {
         const service = await connection.inspect();
         const processes = await connection.listProcesses();
         client.current = { endpoint, client: connection, reads: "relay" };
-        active.record(accessRecord({ ...facts, confirmed: true, relay: relayAttempt(undefined) }));
+        active.record(
+          endpoint.baseUrl,
+          accessRecord({ ...facts, confirmed: true, relay: relayAttempt(undefined) }),
+        );
         dispatch({ type: "connected", endpoint, route: "relay", service, processes });
       } catch (cause) {
         const attempt = relayAttempt(cause);
-        active.record(accessRecord({ ...facts, confirmed: true, relay: attempt }));
+        active.record(
+          endpoint.baseUrl,
+          accessRecord({ ...facts, confirmed: true, relay: attempt }),
+        );
         dispatch({ type: "connect-failed", endpoint, error: relayFailureMessage(attempt, cause) });
       }
     })();
@@ -280,7 +329,9 @@ export function useWorkflow(relayUrl: string | undefined): WorkflowView {
     const active = session.current;
     const facts = pendingOffer.current;
     pendingOffer.current = undefined;
-    if (facts !== undefined) active?.record(accessRecord({ ...facts, confirmed: false }));
+    if (facts !== undefined) {
+      active?.record(facts.endpoint.baseUrl, accessRecord({ ...facts, confirmed: false }));
+    }
     dispatch({ type: "relay-declined" });
   }, []);
 
@@ -300,23 +351,11 @@ export function useWorkflow(relayUrl: string | undefined): WorkflowView {
             // that carries them; forwarded, so the session still records it.
             onObservation: (observation) => {
               if (observation.kind === "process-fetched") warnings = observation.warnings;
-              active.record(observation);
+              active.record(connection.endpoint.baseUrl, observation);
             },
           });
           const plan = resolveFormPlan(process);
-          const endpoint = connection.endpoint.baseUrl;
-          record(formObservationsFor(endpoint, process.id, plan.diagnostics));
-          record(
-            projectedOnly(plan).map(({ inputId, crs }) => ({
-              kind: "form",
-              endpoint: redactUrl(endpoint),
-              processId: process.id,
-              inputId,
-              code: "bbox-projected-crs-only",
-              keyword: undefined,
-              crs,
-            })),
-          );
+          record(formObservationsOf(connection.endpoint.baseUrl, process, plan));
           dispatch({
             type: "process-loaded",
             process,
@@ -516,24 +555,58 @@ export function useWorkflow(relayUrl: string | undefined): WorkflowView {
         const dismissal = await connection.client.dismissJob(jobRef);
         if (dismissal.kind === "dismissed") {
           setDismissWorked((seen) => new Set([...seen, endpointUrl]));
-          active.record({ ...base, outcome: "dismissed" });
+          active.record(endpointUrl, { ...base, outcome: "dismissed" });
           setJobNotice(undefined);
           dispatch({
             type: "run-failed",
             error: { title: "Job cancelled. The server has dismissed it.", notice: true },
           });
         } else {
-          active.record({ ...base, outcome: "unsupported" });
+          active.record(endpointUrl, { ...base, outcome: "unsupported" });
           setJobNotice(
             `The server says it cannot cancel jobs (HTTP ${String(dismissal.status)}). The job keeps running.`,
           );
         }
       } catch (cause) {
-        active.record({ ...base, outcome: "failed" });
+        active.record(endpointUrl, { ...base, outcome: "failed" });
         setJobNotice(
           `The job could not be cancelled: ${cause instanceof Error ? cause.message : String(cause)}. It may still be running.`,
         );
       }
+    })();
+  };
+
+  // One description at a time: a census is for the record, not for speed, and
+  // a server should not see it as a burst. Stops when the connection changes.
+  const describeAll = () => {
+    const connection = client.current;
+    if (state.stage === "choose-endpoint" || connection === undefined) return;
+    if (census?.running === true) return;
+    const summaries = state.processes.processes;
+    const endpoint = redactUrl(connection.endpoint.baseUrl);
+    let progress: CensusProgress = {
+      endpoint,
+      total: summaries.length,
+      described: 0,
+      failed: 0,
+      running: true,
+    };
+    setCensus(progress);
+    void (async () => {
+      for (const summary of summaries) {
+        if (client.current !== connection) break;
+        try {
+          const process = await connection.client.getProcess(summary.id, { summary });
+          record(
+            formObservationsOf(connection.endpoint.baseUrl, process, resolveFormPlan(process)),
+          );
+          progress = { ...progress, described: progress.described + 1 };
+        } catch {
+          progress = { ...progress, failed: progress.failed + 1 };
+        }
+        setCensus(progress);
+      }
+      setCensus({ ...progress, running: false });
     })();
   };
 
@@ -568,6 +641,7 @@ export function useWorkflow(relayUrl: string | undefined): WorkflowView {
     edit: () => {
       dispatch({ type: "edit" });
     },
+    describeAll,
   };
 
   return {
@@ -579,5 +653,6 @@ export function useWorkflow(relayUrl: string | undefined): WorkflowView {
     fieldErrors,
     jobNotice,
     dismissAdvertisedBy,
+    census,
   };
 }

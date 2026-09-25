@@ -127,6 +127,8 @@ export function App() {
               observations={view.snapshot?.observations ?? []}
               relayUrl={relayUrl}
               open={developer}
+              census={view.census}
+              onDescribeAll={state.stage === "choose-endpoint" ? undefined : commands.describeAll}
             />
           </main>
           <MapPane

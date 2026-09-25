@@ -123,11 +123,57 @@ export function formObservationsFor(
   }));
 }
 
-/** What the "Download session observations" button writes. */
+/**
+ * One observation, and the endpoint it was made against: its base URL,
+ * redacted. Attributed when recorded, because several core observations carry
+ * no URL (`capabilities-derived`) and the rest carry one that says nothing
+ * about which endpoint was being read.
+ */
+export interface SessionObservation {
+  readonly endpoint: string;
+  readonly observation: WebObservation;
+}
+
+/** The endpoints a session has observations for, in the order first seen. */
+export function observedEndpoints(entries: readonly SessionObservation[]): string[] {
+  return [...new Set(entries.map((entry) => entry.endpoint))];
+}
+
+/** How many observations of each kind, most frequent first, then by name. */
+export function kindCounts(
+  entries: readonly SessionObservation[],
+): { readonly kind: WebObservation["kind"]; readonly count: number }[] {
+  const counts = new Map<WebObservation["kind"], number>();
+  for (const { observation } of entries) {
+    counts.set(observation.kind, (counts.get(observation.kind) ?? 0) + 1);
+  }
+  return [...counts]
+    .map(([kind, count]) => ({ kind, count }))
+    .sort((a, b) => b.count - a.count || a.kind.localeCompare(b.kind));
+}
+
+/**
+ * What the download buttons write. With `endpoint`, only that endpoint's
+ * observations, and the file names it: one file per endpoint is what the
+ * interoperability matrix is built from. Without it, the whole session.
+ */
 export function observationExport(
-  observations: readonly WebObservation[],
+  entries: readonly SessionObservation[],
   coreVersion: string,
   now: Date = new Date(),
+  endpoint?: string,
 ): string {
-  return JSON.stringify({ exportedAt: now.toISOString(), coreVersion, observations }, null, 2);
+  const observations = entries
+    .filter((entry) => endpoint === undefined || entry.endpoint === endpoint)
+    .map((entry) => entry.observation);
+  return JSON.stringify(
+    {
+      exportedAt: now.toISOString(),
+      coreVersion,
+      ...(endpoint === undefined ? {} : { endpoint }),
+      observations,
+    },
+    null,
+    2,
+  );
 }

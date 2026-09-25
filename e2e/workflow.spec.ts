@@ -565,4 +565,38 @@ test.describe("the workflow in a browser", () => {
       }),
     );
   });
+
+  test("describes every process for the census, and exports one endpoint's observations", async ({
+    page,
+  }) => {
+    await connectTyped(page, PYGEOAPI);
+    await expect(page.getByRole("button", { name: "Hello World", exact: true })).toBeVisible();
+    await page.locator("details.developer > summary").click();
+    await page.getByRole("button", { name: "Describe every process" }).click();
+
+    const status = page.getByRole("status").filter({ hasText: "Process census of" });
+    await expect(status).toHaveText(/(\d+) of \1 described\.$/, { timeout: 60_000 });
+    const total = Number(/(\d+) of/.exec((await status.textContent()) ?? "")?.[1]);
+    expect(total).toBeGreaterThan(1);
+
+    await page.getByRole("combobox", { name: "Observations from" }).selectOption(`${PYGEOAPI}/`);
+    await page.getByRole("combobox", { name: "Observation kind" }).selectOption("process-fetched");
+    await expect(page.locator(".observation-list > li")).toHaveCount(total);
+
+    const download = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Download this endpoint's observations" }).click();
+    const exported = JSON.parse(await readFile(await (await download).path(), "utf8")) as {
+      endpoint: string;
+      observations: { kind: string; processId?: string }[];
+    };
+    expect(exported.endpoint).toBe(`${PYGEOAPI}/`);
+    const kinds = exported.observations.map((observation) => observation.kind);
+    // Carries no URL of its own: only the attribution puts it in this file.
+    expect(kinds).toContain("capabilities-derived");
+    expect(kinds).toContain("endpoint-access");
+    const described = exported.observations.filter(
+      (observation) => observation.kind === "process-fetched",
+    );
+    expect(new Set(described.map((observation) => observation.processId)).size).toBe(total);
+  });
 });

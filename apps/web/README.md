@@ -249,11 +249,28 @@ input value, a schema body, a query string or a response body:
   worked;
 - `cancel-job`: each Cancel job, and whether dismissal had been advertised.
 
-The **Developer** section at the foot of the panel writes them to a file with
-**Download session observations**. They are the raw material of the
-form-generation failure catalogue. Open the page with `?developer` to have the
-section open, which is also where Task 6's raw asynchronous-execution panel now
-lives; the relay's browser tests drive it there.
+Each observation is tagged with the endpoint it was made against when it is
+recorded, because some carry no URL of their own (`capabilities-derived`).
+
+The **Developer** section at the foot of the panel lists them, newest first,
+filtered by endpoint and by kind. It writes them to a file:
+
+- **Download session observations**: the whole session, as one flat list.
+- **Download this endpoint's observations**: one endpoint's, with that
+  endpoint named at the top of the file. This is the file the
+  interoperability matrix is built from.
+
+**Describe every process** is the process census. It fetches each listed
+process's description once, one at a time, through whichever route the
+connection uses. The session then holds a `process-fetched` record, and any
+`form` records, for the whole catalogue, not just for the processes someone
+opened. A description that cannot be read is counted on screen and leaves no
+record, so the matrix reads it as listed but not described.
+
+These files are the raw material of the form-generation failure catalogue.
+Open the page with `?developer` to have the section open. Task 6's raw
+asynchronous-execution panel also lives there, because the relay's browser
+tests drive it.
 
 ## Tests
 

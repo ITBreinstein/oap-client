@@ -14,13 +14,14 @@
 import {
   createClient,
   getJob,
+  redactUrl,
   type Client,
   type FetchLike,
   type ExecuteOutputSelection,
   type Execution,
   type ProcessDescription,
 } from "@breinstein/oap-client";
-import type { WebObservation } from "../observations.js";
+import type { SessionObservation, WebObservation } from "../observations.js";
 import type { RelayEndpoint } from "./contract.js";
 import { openDoorbells, type DoorbellStream, type StreamState } from "./doorbells.js";
 import { JobReconciler, type TrackedJob } from "./reconciler.js";
@@ -43,7 +44,7 @@ export interface JobRow extends TrackedJob {
 export interface JobSessionSnapshot {
   readonly relay: "off" | StreamState;
   readonly jobs: readonly JobRow[];
-  readonly observations: readonly WebObservation[];
+  readonly observations: readonly SessionObservation[];
 }
 
 export interface JobSession {
@@ -72,8 +73,11 @@ export interface JobSession {
   ): Promise<Execution>;
   /** Start reconciling a job the caller found some other way — a sync run the server made async. */
   track(endpoint: RelayEndpoint, statusUrl: string, reads?: Reads): void;
-  /** Add an observation the web app made itself (T4). */
-  record(observation: WebObservation): void;
+  /**
+   * Add an observation the web app made itself (T4), or one the caller took
+   * from a core call of its own, against the endpoint it was made for.
+   */
+  record(endpoint: string, observation: WebObservation): void;
   subscribe(listener: (snapshot: JobSessionSnapshot) => void): () => void;
   dispose(): void;
 }
@@ -131,11 +135,13 @@ export function createJobSession(relayUrl: string | undefined): JobSession {
     relayUrl === undefined || relayUrl === "" ? undefined : createRelayClient(relayUrl);
 
   let relayState: JobSessionSnapshot["relay"] = relay === undefined ? "off" : "connecting";
-  let observations: WebObservation[] = [];
+  let observations: SessionObservation[] = [];
   const meta = new Map<
     string,
     {
       endpointKey: string;
+      /** The endpoint's base URL, which the job's observations are recorded against. */
+      baseUrl: string;
       route: "direct" | "relay" | undefined;
       /** The read route's wrapper, when this job's endpoint is read through the relay. */
       read: FetchLike | undefined;
@@ -156,17 +162,24 @@ export function createJobSession(relayUrl: string | undefined): JobSession {
     const current = snapshot();
     for (const listener of listeners) listener(current);
   };
-  const observe = (observation: WebObservation): void => {
-    observations = [...observations.slice(1 - OBSERVATIONS_KEPT), observation];
-    publish();
-  };
+  // Tagged with the endpoint as they arrive: several core observations carry
+  // no URL at all (`capabilities-derived`), so this is the only place the
+  // endpoint an observation belongs to is still known.
+  const observeFor =
+    (baseUrl: string) =>
+    (observation: WebObservation): void => {
+      const entry = { endpoint: redactUrl(baseUrl), observation };
+      observations = [...observations.slice(1 - OBSERVATIONS_KEPT), entry];
+      publish();
+    };
 
   const reconciler = new JobReconciler({
     readJob: (statusUrl, signal) => {
-      const read = meta.get(statusUrl)?.read;
+      const job = meta.get(statusUrl);
+      const read = job?.read;
       return getJob(statusUrl, {
         signal,
-        onObservation: observe,
+        onObservation: observeFor(job?.baseUrl ?? statusUrl),
         ...(read === undefined ? {} : { fetch: read }),
       });
     },
@@ -211,6 +224,7 @@ export function createJobSession(relayUrl: string | undefined): JobSession {
 
     client(endpoint, reads = "direct") {
       const read = readFetch(endpoint, reads);
+      const observe = observeFor(endpoint.baseUrl);
       return createClient({
         baseUrl: endpoint.baseUrl,
         onObservation: observe,
@@ -228,20 +242,22 @@ export function createJobSession(relayUrl: string | undefined): JobSession {
       const read = readFetch(endpoint, reads);
       meta.set(statusUrl, {
         endpointKey: endpoint.key,
+        baseUrl: endpoint.baseUrl,
         route: read === undefined ? "direct" : "relay",
         read,
       });
       reconciler.track(statusUrl);
     },
 
-    record(observation) {
-      observe(observation);
+    record(endpoint, observation) {
+      observeFor(endpoint)(observation);
     },
 
     async run(endpoint, processId, inputs, outputs, description, reads = "direct") {
       const refs = new Map<string, string>();
       let route: "direct" | "relay" | undefined;
       const read = readFetch(endpoint, reads);
+      const observe = observeFor(endpoint.baseUrl);
       const client = createClient({
         baseUrl: endpoint.baseUrl,
         onObservation: observe,
@@ -267,7 +283,7 @@ export function createJobSession(relayUrl: string | undefined): JobSession {
       });
       if (execution.kind === "job") {
         const { statusUrl } = execution.job;
-        meta.set(statusUrl, { endpointKey: endpoint.key, route, read });
+        meta.set(statusUrl, { endpointKey: endpoint.key, baseUrl: endpoint.baseUrl, route, read });
         reconciler.track(statusUrl, refs.get(statusUrl));
       }
       return execution;

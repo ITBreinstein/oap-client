@@ -483,6 +483,34 @@ button:disabled {
   padding: 0.2rem;
 }
 
+.developer-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.6rem;
+}
+
+.developer-filters select {
+  max-width: 100%;
+}
+
+.observation-list {
+  max-height: 24rem;
+  overflow: auto;
+  padding-left: 1.5rem;
+}
+
+.observation-list summary {
+  font-weight: 400;
+  overflow-wrap: anywhere;
+}
+
+.observation-list pre {
+  margin: 0.25rem 0 0.5rem;
+  overflow-x: auto;
+  font-size: 0.8rem;
+}
+
 /* An image result, scaled down to the panel and never up. */
 .result-image {
   display: block;
