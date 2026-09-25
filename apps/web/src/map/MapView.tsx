@@ -1,11 +1,11 @@
 /**
- * The map (S5): MapLibre over PDOK's BRT-Achtergrondkaart, and bounding-box
- * drawing when a form field asks for it.
+ * The map (S5): MapLibre over PDOK's BRT-Achtergrondkaart, and drawing when a
+ * form field asks for it — a bounding box, or shapes for a GeoJSON input.
  *
  * Knows geometry, not the protocol (`map-binding-knows-no-protocol`): it is
- * handed four numbers and hands four numbers back. When the map cannot start —
- * no WebGL, as in a test runner or an old browser — it says so and the form's
- * typed coordinates remain the way in.
+ * handed four numbers or some shapes, and hands the same back. When the map
+ * cannot start — no WebGL, as in a test runner or an old browser — it says so
+ * and the form's typed coordinates and GeoJSON remain the way in.
  */
 
 import "maplibre-gl/dist/maplibre-gl.css";
@@ -26,7 +26,33 @@ import {
   PDOK_BRT_TILES,
 } from "./basemap.js";
 import type { CreateDrawEngine } from "./draw-engine.js";
+import type { CreateGeometryEngine, Tool } from "./geometry-engine.js";
 import { useBoundingBoxDraw, type BboxDrawProps } from "./useBoundingBoxDraw.js";
+import { useGeometryDraw, type GeometryDrawProps } from "./useGeometryDraw.js";
+
+/** Toolbar wording, in the user's terms rather than GeoJSON's (Sam's). */
+const TOOL_LABELS: Readonly<Record<Tool, string>> = {
+  Point: "Add point",
+  LineString: "Add line",
+  Polygon: "Add area",
+  Rectangle: "Add box",
+};
+
+const TOOL_HINTS: Readonly<Record<Tool, string>> = {
+  Point: "Click to place the point.",
+  LineString: "Click to place each point along the line; double-click to finish.",
+  Polygon:
+    "Click to place each corner. Click the first corner again, or double-click, to close the shape.",
+  Rectangle: "Drag, or click two corners, to draw a box.",
+};
+
+const NO_GEOMETRY: GeometryDrawProps = {
+  active: false,
+  tools: [],
+  several: false,
+  value: [],
+  onChange: () => undefined,
+};
 
 export type CreateMap = (container: HTMLElement, reducedMotion: boolean) => MapLibreMap;
 
@@ -70,17 +96,22 @@ function prefersReducedMotion(): boolean {
 export interface MapViewProps {
   /** Bounding-box drawing for one form field; absent when nothing is drawing. */
   readonly draw: BboxDrawProps;
+  /** GeoJSON drawing for one form field; absent or inactive when nothing is drawing. */
+  readonly geometry?: GeometryDrawProps | undefined;
   /** Whether the map started, so the form can offer "Draw on the map" or not. */
   readonly onAvailable?: ((available: boolean) => void) | undefined;
   readonly createMap?: CreateMap | undefined;
   readonly createEngine?: CreateDrawEngine | undefined;
+  readonly createGeometryEngine?: CreateGeometryEngine | undefined;
 }
 
 export function MapView({
   draw,
+  geometry = NO_GEOMETRY,
   onAvailable,
   createMap = createPdokMap,
   createEngine,
+  createGeometryEngine,
 }: MapViewProps) {
   const [map, setMap] = useState<MapLibreMap | undefined>();
   const [failure, setFailure] = useState<string | undefined>();
@@ -115,9 +146,43 @@ export function MapView({
   );
 
   useBoundingBoxDraw(map, draw, createEngine);
+  const shapes = useGeometryDraw(map, geometry, createGeometryEngine);
+  const drawingShapes = geometry.active && map !== undefined;
 
   return (
     <div className="map-view">
+      {drawingShapes && (
+        <div className="map-tools" role="toolbar" aria-label="Drawing tools">
+          {geometry.tools.map((tool) => (
+            <button
+              key={tool}
+              type="button"
+              className={shapes.placing === tool ? "" : "secondary"}
+              aria-pressed={shapes.placing === tool}
+              onClick={() => {
+                shapes.place(tool);
+              }}
+            >
+              {TOOL_LABELS[tool]}
+            </button>
+          ))}
+          <button
+            type="button"
+            className="secondary"
+            disabled={!shapes.hasSelection}
+            onClick={() => {
+              shapes.deleteSelected();
+            }}
+          >
+            Delete selected
+          </button>
+          <p className="map-hint" role="status">
+            {shapes.placing === undefined
+              ? "Choose a tool to add a shape. Click a shape to select it; drag it or its corners to adjust."
+              : TOOL_HINTS[shapes.placing]}
+          </p>
+        </div>
+      )}
       <div
         ref={attach}
         className="map-canvas"
@@ -125,13 +190,16 @@ export function MapView({
         aria-label={
           draw.active
             ? "Map: drag a rectangle to set the bounding box"
-            : "Map of the Netherlands (BRT-Achtergrondkaart)"
+            : geometry.active
+              ? "Map: draw shapes for the input"
+              : "Map of the Netherlands (BRT-Achtergrondkaart)"
         }
-        data-drawing={draw.active ? "true" : "false"}
+        data-drawing={draw.active || geometry.active ? "true" : "false"}
       />
       {failure !== undefined && (
         <p className="map-failure">
-          The map could not be started ({failure}). Bounding boxes can still be typed in.
+          The map could not be started ({failure}). Bounding boxes and GeoJSON can still be typed
+          in.
         </p>
       )}
     </div>

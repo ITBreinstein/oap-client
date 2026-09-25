@@ -18,7 +18,8 @@
  * The messages say what is wrong and what to do; they never apologise (T11).
  */
 
-import { isAbsent, isRawJson, type FormValues } from "./encode.js";
+import { isAbsent, isGeoJsonText, isRawJson, type FormValues } from "./encode.js";
+import { shapesOfText } from "./geometry.js";
 import { isJsonArray, isJsonObject } from "./json.js";
 import type { Control, FormPlan, NumberControl } from "./plan.js";
 
@@ -124,8 +125,16 @@ function checkControl(control: Control, value: unknown): string | undefined {
       }
       return undefined;
     }
+    case "geometry": {
+      if (!isGeoJsonText(value)) return undefined;
+      return (
+        jsonError(value.geojson) ??
+        (shapesOfText(value.geojson).length === 0
+          ? "This holds no GeoJSON geometry. Draw a shape on the map, or load a GeoJSON file."
+          : undefined)
+      );
+    }
     case "checkbox":
-    case "geometry":
     case "json":
       return undefined;
   }

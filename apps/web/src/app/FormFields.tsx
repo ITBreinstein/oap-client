@@ -25,6 +25,7 @@ import type {
 } from "../forms/plan.js";
 import { BboxField } from "./BboxField.js";
 import { ComplexField } from "./ComplexField.js";
+import { GeometryField } from "./GeometryField.js";
 
 export interface ControlProps<C extends Control = Control> {
   readonly id: string;
@@ -157,7 +158,7 @@ function BooleanInput(props: ControlProps<CheckboxControl>) {
   );
 }
 
-function JsonInput({ id, control, value, describedBy, onChange }: ControlProps<JsonControl>) {
+function JsonInput({ id, value, describedBy, onChange }: ControlProps<JsonControl>) {
   const text = isRawJson(value)
     ? value.rawJson
     : value === undefined
@@ -171,7 +172,7 @@ function JsonInput({ id, control, value, describedBy, onChange }: ControlProps<J
       spellCheck={false}
       value={text}
       aria-describedby={describedBy}
-      placeholder={control.reason.includes("geometry") ? '{ "type": "Point", … }' : "JSON"}
+      placeholder="JSON"
       onChange={(event) => {
         onChange({ rawJson: event.target.value });
       }}
@@ -254,12 +255,7 @@ export function ControlView(props: ControlProps): ReactNode {
     case "complex":
       return <ComplexField {...props} control={control} />;
     case "geometry":
-      return (
-        <JsonInput
-          {...props}
-          control={{ kind: "json", reason: "Drawing a geometry is not supported yet." }}
-        />
-      );
+      return <GeometryField {...props} control={control} />;
     case "json":
       return <JsonInput {...props} control={control} />;
   }
@@ -271,6 +267,7 @@ function isGroup(control: Control, required: boolean): boolean {
     control.kind === "list" ||
     control.kind === "bbox" ||
     control.kind === "complex" ||
+    control.kind === "geometry" ||
     (control.kind === "checkbox" && !required)
   );
 }
@@ -301,9 +298,6 @@ function hint(field: FieldPlan): string | undefined {
     }
   }
   if (control.kind === "json") notes.push(`Enter the value as JSON: ${control.reason}.`);
-  if (control.kind === "geometry") {
-    notes.push("Drawing a geometry is not supported yet: enter it as JSON.");
-  }
   return notes.length === 0 ? undefined : notes.join(" ");
 }
 

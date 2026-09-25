@@ -15,7 +15,7 @@ import {
   type GeoJSONStoreFeatures,
 } from "terra-draw";
 import { TerraDrawMapLibreGLAdapter } from "terra-draw-maplibre-gl-adapter";
-import { INPUT_STYLE } from "./basemap.js";
+import { INPUT_STYLE, SELECTED_INPUT_STYLES } from "./basemap.js";
 import { bboxOfRing, ringOfBbox, type Bbox } from "./bbox.js";
 
 export interface DrawEngine {
@@ -54,6 +54,7 @@ export const createTerraDrawEngine: CreateDrawEngine = (map) => {
       // nor a trackpad user has to discover the other.
       new TerraDrawRectangleMode({ styles, drawInteraction: "click-move-or-drag" }),
       new TerraDrawSelectMode({
+        styles: SELECTED_INPUT_STYLES,
         flags: {
           [RECTANGLE]: {
             feature: {

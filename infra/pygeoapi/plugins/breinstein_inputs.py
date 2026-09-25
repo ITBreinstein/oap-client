@@ -19,6 +19,11 @@
 # value is refused is then pygeoapi's decision alone, which is what the web
 # client's validation question (Task 7, Z5) needs to measure.
 #
+# The optional `area` is a GeoJSON geometry: a `$ref` to the Features
+# geometry schema, the one the standard's own geometry example points to. It is
+# optional so that every test which does not draw leaves it out. What arrives
+# is whatever the client sent, wrapper and all (finding 0052's question).
+#
 # The multi-line string is declared as `type: "string"` with
 # `contentMediaType: "text/plain"`: JSON Schema has no "multi-line" keyword,
 # and a string whose content is a plain-text document is the nearest thing the
@@ -135,6 +140,16 @@ PROCESS_METADATA = {
             'description': 'Optional; left out of the request when empty.',
             'schema': {
                 'type': 'string'
+            },
+            'minOccurs': 0,
+            'maxOccurs': 1
+        },
+        'area': {
+            'title': 'Area',
+            'description': 'Optional; a GeoJSON geometry.',
+            'schema': {
+                '$ref': 'http://schemas.opengis.net/ogcapi/features/part1/1.0/'
+                        'openapi/schemas/geometryGeoJSON.yaml'
             },
             'minOccurs': 0,
             'maxOccurs': 1

@@ -1,9 +1,9 @@
 # @breinstein/web
 
 The client a person uses: pick a service, see its processes, fill in a form
-generated from a process's description — drawing a bounding box on the map where
-one is asked for — run it in the foreground or the background, and see the
-result or download it.
+generated from a process's description — drawing a bounding box or GeoJSON on
+the map where one is asked for — run it in the foreground or the background, and
+see the result or download it.
 
 Built on the published core, [`@breinstein/oap-client`](../../packages/core),
 and on nothing else of this repository's except the relay's wire contract.
@@ -134,6 +134,28 @@ east, north — whatever the CRS. The encoder owns the wire order:
 
 The CRS is always sent, even when it is the default.
 
+### GeoJSON
+
+Built on Sam's drawing and file reader from `feat/T3-prototype-interface-2`.
+
+- A **geometry** input (a `geojson-*` format, a `$ref` to a GeoJSON schema, or
+  `application/geo+json`) holds GeoJSON text: drawn on the map, loaded from a
+  file, or typed. `geometry.ts` puts what was drawn in the wrapper and geometry
+  types the plan names: several polygons become a MultiPolygon only where the
+  input takes one, and what does not fit is counted and said, not dropped.
+- A **complex** input's JSON-object format can be drawn for too, as a
+  FeatureCollection. That is how real services declare geometry: ZOO's Buffer
+  and SAGA's polygon tools take GML or "an object". The user decides that the
+  object is geometry; nothing guesses it from a title.
+- A loaded file is refused when it is not WGS 84: a `crs` member naming
+  anything else, or coordinates beyond ±180/±90, which in Dutch data means RD
+  New (`geojson.ts`).
+- On the wire it is `{ "value": <GeoJSON> }` (Requirement 20), like any object.
+  pygeoapi hands that wrapper to the process unopened (finding 0052).
+
+`test/forms/captured-requests.test.ts` checks the encoder against five requests
+servers accepted, collected by Sam (`test/fixtures/forms/README.md`).
+
 ## The map — [`src/map/`](src/map)
 
 MapLibre over PDOK's BRT-Achtergrondkaart ("standaard", EPSG:3857), which needs
@@ -143,13 +165,17 @@ Kadaster's, CC BY 4.0, credited on the map:
     https://service.pdok.nl/kadaster/brt-achtergrondkaart/wmts/v2_0/standaard/EPSG:3857/{z}/{x}/{y}.png
 
 A bounding-box field's **Draw on the map** puts the map in draw mode: drag a
-rectangle, or click two corners, then move or resize it. The drawn input is
-amber, so nothing Task 8 shows as a result can be mistaken for it. The draw mode
-is removed when the field stops drawing, when another process is chosen, when a
-run starts, and on unmount.
+rectangle, or click two corners, then move or resize it. A GeoJSON field's puts
+a toolbar on the map with the tools its input allows — point, line, area, box —
+and **Delete selected**; a finished shape is selected so it can be adjusted, and
+Terra Draw's own corner and midpoint handles are kept out of the value (Sam's
+fix). The drawn input is amber, so nothing Task 8 shows as a result can be
+mistaken for it. The draw mode is removed when the field stops drawing, when
+another process is chosen, when a run starts, and on unmount.
 
 Only this directory may import `maplibre-gl` or `terra-draw`, and it imports
-nothing from the core: it is handed four numbers and hands four numbers back.
+nothing from the core: it is handed four numbers or some shapes, and hands the
+same back.
 Where the map cannot start — no WebGL — it says so, and the typed coordinates
 remain the way in. MapLibre 6 looks for its worker next to its own module, which
 a bundle moves, so Vite bundles the worker as an ES module and `MapView` hands
@@ -186,8 +212,8 @@ process description, so any change to a matcher shows up as a reviewed diff.
 
 ## Not yet
 
-- Drawing geometries other than a bounding box: a geometry input is a raw JSON
-  editor with a "not yet supported" note.
+- A choice of output format, or a media type for GeoJSON beyond what the
+  description declares.
 - Reprojection, and a choice of basemap.
 - Results on the map, images and collection references (Task 8).
 - The bundle is one chunk of about 1.4 MB, most of it MapLibre.

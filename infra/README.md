@@ -116,11 +116,11 @@ on the backlog after `slow`, one hole each. `:5080` is the only server a browser
 can reach (findings 0049, 0050), so without them the web client's generated form
 had nothing to be tested against but two string inputs.
 
-| Process             | Closes                               | Inputs → outputs                                                                                                                                                                                 |
-| ------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `breinstein-bbox`   | a bounding-box input                 | one `format: "ogc-bbox"` object (`properties.bbox`, four numbers, and `properties.crs`, CRS84 only) → the box as a GeoJSON `Feature` polygon, `application/geo+json`                             |
-| `breinstein-inputs` | every form control, multiple outputs | a bounded string, a multi-line string, a bounded integer, a number with a default, an enum, a boolean, a string repeatable three times, one optional string → `echo` (JSON) and `summary` (text) |
-| `breinstein-png`    | a non-JSON output                    | one bounded integer → an `image/png` of that size                                                                                                                                                |
+| Process             | Closes                               | Inputs → outputs                                                                                                                                                                                                                |
+| ------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `breinstein-bbox`   | a bounding-box input                 | one `format: "ogc-bbox"` object (`properties.bbox`, four numbers, and `properties.crs`, CRS84 only) → the box as a GeoJSON `Feature` polygon, `application/geo+json`                                                            |
+| `breinstein-inputs` | every form control, multiple outputs | a bounded string, a multi-line string, a bounded integer, a number with a default, an enum, a boolean, a string repeatable three times, one optional string, one optional GeoJSON geometry → `echo` (JSON) and `summary` (text) |
+| `breinstein-png`    | a non-JSON output                    | one bounded integer → an `image/png` of that size                                                                                                                                                                               |
 
 Same rule as `slow`: each one **echoes or reshapes its inputs and computes
 nothing**. Three details are deliberate:

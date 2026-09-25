@@ -219,6 +219,7 @@ describe("real descriptions", () => {
       ["enabled", "checkbox", true],
       ["tags", "list", true],
       ["comment", "text", false],
+      ["area", "geometry", false],
     ]);
     expect(plan.diagnostics).toEqual([]);
   });

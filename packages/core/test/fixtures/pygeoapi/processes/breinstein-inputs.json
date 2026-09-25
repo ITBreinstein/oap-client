@@ -138,6 +138,15 @@
             },
             "minOccurs":0,
             "maxOccurs":1
+        },
+        "area":{
+            "title":"Area",
+            "description":"Optional; a GeoJSON geometry.",
+            "schema":{
+                "$ref":"http://schemas.opengis.net/ogcapi/features/part1/1.0/openapi/schemas/geometryGeoJSON.yaml"
+            },
+            "minOccurs":0,
+            "maxOccurs":1
         }
     },
     "outputs":{

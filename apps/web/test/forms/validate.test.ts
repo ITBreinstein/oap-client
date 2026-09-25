@@ -100,6 +100,17 @@ describe("validateForm", () => {
     );
   });
 
+  it("checks that a geometry field holds GeoJSON with a geometry in it", () => {
+    const area = { area: { schema: { format: "geojson-polygon" } } };
+    expect(errorsFor(area, { area: { geojson: "{ half" } })["area"]).toMatch(/not valid JSON/);
+    expect(errorsFor(area, { area: { geojson: '{"type": "Feature"}' } })).toEqual({
+      area: "This holds no GeoJSON geometry. Draw a shape on the map, or load a GeoJSON file.",
+    });
+    expect(
+      errorsFor(area, { area: { geojson: '{"type":"Point","coordinates":[5.1,52.1]}' } }),
+    ).toEqual({});
+  });
+
   it("does not check pattern or format, which the server is authoritative on", () => {
     const shaped = {
       p: { schema: { type: "string", pattern: "^[0-9]+$" } },

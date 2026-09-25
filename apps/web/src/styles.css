@@ -130,6 +130,24 @@ body {
   border-radius: 4px;
 }
 
+/* Above the canvas, clear of the zoom buttons at the top right. */
+.map-tools {
+  position: absolute;
+  z-index: 1;
+  top: 0.75rem;
+  left: 0.75rem;
+  right: 3.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: flex-start;
+}
+
+.map-tools .map-hint {
+  position: static;
+  flex-basis: 100%;
+}
+
 @media (max-width: 52rem) {
   .layout {
     grid-template-columns: 1fr;

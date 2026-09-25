@@ -68,6 +68,19 @@ export function isRawJson(value: unknown): value is RawJson {
 }
 
 /**
+ * What a geometry field holds: GeoJSON text, drawn on the map, loaded from a
+ * file or typed. Unlike {@link RawJson} it is the value, not the wire value —
+ * the encoder wraps it.
+ */
+export interface GeoJsonText {
+  readonly geojson: string;
+}
+
+export function isGeoJsonText(value: unknown): value is GeoJsonText {
+  return isJsonObject(value) && typeof value["geojson"] === "string";
+}
+
+/**
  * Something the encoder changed on the way to the wire and the caller must
  * record (T4, T9). Carries a CRS URI, never a coordinate.
  */
@@ -94,6 +107,7 @@ export interface ExecuteBody {
 export function isAbsent(value: unknown): boolean {
   if (value === undefined || value === null || value === "") return true;
   if (isRawJson(value)) return value.rawJson.trim() === "";
+  if (isGeoJsonText(value)) return value.geojson.trim() === "";
   if (isComplexValue(value)) {
     return (value.value ?? "") === "" && (value.href ?? "").trim() === "";
   }
@@ -238,13 +252,15 @@ function encodeControl(
       return encodeBbox(control, value, note);
     case "complex":
       return encodeComplex(control, value);
-    case "geometry":
-      // Accepted limitation (N4): a geometry object is passed through bare,
-      // although `inputValueNoObject` admits no bare object and 1.0 wants
-      // `{ "value": … }`. Drawing geometries is out of scope for this task —
-      // the renderer shows a raw JSON editor, where the user writes the wire
-      // value — and the right wrapping is decided when drawing lands.
-      return value;
+    case "geometry": {
+      // Requirement 20: `inputValueNoObject` admits no bare object, so GeoJSON
+      // travels as `{ "value": … }`, as a complex input's JSON object does.
+      // This ends accepted limitation N4, which sent it bare while geometry
+      // could only be typed as the wire value. pygeoapi hands the wrapper to
+      // the process unopened (finding 0052); that is the server's to fix.
+      const geojson = isGeoJsonText(value) ? parseRaw({ rawJson: value.geojson }) : value;
+      return isJsonObject(geojson) ? { value: geojson } : geojson;
+    }
     case "text":
     case "select":
     case "json":

@@ -120,19 +120,43 @@ describe("toExecuteBody", () => {
   });
 
   describe("geospatial values", () => {
-    it("sends a geometry inline, untouched — accepted limitation N4", () => {
-      // Pinned to the current behaviour, which the review found does not match
-      // the standard: `inputValueNoObject` admits no bare object, so 1.0 wants
-      // `{ "value": { … } }`, and ZOO answers a bare object for a complex input
-      // with a 500. Accepted because drawing geometries is out of scope here:
-      // the renderer shows a raw JSON editor, where the user writes the wire
-      // value. Revisit when geometry drawing lands.
+    it("sends a geometry as a qualified value, as Requirement 20 asks of an object", () => {
+      // This was accepted limitation N4: the geometry went bare, because it
+      // could only be typed as the wire value. The field now holds GeoJSON and
+      // the encoder wraps it, as it does a complex input's JSON object — and
+      // as ZOO requires (echo-complex-bare-object-500.http).
+      const geometry = { type: "Point", coordinates: [5.1, 52.1] };
+      const inputs = inputsFor(
+        { area: { schema: { format: "geojson-geometry" } } },
+        { area: { geojson: JSON.stringify(geometry) } },
+      );
+      expect(inputs).toEqual({ area: { value: geometry } });
+    });
+
+    it("wraps a GeoJSON object handed over directly, too", () => {
       const geometry = { type: "Point", coordinates: [5.1, 52.1] };
       const inputs = inputsFor(
         { area: { schema: { format: "geojson-geometry" } } },
         { area: geometry },
       );
-      expect(inputs).toEqual({ area: geometry });
+      expect(inputs).toEqual({ area: { value: geometry } });
+    });
+
+    it("leaves a geometry field out when it holds no text", () => {
+      const inputs = inputsFor(
+        { area: { schema: { format: "geojson-geometry" } } },
+        { area: { geojson: "  " } },
+      );
+      expect(inputs).toEqual({});
+    });
+
+    it("sends GeoJSON typed as the wire value in the raw JSON route unchanged", () => {
+      const authored = { value: { type: "Point", coordinates: [5.1, 52.1] }, mediaType: "x" };
+      const inputs = inputsFor(
+        { area: { schema: { format: "geojson-geometry" } } },
+        { area: { rawJson: JSON.stringify(authored) } },
+      );
+      expect(inputs).toEqual({ area: authored });
     });
 
     it("passes an already-encoded bbox object through untouched (the raw JSON route)", () => {
@@ -146,7 +170,10 @@ describe("toExecuteBody", () => {
       expect(inputs).toEqual({ extent: bbox });
     });
 
-    it("does not wrap application/geo+json, which the body carries natively", () => {
+    it("wraps application/geo+json too: the body being JSON does not make it unambiguous", () => {
+      // A bare object with a `bbox`, `href` or `value` member would be read as
+      // something else; the qualified value is what the standard's
+      // `inputValueNoObject` leaves room for.
       const geometry = { type: "Point", coordinates: [5.1, 52.1] };
       const inputs = inputsFor(
         {
@@ -154,9 +181,9 @@ describe("toExecuteBody", () => {
             schema: { format: "geojson-geometry", contentMediaType: "application/geo+json" },
           },
         },
-        { area: geometry },
+        { area: { geojson: JSON.stringify(geometry) } },
       );
-      expect(inputs).toEqual({ area: geometry });
+      expect(inputs).toEqual({ area: { value: geometry } });
     });
   });
 

@@ -7,11 +7,17 @@
  * `contentEncoding: base64` branch (3 574 of ZOO's branches are), as text for
  * everything else. The brief's "a file read as text" would have sent a PNG as
  * mangled UTF-8; the branch's own encoding decides instead.
+ *
+ * A JSON-object format can also be drawn on the map, as a GeoJSON
+ * FeatureCollection. The description says only "an object", so the user
+ * decides whether it is geometry — which is how real services declare it: ZOO's
+ * Buffer and SAGA's polygon tools take GML or "an object".
  */
 
-import { useId } from "react";
+import { useContext, useId } from "react";
 import type { ComplexValue } from "../forms/encode.js";
 import type { ComplexControl } from "../forms/plan.js";
+import { DrawContext } from "./draw.js";
 import type { ControlProps } from "./FormFields.js";
 
 function asComplex(value: unknown): ComplexValue {
@@ -46,12 +52,16 @@ function readFile(file: File, base64: boolean): Promise<string> {
 }
 
 export function ComplexField(props: ControlProps<ComplexControl>) {
-  const { control, value, onChange, describedBy } = props;
+  const { control, value, onChange, describedBy, inputId } = props;
+  const draw = useContext(DrawContext);
   const base = useId();
   const current = asComplex(value);
   const format = control.formats[current.format] ?? control.formats[0];
   const byReference = current.href !== undefined;
   const base64 = format?.encoding?.toLowerCase() === "base64";
+  const drawing = inputId !== undefined && draw.fieldId === inputId;
+  const canDraw =
+    inputId !== undefined && draw.available && format?.object === true && !byReference;
 
   return (
     <div className="complex" aria-describedby={describedBy}>
@@ -62,7 +72,9 @@ export function ComplexField(props: ControlProps<ComplexControl>) {
             id={`${base}-format`}
             value={String(current.format)}
             onChange={(event) => {
-              onChange({ ...current, format: Number(event.target.value) });
+              const next = Number(event.target.value);
+              if (drawing && control.formats[next]?.object !== true) draw.stop();
+              onChange({ ...current, format: next });
             }}
           >
             {control.formats.map((entry, index) => (
@@ -98,6 +110,7 @@ export function ComplexField(props: ControlProps<ComplexControl>) {
               name={`${base}-source`}
               checked={byReference}
               onChange={() => {
+                if (drawing) draw.stop();
                 onChange({ format: current.format, href: "" });
               }}
             />{" "}
@@ -150,6 +163,21 @@ export function ComplexField(props: ControlProps<ComplexControl>) {
               }}
             />
           </p>
+          {canDraw && (
+            <p className="actions">
+              <button
+                type="button"
+                className={drawing ? "" : "secondary"}
+                aria-pressed={drawing}
+                onClick={() => {
+                  if (drawing) draw.stop();
+                  else draw.start(inputId);
+                }}
+              >
+                {drawing ? "Stop drawing" : "Draw GeoJSON on the map"}
+              </button>
+            </p>
+          )}
         </>
       )}
     </div>

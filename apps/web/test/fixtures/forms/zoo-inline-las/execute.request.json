@@ -1,0 +1,37 @@
+{
+  "method": "POST",
+  "url": "{{baseUrl}}/processes/SAGA.pointcloud_tools.4/execution",
+  "headers": {
+    "Accept": "application/json",
+    "Content-Type": "application/json"
+  },
+  "body": {
+    "inputs": {
+      "POINTS": {
+        "value": "TEFTRgAAAAAAAAAAAAAAAAAAAAAAAAAAAQJPR0MgUHJvY2Vzc2VzIHRlc3RzAAAAAAAAAAAAAAAAAGdlbmVyYXRlX2xhc19maXh0dXJlLnB5AAAAAAAAAAAA7QDqB+MA4wAAAAAAAAAAFAAFAAAABQAAAAAAAAAAAAAAAAAAAAAAAACN7bWg98awPo3ttaD3xrA+/Knx0k1iUD8AAAAAAAAQQAAAAAAAAEpAAAAAAAAAAAB1kxgEVg4TQBBYObTI9hJANV66SQxSSkDjpZvEIFBKQM3MzMzMzBBAzczMzMzM/D+ITgsAUI0JADQIAAAAAAkBAAAAAIB5CwDApAkASA0AAAAACQEAAAAAYKgLADiRCQAIBwAAAAAJAQAAAAD4ZQsA6McJAGgQAAAAAAkBAAAAAMCYCwAwvAkAVAsAAAAACQEAAAAA",
+        "format": {
+          "mediaType": "application/x-ogc-lasf",
+          "encoding": "base64"
+        }
+      },
+      "OUTPUT": "only z",
+      "AGGREGATION": "mean value",
+      "CELLSIZE": 0.005
+    },
+    "outputs": {
+      "GRID": {
+        "format": {
+          "mediaType": "image/tiff"
+        },
+        "transmissionMode": "reference"
+      },
+      "COUNT": {
+        "format": {
+          "mediaType": "image/tiff"
+        },
+        "transmissionMode": "reference"
+      }
+    },
+    "response": "document"
+  }
+}

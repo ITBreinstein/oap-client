@@ -32,3 +32,20 @@ export const INPUT_STYLE = {
   outline: "#b45309",
   outlineWidth: 3,
 } as const;
+
+/**
+ * Terra Draw's select mode, in the same colours: left alone it shows a
+ * selected shape, its corners and its midpoints in its own blue.
+ */
+export const SELECTED_INPUT_STYLES = {
+  selectedPointColor: INPUT_STYLE.fill,
+  selectedPointOutlineColor: INPUT_STYLE.outline,
+  selectedLineStringColor: INPUT_STYLE.outline,
+  selectedPolygonColor: INPUT_STYLE.fill,
+  selectedPolygonFillOpacity: 0.25,
+  selectedPolygonOutlineColor: INPUT_STYLE.outline,
+  selectionPointColor: INPUT_STYLE.fill,
+  selectionPointOutlineColor: INPUT_STYLE.outline,
+  midPointColor: INPUT_STYLE.fill,
+  midPointOutlineColor: INPUT_STYLE.outline,
+} as const;

@@ -42,6 +42,15 @@ async function openProcess(page: Page, title: string) {
   await expect(page.getByRole("heading", { level: 2, name: title })).toBeVisible();
 }
 
+/** The required inputs of "Every input kind", with plain values. */
+async function fillRequiredInputs(page: Page) {
+  await page.getByRole("textbox", { name: "Label (required)" }).fill("drawn");
+  await page.getByRole("textbox", { name: "Notes (required)" }).fill("n");
+  await page.getByRole("textbox", { name: "Count (required)" }).fill("1");
+  await page.getByRole("combobox", { name: "Colour (required)" }).selectOption({ label: "red" });
+  await page.getByRole("textbox", { name: "Tags, value 1" }).fill("t");
+}
+
 async function exportedObservations(
   page: Page,
 ): Promise<{ kind: string; [key: string]: unknown }[]> {
@@ -164,6 +173,169 @@ test.describe("the workflow in a browser", () => {
     const summary = page.locator('[data-output-id="summary"]');
     await expect(summary).toHaveAttribute("data-kind", "text");
     await expect(summary).toContainText('tags: ["a", "b"]');
+  });
+
+  test("draws an area for a geometry input, and sends it as a qualified value", async ({
+    page,
+  }) => {
+    await connectTyped(page, PYGEOAPI);
+    await openProcess(page, "Every input kind");
+    await fillRequiredInputs(page);
+
+    const area = page.locator('[data-input-id="area"]');
+    await expect(area).toHaveAttribute("data-control", "geometry");
+    await area.getByRole("button", { name: "Draw on the map" }).click();
+    await page
+      .getByRole("toolbar", { name: "Drawing tools" })
+      .getByRole("button", { name: "Add area" })
+      .click();
+
+    const canvas = page.locator(".map-canvas canvas").first();
+    const box = await canvas.boundingBox();
+    if (box === null) throw new Error("the map has no size");
+    const at = (x: number, y: number) => ({ x: box.x + box.width * x, y: box.y + box.height * y });
+    // Three corners over the middle of the Netherlands, then the first again to close.
+    const corners = [at(0.4, 0.4), at(0.6, 0.4), at(0.5, 0.6), at(0.4, 0.4)];
+    for (const corner of corners) {
+      await page.mouse.click(corner.x, corner.y);
+      await page.waitForTimeout(150);
+    }
+
+    const geojson = area.getByRole("textbox", { name: "GeoJSON" });
+    await expect(geojson).not.toHaveValue("");
+    const drawn = JSON.parse(await geojson.inputValue()) as {
+      type: string;
+      coordinates: number[][][];
+    };
+    expect(drawn.type).toBe("Polygon");
+    // A closed ring of the three corners; no Terra Draw handle points with it.
+    expect(drawn.coordinates[0]).toHaveLength(4);
+
+    await page.getByRole("button", { name: "Run", exact: true }).click();
+    const echo = page.locator('[data-output-id="echo"] pre');
+    await expect(echo).toBeVisible();
+    const received = JSON.parse(await echo.innerText()) as { area: unknown };
+    // pygeoapi hands the process the wrapper as sent (finding 0052).
+    expect(received.area).toEqual({ value: drawn });
+    for (const [lon = 0, lat = 0] of drawn.coordinates[0] ?? []) {
+      expect(lon).toBeGreaterThan(3);
+      expect(lon).toBeLessThan(8);
+      expect(lat).toBeGreaterThan(50);
+      expect(lat).toBeLessThan(54);
+    }
+  });
+
+  test("draws GeoJSON for a complex input's JSON-object format, as ZOO's Buffer declares it", async ({
+    page,
+  }) => {
+    // ZOO is not readable from a page (finding 0049), so its Buffer input's
+    // schema — GML text or "an object" — is put on breinstein-inputs' optional
+    // `comment`, which echoes what arrives.
+    await page.route(
+      (url) => url.pathname === "/processes/breinstein-inputs",
+      async (route) => {
+        const response = await route.fetch();
+        const description = (await response.json()) as {
+          inputs: Record<string, { schema: unknown }>;
+        };
+        const comment = description.inputs["comment"];
+        if (comment !== undefined) {
+          comment.schema = {
+            oneOf: [
+              { type: "string", contentEncoding: "UTF-8", contentMediaType: "text/xml" },
+              { type: "object" },
+            ],
+          };
+        }
+        await route.fulfill({ response, json: description });
+      },
+    );
+    await connectTyped(page, PYGEOAPI);
+    await openProcess(page, "Every input kind");
+    await fillRequiredInputs(page);
+
+    const field = page.locator('[data-input-id="comment"]');
+    await expect(field).toHaveAttribute("data-control", "complex");
+    // Only the object format can be drawn for.
+    await expect(field.getByRole("button", { name: "Draw GeoJSON on the map" })).toHaveCount(0);
+    await field.getByRole("combobox", { name: "Format" }).selectOption({ label: "JSON object" });
+    await field.getByRole("button", { name: "Draw GeoJSON on the map" }).click();
+    await page
+      .getByRole("toolbar", { name: "Drawing tools" })
+      .getByRole("button", { name: "Add point" })
+      .click();
+    const canvas = page.locator(".map-canvas canvas").first();
+    const box = await canvas.boundingBox();
+    if (box === null) throw new Error("the map has no size");
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+
+    const value = field.getByRole("textbox", { name: "Value (JSON)" });
+    await expect(value).not.toHaveValue("");
+    const drawn = JSON.parse(await value.inputValue()) as {
+      type: string;
+      features: { geometry: { type: string } }[];
+    };
+    expect(drawn.type).toBe("FeatureCollection");
+    expect(drawn.features.map((feature) => feature.geometry.type)).toEqual(["Point"]);
+
+    await page.getByRole("button", { name: "Run", exact: true }).click();
+    const echo = page.locator('[data-output-id="echo"] pre');
+    await expect(echo).toBeVisible();
+    const received = JSON.parse(await echo.innerText()) as { comment: unknown };
+    expect(received.comment).toEqual({ value: drawn });
+  });
+
+  test("loads a GeoJSON file into a geometry input, and refuses one in RD New", async ({
+    page,
+  }) => {
+    await connectTyped(page, PYGEOAPI);
+    await openProcess(page, "Every input kind");
+    const area = page.locator('[data-input-id="area"]');
+    const file = area.getByLabel("Or load a GeoJSON file");
+    const geojson = area.getByRole("textbox", { name: "GeoJSON" });
+
+    const ring = (points: number[][]) => [[...points, points[0]]];
+    await file.setInputFiles({
+      name: "rd.geojson",
+      mimeType: "application/geo+json",
+      buffer: Buffer.from(
+        JSON.stringify({
+          type: "Polygon",
+          coordinates: ring([
+            [155000, 463000],
+            [155100, 463000],
+            [155100, 463100],
+          ]),
+        }),
+      ),
+    });
+    await expect(area.getByRole("status")).toContainText("RD New (EPSG:28992)");
+    await expect(geojson).toHaveValue("");
+
+    const square = ring([
+      [5.1, 52.1],
+      [5.2, 52.1],
+      [5.2, 52.2],
+    ]);
+    await file.setInputFiles({
+      name: "parcels.geojson",
+      mimeType: "application/geo+json",
+      buffer: Buffer.from(
+        JSON.stringify({
+          type: "FeatureCollection",
+          features: [
+            { type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: square } },
+            { type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: square } },
+          ],
+        }),
+      ),
+    });
+    // Two polygons, and the input takes a MultiPolygon: both are kept.
+    await expect(area.getByRole("status")).toHaveText("Loaded 2 shapes.");
+    expect(JSON.parse(await geojson.inputValue())).toEqual({
+      type: "MultiPolygon",
+      coordinates: [square, square],
+    });
   });
 
   test("shows the raw JSON editor, with its reason, for an input it cannot handle, and still runs", async ({

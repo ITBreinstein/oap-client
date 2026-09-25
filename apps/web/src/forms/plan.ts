@@ -76,9 +76,8 @@ export type GeometryType =
 export type GeometryWrapper = "geometry" | "feature" | "feature-collection";
 
 /**
- * Drawing a geometry is out of scope for Task 7: the renderer shows this as a
- * raw JSON editor with a "not yet supported" note. The plan still records it,
- * so the failure catalogue counts geometry inputs as geometry.
+ * A GeoJSON input: drawn on the map, loaded from a file, or typed as GeoJSON.
+ * The field holds the GeoJSON itself; the encoder wraps it (Requirement 20).
  */
 export interface GeometryControl {
   readonly kind: "geometry";

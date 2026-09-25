@@ -1,0 +1,26 @@
+{
+  "method": "POST",
+  "url": "{{baseUrl}}/processes/Contains/execution",
+  "headers": {
+    "Accept": "application/json",
+    "Content-Type": "application/json"
+  },
+  "body": {
+    "inputs": {
+      "InputEntity1": {
+        "href": "https://raw.githubusercontent.com/Gouwe-Gozer/ogc-processes-tests/6337cf43f22f780b883b7b0f43650585e4bf0d92/fixtures/gml/simple_polygon.gml",
+        "type": "text/xml"
+      },
+      "InputEntity2": {
+        "href": "https://raw.githubusercontent.com/Gouwe-Gozer/ogc-processes-tests/6337cf43f22f780b883b7b0f43650585e4bf0d92/fixtures/gml/inside_point.gml",
+        "type": "text/xml"
+      }
+    },
+    "outputs": {
+      "Result": {
+        "transmissionMode": "value"
+      }
+    },
+    "response": "document"
+  }
+}

@@ -37,6 +37,8 @@ the versions are recorded here rather than left to a commit message.
               execution/preflight-execute-{cors,nocors}.http          2026-09-23
               processes/breinstein-{bbox,inputs,png}.json,
               process-list.json  (re-captured; now carries all five)  2026-09-23
+              processes/breinstein-inputs.json (re-captured; now
+                carries the optional geometry input `area`)          2026-09-25
 
 The three `breinstein-*` descriptions are processes this repository adds to the
 pinned image (see `infra/README.md`). They are the only descriptions a browser
