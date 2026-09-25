@@ -24,6 +24,8 @@ describe("parseEndpoints", () => {
     ["an unknown read route", { ...base, readRoute: "proxy" }],
     ["a process list that is not an array", { ...base, processes: "hellojs" }],
     ["a process id that is not a string", { ...base, processes: ["hellojs", 7] }],
+    ["an empty process list", { ...base, processes: [] }],
+    ["a process id listed twice", { ...base, processes: ["hellojs", "hellojs"] }],
   ])("refuses %s", (_, entry) => {
     expect(() => parseEndpoints({ endpoints: [entry] })).toThrow(RelayContractError);
   });

@@ -42,7 +42,7 @@ import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
 import { streamSSE } from "hono/streaming";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { parseConfig, type EndpointConfig, type RelayConfig } from "./config.js";
+import { parseConfig, PROCESS_ID, type EndpointConfig, type RelayConfig } from "./config.js";
 import {
   forward as forwardUpstream,
   isJobResource,
@@ -69,13 +69,6 @@ export type CallbackKind = (typeof CALLBACK_KINDS)[number];
 function isCallbackKind(value: string): value is CallbackKind {
   return CALLBACK_KINDS.some((kind) => kind === value);
 }
-
-/**
- * Server ids are chosen by the server, so this admits what both reference
- * servers use — ZOO's `OTB.BandMath` included — and nothing that could change
- * the shape of the URL it is placed into.
- */
-const PROCESS_ID = /^[A-Za-z0-9_][A-Za-z0-9._~-]{0,127}$/;
 
 /**
  * What happened, for tests and operators. Carries no token, no URL and no
@@ -448,7 +441,7 @@ export function createApp(options: AppOptions = {}): Hono {
         executeRoute: endpoint.executeRoute,
         readRoute: endpoint.readRoute,
         callbacks: endpoint.callbacks,
-        ...(endpoint.processes === undefined ? {} : { processes: endpoint.processes }),
+        processes: endpoint.processes,
       })),
     }),
   );

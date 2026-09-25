@@ -69,13 +69,20 @@ interface Connected {
   readonly listFilter?: ListFilter | undefined;
 }
 
-/** How a configured process list narrowed what the server offers. */
+/**
+ * How a configured process list narrowed what the server offers. How many are
+ * shown, and whether the read was cut short, are on the narrowed list itself.
+ */
 export interface ListFilter {
-  readonly shown: number;
-  /** What the server listed, before narrowing. */
-  readonly total: number;
-  /** Configured ids the server does not have. */
+  /** How many processes the client read, before narrowing. */
+  readonly read: number;
+  /**
+   * Configured ids not among those read. On a list cut short they may still be
+   * on the server, on a page that was not read.
+   */
   readonly missing: readonly string[];
+  /** False when none of the configured ids was read, so the whole list is shown. */
+  readonly applied: boolean;
 }
 
 interface ProcessOpen extends Connected {

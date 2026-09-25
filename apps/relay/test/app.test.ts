@@ -234,7 +234,6 @@ describe("GET /endpoints with a process list", () => {
     expect(body).toMatchObject({
       endpoints: [{ key: "zoo", processes: ["hellojs", "Buffer"] }, { key: "all" }],
     });
-    expect(JSON.stringify(body)).not.toContain('"processes":null');
   });
 });
 

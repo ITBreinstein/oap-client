@@ -68,6 +68,7 @@ export function relayEndpointFor(endpoint: EndpointRef): RelayEndpoint {
         executeRoute: endpoint.executeRoute,
         readRoute: endpoint.readRoute,
         callbacks: endpoint.callbacks,
+        processes: endpoint.processes,
       }
     : {
         key: "typed",
@@ -81,7 +82,8 @@ export function relayEndpointFor(endpoint: EndpointRef): RelayEndpoint {
 /**
  * The list the page shows. For a configured endpoint that names its processes,
  * only those, in the server's order, and a note of what was left out, so the
- * screen can say so. Anything else is shown whole.
+ * screen can say so. Anything else is shown whole. So is the list when none of
+ * the configured ids was read, rather than leaving the page with nothing to open.
  */
 export function listedProcesses(
   endpoint: EndpointRef,
@@ -93,12 +95,13 @@ export function listedProcesses(
   const wanted = new Set(endpoint.processes);
   const kept = list.processes.filter((summary) => wanted.has(summary.id));
   const present = new Set(list.processes.map((summary) => summary.id));
+  const applied = kept.length > 0;
   return {
-    processes: { ...list, processes: kept },
+    processes: applied ? { ...list, processes: kept } : list,
     listFilter: {
-      shown: kept.length,
-      total: list.processes.length,
+      read: list.processes.length,
       missing: endpoint.processes.filter((id) => !present.has(id)),
+      applied,
     },
   };
 }

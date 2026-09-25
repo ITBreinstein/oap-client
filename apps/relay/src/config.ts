@@ -120,8 +120,13 @@ export class ConfigError extends Error {
 
 const ENDPOINT_KEY = /^[a-z0-9][a-z0-9-]{0,62}$/;
 
-/** As the execute route accepts them: ZOO's `OTB.BandMath` included, nothing URL-shaped. */
-const PROCESS_ID = /^[A-Za-z0-9_][A-Za-z0-9._~-]{0,127}$/;
+/**
+ * Server ids are chosen by the server, so this admits what both reference
+ * servers use — ZOO's `OTB.BandMath` included — and nothing that could change
+ * the shape of the URL it is placed into. The execute route checks against it
+ * too, so a configured list and the route accept the same ids.
+ */
+export const PROCESS_ID = /^[A-Za-z0-9_][A-Za-z0-9._~-]{0,127}$/;
 
 function readProcessIds(record: Record<string, unknown>, path: string): string[] | undefined {
   const value = record["processes"];

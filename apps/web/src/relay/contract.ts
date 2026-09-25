@@ -77,6 +77,18 @@ function optionalString(
   return value;
 }
 
+/** As the relay's config allows it: absent, or a non-empty list of distinct ids. */
+function processIds(value: unknown): readonly string[] | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value) || value.length === 0) throw new RelayContractError("endpoint");
+  const ids: string[] = [];
+  for (const id of value) {
+    if (typeof id !== "string" || ids.includes(id)) throw new RelayContractError("endpoint");
+    ids.push(id);
+  }
+  return ids;
+}
+
 export function parseEndpoints(value: unknown): RelayEndpoint[] {
   if (!isRecord(value) || !Array.isArray(value["endpoints"])) {
     throw new RelayContractError("endpoint list");
@@ -95,23 +107,8 @@ export function parseEndpoints(value: unknown): RelayEndpoint[] {
     ) {
       throw new RelayContractError("endpoint");
     }
-    const processes = entry["processes"];
-    if (
-      processes !== undefined &&
-      (!Array.isArray(processes) || !processes.every((id) => typeof id === "string"))
-    ) {
-      throw new RelayContractError("endpoint");
-    }
-    return {
-      key,
-      baseUrl,
-      executeRoute,
-      readRoute,
-      callbacks,
-      ...(processes === undefined
-        ? {}
-        : { processes: processes.filter((id) => typeof id === "string") }),
-    };
+    const processes = processIds(entry["processes"]);
+    return { key, baseUrl, executeRoute, readRoute, callbacks, processes };
   });
 }
 

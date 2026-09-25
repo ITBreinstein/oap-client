@@ -375,7 +375,20 @@ describe("listedProcesses", () => {
   it("keeps the configured ids, in the server's order, and says what it left out", () => {
     const { processes, listFilter } = listedProcesses(zoo, list);
     expect(processes.processes.map((entry) => entry.id)).toEqual(["Buffer", "hellojs"]);
-    expect(listFilter).toEqual({ shown: 2, total: 4, missing: ["NotThere"] });
+    expect(listFilter).toEqual({ read: 4, missing: ["NotThere"], applied: true });
+  });
+
+  it("keeps the narrowed list's truncation, so the screen can hedge what is missing", () => {
+    const { processes } = listedProcesses(zoo, { ...list, truncated: true });
+    expect(processes.truncated).toBe(true);
+  });
+
+  it("shows everything when none of the configured ids was read, and says so", () => {
+    const renamed: EndpointRef = { ...zoo, processes: ["EchoProcess", "NotThere"] };
+    expect(listedProcesses(renamed, list)).toEqual({
+      processes: list,
+      listFilter: { read: 4, missing: ["EchoProcess", "NotThere"], applied: false },
+    });
   });
 
   it("shows everything for an endpoint that names no processes, and for a typed one", () => {

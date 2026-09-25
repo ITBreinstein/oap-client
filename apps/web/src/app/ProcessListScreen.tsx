@@ -28,7 +28,11 @@ export function ProcessListScreen(props: ProcessListScreenProps) {
       process.id.toLowerCase().includes(needle) ||
       (process.title ?? "").toLowerCase().includes(needle),
   );
+  const count = processes.processes.length;
   const total = processes.numberTotal;
+  const cutShort = processes.truncated;
+  // On a list cut short, an id not read may still be on a page that was not.
+  const missingLabel = cutShort ? "not among those read" : "not on the server";
 
   return (
     <section aria-labelledby={`${base}-heading`}>
@@ -42,25 +46,31 @@ export function ProcessListScreen(props: ProcessListScreenProps) {
         Processes
       </h2>
       {service.description !== undefined && <p className="help">{service.description}</p>}
-      {listFilter !== undefined && (
+      {listFilter?.applied === true ? (
         <p className="muted" data-testid="list-filter">
-          {`${String(listFilter.shown)} of the ${String(listFilter.total)} processes this server lists, as configured for this service.`}
+          {`${String(count)} of the ${String(listFilter.read)} processes this server lists, as configured for this service`}
+          {total !== undefined && total > listFilter.read && ` (it reports ${String(total)})`}
+          {cutShort &&
+            " — the list was cut short after too many pages, so configured processes on the pages not read are not shown"}
+          .
           {listFilter.missing.length > 0 &&
-            ` Configured but not on the server: ${listFilter.missing.join(", ")}.`}
+            ` Configured but ${missingLabel}: ${listFilter.missing.join(", ")}.`}
         </p>
+      ) : (
+        <>
+          {listFilter !== undefined && (
+            <p className="muted" data-testid="list-filter">
+              {`None of the processes configured for this service is ${cutShort ? "among those read" : "on the server"}, so all are listed. Configured: ${listFilter.missing.join(", ")}.`}
+            </p>
+          )}
+          <p className="muted">
+            {count === 1 ? "1 process" : `${String(count)} processes`}
+            {total !== undefined && total > count && ` of ${String(total)} the server reports`}
+            {cutShort && " — the list was cut short after too many pages; some are not shown"}.
+          </p>
+        </>
       )}
-      <p className="muted">
-        {processes.processes.length === 1
-          ? "1 process"
-          : `${String(processes.processes.length)} processes`}
-        {total !== undefined &&
-          total > processes.processes.length &&
-          ` of ${String(total)} the server reports`}
-        {processes.truncated &&
-          " — the list was cut short after too many pages; some are not shown"}
-        .
-      </p>
-      {processes.processes.length > 8 && (
+      {count > 8 && (
         <p>
           <label htmlFor={`${base}-filter`}>Filter by id or title</label>
           <input
