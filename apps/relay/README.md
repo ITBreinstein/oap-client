@@ -29,7 +29,9 @@ route only after a CORS failure, and only once the user has confirmed it. The
 direct failure is still recorded. So the matrix still says the server cannot
 be used from a web page, and the page shows it is reaching the server through
 the relay. This is phase 3 of the plan: a proxy added only after a server had
-been shown to need one (finding 0050), not a change of course. Without
+been shown to need one (finding 0050), not a change of course. The decision,
+and the alternatives rejected, are in
+[docs/adr/0001-relay-read-route.md](../../docs/adr/0001-relay-read-route.md). Without
 `readRoute`, a server with no CORS headers — pygeoapi on `:5081` in CI —
 stays unusable from a browser, relay or not (finding 0049).
 
