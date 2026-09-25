@@ -101,7 +101,10 @@ Detecting one is not simply "has a `type` or `title`". Both members collide with
 ordinary payloads: a job document is `{"type": "process", ...}` and every
 process description carries a `title`. A body qualifies when the server declared
 `application/problem+json`, or the wire status is already >= 400, or `type` is
-URI-shaped, or the body itself claims a failing numeric `status`.
+URI-shaped and the body carries a `detail` or a failing numeric `status`, or the
+body claims a failing numeric `status` alongside a `title`. A URI-shaped `type`
+alone is not enough: a process result may carry one (`"urn:…"`, `"EPSG:4326"`),
+and reading it as a problem document would throw a synchronous result away.
 
 The wire status and the body's claimed status are kept separate and never
 reconciled. Servers disagree with themselves, and the disagreement is a finding.
@@ -550,7 +553,9 @@ There is no `JobFailedError`. Throwing would discard the server's explanation
 and replace it with a worse version of the same information, and the job panel's
 entire purpose is to show what the server said. `waitForJob()` resolves for
 `failed` and `dismissed` too; whether a failure is an error is the caller's
-decision.
+decision. It does throw `JobPollTimeoutError` when polling stops at `maxPolls`
+with the job still not terminal — `pollJob()` reports that as a `timeout`
+outcome, but a status that is still `running` is not the final one.
 
 What _does_ throw: a 404 (`JobNotFoundError`), a 5xx (`ProcessesError`), a
 transport failure, an abort, and a body with no usable `status`
@@ -616,7 +621,9 @@ const report = await client.pollJob(url, {
   floor. Because that floor is _below_ the one-second `Retry-After` minimum, a
   server can currently only ever lengthen a wait, never shorten one.
 - **The total deadline is separate from your signal**, and so is its error:
-  `JobPollTimeoutError` for the deadline, `AbortError` for you. The timeout
+  `JobPollTimeoutError` for the deadline, `AbortError` for you. It also ends a
+  status read still in flight, so a server that never answers cannot hold the
+  loop past it. The timeout
   error carries the last status seen, the poll count and the elapsed time,
   because "still running after twenty minutes" and "never answered at all" are
   different failures.

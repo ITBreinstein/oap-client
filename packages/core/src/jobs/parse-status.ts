@@ -59,12 +59,21 @@ function stringOrUndefined(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() !== "" ? value : undefined;
 }
 
-/** `jobID`, then `id`, then the last path segment of the URL it was read from. */
-function readJobId(body: Record<string, unknown>, documentUrl: string): string | undefined {
+/**
+ * `jobID`, then `id`, then — for a job's own document only — the last path
+ * segment of the URL it was read from. An entry on a job-list page was read
+ * from the list, whose last segment names the list and not the job.
+ */
+function readJobId(
+  body: Record<string, unknown>,
+  documentUrl: string,
+  listEntry: boolean,
+): string | undefined {
   for (const key of ["jobID", "id"] as const) {
     const value = stringOrUndefined(body[key]);
     if (value !== undefined) return value;
   }
+  if (listEntry) return undefined;
   try {
     const segments = new URL(documentUrl).pathname.split("/").filter((part) => part !== "");
     const tail = segments[segments.length - 1];
@@ -124,6 +133,12 @@ export interface ParseJobStatusOptions {
   readonly sink?: ObservationSink | undefined;
   /** Names the offending entry when parsing a job-list page. */
   readonly where?: string | undefined;
+  /**
+   * The document is one entry of a job-list page, so `documentUrl` is the
+   * list's. An entry with no `jobID` or `id` then has no id, rather than the
+   * list's last path segment.
+   */
+  readonly listEntry?: boolean | undefined;
 }
 
 /**
@@ -148,7 +163,7 @@ export function parseJobStatus(body: unknown, options: ParseJobStatusOptions): J
   // Fatal. Without a status there is no job state to report, no way to decide
   // whether to keep polling, and nothing a job panel could render.
   if (rawStatus === undefined) {
-    const jobId = readJobId(body, documentUrl);
+    const jobId = readJobId(body, documentUrl, options.listEntry === true);
     throw new MalformedJobDocumentError(
       documentUrl,
       body["status"] === undefined
@@ -166,7 +181,7 @@ export function parseJobStatus(body: unknown, options: ParseJobStatusOptions): J
   // does not know.
   const status: JobState = recognised ? (rawStatus.toLowerCase() as JobState) : "running";
 
-  const jobId = readJobId(body, documentUrl);
+  const jobId = readJobId(body, documentUrl, options.listEntry === true);
   if (jobId === undefined) warnings.push("no-job-id");
 
   const processId = stringOrUndefined(body["processID"]);

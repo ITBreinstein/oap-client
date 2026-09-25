@@ -77,6 +77,35 @@ describe("classify", () => {
     expect(result.kind).toBe("exception");
   });
 
+  it("takes a 200 with a URI-shaped type and a detail", async () => {
+    const result = await classify(
+      envelope(JSON.stringify({ type: "https://example.test/errors/x", detail: "it broke" }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    expect(result.kind).toBe("exception");
+  });
+
+  // A synchronous result is free to carry a URI-shaped `type`. Read as a
+  // problem document, the result would be thrown away as an exception.
+  it.each([
+    [{ type: "urn:ogc:def:crs:EPSG::4326", value: [5, 52] }],
+    [{ type: "EPSG:4326", title: "Amersfoort" }],
+    [{ type: "https://schema.org/Place", title: "Utrecht", status: "open" }],
+  ])(
+    "does not mistake a result with a URI-shaped type for a problem document: %j",
+    async (body) => {
+      const result = await classify(
+        envelope(JSON.stringify(body), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+      );
+      expect(result.kind).toBe("ok");
+    },
+  );
+
   it("takes a 200 whose body claims a failing status", async () => {
     const result = await classify(
       envelope(JSON.stringify({ title: "Internal error", status: 500 }), {

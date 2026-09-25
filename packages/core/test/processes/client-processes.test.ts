@@ -120,6 +120,66 @@ describe("client.listProcesses", () => {
     await expect(client.listProcesses()).resolves.toMatchObject({ pageCount: 1 });
   });
 
+  it("asks again after a landing page it could not reach, rather than keeping the guess", async () => {
+    // A blip on the first call would otherwise pin this client to `./processes`
+    // for its whole life, over the link the server does advertise.
+    const LISTED = `${ORIGIN}/elsewhere/processes`;
+    let landingRequests = 0;
+    server.use(
+      http.get(BASE, () => {
+        landingRequests += 1;
+        return landingRequests === 1
+          ? new HttpResponse("busy", { status: 503 })
+          : HttpResponse.json(
+              landing([{ rel: "processes", type: "application/json", href: LISTED }]),
+            );
+      }),
+      http.get(`${BASE}conformance`, () => HttpResponse.json(conformanceFixture)),
+      http.get(`${BASE}processes`, () => HttpResponse.json(pygeoapiList)),
+      http.get(LISTED, () => HttpResponse.json(pygeoapiList)),
+    );
+    const { sink, seen } = collect();
+    const client = createClient({ baseUrl: BASE, onObservation: sink });
+
+    await client.listProcesses();
+    await client.listProcesses();
+
+    const links = seen.filter((entry) => entry.kind === "processes-link");
+    expect(links.map((entry) => entry.source)).toEqual(["path-fallback", "advertised"]);
+  });
+
+  it("keeps a guess made because the landing page is not JSON: it will say the same again", async () => {
+    let landingRequests = 0;
+    server.use(
+      http.get(BASE, () => {
+        landingRequests += 1;
+        return HttpResponse.html("<html><body>Welcome</body></html>");
+      }),
+      http.get(`${BASE}processes`, () => HttpResponse.json(pygeoapiList)),
+    );
+    const client = createClient({ baseUrl: BASE });
+
+    await client.listProcesses();
+    const afterFirst = landingRequests;
+    await client.listProcesses();
+
+    expect(landingRequests).toBe(afterFirst);
+  });
+
+  it("does not fail one caller because another sharing its discovery cancelled", async () => {
+    serveDiscovery();
+    server.use(http.get(`${BASE}processes`, () => HttpResponse.json(pygeoapiList)));
+    const client = createClient({ baseUrl: BASE });
+    const controller = new AbortController();
+
+    const cancelled = client.listProcesses({ signal: controller.signal });
+    const other = client.listProcesses();
+    controller.abort();
+
+    await expect(cancelled).rejects.toMatchObject({ name: "AbortError" });
+    await expect(other).resolves.toMatchObject({ pageCount: 1 });
+  });
+
   it("does not memoise a cancelled discovery", async () => {
     serveDiscovery();
     server.use(http.get(`${BASE}processes`, () => HttpResponse.json(pygeoapiList)));

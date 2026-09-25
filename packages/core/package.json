@@ -1,6 +1,6 @@
 {
   "name": "@breinstein/oap-client",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "license": "MIT",
   "description": "A runtime-neutral OGC API - Processes client: discovery, execution, job polling and results.",
   "keywords": [

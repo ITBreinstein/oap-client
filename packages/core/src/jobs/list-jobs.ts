@@ -147,6 +147,7 @@ export async function listJobs(jobsUrl: string, options: ListJobsOptions = {}): 
         status = parseJobStatus(entry, {
           documentUrl: page.envelope.url,
           where: `page ${String(pageCount)}, entry at index ${String(index)}`,
+          listEntry: true,
           ...(sink === undefined ? {} : { sink }),
         });
       } catch {

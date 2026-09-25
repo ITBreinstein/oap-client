@@ -485,6 +485,59 @@ describe("terminal outcomes", () => {
     expect(report.statusSequence).toEqual(["paused", "paused", "paused"]);
   });
 
+  it("has waitForJob throw at maxPolls rather than hand back a status that is not final", async () => {
+    const fake = scripted([() => json(jobBody("paused"))]);
+    const outcome = waitForJob(JOB_URL, { fetch: fake.fetch, maxPolls: 3 }).catch(
+      (error: unknown) => error,
+    );
+
+    await vi.advanceTimersByTimeAsync(600_000);
+    const error = await outcome;
+
+    expect(error).toBeInstanceOf(JobPollTimeoutError);
+    expect(error).toMatchObject({ pollCap: 3, pollCount: 3 });
+    expect(String(error)).toContain("within 3 polls");
+  });
+
+  it("ends a status read that never answers at the total deadline", async () => {
+    // A browser `fetch` has no timeout of its own. Checked only between polls,
+    // the deadline would never come round while this read hangs.
+    let aborted = false;
+    const hang = (_url: string, init?: RequestInit): Promise<Response> =>
+      new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => {
+          aborted = true;
+          reject(new DOMException("aborted", "AbortError"));
+        });
+      });
+    const { sink, seen } = collect();
+    const promise = pollJob(JOB_URL, { fetch: hang, timeoutMs: 5_000, onObservation: sink });
+    const outcome = promise.catch((error: unknown) => error);
+
+    await vi.advanceTimersByTimeAsync(5_000);
+
+    expect(await outcome).toBeInstanceOf(JobPollTimeoutError);
+    expect(aborted).toBe(true);
+    expect(seen.find((entry) => entry.kind === "job-polled")).toMatchObject({ outcome: "timeout" });
+  });
+
+  it("still reports the caller's own abort of a read in flight as an abort", async () => {
+    const controller = new AbortController();
+    const hang = (_url: string, init?: RequestInit): Promise<Response> =>
+      new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => {
+          reject(new DOMException("aborted", "AbortError"));
+        });
+      });
+    const outcome = pollJob(JOB_URL, { fetch: hang, signal: controller.signal }).catch(
+      (error: unknown) => error,
+    );
+
+    controller.abort();
+
+    expect(await outcome).toBeInstanceOf(AbortError);
+  });
+
   it("records the full status sequence — the async-usability matrix column", async () => {
     const { sink, seen } = collect();
     const fake = scripted([

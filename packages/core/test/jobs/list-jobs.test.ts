@@ -206,6 +206,22 @@ describe("tolerance", () => {
     });
   });
 
+  it("keeps every entry without an id, rather than naming it after the list", async () => {
+    // The list URL ends in `jobs`. Taking that as the id would merge every
+    // id-less entry into one job called "jobs" and count the rest as repeats.
+    const fake = pages({
+      [JOBS_URL]: {
+        jobs: [job("a"), { status: "running" }, { status: "failed" }],
+        links: [],
+      },
+    });
+
+    const list = await listJobs(JOBS_URL, { fetch: fake.fetch });
+
+    expect(list.jobs.map((entry) => entry.jobId)).toEqual(["a", "", ""]);
+    expect(list.jobs[1]?.warnings).toContain("no-job-id");
+  });
+
   it("is fatal when `jobs` is not an array", async () => {
     const fake = pages({ [JOBS_URL]: { jobs: "lots", links: [] } });
 
