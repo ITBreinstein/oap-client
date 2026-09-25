@@ -372,6 +372,68 @@
             "outputTransmission":[
                 "value"
             ]
+        },
+        {
+            "version":"1.0.0",
+            "id":"breinstein-aerial",
+            "title":"Aerial photograph of an area",
+            "description":"Takes one GeoJSON polygon in the Netherlands and returns the current aerial photograph of its bounding box, with that box. Imagery: Beeldmateriaal Nederland, Luchtfoto Actueel Ortho 8cm RGB, open data, via PDOK.",
+            "jobControlOptions":[
+                "sync-execute",
+                "async-execute"
+            ],
+            "keywords":[
+                "geojson",
+                "image",
+                "aerial photograph",
+                "testbed"
+            ],
+            "links":[
+                {
+                    "type":"text/xml",
+                    "rel":"related",
+                    "title":"The imagery source: PDOK Luchtfoto RGB (WMS capabilities)",
+                    "href":"https://service.pdok.nl/hwh/luchtfotorgb/wms/v1_0?request=GetCapabilities&service=WMS"
+                },
+                {
+                    "type":"application/json",
+                    "rel":"self",
+                    "href":"http://localhost:5080/processes/breinstein-aerial?f=json",
+                    "title":"Process description as JSON",
+                    "hreflang":"en-US"
+                },
+                {
+                    "type":"text/html",
+                    "rel":"alternate",
+                    "href":"http://localhost:5080/processes/breinstein-aerial?f=html",
+                    "title":"Process description as HTML",
+                    "hreflang":"en-US"
+                },
+                {
+                    "type":"text/html",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/job-list",
+                    "href":"http://localhost:5080/jobs?f=html",
+                    "title":"Jobs list as HTML",
+                    "hreflang":"en-US"
+                },
+                {
+                    "type":"application/json",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/job-list",
+                    "href":"http://localhost:5080/jobs?f=json",
+                    "title":"Jobs list as JSON",
+                    "hreflang":"en-US"
+                },
+                {
+                    "type":"application/json",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/execute",
+                    "href":"http://localhost:5080/processes/breinstein-aerial/execution?f=json",
+                    "title":"Execution for this process as JSON",
+                    "hreflang":"en-US"
+                }
+            ],
+            "outputTransmission":[
+                "value"
+            ]
         }
     ],
     "links":[

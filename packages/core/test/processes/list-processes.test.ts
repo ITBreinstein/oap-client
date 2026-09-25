@@ -60,6 +60,7 @@ describe("listProcesses on a single page", () => {
       "breinstein-inputs",
       "breinstein-png",
       "breinstein-rotate",
+      "breinstein-aerial",
     ]);
     expect(list.pageCount).toBe(1);
     expect(list.truncated).toBe(false);

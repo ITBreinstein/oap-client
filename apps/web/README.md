@@ -98,7 +98,17 @@ moves to show both. It is recognised by what it is, not by its media type:
 pygeoapi labels GeoJSON `application/geo+json`, ZOO's geometry services send
 it as `application/json`. GeoJSON in projected coordinates is not drawn, and
 the result says why ([`src/results/plottable.ts`](src/results/plottable.ts)).
-Images and collection references are Task 8.
+
+An image result a browser shows by itself — PNG, JPEG, GIF, WebP — is shown
+under Result as well as offered as a download. When the same results carry
+exactly one such image and exactly one bounding box in CRS84, the image is also
+placed on the map over that box, beneath the input's outline. That pairing is
+this client's reading: the standard has no way to say one output is another's
+extent, so with two images or two boxes nothing is placed.
+
+The display limit (512 kB) applies to each output of a results document on its
+own, so a base64 image carried in one does not push the JSON beside it into a
+download. Collection references are Task 8.
 
 ## Generated forms — [`src/forms/`](src/forms)
 
@@ -223,5 +233,5 @@ process description, so any change to a matcher shows up as a reviewed diff.
 - A choice of output format, or a media type for GeoJSON beyond what the
   description declares.
 - Reprojection, and a choice of basemap.
-- Images and collection references among the results (Task 8).
+- Collection references among the results (Task 8).
 - The bundle is one chunk of about 1.4 MB, most of it MapLibre.

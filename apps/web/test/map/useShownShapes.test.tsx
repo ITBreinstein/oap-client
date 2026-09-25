@@ -7,11 +7,17 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it } from "vitest";
 import type { MapShape } from "../../src/map/geometry-engine.js";
-import type { CreateShapeLayers, ShapeLayers, ShownShapes } from "../../src/map/shape-layers.js";
+import type {
+  CreateShapeLayers,
+  ShapeLayers,
+  ShownImage,
+  ShownShapes,
+} from "../../src/map/shape-layers.js";
 import { useShownShapes } from "../../src/map/useShownShapes.js";
 
 interface FakeLayers extends ShapeLayers {
   readonly shown: (readonly ShownShapes[])[];
+  readonly images: (ShownImage | undefined)[];
   readonly create: CreateShapeLayers;
   stopped: boolean;
   becomeReady(): void;
@@ -21,9 +27,11 @@ function fakeLayers(): FakeLayers {
   let ready: (() => void) | undefined;
   const layers: FakeLayers = {
     shown: [],
+    images: [],
     stopped: false,
     create: () => layers,
     show: (sets) => layers.shown.push(sets),
+    showImage: (image) => layers.images.push(image),
     onReady: (listener) => {
       ready = listener;
     },
@@ -61,9 +69,19 @@ function count(): number {
   return Number(host?.querySelector("[data-count]")?.getAttribute("data-count") ?? -1);
 }
 
-function Harness(props: { map: unknown; sets: readonly ShownShapes[]; layers: FakeLayers }) {
-  const { resultShapes } = useShownShapes(props.map as never, props.sets, props.layers.create);
-  return <span data-count={resultShapes} />;
+function Harness(props: {
+  map: unknown;
+  sets: readonly ShownShapes[];
+  image?: ShownImage;
+  layers: FakeLayers;
+}) {
+  const { resultShapes, resultImage } = useShownShapes(
+    props.map as never,
+    props.sets,
+    props.image,
+    props.layers.create,
+  );
+  return <span data-count={resultShapes} data-image={String(resultImage)} />;
 }
 
 function render(element: React.ReactNode) {
@@ -126,5 +144,30 @@ describe("useShownShapes", () => {
     });
     root = undefined;
     expect(layers.stopped).toBe(true);
+  });
+
+  it("hands the image over, moves the map to it, and says it is shown once ready", () => {
+    const layers = fakeLayers();
+    const { map, fitted } = fakeMap();
+    const image: ShownImage = {
+      url: "data:image/jpeg;base64,AA==",
+      bounds: [5.1, 52.08, 5.14, 52.1],
+    };
+    render(<Harness map={map} sets={[]} image={image} layers={layers} />);
+    expect(layers.images.at(-1)).toEqual(image);
+    expect(fitted).toEqual([
+      [
+        [5.1, 52.08],
+        [5.14, 52.1],
+      ],
+    ]);
+    expect(host?.querySelector("[data-image]")?.getAttribute("data-image")).toBe("false");
+    act(() => {
+      layers.becomeReady();
+    });
+    expect(host?.querySelector("[data-image]")?.getAttribute("data-image")).toBe("true");
+
+    render(<Harness map={map} sets={[]} layers={layers} />);
+    expect(layers.images.at(-1)).toBeUndefined();
   });
 });
