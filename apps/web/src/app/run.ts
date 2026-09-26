@@ -25,11 +25,29 @@ import type { RelayEndpoint } from "../relay/contract.js";
  * same request a client that let the user pick outputs would send with every
  * box ticked, and the execution observation still records that `outputs` was
  * supplied, so 0025 stays visible in the matrix.
+ *
+ * An output in `linkOutputs` is asked for by reference (Task 8, T2); the rest
+ * stay as the server prefers, exactly as before.
  */
 export function outputSelection(
   process: ProcessDescription,
+  linkOutputs: readonly string[] = [],
 ): Record<string, ExecuteOutputSelection> {
-  return Object.fromEntries(process.outputs.map((output) => [output.id, {}]));
+  return Object.fromEntries(
+    process.outputs.map((output) => [
+      output.id,
+      linkOutputs.includes(output.id) ? { transmissionMode: "reference" } : {},
+    ]),
+  );
+}
+
+/**
+ * Task 8, T2: whether the description allows asking for an output by
+ * reference. Process level only: 1.0 has no per-output declaration, and
+ * neither server sends one.
+ */
+export function offersLink(process: ProcessDescription): boolean {
+  return process.outputTransmission.includes("reference");
 }
 
 /** Each output's declared `contentMediaType`, for the result screen. */
@@ -54,9 +72,10 @@ export function runRequest(
   process: ProcessDescription,
   plan: FormPlan,
   values: FormValues,
+  linkOutputs: readonly string[] = [],
 ): RunRequest {
   const { inputs, notes } = toExecuteBody(plan, values);
-  return { inputs, outputs: outputSelection(process), notes };
+  return { inputs, outputs: outputSelection(process, linkOutputs), notes };
 }
 
 /** The relay's view of an endpoint. A typed URL is always direct (T8). */

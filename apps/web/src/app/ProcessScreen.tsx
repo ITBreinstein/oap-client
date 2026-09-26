@@ -9,6 +9,7 @@ import type { JobRow } from "../relay/job-session.js";
 import { ErrorMessage } from "./ErrorMessage.js";
 import { FieldView } from "./FormFields.js";
 import { ResultsView } from "./ResultsView.js";
+import { offersLink } from "./run.js";
 import type { WorkflowCommands, WorkflowView } from "./useWorkflow.js";
 import type { Workflow } from "./workflow.js";
 
@@ -77,6 +78,90 @@ function About({ state }: { readonly state: Open }) {
   );
 }
 
+/**
+ * Task 8, T2: how each output comes back. Offered when the description allows
+ * a reference, and then per output, value by default. Where it does not — every
+ * pygeoapi process, which describes itself as value-only whatever it honours
+ * (finding 0059) — only the developer view offers to ask for a link anyway,
+ * and the result's record says the request went beyond the description.
+ */
+function OutputChoices({
+  state,
+  developer,
+  editable,
+  onChange,
+}: {
+  readonly state: Open;
+  readonly developer: boolean;
+  readonly editable: boolean;
+  readonly onChange: WorkflowCommands["setTransmission"];
+}) {
+  const { process, linkOutputs } = state;
+  const allowed = offersLink(process);
+  if (process.outputs.length === 0 || (!allowed && !developer)) return null;
+  if (!allowed) {
+    return (
+      <fieldset className="outputs developer" disabled={!editable}>
+        <legend>Developer: ask for a link anyway</legend>
+        <p className="muted">
+          The description does not offer outputs by reference (
+          {process.outputTransmission.length === 0
+            ? "it declares nothing"
+            : `it declares ${process.outputTransmission.join(", ")}`}
+          ). Asking anyway is recorded as going beyond it.
+        </p>
+        {process.outputs.map((output) => (
+          <label key={output.id} className="choice">
+            <input
+              type="checkbox"
+              checked={linkOutputs.includes(output.id)}
+              onChange={(event) => {
+                onChange(output.id, event.target.checked ? "reference" : "value");
+              }}
+            />{" "}
+            Ask for “{output.title ?? output.id}” as a link
+          </label>
+        ))}
+      </fieldset>
+    );
+  }
+  return (
+    <fieldset className="outputs" disabled={!editable}>
+      <legend>Outputs</legend>
+      {process.outputs.map((output) => {
+        const link = linkOutputs.includes(output.id);
+        return (
+          <fieldset key={output.id} className="output-choice" data-output-choice={output.id}>
+            <legend>{output.title ?? output.id}</legend>
+            <label className="choice">
+              <input
+                type="radio"
+                name={`transmission-${output.id}`}
+                checked={!link}
+                onChange={() => {
+                  onChange(output.id, "value");
+                }}
+              />{" "}
+              Value
+            </label>{" "}
+            <label className="choice">
+              <input
+                type="radio"
+                name={`transmission-${output.id}`}
+                checked={link}
+                onChange={() => {
+                  onChange(output.id, "reference");
+                }}
+              />{" "}
+              Link
+            </label>
+          </fieldset>
+        );
+      })}
+    </fieldset>
+  );
+}
+
 function JobStatusLine({ job }: { readonly job: JobRow | undefined }) {
   if (job === undefined) return <>Starting the job…</>;
   if (job.status === undefined) {
@@ -105,10 +190,13 @@ export interface ProcessScreenProps {
   readonly jobs: readonly JobRow[];
   readonly jobNotice: string | undefined;
   readonly dismissAdvertisedBy: WorkflowView["dismissAdvertisedBy"];
+  /** Opened with `?developer`: offers asking for a link the description does not. */
+  readonly developer?: boolean | undefined;
 }
 
 export function ProcessScreen(props: ProcessScreenProps) {
   const { state, commands, fieldErrors, jobs, jobNotice, dismissAdvertisedBy } = props;
+  const developer = props.developer === true;
   const { process, plan, values, warnings, mode } = state;
   const base = useId();
   const both = process.execution.sync && process.execution.async;
@@ -179,6 +267,13 @@ export function ProcessScreen(props: ProcessScreenProps) {
             />
           ))}
         </fieldset>
+
+        <OutputChoices
+          state={state}
+          developer={developer}
+          editable={editable}
+          onChange={commands.setTransmission}
+        />
 
         {errorCount > 0 && (
           <p className="error-box" role="alert">
@@ -251,7 +346,11 @@ export function ProcessScreen(props: ProcessScreenProps) {
 
       {state.stage === "result" && (
         <>
-          <ResultsView results={state.results} processId={process.id} />
+          <ResultsView
+            results={state.results}
+            processId={process.id}
+            onLoad={commands.loadReference}
+          />
           <p className="actions">
             <button type="button" onClick={commands.edit}>
               Change the inputs

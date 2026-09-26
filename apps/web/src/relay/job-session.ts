@@ -62,6 +62,13 @@ export interface JobSession {
    */
   client(endpoint: RelayEndpoint, reads?: Reads): Client;
   /**
+   * The read route's `fetch` for one endpoint, or undefined unless `reads` is
+   * `relay` and the relay offers that endpoint the read route. For a URL a
+   * result handed back rather than one the core built; it refuses anything
+   * outside the endpoint's `baseUrl` by itself.
+   */
+  readFetch(endpoint: RelayEndpoint, reads: Reads): FetchLike | undefined;
+  /**
    * Start one asynchronous execution. Resolves once the job is known, or refused.
    * Pass the description and the core uses its `execute` link and checks arity.
    */
@@ -229,6 +236,8 @@ export function createJobSession(relayUrl: string | undefined): JobSession {
     async endpoints() {
       return relay === undefined ? [] : relay.endpoints();
     },
+
+    readFetch,
 
     client(endpoint, reads = "direct") {
       const read = readFetch(endpoint, reads);

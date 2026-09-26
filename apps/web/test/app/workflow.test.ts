@@ -12,7 +12,13 @@ import {
 import { describe, expect, it } from "vitest";
 import { initialValues } from "../../src/forms/defaults.js";
 import { resolveFormPlan } from "../../src/forms/resolve.js";
-import { outputSelection, runError, runRequest, typedEndpoint } from "../../src/app/run.js";
+import {
+  offersLink,
+  outputSelection,
+  runError,
+  runRequest,
+  typedEndpoint,
+} from "../../src/app/run.js";
 import {
   INITIAL_WORKFLOW,
   workflowReducer,
@@ -326,6 +332,91 @@ describe("the run request", () => {
     expect(request.notes).toEqual([
       { inputId: "c", code: "bbox-axis-swapped", crs: "urn:ogc:def:crs:EPSG:6.6:4326" },
     ]);
+  });
+});
+
+describe("outputs by reference (Task 8)", () => {
+  const echo = fixtureProcess("zoo-project/echo");
+
+  it("T2: offers a link only where the description allows one, at process level", () => {
+    expect(offersLink(echo)).toBe(true);
+    // pygeoapi describes every process as value-only (finding 0059).
+    expect(offersLink(inputsProcess)).toBe(false);
+  });
+
+  it("asks for a chosen output by reference and leaves the rest as the server prefers", () => {
+    expect(outputSelection(echo, ["c"])).toEqual({
+      a: {},
+      b: {},
+      c: { transmissionMode: "reference" },
+    });
+    expect(runRequest(echo, resolveFormPlan(echo), {}, ["a"]).outputs).toEqual({
+      a: { transmissionMode: "reference" },
+      b: {},
+      c: {},
+    });
+  });
+
+  it("records each output's choice on the open process, and nothing for an unknown output", () => {
+    const linked = reduce(open, {
+      type: "set-transmission",
+      outputId: "echo",
+      transmission: "reference",
+    });
+    expect(linked).toMatchObject({ stage: "process", linkOutputs: ["echo"] });
+    const back = reduce(linked, {
+      type: "set-transmission",
+      outputId: "echo",
+      transmission: "value",
+    });
+    expect(back).toMatchObject({ linkOutputs: [] });
+    const unknown = {
+      type: "set-transmission",
+      outputId: "nope",
+      transmission: "reference",
+    } as const;
+    expect(reduce(open, unknown)).toBe(open);
+    expect(reduce(result, unknown)).toBe(result);
+  });
+
+  it("starts every process with no output asked for by reference", () => {
+    expect(open).toMatchObject({ linkOutputs: [] });
+  });
+
+  const withLink = reduce(running, {
+    type: "results",
+    results: [
+      { kind: "reference", outputId: "echo", href: "https://x.test/a" },
+      { kind: "json", outputId: "summary", value: {} },
+    ],
+  });
+  const found = {
+    outcome: "cors-blocked",
+    route: "direct",
+    representation: undefined,
+    mediaType: undefined,
+    status: undefined,
+    detail: undefined,
+    blob: undefined,
+    geojson: undefined,
+    contentCrs: undefined,
+    axes: undefined,
+    page: undefined,
+    itemsUrl: undefined,
+  } as const;
+
+  it("puts what Load found on its own output, and nowhere else", () => {
+    const after = reduce(withLink, { type: "reference-loaded", outputId: "echo", loaded: found });
+    if (after.stage !== "result") throw new Error("not a result");
+    expect(after.results[0]).toMatchObject({ kind: "reference", loaded: found });
+    expect(after.results[1]).toBe(withLink.stage === "result" ? withLink.results[1] : undefined);
+  });
+
+  it("ignores a Load that lands after the result has gone (T8)", () => {
+    const action = { type: "reference-loaded", outputId: "echo", loaded: found } as const;
+    const edited = reduce(withLink, { type: "edit" });
+    expect(reduce(edited, action)).toBe(edited);
+    expect(reduce(result, action)).toBe(result);
   });
 });
 

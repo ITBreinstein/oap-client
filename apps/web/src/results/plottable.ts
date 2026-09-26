@@ -20,6 +20,11 @@
  * one output is the extent of another, so a process can only say so in its
  * descriptions, and a client can only infer it. With two images, or two
  * boxes, there is nothing to infer from, and nothing is placed.
+ *
+ * An output given by reference joins in once it is loaded (Task 8, T8): its
+ * GeoJSON is plotted and its image placed by the same rules, on the same
+ * path. Its `Content-Crs` comes first: EPSG:4326 is swapped back to longitude
+ * first, and any other CRS is not plotted and says so as `projected`.
  */
 
 import { CRS84 } from "../forms/crs.js";
@@ -44,11 +49,29 @@ function inDegrees(shape: Shape): boolean {
   return positions.every(([x = 0, y = 0]) => Math.abs(x) <= 180 && Math.abs(y) <= 90);
 }
 
-/** The JSON a result holds: shown, or read and too large to show. */
+/** The JSON a result holds: shown, read and too large to show, or loaded from its reference. */
 function jsonOf(result: RenderableResult): unknown {
   if (result.kind === "json") return result.value;
   if (result.kind === "download") return result.json;
+  if (result.kind === "reference" && result.loaded?.outcome === "ok") return result.loaded.geojson;
   return undefined;
+}
+
+function swapped(position: readonly number[]): number[] {
+  const [first = 0, second = 0, ...rest] = position;
+  return [second, first, ...rest];
+}
+
+/** Latitude-first to longitude-first, as `forms/crs.ts` does the other way (Task 8, T5). */
+export function swapAxes(shape: Shape): Shape {
+  switch (shape.type) {
+    case "Point":
+      return { type: "Point", coordinates: swapped(shape.coordinates) };
+    case "LineString":
+      return { type: "LineString", coordinates: shape.coordinates.map(swapped) };
+    case "Polygon":
+      return { type: "Polygon", coordinates: shape.coordinates.map((ring) => ring.map(swapped)) };
+  }
 }
 
 export function plotStatus(result: RenderableResult): PlotStatus {
@@ -56,8 +79,11 @@ export function plotStatus(result: RenderableResult): PlotStatus {
   if (value === undefined) return { kind: "not-geojson" };
   const shapes = shapesIn(value);
   if (shapes === undefined || shapes.length === 0) return { kind: "not-geojson" };
-  if (!shapes.every(inDegrees)) return { kind: "projected" };
-  return { kind: "plotted", shapes };
+  const axes = result.kind === "reference" ? result.loaded?.axes : undefined;
+  if (axes === "not-plotted") return { kind: "projected" };
+  const placed = axes === "swapped" ? shapes.map(swapAxes) : shapes;
+  if (!placed.every(inDegrees)) return { kind: "projected" };
+  return { kind: "plotted", shapes: placed };
 }
 
 /** Every shape of every result that can be plotted, in output order. */
@@ -76,12 +102,22 @@ const MAP_IMAGE_TYPES: ReadonlySet<string> = new Set([
   "image/webp",
 ]);
 
+/** The image a result holds, inline or loaded from its reference, when a browser shows it. */
+export function shownImage(result: RenderableResult): Blob | undefined {
+  if (result.kind === "download") {
+    return result.mediaType !== undefined && MAP_IMAGE_TYPES.has(result.mediaType)
+      ? result.blob
+      : undefined;
+  }
+  if (result.kind === "reference" && result.loaded?.representation === "image") {
+    const blob = result.loaded.blob;
+    return blob !== undefined && MAP_IMAGE_TYPES.has(blob.type) ? blob : undefined;
+  }
+  return undefined;
+}
+
 export function isShownImage(result: RenderableResult): boolean {
-  return (
-    result.kind === "download" &&
-    result.mediaType !== undefined &&
-    MAP_IMAGE_TYPES.has(result.mediaType)
-  );
+  return shownImage(result) !== undefined;
 }
 
 /** West, south, east, north, from an OGC bbox object in CRS84, or undefined. */
@@ -117,7 +153,10 @@ export interface MapImage {
 
 /** The one image and the one box that places it, or undefined. See the module comment. */
 export function mapImage(results: readonly RenderableResult[]): MapImage | undefined {
-  const images = results.filter(isShownImage);
+  const images = results.flatMap((result) => {
+    const blob = shownImage(result);
+    return blob === undefined ? [] : [{ outputId: result.outputId, blob }];
+  });
   const boxes = results.flatMap((result) => {
     if (result.kind !== "json") return [];
     const bounds = crs84Box(result.value);
@@ -125,12 +164,7 @@ export function mapImage(results: readonly RenderableResult[]): MapImage | undef
   });
   const [image] = images;
   const [box] = boxes;
-  if (
-    images.length !== 1 ||
-    boxes.length !== 1 ||
-    image?.kind !== "download" ||
-    box === undefined
-  ) {
+  if (images.length !== 1 || boxes.length !== 1 || image === undefined || box === undefined) {
     return undefined;
   }
   return {

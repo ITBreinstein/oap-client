@@ -112,6 +112,12 @@ Running:
 - **Every declared output is named** in the request, with no format or
   transmission mode: "all of them, as the server prefers". The core never adds
   `outputs` itself, and ZOO refuses a body without it (finding 0025).
+- **Value or Link, per output**, where the description's `outputTransmission`
+  offers `reference`; value by default, and a link is asked for with
+  `transmissionMode: "reference"`. Where it does not — every pygeoapi process,
+  which describes itself as value-only whatever it honours (finding 0059) — only
+  the page opened with `?developer` offers to ask for a link anyway, and the
+  result's record says the request went beyond the description.
 - **A server's refusal** is shown with its own words, and the input it names
   when its words name one.
 - **Cancel job** is offered for a background run. Where neither the process nor
@@ -141,7 +147,38 @@ The display limit (512 kB) applies to each output of a results document on its
 own, so a base64 image carried in one does not push the JSON beside it into a
 download. JSON over the limit is offered as a download but still read, so
 GeoJSON too large to show — a few hundred buildings is already a megabyte — is
-still drawn on the map. Collection references are Task 8.
+still drawn on the map.
+
+An output given **by reference** — a link in the results document — is shown
+as a link: where it points, **Load**, and **Open the link** in a new tab
+([`src/results/reference.ts`](src/results/reference.ts)). Nothing is fetched
+until Load is clicked: the href is the server's choice, possibly on a third
+party's host, which then sees the user's address, and possibly large.
+
+- **Refused before sending**: anything but `http:` and `https:` (never
+  clickable either), and a plain-`http:` href from a page served over HTTPS,
+  which the browser would block as mixed content.
+- **Direct**, unless the connection already reads through the relay — the user
+  confirmed it — and the href is under the endpoint's `baseUrl`. The relay is
+  never used for anything else (ADR 0001). A page that cannot read the href
+  says so and offers the link; ZOO's reference files are all like that
+  (outside its OGC API path, no CORS headers).
+- **Read under the envelope's buffer limit**, which also stops a chunked body.
+  An error page is shown as its status and its text, never rendered.
+- **Classified by what it is**: parsed as JSON — never evaluated — when labelled
+  JSON, JavaScript, plain text or nothing (ZOO serves GeoJSON as
+  `application/javascript`, finding 0026); GeoJSON is plotted like an inline
+  result; a collection is followed to its GeoJSON items in the same click; an
+  image goes the image path; anything else is a download.
+- **`Content-Crs` first**: none or CRS84 is plotted as is, EPSG:4326 has its
+  axes swapped back and says so, anything else (EPSG:4258, RD New) is not
+  plotted and says why. Nothing reprojects.
+- **One page, never silently**: a `next` link, or `numberMatched` above
+  `numberReturned`, says "First page only" or "Showing N of M".
+
+No live server returns a collection as a reference: `breinstein-buildings`
+links to an items query, ZOO to files and to a MapServer WFS request. The
+collection path is tested against PDOK's captured collection only.
 
 ## Generated forms — [`src/forms/`](src/forms)
 
@@ -247,7 +284,13 @@ input value, a schema body, a query string or a response body:
   confirmed, how the relay attempt ended (`relayOutcome`, with the relay's own
   `relayReasonCode`), and `routeUsed`, which is `relay` only when that attempt
   worked;
-- `cancel-job`: each Cancel job, and whether dismissal had been advertised.
+- `cancel-job`: each Cancel job, and whether dismissal had been advertised;
+- `result`: one per output of each run, as the result is shown — its media
+  type, whether it came as a value or a reference, what was asked for and what
+  the description declared (`declaredTransmission`), and, of a reference, only
+  its origin. A Load appends a second record for the same `runId`, with the
+  route, the outcome, what the href held, whether the page was truncated, and
+  its `Content-Crs` and any axis swap. The first record is never changed.
 
 Each observation is tagged with the endpoint it was made against when it is
 recorded, because some carry no URL of their own (`capabilities-derived`).
@@ -287,5 +330,8 @@ process description, so any change to a matcher shows up as a reviewed diff.
 - A choice of output format, or a media type for GeoJSON beyond what the
   description declares.
 - Reprojection, and a choice of basemap.
-- Collection references among the results (Task 8).
+- Paging through more than the first page of a reference, and map, tile or
+  WMS layers from a collection.
+- A `raw` response whose outputs are all given by reference (a `204` with
+  `Link` headers): neither reference server answers that way.
 - The bundle is one chunk of about 1.4 MB, most of it MapLibre.
