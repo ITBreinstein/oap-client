@@ -715,20 +715,20 @@ So the request sends `application/json, */*;q=0.8` — a preference a
 content-negotiating server can act on, while a result that is legitimately a PNG
 or a zip is still acceptable and still arrives.
 
-### A known gap: chunked result bodies are not size-guarded
+### Chunked bodies are counted as they are read
 
 `ResponseEnvelope` refuses to buffer a body whose **declared** `Content-Length`
-exceeds `maxBufferBytes`. A chunked response declares no length, so it is
-buffered regardless of size — and a result is exactly the response most likely
-to be both large and chunked. ZOO's results endpoint sends
-`Transfer-Encoding: chunked` on every response.
+exceeds `maxBufferBytes`, before reading any of it; `bodyTooLarge` says so, and
+`blob()` can still stream it. A chunked response declares no length — ZOO's
+results endpoint sends `Transfer-Encoding: chunked` on every response, and so
+does PDOK — so its decoded bytes are counted as they arrive, and reading stops
+at the limit: the stream is cancelled and every reader, `blob()` included,
+rejects with `BodyTooLargeError`, whose `bytesRead` says how far it got. The
+same count catches a `Content-Length` that understates the body.
 
-This is **tracked, not fixed**, against the October milestone. Fixing it properly
-means streaming into a `Blob` with a running byte count, which changes the
-envelope's reader contract for every caller, and doing that in the same change
-as the job layer would couple two unrelated risks. Until then, pass an explicit
-`maxBufferBytes` if you expect large results, and use `blob()` rather than
-`text()` or `json()`.
+The default, 8 MiB, reads PDOK's 1.08 MB page of 815 buildings and stops a
+10.8 MB WFS response from ZOO about 16 KB past the limit. Pass an explicit
+`maxBufferBytes` to read more.
 
 ### The job list, and why it is not a filter API
 

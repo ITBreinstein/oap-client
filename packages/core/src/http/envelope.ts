@@ -16,10 +16,18 @@ import { isJsonMediaType, parseContentDisposition, parseMediaType } from "./medi
 import { parseLinkHeader, resolve, type WebLink } from "./link-header.js";
 
 /**
- * Bodies above this are not buffered, so `json()`, `text()` and `arrayBuffer()`
- * refuse and only `blob()` is available. Process results are routinely large;
- * the point is that nothing decodes 400 MB of GeoTIFF into a string by accident.
+ * Bodies above this are not buffered. Process results are routinely large; the
+ * point is that nothing decodes 400 MB of GeoTIFF into a string by accident.
  * Override per request with `maxBufferBytes`.
+ *
+ * Enforced twice. A declared `Content-Length` over the limit is refused before
+ * anything is read, and `blob()` alone may then stream the body — the caller
+ * can see {@link ResponseEnvelope.bodyTooLarge} and decide. A body that
+ * declares no length (chunked), or declares less than it sends, is counted as
+ * it is read, after decompression, and reading stops at the limit: every
+ * reader, `blob()` included, then rejects with `BodyTooLargeError`. That second
+ * check is what makes a server-chosen URL — an output given by reference —
+ * safe to read at all.
  */
 export const DEFAULT_MAX_BUFFER_BYTES: number = 8 * 1024 * 1024;
 
@@ -54,7 +62,12 @@ export interface ResponseEnvelope {
   /** From the `Link` header only. Body links are a later concern. */
   readonly links: readonly WebLink[];
 
-  /** True when Content-Length exceeded the buffer limit; only `blob()` will work. */
+  /**
+   * True when the declared Content-Length exceeds the buffer limit; only
+   * `blob()` will work. False says nothing about a body that declares no
+   * length: that one is counted as it is read, and a reader rejects with
+   * `BodyTooLargeError` if it passes the limit.
+   */
   readonly bodyTooLarge: boolean;
 
   /**
@@ -130,18 +143,51 @@ export function createEnvelope(
   const { mediaType, params } = parseMediaType(headers.get("content-type"));
   const locationRaw = headers.get("location") ?? undefined;
   const length = declaredLength(headers);
-  // Only a *declared* length can be guarded. A chunked response has none, so it
-  // buffers; that is a known gap, not an oversight.
+  // A declared length is refused up front. One that is absent or understated
+  // is caught by the count in `readCapped`.
   const bodyTooLarge = length !== undefined && length > limit;
 
   let buffered: Promise<ArrayBuffer> | undefined;
   let blobbed: Promise<Blob> | undefined;
 
+  /**
+   * The body, read chunk by chunk with a running count of the decoded bytes.
+   * Past the limit the stream is cancelled, which stops the download, and the
+   * read rejects. What was read so far is dropped: a truncated body is not a
+   * body, and handing it over would invite parsing it.
+   */
+  async function readCapped(): Promise<ArrayBuffer> {
+    const stream = response.body;
+    if (stream === null) return new ArrayBuffer(0);
+    const reader = stream.getReader();
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > limit) {
+        // Cancelling can itself fail on a stream that already errored; the
+        // limit is the answer either way.
+        await reader.cancel().catch(() => undefined);
+        throw new BodyTooLargeError(url, length, limit, total);
+      }
+      chunks.push(value);
+    }
+    const whole = new Uint8Array(total);
+    let offset = 0;
+    for (const chunk of chunks) {
+      whole.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    return whole.buffer;
+  }
+
   function buffer(): Promise<ArrayBuffer> {
     if (bodyTooLarge) {
       return Promise.reject(new BodyTooLargeError(url, length, limit));
     }
-    buffered ??= response.arrayBuffer();
+    buffered ??= readCapped();
     return buffered;
   }
 

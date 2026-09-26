@@ -4,6 +4,7 @@
  */
 
 import {
+  BodyTooLargeError,
   unknownCapabilities,
   type ProcessList,
   type ServiceDescription,
@@ -344,5 +345,14 @@ describe("runError", () => {
     const plan = resolveFormPlan(inputsProcess);
     const error = runError(new Error("socket closed"), plan);
     expect(error).toEqual({ title: "The request did not complete.", detail: "socket closed" });
+  });
+
+  it("says the run finished when only its result was too large to read", () => {
+    const plan = resolveFormPlan(inputsProcess);
+    const cause = new BodyTooLargeError("http://x.test/r", undefined, 8 * 1024 * 1024, 8_404_992);
+    expect(runError(cause, plan)).toEqual({
+      title: "The run finished, but its result is larger than the 8 MB this page reads.",
+      detail: cause.message,
+    });
   });
 });
