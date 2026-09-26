@@ -58,7 +58,8 @@ export type KnownRelation =
   | "execute"
   | "monitor"
   | "results"
-  | "jobList";
+  | "jobList"
+  | "items";
 
 const REL_ALIASES: Readonly<Record<KnownRelation, readonly string[]>> = {
   self: ["self"],
@@ -99,6 +100,14 @@ const REL_ALIASES: Readonly<Record<KnownRelation, readonly string[]>> = {
   // finding 0006 and the reason `capabilities.jobList` is documented as
   // evidence rather than permission.
   jobList: ["jobs", "job-list", "http://www.opengis.net/def/rel/ogc/1.0/job-list"],
+  // A collection's features, from OGC API - Features. Not a Processes
+  // relation: it is how a client follows an output given by reference to a
+  // collection. PDOK's BAG collection writes only the short form, once per
+  // representation (GeoJSON, JSON-FG, HTML). `findLink` scores GeoJSON and
+  // JSON-FG alike (both `+json`), so a caller that needs GeoJSON picks it by
+  // `type` from `findLinks`. Verified 2026-09-26 against
+  // api.pdok.nl/kadaster/bag/ogc/v2, captured in `test/fixtures/pdok/`.
+  items: ["items", "http://www.opengis.net/def/rel/ogc/1.0/items"],
 };
 
 /**

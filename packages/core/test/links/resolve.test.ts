@@ -9,7 +9,12 @@
 import { describe, expect, it } from "vitest";
 import { createEnvelope } from "../../src/http/envelope.js";
 import type { ResponseEnvelope } from "../../src/http/envelope.js";
-import { collectLinks, readBodyLinks } from "../../src/links/resolve.js";
+import {
+  collectLinks,
+  readBodyLinks,
+  resolveBodyLinks,
+  resolveHref,
+} from "../../src/links/resolve.js";
 import type { Link } from "../../src/links/types.js";
 import type { Observation } from "../../src/observations.js";
 
@@ -184,5 +189,37 @@ describe("readBodyLinks", () => {
     expect(readBodyLinks({ links: "nope" })).toEqual([]);
     expect(readBodyLinks({ links: [{ rel: "self", href: "." }] })).toHaveLength(1);
     expect(readBodyLinks("not an object")).toBeUndefined();
+  });
+});
+
+describe("resolveHref", () => {
+  it("resolves against the URL the document was served from, per RFC 3986", () => {
+    expect(resolveHref("results/a.txt", "https://x.test/oapi/jobs/1/")).toBe(
+      "https://x.test/oapi/jobs/1/results/a.txt",
+    );
+    expect(resolveHref("results/a.txt", "https://x.test/oapi/jobs/1")).toBe(
+      "https://x.test/oapi/jobs/results/a.txt",
+    );
+  });
+
+  it("passes an absolute href through unchanged, double slash and all", () => {
+    // ZOO fork 46289f6, 2026-09-26: `zoo-project/execution/echo-reference.http`.
+    const href = "http://localhost:5090/temp//ZOO_DATA_echo_a_0.txt";
+    expect(resolveHref(href, "http://localhost:5090/ogc-api/processes/echo/execution")).toBe(href);
+  });
+
+  it("returns undefined, never the raw value, when the href cannot be made absolute", () => {
+    expect(resolveHref("relative", "not a base")).toBeUndefined();
+    expect(resolveHref("http://[bad", "https://x.test/")).toBeUndefined();
+  });
+
+  it("resolves an href that resolveBodyLinks skips for having no rel", () => {
+    // A by-reference output, as ZOO sends it: `link.yaml` requires only `href`.
+    const entry = { href: "/temp//ZOO_DATA_HelloPy_Result_0.txt" } as unknown as Link;
+    const base = "http://localhost:5090/ogc-api/processes/HelloPy/execution";
+    expect(resolveBodyLinks(base, [entry])).toEqual([]);
+    expect(resolveHref(entry.href, base)).toBe(
+      "http://localhost:5090/temp//ZOO_DATA_HelloPy_Result_0.txt",
+    );
   });
 });
