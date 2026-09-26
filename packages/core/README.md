@@ -163,6 +163,11 @@ deduped, because servers are inconsistent about which they use. A malformed link
 entry is skipped and recorded, never thrown: one bad link must not take down
 discovery of the other eleven.
 
+An href that is not in a `links` array — an output given by reference in a
+results document, which `link.yaml` allows to carry nothing but `href` — goes
+through `resolveHref(href, envelope.url)`: the same resolution, returning
+`undefined` rather than a relative URL when the href cannot be made absolute.
+
 ### Relation matching tolerates both spellings
 
 OGC registers its relations as full URIs; IANA registers short names; servers
@@ -170,6 +175,9 @@ pick either. `findLink` matches both, and it is not defensive programming —
 pygeoapi 0.21 advertises **conformance under the short name** and **processes
 under the long OGC URI**, on the same landing page. Either form alone finds one
 and misses the other.
+
+`items`, from OGC API - Features, is matched too: it is how a client follows an
+output given by reference to a collection.
 
 Where several links share a relation, `application/json` wins, then any `+json`
 suffix type, then an untyped link, then the first match. An untyped link

@@ -46,7 +46,7 @@ export type { FetchLike } from "./http/fetch.js";
 // Links. Everything above the transport navigates by these rather than by
 // concatenating paths onto the base URL — a server is free to mount its API
 // wherever it likes, and only it knows where that is.
-export { collectLinks, readBodyLinks, resolveBodyLinks } from "./links/resolve.js";
+export { collectLinks, readBodyLinks, resolveBodyLinks, resolveHref } from "./links/resolve.js";
 export { findLink, findLinks, requireLink } from "./links/find.js";
 export { aliasesFor, matchesRelation } from "./links/types.js";
 export type { KnownRelation, Link } from "./links/types.js";
@@ -236,4 +236,4 @@ export type {
  * and cannot read a file. `smoke/run.mjs` asserts the two agree — the
  * tests here only check the shape, so a half-done bump used to pass.
  */
-export const VERSION: string = "0.4.0";
+export const VERSION: string = "0.5.0";

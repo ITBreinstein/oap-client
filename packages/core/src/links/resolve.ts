@@ -37,8 +37,15 @@ const EMPTY_LINKS: readonly Link[] = Object.freeze([]);
  * keeping verbatim. It is wrong here, because a `Link` promises an absolute
  * `href` and handing back a relative one would push the failure into whoever
  * tries to fetch it.
+ *
+ * Exported for an href that is not in a `links` array: an output given by
+ * reference in a results document is a link object whose only required
+ * member is `href` (18-062r2 `link.yaml`), and ZOO-Project sends it with no
+ * `rel` — which {@link resolveBodyLinks} rightly skips, since a link without a
+ * relation cannot be looked up. `base` is the URL the carrying document was
+ * served from, {@link ResponseEnvelope.url}, as everywhere in this file.
  */
-function resolveStrict(href: string, base: string): string | undefined {
+export function resolveHref(href: string, base: string): string | undefined {
   try {
     return new URL(href, base).toString();
   } catch {
@@ -145,7 +152,7 @@ function addBodyLinks(
       continue;
     }
 
-    const href = resolveStrict(rawHref, base);
+    const href = resolveHref(rawHref, base);
     if (href === undefined) {
       observe(sink, { kind: "link-skipped", documentUrl, reason: "unresolvable-href" });
       continue;
@@ -209,7 +216,7 @@ export function collectLinks(
   // reported as a skipped body link.
   for (const header of envelope.links) {
     if (header.rel === undefined || header.rel.trim() === "") continue;
-    const href = resolveStrict(header.hrefRaw, base);
+    const href = resolveHref(header.hrefRaw, base);
     if (href === undefined) {
       observe(sink, { kind: "link-skipped", documentUrl, reason: "unresolvable-href" });
       continue;

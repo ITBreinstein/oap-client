@@ -53,6 +53,48 @@ describe("relation matching", () => {
   });
 });
 
+describe("the items relation", () => {
+  /**
+   * PDOK BAG `pand`, captured 2026-09-26 in `pdok/bag-pand-collection.http`:
+   * `items` in the short form only, once per representation.
+   */
+  const pdok: readonly Link[] = [
+    {
+      rel: "self",
+      href: "https://api.pdok.nl/kadaster/bag/ogc/v2/collections/pand?f=json",
+      type: "application/json",
+    },
+    {
+      rel: "items",
+      href: "https://api.pdok.nl/kadaster/bag/ogc/v2/collections/pand/items?f=json",
+      type: "application/geo+json",
+    },
+    {
+      rel: "items",
+      href: "https://api.pdok.nl/kadaster/bag/ogc/v2/collections/pand/items?f=jsonfg",
+      type: "application/vnd.ogc.fg+json",
+    },
+    {
+      rel: "items",
+      href: "https://api.pdok.nl/kadaster/bag/ogc/v2/collections/pand/items?f=html",
+      type: "text/html",
+    },
+  ];
+
+  it("finds the short form, one link per representation", () => {
+    expect(findLinks(pdok, "items").map((link) => link.type)).toEqual([
+      "application/geo+json",
+      "application/vnd.ogc.fg+json",
+      "text/html",
+    ]);
+  });
+
+  it("finds the long OGC URI form", () => {
+    expect(matchesRelation(`${OGC}/items`, "items")).toBe(true);
+    expect(matchesRelation("item", "items")).toBe(false);
+  });
+});
+
 describe("media-type preference", () => {
   it("prefers the application/json link over a text/html sibling", () => {
     const links: readonly Link[] = [
