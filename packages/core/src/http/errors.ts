@@ -88,21 +88,38 @@ export class ProcessesError extends Error {
   }
 }
 
-/** Reading a body that exceeded the configured buffer limit. Only `blob()` is available. */
+/**
+ * Reading a body that exceeded the configured buffer limit. When the limit was
+ * exceeded by the declared `Content-Length`, `blob()` can still stream it; when
+ * it was exceeded while counting, the stream was cancelled and nothing can.
+ */
 export class BodyTooLargeError extends Error {
   override readonly name = "BodyTooLargeError";
   readonly url: string;
-  /** The declared `Content-Length`. */
-  readonly contentLength: number;
+  /** The declared `Content-Length`, or undefined when the server declared none. */
+  readonly contentLength: number | undefined;
   readonly limit: number;
+  /**
+   * How many decoded bytes had arrived when reading stopped, one chunk past the
+   * limit. Undefined when the declared length was refused before reading.
+   */
+  readonly bytesRead: number | undefined;
 
-  constructor(url: string, contentLength: number, limit: number) {
+  constructor(url: string, contentLength: number | undefined, limit: number, bytesRead?: number) {
     super(
-      `Body of ${url} declares ${String(contentLength)} bytes, over the ${String(limit)}-byte ` +
-        `buffer limit. Use blob() to stream it, or raise maxBufferBytes.`,
+      bytesRead === undefined
+        ? `Body of ${url} declares ${String(contentLength)} bytes, over the ${String(limit)}-byte ` +
+            `buffer limit. Use blob() to stream it, or raise maxBufferBytes.`
+        : `Body of ${url} passed the ${String(limit)}-byte buffer limit after ` +
+            `${String(bytesRead)} bytes ` +
+            (contentLength === undefined
+              ? "with no Content-Length declared"
+              : `though it declared ${String(contentLength)}`) +
+            `, so reading stopped. Raise maxBufferBytes to read it.`,
     );
     this.url = url;
     this.contentLength = contentLength;
     this.limit = limit;
+    this.bytesRead = bytesRead;
   }
 }

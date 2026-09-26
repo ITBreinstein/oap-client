@@ -4,6 +4,7 @@
  */
 
 import {
+  BodyTooLargeError,
   isAbsoluteUrl,
   ProcessesError,
   type ExecuteOutputSelection,
@@ -112,6 +113,15 @@ export function runError(cause: unknown, plan: FormPlan): WorkflowError {
       title: `The server refused the request (HTTP ${String(cause.status)}). Check the inputs and run again.`,
       detail,
       inputId: named?.id,
+    };
+  }
+  if (cause instanceof BodyTooLargeError) {
+    // The run finished; its answer is more than this page reads. Not "did not
+    // complete", which would send the user back to run it again.
+    const megabytes = (cause.limit / (1024 * 1024)).toFixed(0);
+    return {
+      title: `The run finished, but its result is larger than the ${megabytes} MB this page reads.`,
+      detail: cause.message,
     };
   }
   return {

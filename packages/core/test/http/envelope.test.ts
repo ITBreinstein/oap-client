@@ -258,12 +258,83 @@ describe("the buffer limit", () => {
     await expect(env.text()).resolves.toHaveLength(200);
   });
 
-  it("cannot guard a body that declares no length", async () => {
-    const env = createEnvelope(new Response(big, { headers: { "content-type": "text/plain" } }), {
-      requestedUrl: BASE,
-      maxBufferBytes: 1,
+  /** A chunked body: no Content-Length, `chunks` pushed on demand, cancellation seen. */
+  function chunked(chunks: readonly Uint8Array[]): { response: Response; pulled: () => number } {
+    let next = 0;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        const chunk = chunks[next];
+        next += 1;
+        if (chunk === undefined) controller.close();
+        else controller.enqueue(chunk);
+      },
     });
+    return {
+      response: new Response(stream, { headers: { "content-type": "application/geo+json" } }),
+      pulled: () => next,
+    };
+  }
+
+  const kilobyte = new Uint8Array(1024).fill(0x78);
+
+  it("counts a body that declares no length, and stops reading at the limit", async () => {
+    const { response, pulled } = chunked(Array.from({ length: 50 }, () => kilobyte));
+    const env = createEnvelope(response, { requestedUrl: BASE, maxBufferBytes: 4 * 1024 });
+
     expect(env.bodyTooLarge).toBe(false);
-    await expect(env.text()).resolves.toHaveLength(200);
+    const error: unknown = await env.text().catch((cause: unknown) => cause);
+    expect(error).toBeInstanceOf(BodyTooLargeError);
+    expect(error).toMatchObject({ contentLength: undefined, limit: 4096, bytesRead: 5 * 1024 });
+    // The fifth chunk crossed the limit; the stream was cancelled, not drained.
+    expect(pulled()).toBeLessThan(10);
+  });
+
+  it("refuses every reader once the count has passed the limit, blob() included", async () => {
+    const { response } = chunked([kilobyte, kilobyte, kilobyte]);
+    const env = createEnvelope(response, { requestedUrl: BASE, maxBufferBytes: 2048 });
+
+    await expect(env.json()).rejects.toBeInstanceOf(BodyTooLargeError);
+    await expect(env.text()).rejects.toBeInstanceOf(BodyTooLargeError);
+    await expect(env.arrayBuffer()).rejects.toBeInstanceOf(BodyTooLargeError);
+    await expect(env.blob()).rejects.toBeInstanceOf(BodyTooLargeError);
+  });
+
+  it("reads a body that declares no length at exactly the limit", async () => {
+    const { response } = chunked([kilobyte, kilobyte]);
+    const env = createEnvelope(response, { requestedUrl: BASE, maxBufferBytes: 2048 });
+    expect((await env.arrayBuffer()).byteLength).toBe(2048);
+  });
+
+  it("catches a Content-Length that understates the body", async () => {
+    const env = createEnvelope(
+      new Response(big, { headers: { "content-type": "text/plain", "content-length": "10" } }),
+      { requestedUrl: BASE, maxBufferBytes: 100 },
+    );
+    expect(env.bodyTooLarge).toBe(false);
+    await expect(env.text()).rejects.toMatchObject({ contentLength: 10, limit: 100 });
+  });
+
+  it("counts bytes, not characters", async () => {
+    const env = createEnvelope(
+      new Response("é".repeat(60), { headers: { "content-type": "text/plain" } }),
+      { requestedUrl: BASE, maxBufferBytes: 100 },
+    );
+    await expect(env.text()).rejects.toMatchObject({ bytesRead: 120 });
+  });
+
+  it("admits PDOK's 1.08 MB chunked page under the default limit", async () => {
+    // The page breinstein-buildings links to, 2026-09-26: 1 082 394 bytes of
+    // chunked GeoJSON (fixtures README, `pdok/`).
+    const size = 1_082_394;
+    const chunks = Array.from({ length: Math.ceil(size / 16_384) }, (_, index) =>
+      new Uint8Array(Math.min(16_384, size - index * 16_384)).fill(0x20),
+    );
+    const env = createEnvelope(chunked(chunks).response, { requestedUrl: BASE });
+    expect((await env.arrayBuffer()).byteLength).toBe(size);
+  });
+
+  it("reads a response with no body as empty", async () => {
+    const env = createEnvelope(new Response(null, { status: 204 }), { requestedUrl: BASE });
+    await expect(env.text()).resolves.toBe("");
   });
 });
