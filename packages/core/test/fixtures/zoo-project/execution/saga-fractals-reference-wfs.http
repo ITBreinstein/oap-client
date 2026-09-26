@@ -1,0 +1,9 @@
+HTTP/1.1 200 Ok
+Date: Sat, 26 Sep 2026 19:43:56 GMT
+Server: Apache/2.4.29 (Ubuntu)
+X-Powered-By: ZOO-Project
+Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self';
+Content-Length: 367
+Content-Type: application/json;charset=UTF-8
+
+{"RESULT":{"href":"http:\/\/localhost:5090\/cgi-bin\/mapserv?map=\/usr\/com\/zoo-project\/RESULT_0_9cc92ce2-b9e2-11f1-b6bf-3a9d4c7adc78.map&request=GetFeature&service=WFS&version=1.0.0&typename=RESULT&format=text\/xml&bbox=-2.453125000000000,0.000000000000000,3.453125000000000,3.953125000000000&crs=EPSG:4326","type":"text\/xml","format":{"mediaType":"text\/xml"}}}

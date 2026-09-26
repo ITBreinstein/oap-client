@@ -1,0 +1,19 @@
+HTTP/1.1 200 OK
+Date: Sat, 26 Sep 2026 19:44:59 GMT
+Server: Apache/2.4.29 (Ubuntu)
+Transfer-Encoding: chunked
+Content-Type: multipart/related; boundary="--c23c8848-b9e2-11f1-829e-3a9d4c7adc78"; type=text/plain; start=a
+
+----c23c8848-b9e2-11f1-829e-3a9d4c7adc78
+Content-ID: a
+Content-Type: text/plain; charset=utf-8
+Status: 200 OK
+
+Content-Location: http://localhost:5090/temp//ZOO_DATA_echo_a_c23c8848-b9e2-11f1-829e-3a9d4c7adc78_0.txt
+----c23c8848-b9e2-11f1-829e-3a9d4c7adc78
+Content-ID: c
+Content-Type: text/plain; charset=utf-8
+Status: 200 OK
+
+Content-Location: http://localhost:5090/temp//ZOO_DATA_echo_c_c23c8848-b9e2-11f1-829e-3a9d4c7adc78_1.txt
+----c23c8848-b9e2-11f1-829e-3a9d4c7adc78--
