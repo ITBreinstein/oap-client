@@ -18,9 +18,13 @@
  * request exists, and a failure on the chosen route is reported, not rerouted.
  *
  * - `executeRoute: "relay"` and an asynchronous execute → the relay.
- * - anything else → straight through. Synchronous execution does not need
- *   `Location`; its answer is the body, and the browser can read that itself
- *   wherever the server sends CORS headers.
+ * - a synchronous execute, once the user confirmed the read route for this
+ *   endpoint → the relay, answered raw: the result itself is what the browser
+ *   cannot read from this server.
+ * - anything else → straight through, meaning through `fetch`, which is the
+ *   read route's own wrapper when that route was confirmed. Synchronous
+ *   execution does not need `Location`; its answer is the body, and the
+ *   browser can read that itself wherever the server sends CORS headers.
  *
  * The one retry there is: when the relay refuses *before sending anything
  * upstream* because it does not know the session — which is what a relay
@@ -31,6 +35,7 @@
 
 import type { FetchLike } from "@breinstein/oap-client";
 import type { RelayedExecute, RelayEndpoint } from "./contract.js";
+import { fromRelay, RelayRouteError } from "./relay-fetch.js";
 import { RelayError, type RelayClient } from "./relay-client.js";
 
 /**
@@ -73,6 +78,12 @@ export interface RoutedFetchOptions {
   readonly relay: RelayClient | undefined;
   readonly session?: SessionSource | undefined;
   readonly fetch?: FetchLike | undefined;
+  /**
+   * `relay` once the user confirmed the read route for this endpoint: `fetch`
+   * is then the read route's wrapper, and synchronous executes go to the relay
+   * too. Never set without that confirmation.
+   */
+  readonly reads?: "direct" | "relay" | undefined;
   readonly onRoute?: ((observation: ExecuteRouteObservation) => void) | undefined;
   /**
    * A job was started with callbacks registered under `ref`. `statusUrl` is
@@ -119,6 +130,69 @@ export function createRoutedFetch(options: RoutedFetchOptions): FetchLike {
       ? "async"
       : "sync";
     const base = { endpointKey: endpoint.key, requestedMode, queryDropped: url.search !== "" };
+
+    if (requestedMode === "sync" && options.reads === "relay" && relay !== undefined) {
+      const body = init?.body;
+      if (typeof body !== "string") {
+        record({
+          ...base,
+          kind: "execute-route",
+          route: "relay",
+          outcome: "refused",
+          locationPresent: undefined,
+          callbacksRegistered: false,
+          reason: "body-not-text",
+        });
+        throw new TypeError("the relay route carries JSON text bodies only");
+      }
+      const processId = decodeURIComponent(match[1]);
+      let response: Response;
+      try {
+        let answer: Response;
+        try {
+          answer = await relay.forward(
+            `/execute/${encodeURIComponent(endpoint.key)}/${encodeURIComponent(processId)}`,
+            {
+              method: "POST",
+              // No Prefer: that is what makes this a synchronous execute.
+              headers: {
+                "Content-Type": "application/json",
+                Accept: headerValue(init, "Accept") ?? "*/*",
+              },
+              body,
+              ...(init?.signal === undefined || init.signal === null
+                ? {}
+                : { signal: init.signal }),
+            },
+          );
+        } catch {
+          throw new RelayRouteError("relay-unreachable", "unreachable");
+        }
+        response = fromRelay(answer);
+      } catch (error) {
+        const refused = error instanceof RelayRouteError && error.outcome === "relay-refused";
+        record({
+          ...base,
+          kind: "execute-route",
+          route: "relay",
+          outcome: refused ? "relay-refused" : "relay-failed",
+          locationPresent: undefined,
+          callbacksRegistered: false,
+          reason: error instanceof RelayRouteError ? error.code : "unreachable",
+        });
+        throw error;
+      }
+      record({
+        ...base,
+        kind: "execute-route",
+        route: "relay",
+        outcome: "sent",
+        locationPresent: response.headers.has("Location"),
+        callbacksRegistered: false,
+        reason: undefined,
+      });
+      return response;
+    }
 
     if (relay === undefined || endpoint.executeRoute !== "relay" || requestedMode === "sync") {
       const response = await direct(input, init);

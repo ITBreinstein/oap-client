@@ -48,7 +48,13 @@ export interface UpstreamResponse {
  * browser has no business learning.
  */
 export type UpstreamFailure =
-  "blocked-address" | "timeout" | "redirect-refused" | "response-too-large" | "connection-failed";
+  | "blocked-address"
+  | "timeout"
+  | "redirect-refused"
+  /** Read route: more redirects under `baseUrl` than it follows. */
+  | "redirect-limit"
+  | "response-too-large"
+  | "connection-failed";
 
 export class UpstreamError extends Error {
   readonly reason: UpstreamFailure;

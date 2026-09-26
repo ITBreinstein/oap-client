@@ -51,6 +51,13 @@ export interface RelayClient {
     sessionToken: string | undefined,
     signal?: AbortSignal,
   ): Promise<RelayedExecute>;
+  /**
+   * One request to a path on the relay, answered raw: the read route and the
+   * synchronous execute of a read-route endpoint. The caller reads the markers
+   * — see `relay-fetch.ts`. Redirects are an error, so nothing the relay hands
+   * back can send the browser somewhere else.
+   */
+  forward(path: string, init: RequestInit): Promise<Response>;
 }
 
 /**
@@ -108,6 +115,10 @@ export function createRelayClient(baseUrl: string, fetchImpl: FetchLike = fetch)
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            // Said out loud, because the relay reads it: for an endpoint with
+            // the read route, an execute without it is a synchronous one and is
+            // answered raw, not with this envelope.
+            Prefer: "respond-async",
             ...(sessionToken === undefined ? {} : { Authorization: `Bearer ${sessionToken}` }),
           },
           body,
@@ -117,6 +128,10 @@ export function createRelayClient(baseUrl: string, fetchImpl: FetchLike = fetch)
       if (response.status === 200) return parseRelayedExecute(await readJson(response));
       const code = readRefusalReason(await readJson(response)) ?? String(response.status);
       throw new RelayError(response.status, code, REFUSED_BEFORE_UPSTREAM.has(response.status));
+    },
+
+    forward(path, init) {
+      return call(path, init);
     },
   };
 }

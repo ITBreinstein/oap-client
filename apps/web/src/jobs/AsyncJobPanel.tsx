@@ -81,6 +81,7 @@ export function AsyncJobPanel({ relayUrl }: { readonly relayUrl: string | undefi
       key: MANUAL_KEY,
       baseUrl: manualBase.replace(/\/+$/, ""),
       executeRoute: "direct",
+      readRoute: "direct",
       callbacks: false,
     };
     let parsedInputs: Record<string, unknown>;

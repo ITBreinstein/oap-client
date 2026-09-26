@@ -14,17 +14,27 @@
 import {
   createClient,
   getJob,
+  redactUrl,
   type Client,
+  type FetchLike,
   type ExecuteOutputSelection,
   type Execution,
   type ProcessDescription,
 } from "@breinstein/oap-client";
-import type { WebObservation } from "../observations.js";
+import type { SessionObservation, WebObservation } from "../observations.js";
 import type { RelayEndpoint } from "./contract.js";
 import { openDoorbells, type DoorbellStream, type StreamState } from "./doorbells.js";
 import { JobReconciler, type TrackedJob } from "./reconciler.js";
 import { createRelayClient, type RelayClient } from "./relay-client.js";
+import { createRelayFetch } from "./relay-fetch.js";
 import { createRoutedFetch } from "./routed-fetch.js";
+
+/**
+ * How this page reads one endpoint, decided per connection: `direct` always
+ * first, `relay` only after a CORS failure the user confirmed the fallback for.
+ * Never remembered past the page: reconnecting starts direct again.
+ */
+export type Reads = "direct" | "relay";
 
 export interface JobRow extends TrackedJob {
   readonly endpointKey: string;
@@ -34,7 +44,9 @@ export interface JobRow extends TrackedJob {
 export interface JobSessionSnapshot {
   readonly relay: "off" | StreamState;
   readonly jobs: readonly JobRow[];
-  readonly observations: readonly WebObservation[];
+  readonly observations: readonly SessionObservation[];
+  /** Observations dropped from the front to keep the cap; 0 until it is reached. */
+  readonly droppedObservations: number;
 }
 
 export interface JobSession {
@@ -44,8 +56,11 @@ export interface JobSession {
    * observations and sending through the same route choice as `run`. For
    * everything but an asynchronous execute: discovery, the process list and
    * descriptions, a synchronous run, results and dismissal.
+   *
+   * `reads: "relay"` sends all of that through the relay's read route, and is
+   * ignored for an endpoint the relay does not offer it for.
    */
-  client(endpoint: RelayEndpoint): Client;
+  client(endpoint: RelayEndpoint, reads?: Reads): Client;
   /**
    * Start one asynchronous execution. Resolves once the job is known, or refused.
    * Pass the description and the core uses its `execute` link and checks arity.
@@ -56,20 +71,27 @@ export interface JobSession {
     inputs: Record<string, unknown>,
     outputs: Record<string, unknown>,
     description?: ProcessDescription,
+    reads?: Reads,
   ): Promise<Execution>;
   /** Start reconciling a job the caller found some other way — a sync run the server made async. */
-  track(endpoint: RelayEndpoint, statusUrl: string): void;
-  /** Add an observation the web app made itself (T4). */
-  record(observation: WebObservation): void;
+  track(endpoint: RelayEndpoint, statusUrl: string, reads?: Reads): void;
+  /**
+   * Add an observation the web app made itself (T4), or one the caller took
+   * from a core call of its own, against the endpoint it was made for.
+   */
+  record(endpoint: string, observation: WebObservation): void;
   subscribe(listener: (snapshot: JobSessionSnapshot) => void): () => void;
   dispose(): void;
 }
 
 /**
- * Enough for a long demo session, bounded so a page left open for a day does
- * not grow without limit. The export button writes whatever is kept.
+ * Enough for a long demo session and a process census of a large catalogue,
+ * bounded so a page left open for a day does not grow without limit. ZOO's
+ * census alone leaves well over a thousand, the first cap, and pushed every
+ * earlier endpoint's observations out without a trace. What is dropped is now
+ * counted, and the count travels with the export.
  */
-const OBSERVATIONS_KEPT = 1_000;
+const OBSERVATIONS_KEPT = 20_000;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -118,8 +140,19 @@ export function createJobSession(relayUrl: string | undefined): JobSession {
     relayUrl === undefined || relayUrl === "" ? undefined : createRelayClient(relayUrl);
 
   let relayState: JobSessionSnapshot["relay"] = relay === undefined ? "off" : "connecting";
-  let observations: WebObservation[] = [];
-  const meta = new Map<string, { endpointKey: string; route: "direct" | "relay" | undefined }>();
+  let observations: SessionObservation[] = [];
+  let dropped = 0;
+  const meta = new Map<
+    string,
+    {
+      endpointKey: string;
+      /** The endpoint's base URL, which the job's observations are recorded against. */
+      baseUrl: string;
+      route: "direct" | "relay" | undefined;
+      /** The read route's wrapper, when this job's endpoint is read through the relay. */
+      read: FetchLike | undefined;
+    }
+  >();
   const listeners = new Set<(snapshot: JobSessionSnapshot) => void>();
 
   const snapshot = (): JobSessionSnapshot => ({
@@ -130,18 +163,34 @@ export function createJobSession(relayUrl: string | undefined): JobSession {
       route: meta.get(job.statusUrl)?.route,
     })),
     observations,
+    droppedObservations: dropped,
   });
   const publish = (): void => {
     const current = snapshot();
     for (const listener of listeners) listener(current);
   };
-  const observe = (observation: WebObservation): void => {
-    observations = [...observations.slice(1 - OBSERVATIONS_KEPT), observation];
-    publish();
-  };
+  // Tagged with the endpoint as they arrive: several core observations carry
+  // no URL at all (`capabilities-derived`), so this is the only place the
+  // endpoint an observation belongs to is still known.
+  const observeFor =
+    (baseUrl: string) =>
+    (observation: WebObservation): void => {
+      const entry = { endpoint: redactUrl(baseUrl), observation };
+      if (observations.length >= OBSERVATIONS_KEPT) dropped += 1;
+      observations = [...observations.slice(1 - OBSERVATIONS_KEPT), entry];
+      publish();
+    };
 
   const reconciler = new JobReconciler({
-    readJob: (statusUrl, signal) => getJob(statusUrl, { signal, onObservation: observe }),
+    readJob: (statusUrl, signal) => {
+      const job = meta.get(statusUrl);
+      const read = job?.read;
+      return getJob(statusUrl, {
+        signal,
+        onObservation: observeFor(job?.baseUrl ?? statusUrl),
+        ...(read === undefined ? {} : { fetch: read }),
+      });
+    },
     onChange: publish,
   });
 
@@ -162,31 +211,61 @@ export function createJobSession(relayUrl: string | undefined): JobSession {
           },
         });
 
+  /** The read route's wrapper, only when asked for and only where the relay offers it. */
+  const readFetch = (endpoint: RelayEndpoint, reads: Reads): FetchLike | undefined =>
+    reads === "relay" &&
+    endpoint.readRoute === "relay" &&
+    relay !== undefined &&
+    doorbells !== undefined
+      ? createRelayFetch({
+          relay,
+          endpointKey: endpoint.key,
+          baseUrl: endpoint.baseUrl,
+          session: doorbells,
+        })
+      : undefined;
+
   return {
     async endpoints() {
       return relay === undefined ? [] : relay.endpoints();
     },
 
-    client(endpoint) {
+    client(endpoint, reads = "direct") {
+      const read = readFetch(endpoint, reads);
+      const observe = observeFor(endpoint.baseUrl);
       return createClient({
         baseUrl: endpoint.baseUrl,
         onObservation: observe,
-        fetch: createRoutedFetch({ endpoint, relay, session: doorbells, onRoute: observe }),
+        fetch: createRoutedFetch({
+          endpoint,
+          relay,
+          session: doorbells,
+          onRoute: observe,
+          ...(read === undefined ? {} : { fetch: read, reads: "relay" }),
+        }),
       });
     },
 
-    track(endpoint, statusUrl) {
-      meta.set(statusUrl, { endpointKey: endpoint.key, route: "direct" });
+    track(endpoint, statusUrl, reads = "direct") {
+      const read = readFetch(endpoint, reads);
+      meta.set(statusUrl, {
+        endpointKey: endpoint.key,
+        baseUrl: endpoint.baseUrl,
+        route: read === undefined ? "direct" : "relay",
+        read,
+      });
       reconciler.track(statusUrl);
     },
 
-    record(observation) {
-      observe(observation);
+    record(endpoint, observation) {
+      observeFor(endpoint)(observation);
     },
 
-    async run(endpoint, processId, inputs, outputs, description) {
+    async run(endpoint, processId, inputs, outputs, description, reads = "direct") {
       const refs = new Map<string, string>();
       let route: "direct" | "relay" | undefined;
+      const read = readFetch(endpoint, reads);
+      const observe = observeFor(endpoint.baseUrl);
       const client = createClient({
         baseUrl: endpoint.baseUrl,
         onObservation: observe,
@@ -194,6 +273,7 @@ export function createJobSession(relayUrl: string | undefined): JobSession {
           endpoint,
           relay,
           session: doorbells,
+          ...(read === undefined ? {} : { fetch: read, reads: "relay" }),
           onRoute: (observation) => {
             route = observation.route;
             observe(observation);
@@ -211,7 +291,7 @@ export function createJobSession(relayUrl: string | undefined): JobSession {
       });
       if (execution.kind === "job") {
         const { statusUrl } = execution.job;
-        meta.set(statusUrl, { endpointKey: endpoint.key, route });
+        meta.set(statusUrl, { endpointKey: endpoint.key, baseUrl: endpoint.baseUrl, route, read });
         reconciler.track(statusUrl, refs.get(statusUrl));
       }
       return execution;

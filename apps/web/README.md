@@ -42,10 +42,11 @@ docker compose -f infra/compose/pygeoapi.yml up -d --wait   # :5080 with CORS, :
 1. **Configured**, from the relay's `GET /endpoints`, when `VITE_RELAY_URL` is
    set. They keep their configured `executeRoute`: an endpoint marked `relay`
    sends its background runs through the relay, which is what lets a page name
-   the job.
+   the job. One marked `readRoute: "relay"` may also be _read_ through the
+   relay, but only as a fallback the user confirms (below).
 2. **Typed**, in the address field. A typed address is **always reached
-   directly** — the relay only accepts the keys it was configured with, and is
-   not a proxy.
+   directly**: the relay only accepts the keys it was configured with, and is
+   not a general proxy.
 
 Which of the reference servers a page can read at all, measured in Chromium on
 2026-09-23 (Task 7, Z1):
@@ -58,7 +59,37 @@ Which of the reference servers a page can read at all, measured in Chromium on
 
 Connecting to a blocked server says so — "This server doesn't allow access
 from a web page (no CORS headers). The attempt has been recorded." — and records
-an `endpoint-access` observation. There is no CORS proxy, on purpose.
+an `endpoint-access` observation.
+
+### Direct first, then the relay after a click (phase 3)
+
+For a configured endpoint with `readRoute: "relay"`, there is one more step.
+The page still tries the server directly first. Only if that fails the way a
+missing CORS header fails does it ask:
+
+> This server sent no CORS headers, so a web page cannot read it directly.
+> Reach it through the relay instead? This will be recorded as a finding.
+
+**Use relay** reconnects through the relay's read route. Everything for that
+endpoint then goes through it: the landing page, processes, descriptions, sync
+and background runs, job status, results and Cancel job. A banner that cannot
+be dismissed says so for as long as the connection lasts. **Cancel**, Escape or
+closing the question in any other way is a decline, and the direct failure is
+shown as before. Nothing ever switches route without the click. The choice is
+not remembered: connecting again starts direct.
+
+It lives in three places:
+
+- `app/route-decision.ts` holds the rules;
+- `relay/relay-fetch.ts` is the `fetch` handed to the core, which rewrites URLs
+  under `baseUrl` onto the relay and refuses any other;
+- the workflow reducer's offer state is the only way onto the route.
+
+The core does not know the relay exists: to the core, it looks like a server
+that sends perfect CORS headers.
+
+In CI, `pygeoapi-nocors-relay` offers this for `:5081` and `zoo` for `:5090`.
+`pygeoapi-nocors` offers nothing, so the unassisted failure stays visible.
 
 ## The screens
 
@@ -211,14 +242,35 @@ input value, a schema body, a query string or a response body:
 - `execute-route`: which route an execute took, from Task 6;
 - `form`: every input the generator could not handle, with the schema keyword
   that caused it, and every change the encoder made on the way (an axis swap);
-- `endpoint-access`: how connecting went, and whether the address was typed;
+- `endpoint-access`: one per connection attempt. It records the direct outcome
+  (always), whether the relay offers its read route, whether the user
+  confirmed, how the relay attempt ended (`relayOutcome`, with the relay's own
+  `relayReasonCode`), and `routeUsed`, which is `relay` only when that attempt
+  worked;
 - `cancel-job`: each Cancel job, and whether dismissal had been advertised.
 
-The **Developer** section at the foot of the panel writes them to a file with
-**Download session observations**. They are the raw material of the
-form-generation failure catalogue. Open the page with `?developer` to have the
-section open, which is also where Task 6's raw asynchronous-execution panel now
-lives; the relay's browser tests drive it there.
+Each observation is tagged with the endpoint it was made against when it is
+recorded, because some carry no URL of their own (`capabilities-derived`).
+
+The **Developer** section at the foot of the panel lists them, newest first,
+filtered by endpoint and by kind. It writes them to a file:
+
+- **Download session observations**: the whole session, as one flat list.
+- **Download this endpoint's observations**: one endpoint's, with that
+  endpoint named at the top of the file. This is the file the
+  interoperability matrix is built from.
+
+**Describe every process** is the process census. It fetches each listed
+process's description once, one at a time, through whichever route the
+connection uses. The session then holds a `process-fetched` record, and any
+`form` records, for the whole catalogue, not just for the processes someone
+opened. A description that cannot be read is counted on screen and leaves no
+record, so the matrix reads it as listed but not described.
+
+These files are the raw material of the form-generation failure catalogue.
+Open the page with `?developer` to have the section open. Task 6's raw
+asynchronous-execution panel also lives there, because the relay's browser
+tests drive it.
 
 ## Tests
 

@@ -8,12 +8,17 @@
  * does not change the answer: it names the job, and the page still cannot
  * read it.
  *
+ * The last test is phase 3: the read route. The page still tries ZOO directly
+ * first and fails, and only after the user confirms does it reach ZOO through
+ * the relay, with the banner shown and the direct failure still on the record.
+ *
  * ZOO is the interop server, not the pinned one, so every test here skips
  * when it is not answering. One job per run, to spare its worker pool
  * (finding 0044).
  */
 
 import { expect, test } from "@playwright/test";
+import { readFile } from "node:fs/promises";
 
 const ZOO = "http://localhost:5090/ogc-api";
 const RELAY = "http://localhost:8787";
@@ -84,5 +89,61 @@ test.describe("ZOO-Project from a browser", () => {
     const job = page.getByTestId("job");
     await expect(job).toHaveAttribute("data-route", "relay");
     await expect(job).toContainText("last read failed");
+  });
+
+  test("through the read route, after the user confirms: list, banner, a sync run", async ({
+    page,
+  }) => {
+    test.skip(!(await answering(`${RELAY}/healthz`)), "the relay is not answering");
+    // ZOO lists some 700 processes, every page of them now through the relay.
+    test.setTimeout(90_000);
+    await page.getByRole("radio", { name: /^zoo / }).check();
+    await page.getByRole("button", { name: "Connect" }).click();
+
+    await expect(page.getByTestId("relay-offer")).toBeVisible();
+    await page.getByRole("button", { name: "Use relay" }).click();
+    await expect(page.getByTestId("relay-banner")).toBeVisible({ timeout: 30_000 });
+
+    // Several ZOO processes are titled "Echo input"; the one with id `echo`.
+    await page
+      .getByRole("listitem")
+      .filter({ has: page.locator("code", { hasText: /^echo$/ }) })
+      .getByRole("button", { name: "Echo input", exact: true })
+      .click();
+    await page
+      .getByRole("textbox", { name: "Literal Input (string) (optional)" })
+      .fill("through the relay");
+    // The web app names every output (finding 0025), and ZOO refuses to answer
+    // output `c` when input `c` is empty, so the run gives it a box.
+    await page.getByRole("textbox", { name: "West (minimum longitude)" }).fill("4.8");
+    await page.getByRole("textbox", { name: "South (minimum latitude)" }).fill("52.3");
+    await page.getByRole("textbox", { name: "East (maximum longitude)" }).fill("4.9");
+    await page.getByRole("textbox", { name: "North (maximum latitude)" }).fill("52.4");
+    await page.getByRole("button", { name: "Run", exact: true }).click();
+    await expect(page.locator('[data-output-id="a"]')).toContainText("through the relay", {
+      timeout: 30_000,
+    });
+
+    // ZOO stays recorded as unusable from a web page: the direct failure is on
+    // the same record as the relay attempt that worked.
+    // Opened with ?developer, so the panel may already be open.
+    const developer = page.locator("details.developer");
+    if ((await developer.getAttribute("open")) === null) {
+      await developer.locator("summary").click();
+    }
+    const download = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Download session observations" }).click();
+    const exported = JSON.parse(await readFile(await (await download).path(), "utf8")) as {
+      observations: { kind: string; [key: string]: unknown }[];
+    };
+    expect(exported.observations.filter((entry) => entry.kind === "endpoint-access")).toEqual([
+      expect.objectContaining({
+        endpointKey: "zoo",
+        outcome: "cors-blocked",
+        userConfirmedRelay: true,
+        relayOutcome: "ok",
+        routeUsed: "relay",
+      }),
+    ]);
   });
 });

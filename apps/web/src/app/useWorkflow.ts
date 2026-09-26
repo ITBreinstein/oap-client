@@ -12,9 +12,9 @@
 import {
   AmbiguousExecutionResponseError,
   redactUrl,
-  TransportError,
   type Client,
   type ExecutionMode,
+  type ProcessDescription,
   type ProcessSummary,
 } from "@breinstein/oap-client";
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
@@ -29,7 +29,17 @@ import {
   createJobSession,
   type JobSession,
   type JobSessionSnapshot,
+  type Reads,
 } from "../relay/job-session.js";
+import {
+  accessRecord,
+  directFailure,
+  errorName,
+  offersRelay,
+  relayAttempt,
+  type AttemptFacts,
+  type RelayAttempt,
+} from "./route-decision.js";
 import { toRenderable } from "../results/renderable.js";
 import { declaredMediaTypes, relayEndpointFor, runError, runRequest } from "./run.js";
 import {
@@ -43,6 +53,10 @@ import {
 /** Properties, not methods: each is handed to a component on its own. */
 export interface WorkflowCommands {
   readonly connect: (endpoint: EndpointRef) => void;
+  /** "Use relay": the only way anything is sent through the relay's read route. */
+  readonly confirmRelay: () => void;
+  /** "Cancel", Escape, or any other way of closing the question. */
+  readonly declineRelay: () => void;
   readonly disconnect: () => void;
   readonly openProcess: (summary: ProcessSummary) => void;
   readonly backToList: () => void;
@@ -51,6 +65,25 @@ export interface WorkflowCommands {
   readonly run: () => void;
   readonly cancelJob: () => void;
   readonly edit: () => void;
+  /**
+   * The process census: describe every listed process once, through the
+   * connection's route, so the session's observations cover the whole
+   * catalogue and not only the processes someone happened to open.
+   */
+  readonly describeAll: () => void;
+}
+
+/**
+ * How far the census has got. Failed descriptions leave no observation of
+ * their own — the matrix reads them as listed but not described — so they are
+ * only counted here.
+ */
+export interface CensusProgress {
+  readonly endpoint: string;
+  readonly total: number;
+  readonly described: number;
+  readonly failed: number;
+  readonly running: boolean;
 }
 
 export interface WorkflowView {
@@ -65,19 +98,21 @@ export interface WorkflowView {
   readonly jobNotice: string | undefined;
   /** Whether Cancel job was advertised, and by whom (T6). */
   readonly dismissAdvertisedBy: "process" | "service" | "observed-earlier" | "nothing";
+  readonly census: CensusProgress | undefined;
 }
 
 const NO_ERRORS: FieldErrors = new Map();
 
 function transportMessage(cause: unknown, endpoint: EndpointRef): WorkflowError {
-  if (cause instanceof TransportError && cause.crossOrigin === true) {
-    // What to do next depends on where the address came from. A configured
-    // endpoint is no way out: the relay carries background runs only, and
-    // never reads a server's pages for the browser (findings 0049, 0050).
+  if (directFailure(cause) === "cors-blocked") {
+    // What to do next depends on where the address came from, and on whether
+    // the relay may read this server (findings 0049, 0050).
     const next =
-      endpoint.source === "configured"
-        ? "Being configured on the relay does not change that: the relay only starts background runs, and never reads a server's pages for this page. Choose another service, or ask this server's operator to enable CORS."
-        : "Choose another service, or ask this server's operator to enable CORS.";
+      endpoint.source !== "configured"
+        ? "Choose another service, or ask this server's operator to enable CORS."
+        : endpoint.readRoute === "relay"
+          ? "Connect again to be offered the relay, choose another service, or ask this server's operator to enable CORS."
+          : "The relay is not set up to read this service for a web page, so it cannot help here. Choose another service, or ask this server's operator to enable CORS.";
     return {
       title:
         "This server doesn't allow access from a web page (no CORS headers). The attempt has been recorded.",
@@ -88,6 +123,39 @@ function transportMessage(cause: unknown, endpoint: EndpointRef): WorkflowError 
     title: "Could not connect to this server. Check the address and try again.",
     detail: cause instanceof Error ? cause.message : String(cause),
   };
+}
+
+/** Why the relay attempt did not connect, in words that do not overclaim. */
+function relayFailureMessage(attempt: RelayAttempt, cause: unknown): WorkflowError {
+  const code = attempt.relayReasonCode;
+  switch (attempt.relayOutcome) {
+    case "relay-unreachable":
+      return {
+        title: "The relay did not answer, so this server could not be reached through it either.",
+        detail: `Check that the relay is running, then connect again. (${code ?? "unreachable"})`,
+      };
+    case "relay-refused":
+      return {
+        title: "The relay refused to read this server.",
+        detail: `The relay said: ${code ?? "refused"}.`,
+      };
+    case "upstream-failed":
+      return code === "blocked-address"
+        ? {
+            title: "The relay is not allowed to reach this server's address.",
+            detail: "That is the relay's configuration, not the server. (blocked-address)",
+          }
+        : {
+            title: "The relay could not get an answer from this server. It may be down.",
+            detail: `(${code ?? "upstream-failed"})`,
+          };
+    case "other-failure":
+    case "ok":
+      return {
+        title: "The relay reached this server, but its answer could not be used.",
+        detail: cause instanceof Error ? cause.message : String(cause),
+      };
+  }
 }
 
 /** Bbox inputs whose CRSs a map-drawn box cannot be sent in (T9). */
@@ -102,6 +170,26 @@ function projectedOnly(plan: FormPlan): { inputId: string; crs: string }[] {
   });
 }
 
+/** What form generation made of one description, as observations. */
+function formObservationsOf(
+  endpoint: string,
+  process: ProcessDescription,
+  plan: FormPlan,
+): FormObservation[] {
+  return [
+    ...formObservationsFor(endpoint, process.id, plan.diagnostics),
+    ...projectedOnly(plan).map(({ inputId, crs }) => ({
+      kind: "form" as const,
+      endpoint: redactUrl(endpoint),
+      processId: process.id,
+      inputId,
+      code: "bbox-projected-crs-only" as const,
+      keyword: undefined,
+      crs,
+    })),
+  ];
+}
+
 export function useWorkflow(relayUrl: string | undefined): WorkflowView {
   const [state, dispatch] = useReducer(workflowReducer, INITIAL_WORKFLOW);
   const [snapshot, setSnapshot] = useState<JobSessionSnapshot | undefined>();
@@ -113,15 +201,19 @@ export function useWorkflow(relayUrl: string | undefined): WorkflowView {
   // Made inside the effect, for the reason AsyncJobPanel gives: StrictMode
   // runs effects twice, and a memoised session would be disposed and reused.
   const session = useRef<JobSession | undefined>(undefined);
-  const client = useRef<{ readonly endpoint: EndpointRef; readonly client: Client } | undefined>(
-    undefined,
-  );
+  const client = useRef<
+    { readonly endpoint: EndpointRef; readonly client: Client; readonly reads: Reads } | undefined
+  >(undefined);
+  /** The direct attempt behind an open offer, for the record its answer completes. */
+  const pendingOffer = useRef<AttemptFacts | undefined>(undefined);
+  const relayAvailable = relayUrl !== undefined && relayUrl !== "";
   /** Endpoints where a dismissal has been seen to work this session (T6). */
   const [dismissWorked, setDismissWorked] = useState<ReadonlySet<string>>(() => new Set());
   /** Form observations already recorded, so reopening a process does not repeat them. */
   const recorded = useRef(new Set<string>());
   /** The job whose results are being fetched, so a snapshot burst fetches once. */
   const fetching = useRef<string | undefined>(undefined);
+  const [census, setCensus] = useState<CensusProgress | undefined>();
 
   useEffect(() => {
     const created = createJobSession(relayUrl);
@@ -155,37 +247,92 @@ export function useWorkflow(relayUrl: string | undefined): WorkflowView {
       const key = JSON.stringify(observation);
       if (recorded.current.has(key)) continue;
       recorded.current.add(key);
-      session.current?.record(observation);
+      session.current?.record(observation.endpoint, observation);
     }
   }, []);
 
-  const connect = useCallback((endpoint: EndpointRef) => {
+  // Direct first, always (route-decision.ts). The relay is offered only for a
+  // CORS-shaped failure on an endpoint that allows it, and tried only from
+  // confirmRelay. The attempt's one record is written when it settles.
+  const connect = useCallback(
+    (endpoint: EndpointRef) => {
+      const active = session.current;
+      if (active === undefined) return;
+      dispatch({ type: "connect", endpoint });
+      pendingOffer.current = undefined;
+      const at = new Date();
+      const connection = active.client(relayEndpointFor(endpoint), "direct");
+      void (async () => {
+        try {
+          const service = await connection.inspect();
+          const processes = await connection.listProcesses();
+          client.current = { endpoint, client: connection, reads: "direct" };
+          active.record(
+            endpoint.baseUrl,
+            accessRecord({
+              endpoint,
+              at,
+              relayAvailable,
+              direct: "connected",
+              directError: undefined,
+            }),
+          );
+          dispatch({ type: "connected", endpoint, route: "direct", service, processes });
+        } catch (cause) {
+          const direct = directFailure(cause);
+          const facts = { endpoint, at, relayAvailable, direct, directError: errorName(cause) };
+          const error = transportMessage(cause, endpoint);
+          if (offersRelay(endpoint, direct, relayAvailable)) {
+            pendingOffer.current = facts;
+            dispatch({ type: "relay-offered", endpoint, error });
+            return;
+          }
+          active.record(endpoint.baseUrl, accessRecord(facts));
+          dispatch({ type: "connect-failed", endpoint, error });
+        }
+      })();
+    },
+    [relayAvailable],
+  );
+
+  const confirmRelay = useCallback(() => {
     const active = session.current;
-    if (active === undefined) return;
-    dispatch({ type: "connect", endpoint });
-    const connection = active.client(relayEndpointFor(endpoint));
-    const observed = {
-      kind: "endpoint-access" as const,
-      endpoint: redactUrl(endpoint.baseUrl),
-      source: endpoint.source,
-    };
+    const facts = pendingOffer.current;
+    pendingOffer.current = undefined;
+    if (active === undefined || facts === undefined) return;
+    const { endpoint } = facts;
+    dispatch({ type: "relay-confirmed" });
+    const connection = active.client(relayEndpointFor(endpoint), "relay");
     void (async () => {
       try {
         const service = await connection.inspect();
         const processes = await connection.listProcesses();
-        client.current = { endpoint, client: connection };
-        active.record({ ...observed, outcome: "connected", error: undefined });
-        dispatch({ type: "connected", endpoint, service, processes });
+        client.current = { endpoint, client: connection, reads: "relay" };
+        active.record(
+          endpoint.baseUrl,
+          accessRecord({ ...facts, confirmed: true, relay: relayAttempt(undefined) }),
+        );
+        dispatch({ type: "connected", endpoint, route: "relay", service, processes });
       } catch (cause) {
-        const cors = cause instanceof TransportError && cause.crossOrigin === true;
-        active.record({
-          ...observed,
-          outcome: cors ? "cors-blocked" : "failed",
-          error: cause instanceof Error ? cause.name : typeof cause,
-        });
-        dispatch({ type: "connect-failed", endpoint, error: transportMessage(cause, endpoint) });
+        const attempt = relayAttempt(cause);
+        active.record(
+          endpoint.baseUrl,
+          accessRecord({ ...facts, confirmed: true, relay: attempt }),
+        );
+        dispatch({ type: "connect-failed", endpoint, error: relayFailureMessage(attempt, cause) });
       }
     })();
+  }, []);
+
+  // Cancel, Escape, or anything else that closes the question: a decline.
+  const declineRelay = useCallback(() => {
+    const active = session.current;
+    const facts = pendingOffer.current;
+    pendingOffer.current = undefined;
+    if (facts !== undefined) {
+      active?.record(facts.endpoint.baseUrl, accessRecord({ ...facts, confirmed: false }));
+    }
+    dispatch({ type: "relay-declined" });
   }, []);
 
   const openProcess = useCallback(
@@ -204,23 +351,11 @@ export function useWorkflow(relayUrl: string | undefined): WorkflowView {
             // that carries them; forwarded, so the session still records it.
             onObservation: (observation) => {
               if (observation.kind === "process-fetched") warnings = observation.warnings;
-              active.record(observation);
+              active.record(connection.endpoint.baseUrl, observation);
             },
           });
           const plan = resolveFormPlan(process);
-          const endpoint = connection.endpoint.baseUrl;
-          record(formObservationsFor(endpoint, process.id, plan.diagnostics));
-          record(
-            projectedOnly(plan).map(({ inputId, crs }) => ({
-              kind: "form",
-              endpoint: redactUrl(endpoint),
-              processId: process.id,
-              inputId,
-              code: "bbox-projected-crs-only",
-              keyword: undefined,
-              crs,
-            })),
-          );
+          record(formObservationsOf(connection.endpoint.baseUrl, process, plan));
           dispatch({
             type: "process-loaded",
             process,
@@ -283,12 +418,21 @@ export function useWorkflow(relayUrl: string | undefined): WorkflowView {
                 mode: "sync",
                 description: process,
               })
-            : await active.run(relayEndpoint, process.id, request.inputs, request.outputs, process);
+            : await active.run(
+                relayEndpoint,
+                process.id,
+                request.inputs,
+                request.outputs,
+                process,
+                connection.reads,
+              );
         if (execution.kind === "job") {
           // The reconciler owns the job from here; `run` already tracks an
           // asynchronous one, and a sync request the server made async is
           // handed over here.
-          if (mode === "sync") active.track(relayEndpoint, execution.job.statusUrl);
+          if (mode === "sync") {
+            active.track(relayEndpoint, execution.job.statusUrl, connection.reads);
+          }
           dispatch({ type: "job-started", jobRef: execution.job.statusUrl });
           return;
         }
@@ -411,20 +555,20 @@ export function useWorkflow(relayUrl: string | undefined): WorkflowView {
         const dismissal = await connection.client.dismissJob(jobRef);
         if (dismissal.kind === "dismissed") {
           setDismissWorked((seen) => new Set([...seen, endpointUrl]));
-          active.record({ ...base, outcome: "dismissed" });
+          active.record(endpointUrl, { ...base, outcome: "dismissed" });
           setJobNotice(undefined);
           dispatch({
             type: "run-failed",
             error: { title: "Job cancelled. The server has dismissed it.", notice: true },
           });
         } else {
-          active.record({ ...base, outcome: "unsupported" });
+          active.record(endpointUrl, { ...base, outcome: "unsupported" });
           setJobNotice(
             `The server says it cannot cancel jobs (HTTP ${String(dismissal.status)}). The job keeps running.`,
           );
         }
       } catch (cause) {
-        active.record({ ...base, outcome: "failed" });
+        active.record(endpointUrl, { ...base, outcome: "failed" });
         setJobNotice(
           `The job could not be cancelled: ${cause instanceof Error ? cause.message : String(cause)}. It may still be running.`,
         );
@@ -432,8 +576,44 @@ export function useWorkflow(relayUrl: string | undefined): WorkflowView {
     })();
   };
 
+  // One description at a time: a census is for the record, not for speed, and
+  // a server should not see it as a burst. Stops when the connection changes.
+  const describeAll = () => {
+    const connection = client.current;
+    if (state.stage === "choose-endpoint" || connection === undefined) return;
+    if (census?.running === true) return;
+    const summaries = state.processes.processes;
+    const endpoint = redactUrl(connection.endpoint.baseUrl);
+    let progress: CensusProgress = {
+      endpoint,
+      total: summaries.length,
+      described: 0,
+      failed: 0,
+      running: true,
+    };
+    setCensus(progress);
+    void (async () => {
+      for (const summary of summaries) {
+        if (client.current !== connection) break;
+        try {
+          const process = await connection.client.getProcess(summary.id, { summary });
+          record(
+            formObservationsOf(connection.endpoint.baseUrl, process, resolveFormPlan(process)),
+          );
+          progress = { ...progress, described: progress.described + 1 };
+        } catch {
+          progress = { ...progress, failed: progress.failed + 1 };
+        }
+        setCensus(progress);
+      }
+      setCensus({ ...progress, running: false });
+    })();
+  };
+
   const commands: WorkflowCommands = {
     connect,
+    confirmRelay,
+    declineRelay,
     disconnect: () => {
       client.current = undefined;
       setFieldErrors(NO_ERRORS);
@@ -461,6 +641,7 @@ export function useWorkflow(relayUrl: string | undefined): WorkflowView {
     edit: () => {
       dispatch({ type: "edit" });
     },
+    describeAll,
   };
 
   return {
@@ -472,5 +653,6 @@ export function useWorkflow(relayUrl: string | undefined): WorkflowView {
     fieldErrors,
     jobNotice,
     dismissAdvertisedBy,
+    census,
   };
 }
