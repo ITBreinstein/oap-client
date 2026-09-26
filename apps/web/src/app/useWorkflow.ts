@@ -23,7 +23,13 @@ import { initialValues } from "../forms/defaults.js";
 import type { BboxControl, Control, FormPlan } from "../forms/plan.js";
 import { resolveFormPlan } from "../forms/resolve.js";
 import { validateForm, type FieldErrors } from "../forms/validate.js";
-import { formObservationsFor, type FormObservation } from "../observations.js";
+import {
+  formObservationsFor,
+  loadedObservation,
+  resultObservations,
+  type FormObservation,
+  type RunFacts,
+} from "../observations.js";
 import type { RelayEndpoint } from "../relay/contract.js";
 import {
   createJobSession,
@@ -40,7 +46,8 @@ import {
   type AttemptFacts,
   type RelayAttempt,
 } from "./route-decision.js";
-import { toRenderable } from "../results/renderable.js";
+import { loadReference as followReference } from "../results/reference.js";
+import { toRenderable, type RenderableResult } from "../results/renderable.js";
 import { declaredMediaTypes, relayEndpointFor, runError, runRequest } from "./run.js";
 import {
   INITIAL_WORKFLOW,
@@ -62,9 +69,16 @@ export interface WorkflowCommands {
   readonly backToList: () => void;
   readonly setValue: (id: string, value: unknown) => void;
   readonly setMode: (mode: ExecutionMode) => void;
+  /** Task 8, T2: ask for one output as a value (as the server prefers) or a link. */
+  readonly setTransmission: (outputId: string, transmission: "value" | "reference") => void;
   readonly run: () => void;
   readonly cancelJob: () => void;
   readonly edit: () => void;
+  /**
+   * "Load" on an output given by reference (Task 8, T3): the only way its href
+   * is ever fetched. Settles when the result screen has what it found.
+   */
+  readonly loadReference: (outputId: string) => Promise<void>;
   /**
    * The process census: describe every listed process once, through the
    * connection's route, so the session's observations cover the whole
@@ -102,6 +116,31 @@ export interface WorkflowView {
 }
 
 const NO_ERRORS: FieldErrors = new Map();
+
+let runCounter = 0;
+
+/**
+ * Task 8, T9: pairs a Load's record with its run's. Random, so exports from
+ * two sessions do not collide; never derived from inputs or URLs.
+ */
+function newRunId(): string {
+  try {
+    return globalThis.crypto.randomUUID();
+  } catch {
+    // Not a secure context: randomUUID is missing there.
+    runCounter += 1;
+    return `run-${String(runCounter)}-${Math.random().toString(36).slice(2, 10)}`;
+  }
+}
+
+/** The page's protocol, for the mixed-content check; undefined off-browser. */
+function pageProtocol(): string | undefined {
+  try {
+    return globalThis.location.protocol;
+  } catch {
+    return undefined;
+  }
+}
 
 function transportMessage(cause: unknown, endpoint: EndpointRef): WorkflowError {
   if (directFailure(cause) === "cors-blocked") {
@@ -214,6 +253,17 @@ export function useWorkflow(relayUrl: string | undefined): WorkflowView {
   /** The job whose results are being fetched, so a snapshot burst fetches once. */
   const fetching = useRef<string | undefined>(undefined);
   const [census, setCensus] = useState<CensusProgress | undefined>();
+  /** The run whose results are on screen, for their observations (Task 8, T9). */
+  const lastRun = useRef<RunFacts | undefined>(undefined);
+
+  /** The first record for each output, as the result is shown. */
+  const recordResults = useCallback((results: readonly RenderableResult[]) => {
+    const run = lastRun.current;
+    if (run === undefined) return;
+    for (const observation of resultObservations(run, results)) {
+      session.current?.record(run.endpoint, observation);
+    }
+  }, []);
 
   useEffect(() => {
     const created = createJobSession(relayUrl);
@@ -390,8 +440,15 @@ export function useWorkflow(relayUrl: string | undefined): WorkflowView {
     setFieldErrors(errors);
     if (errors.size > 0) return;
 
-    const { process, plan, mode } = state;
-    const request = runRequest(process, plan, state.values);
+    const { process, plan, mode, linkOutputs } = state;
+    const request = runRequest(process, plan, state.values, linkOutputs);
+    lastRun.current = {
+      runId: newRunId(),
+      endpoint: connection.endpoint.baseUrl,
+      processId: process.id,
+      declaredTransmission: process.outputTransmission,
+      linkOutputs,
+    };
     record(
       request.notes.map((note) => ({
         kind: "form",
@@ -441,6 +498,7 @@ export function useWorkflow(relayUrl: string | undefined): WorkflowView {
           processId: process.id,
           declaredMediaTypes: declaredMediaTypes(process),
         });
+        recordResults(results);
         dispatch({ type: "results", results });
       } catch (cause) {
         if (cause instanceof AmbiguousExecutionResponseError) {
@@ -500,14 +558,13 @@ export function useWorkflow(relayUrl: string | undefined): WorkflowView {
     void (async () => {
       try {
         const { envelope } = await connection.client.getResults(jobRef, { status });
-        dispatch({
-          type: "results",
-          results: await toRenderable(envelope, {
-            outputIds,
-            processId,
-            declaredMediaTypes: declared,
-          }),
+        const results = await toRenderable(envelope, {
+          outputIds,
+          processId,
+          declaredMediaTypes: declared,
         });
+        recordResults(results);
+        dispatch({ type: "results", results });
       } catch (cause) {
         dispatch({
           type: "run-failed",
@@ -520,7 +577,7 @@ export function useWorkflow(relayUrl: string | undefined): WorkflowView {
         fetching.current = undefined;
       }
     })();
-  }, [snapshot, state]);
+  }, [snapshot, state, recordResults]);
 
   const dismissAdvertisedBy: WorkflowView["dismissAdvertisedBy"] =
     state.stage === "choose-endpoint" || state.stage === "connected"
@@ -610,6 +667,28 @@ export function useWorkflow(relayUrl: string | undefined): WorkflowView {
     })();
   };
 
+  // Direct unless this connection's reads already go through the relay and the
+  // href is this endpoint's own (reference.ts, Task 8, T4).
+  const loadReference = async (outputId: string): Promise<void> => {
+    const connection = client.current;
+    const active = session.current;
+    const run = lastRun.current;
+    if (state.stage !== "result" || connection === undefined || active === undefined) return;
+    const result = state.results.find(
+      (candidate) => candidate.kind === "reference" && candidate.outputId === outputId,
+    );
+    if (result?.kind !== "reference") return;
+    const loaded = await followReference(result, {
+      endpoint: { baseUrl: connection.endpoint.baseUrl, reads: connection.reads },
+      relayFetch: active.readFetch(relayEndpointFor(connection.endpoint), connection.reads),
+      pageProtocol: pageProtocol(),
+    });
+    if (run !== undefined) {
+      active.record(connection.endpoint.baseUrl, loadedObservation(run, result, loaded));
+    }
+    dispatch({ type: "reference-loaded", outputId, loaded });
+  };
+
   const commands: WorkflowCommands = {
     connect,
     confirmRelay,
@@ -636,11 +715,15 @@ export function useWorkflow(relayUrl: string | undefined): WorkflowView {
     setMode: (mode) => {
       dispatch({ type: "set-mode", mode });
     },
+    setTransmission: (outputId, transmission) => {
+      dispatch({ type: "set-transmission", outputId, transmission });
+    },
     run,
     cancelJob,
     edit: () => {
       dispatch({ type: "edit" });
     },
+    loadReference,
     describeAll,
   };
 

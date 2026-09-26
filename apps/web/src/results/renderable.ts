@@ -1,12 +1,12 @@
 /**
  * From a response envelope to what the result screen shows (T10).
  *
- * Deliberately minimal in Task 7: JSON is shown pretty-printed, text is shown
- * as text and never rendered as HTML, and everything else is offered as a
- * download with its media type, file name and size. GeoJSON is also put on
- * the map, from the JSON it is shown as (`plottable.ts`). Images and
- * collection references are Task 8, which adds arms to
- * {@link RenderableResult} rather than changing these.
+ * JSON is shown pretty-printed, text is shown as text and never rendered as
+ * HTML, and everything else is offered as a download with its media type,
+ * file name and size. GeoJSON is also put on the map, from the JSON it is
+ * shown as, and an image a browser shows is shown and sometimes placed
+ * (`plottable.ts`). An output given by reference is its own arm (Task 8, T1):
+ * a link, followed only when the user asks (`reference.ts`).
  *
  * Built on the core's envelope and its readers: nothing here reads a stream
  * or a header by hand. What *is* here is the one interpretation the core
@@ -14,7 +14,8 @@
  * and how a results document splits into outputs.
  */
 
-import { isJsonMediaType, type ResponseEnvelope } from "@breinstein/oap-client";
+import { isJsonMediaType, resolveHref, type ResponseEnvelope } from "@breinstein/oap-client";
+import type { LoadedReference } from "./reference.js";
 
 export type RenderableResult =
   | { readonly kind: "json"; readonly outputId: string; readonly value: unknown }
@@ -37,6 +38,22 @@ export type RenderableResult =
        * still read, so GeoJSON can go on the map (`plottable.ts`).
        */
       readonly json?: unknown;
+    }
+  | {
+      /**
+       * An output given by reference: a `link.yaml` object in the results
+       * document (Task 8, T1). Nothing has been fetched; `loaded` is what the
+       * user's "Load" found.
+       */
+      readonly kind: "reference";
+      readonly outputId: string;
+      /** Resolved against the URL the results document was served from. */
+      readonly href: string;
+      /** The link's `type`, or ZOO's `format.mediaType`: what the server says it is. */
+      readonly mediaType?: string | undefined;
+      readonly rel?: string | undefined;
+      readonly title?: string | undefined;
+      readonly loaded?: LoadedReference | undefined;
     };
 
 /**
@@ -76,7 +93,7 @@ const EXTENSIONS: Readonly<Record<string, string>> = {
   "application/pdf": "pdf",
 };
 
-function defaultFilename(
+export function defaultFilename(
   processId: string,
   outputId: string,
   mediaType: string | undefined,
@@ -120,8 +137,45 @@ function base64Blob(text: string, mediaType: string | undefined): Blob {
   return new Blob([bytes], mediaType === undefined ? {} : { type: mediaType });
 }
 
+function optionalString(value: unknown): string | undefined {
+  return typeof value === "string" && value !== "" ? value : undefined;
+}
+
+/**
+ * An entry with a string `href` and no `value`: `link.yaml`, whose only
+ * required member is `href`. pygeoapi's carries `type`, `rel` and `title`;
+ * ZOO's carries nothing, or `format.mediaType`, or both `type` and `format`.
+ */
+function fromLink(
+  outputId: string,
+  entry: Record<string, unknown>,
+  href: string,
+  base: string,
+): RenderableResult {
+  const mediaType = optionalString(entry["type"]) ?? qualifiedMediaType(entry);
+  const rel = optionalString(entry["rel"]);
+  const title = optionalString(entry["title"]);
+  return {
+    kind: "reference",
+    outputId,
+    // Unresolvable stays as sent: it is then refused before any fetch (T7).
+    href: resolveHref(href, base) ?? href,
+    ...(mediaType === undefined ? {} : { mediaType }),
+    ...(rel === undefined ? {} : { rel }),
+    ...(title === undefined ? {} : { title }),
+  };
+}
+
 /** One output's entry in a results document: a bare value, a qualified value or a link. */
-function fromEntry(outputId: string, entry: unknown, options: RenderOptions): RenderableResult {
+function fromEntry(
+  outputId: string,
+  entry: unknown,
+  options: RenderOptions,
+  base: string,
+): RenderableResult {
+  if (isRecord(entry) && typeof entry["href"] === "string" && !("value" in entry)) {
+    return fromLink(outputId, entry, entry["href"], base);
+  }
   if (typeof entry === "string") {
     const declared = options.declaredMediaTypes?.[outputId];
     if (declared === undefined || isTextual(declared)) {
@@ -184,7 +238,7 @@ function byteLength(text: string): number {
 
 /** One output of a results document, made a download when it is too large to show. */
 function withinLimit(result: RenderableResult, limit: number, processId: string): RenderableResult {
-  if (result.kind === "download") return result;
+  if (result.kind === "download" || result.kind === "reference") return result;
   const text = result.kind === "json" ? JSON.stringify(result.value, null, 2) : result.value;
   if (byteLength(text) <= limit) return result;
   const mediaType = result.kind === "json" ? "application/json" : result.mediaType;
@@ -241,7 +295,7 @@ export async function toRenderable(
     const entries = splitResults(value, options.outputIds);
     if (entries !== undefined) {
       return entries.map(([id, entry]) =>
-        withinLimit(fromEntry(id, entry, options), limit, options.processId),
+        withinLimit(fromEntry(id, entry, options, envelope.url), limit, options.processId),
       );
     }
     if (tooLarge) return download("too-large", value);

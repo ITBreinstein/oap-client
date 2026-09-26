@@ -1,0 +1,18 @@
+HTTP/1.1 200 OK
+Server: gunicorn
+Date: Sat, 26 Sep 2026 19:39:03 GMT
+Connection: keep-alive
+Content-Type: application/json
+X-Powered-By: pygeoapi 0.21.0
+Content-Language: en-US
+Access-Control-Allow-Origin: *
+Content-Length: 296
+
+{
+    "buildings": {
+        "href": "https://api.pdok.nl/kadaster/bag/ogc/v2/collections/pand/items?f=json&bbox=5.118%2C52.089%2C5.124%2C52.093&limit=1000",
+        "rel": "related",
+        "title": "The buildings in the bounding box of the area",
+        "type": "application/geo+json"
+    }
+}

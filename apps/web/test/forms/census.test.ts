@@ -77,7 +77,7 @@ describe("census over the committed fixtures", () => {
           "select": 4,
           "text": 27,
         },
-        "descriptions": 33,
+        "descriptions": 34,
         "diagnostics": {
           "contradictory-schema": 1,
         },

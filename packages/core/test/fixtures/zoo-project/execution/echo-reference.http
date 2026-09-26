@@ -1,0 +1,9 @@
+HTTP/1.1 200 Ok
+Date: Sat, 26 Sep 2026 19:42:57 GMT
+Server: Apache/2.4.29 (Ubuntu)
+X-Powered-By: ZOO-Project
+Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self';
+Content-Length: 216
+Content-Type: application/json;charset=UTF-8
+
+{"a":{"href":"http:\/\/localhost:5090\/temp\/\/ZOO_DATA_echo_a_79756b8e-b9e2-11f1-9d7f-3a9d4c7adc78_0.txt"},"c":{"href":"http:\/\/localhost:5090\/temp\/\/ZOO_DATA_echo_c_79756b8e-b9e2-11f1-9d7f-3a9d4c7adc78_1.txt"}}

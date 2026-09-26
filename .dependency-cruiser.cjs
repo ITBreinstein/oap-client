@@ -47,6 +47,16 @@ module.exports = {
       },
     },
     {
+      // Deciding what a result is, and following an output given by
+      // reference, never draws: features reach the map through the screen's
+      // data path, the same one inline GeoJSON takes, and nothing here calls
+      // MapLibre or renders. Task 8, T8.
+      name: "results-are-framework-free",
+      severity: "error",
+      from: { path: "^apps/web/src/results/" },
+      to: { path: "node_modules/(react|react-dom|maplibre-gl|terra-draw)" },
+    },
+    {
       // The execution layer sits on the transport, the links, the process
       // types, the errors, the observations and the vocabulary — and on nothing
       // else. Discovery and conformance are deliberately out of reach:

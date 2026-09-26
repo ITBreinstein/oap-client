@@ -1,0 +1,116 @@
+HTTP/1.1 200 OK
+Access-Control-Allow-Origin: *
+Access-Control-Expose-Headers: Content-Crs,Link
+Api-Version: 2.0.0
+Cache-Control: public, max-age=3600, no-transform
+Content-Security-Policy: default-src 'self'; frame-ancestors 'none'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; script-src 'self' 'unsafe-inline' https://*.piwik.pro; connect-src 'self' https://*.pdok.nl https://*.piwik.pro; img-src 'self' data: https://*.pdok.nl; font-src 'self' https://cdn.jsdelivr.net;
+Content-Type: application/json
+Date: Sat, 26 Sep 2026 19:41:40 GMT
+Referrer-Policy: origin
+Vary: Cookie, Accept, Accept-Encoding, Accept-Language
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+Transfer-Encoding: chunked
+Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+
+{
+ "id": "pand",
+ "title": "Pand",
+ "description": "Een zelfstandig bouwwerk, zowel zelfstandig in de manier hoe het is gebouwd als waarvoor het is bedoeld om te gebruiken. Een pand voldoet ook aan de volgende eisen: een pand is direct en voor lange tijd met de aarde verbonden (een pand is niet makkelijk te verplaatsen) en een pand kun je binnengaan en afsluiten. Een eenheid kan alleen een pand zijn als het voldoet aan alle eisen uit de Catalogus BAG 2018. Voor meer informatie zie: bag:pand ",
+ "keywords": [
+  {
+   "keyword": "Pand"
+  },
+  {
+   "keyword": "Gebouw"
+  },
+  {
+   "keyword": "Onroerend goed"
+  }
+ ],
+ "extent": {
+  "spatial": {
+   "bbox": [
+    [
+     -1.657292,
+     48.040502,
+     12.431727,
+     56.110590
+    ]
+   ],
+   "crs": "http://www.opengis.net/def/crs/OGC/1.3/CRS84"
+  }
+ },
+ "itemType": "feature",
+ "crs": [
+  "http://www.opengis.net/def/crs/OGC/1.3/CRS84",
+  "http://www.opengis.net/def/crs/EPSG/0/28992",
+  "http://www.opengis.net/def/crs/EPSG/0/3857",
+  "http://www.opengis.net/def/crs/EPSG/0/4258"
+ ],
+ "storageCrs": "http://www.opengis.net/def/crs/EPSG/0/28992",
+ "links": [
+  {
+   "rel": "self",
+   "type": "application/json",
+   "title": "This document as JSON",
+   "updated": "2026-09-26T00:00:00Z",
+   "href": "https://api.pdok.nl/kadaster/bag/ogc/v2/collections/pand?f=json"
+  },
+  {
+   "rel": "alternate",
+   "type": "text/html",
+   "title": "This document as HTML",
+   "updated": "2026-09-26T00:00:00Z",
+   "href": "https://api.pdok.nl/kadaster/bag/ogc/v2/collections/pand?f=html"
+  },
+  {
+   "rel": "preview",
+   "type": "image/png",
+   "title": "Thumbnail for pand",
+   "href": "https://api.pdok.nl/kadaster/bag/ogc/v2/resources/Pand.png"
+  },
+  {
+   "rel": "items",
+   "type": "application/geo+json",
+   "title": "The JSON representation of the pand features served from this endpoint",
+   "href": "https://api.pdok.nl/kadaster/bag/ogc/v2/collections/pand/items?f=json"
+  },
+  {
+   "rel": "items",
+   "type": "application/vnd.ogc.fg+json",
+   "title": "The JSON-FG representation of the pand features served from this endpoint",
+   "href": "https://api.pdok.nl/kadaster/bag/ogc/v2/collections/pand/items?f=jsonfg"
+  },
+  {
+   "rel": "items",
+   "type": "text/html",
+   "title": "The HTML representation of the pand features served from this endpoint",
+   "href": "https://api.pdok.nl/kadaster/bag/ogc/v2/collections/pand/items?f=html"
+  },
+  {
+   "rel": "http://www.opengis.net/def/rel/ogc/1.0/schema",
+   "type": "application/schema+json",
+   "title": "The JSON representation of the pand schema",
+   "href": "https://api.pdok.nl/kadaster/bag/ogc/v2/collections/pand/schema?f=json"
+  },
+  {
+   "rel": "http://www.opengis.net/def/rel/ogc/1.0/schema",
+   "type": "text/html",
+   "title": "The HTML representation of the pand schema",
+   "href": "https://api.pdok.nl/kadaster/bag/ogc/v2/collections/pand/schema?f=html"
+  },
+  {
+   "rel": "http://www.opengis.net/def/rel/ogc/1.0/queryables",
+   "type": "application/schema+json",
+   "title": "The JSON representation of the pand queryable properties",
+   "href": "https://api.pdok.nl/kadaster/bag/ogc/v2/collections/pand/queryables?f=json"
+  },
+  {
+   "rel": "http://www.opengis.net/def/rel/ogc/1.0/queryables",
+   "type": "text/html",
+   "title": "The HTML representation of the pand queryable properties",
+   "href": "https://api.pdok.nl/kadaster/bag/ogc/v2/collections/pand/queryables?f=html"
+  }
+ ]
+}

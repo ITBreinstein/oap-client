@@ -17,6 +17,14 @@ import { redactUrl, type Observation } from "@breinstein/oap-client";
 import type { EncodeNote } from "./forms/encode.js";
 import type { Diagnostic, DiagnosticCode } from "./forms/plan.js";
 import type { RelayOutcome } from "./relay/relay-fetch.js";
+import {
+  isTruncated,
+  originOf,
+  type LoadedReference,
+  type ReferenceOutcome,
+  type Representation,
+} from "./results/reference.js";
+import type { RenderableResult } from "./results/renderable.js";
 import type { ExecuteRouteObservation } from "./relay/routed-fetch.js";
 
 /**
@@ -100,12 +108,124 @@ export interface CancelJobObservation {
   readonly outcome: "dismissed" | "unsupported" | "failed";
 }
 
+/**
+ * One output of one run as the result screen received it, and — in a second
+ * record, never by changing the first — what "Load" found behind it when it
+ * was given by reference (Task 8, T9). The matrix reads output types,
+ * transmission, and whether a page can read what a reference points at, per
+ * service, from these.
+ *
+ * Redacted at creation like the rest: of a reference, only its origin. Never
+ * its path or query, which may name a user's file or carry a signed token, and
+ * never a body.
+ */
+export interface ResultObservation {
+  readonly kind: "result";
+  /** Pairs a Load's record with its run's. Random; never derived from inputs or URLs. */
+  readonly runId: string;
+  readonly endpoint: string;
+  readonly processId: string;
+  readonly outputId: string;
+  /** The process's `outputTransmission`, as described (finding 0059 on pygeoapi). */
+  readonly declaredTransmission: readonly string[];
+  /** `unspecified`: the output was named with no transmission mode, as the server prefers. */
+  readonly requestedTransmission: "value" | "reference" | "unspecified";
+  readonly receivedAs: "value" | "reference";
+  /**
+   * First record: what the results say the output is. Second: the
+   * Content-Type the href was served with, verbatim.
+   */
+  readonly mediaType: string | undefined;
+  readonly renderedAs: RenderableResult["kind"];
+  readonly referenceOrigin: string | undefined;
+  readonly referenceRoute: "direct" | "relay" | undefined;
+  readonly referenceOutcome: "not-followed" | ReferenceOutcome | undefined;
+  readonly representation: Representation | undefined;
+  readonly truncated: boolean | undefined;
+  /** The header's URI, when one was sent. */
+  readonly contentCrs: string | undefined;
+  readonly axisSwapped: boolean | undefined;
+}
+
 export type WebObservation =
   | Observation
   | ExecuteRouteObservation
   | FormObservation
   | EndpointAccessObservation
-  | CancelJobObservation;
+  | CancelJobObservation
+  | ResultObservation;
+
+/** One run, as far as its result records need it. */
+export interface RunFacts {
+  readonly runId: string;
+  readonly endpoint: string;
+  readonly processId: string;
+  readonly declaredTransmission: readonly string[];
+  /** The outputs asked for by reference. */
+  readonly linkOutputs: readonly string[];
+}
+
+function declaredMediaType(result: RenderableResult): string | undefined {
+  switch (result.kind) {
+    case "json":
+      return undefined;
+    case "text":
+      return result.mediaType;
+    case "download":
+    case "reference":
+      return result.mediaType;
+  }
+}
+
+/** The first record for each output, written when the result is shown. */
+export function resultObservations(
+  run: RunFacts,
+  results: readonly RenderableResult[],
+): ResultObservation[] {
+  return results.map((result) => {
+    const reference = result.kind === "reference";
+    return {
+      kind: "result",
+      runId: run.runId,
+      endpoint: redactUrl(run.endpoint),
+      processId: run.processId,
+      outputId: result.outputId,
+      declaredTransmission: run.declaredTransmission,
+      requestedTransmission: run.linkOutputs.includes(result.outputId)
+        ? "reference"
+        : "unspecified",
+      receivedAs: reference ? "reference" : "value",
+      mediaType: declaredMediaType(result),
+      renderedAs: result.kind,
+      referenceOrigin: reference ? originOf(result.href) : undefined,
+      referenceRoute: undefined,
+      referenceOutcome: reference ? "not-followed" : undefined,
+      representation: undefined,
+      truncated: undefined,
+      contentCrs: undefined,
+      axisSwapped: undefined,
+    };
+  });
+}
+
+/** The second record for an output given by reference: what Load found. */
+export function loadedObservation(
+  run: RunFacts,
+  result: Extract<RenderableResult, { kind: "reference" }>,
+  loaded: LoadedReference,
+): ResultObservation {
+  const [first] = resultObservations(run, [result]);
+  return {
+    ...(first as ResultObservation),
+    mediaType: loaded.mediaType,
+    referenceRoute: loaded.route,
+    referenceOutcome: loaded.outcome,
+    representation: loaded.representation,
+    truncated: loaded.page === undefined ? undefined : isTruncated(loaded.page),
+    contentCrs: loaded.contentCrs,
+    axisSwapped: loaded.axes === undefined ? undefined : loaded.axes === "swapped",
+  };
+}
 
 export function formObservationsFor(
   endpoint: string,

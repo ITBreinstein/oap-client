@@ -102,6 +102,7 @@ export function App() {
           jobs={view.snapshot?.jobs ?? []}
           jobNotice={view.jobNotice}
           dismissAdvertisedBy={view.dismissAdvertisedBy}
+          developer={developer}
         />
       );
       break;

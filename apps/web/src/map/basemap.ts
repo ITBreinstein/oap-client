@@ -23,8 +23,8 @@ export const INITIAL_BOUNDS = [3.2, 50.7, 7.3, 53.6] as const;
 
 /**
  * The drawn input's colours. Amber and dashed-looking by weight, so nothing
- * Task 8 shows as a *result* — which will be the blue end of the palette — can
- * be mistaken for what the user drew.
+ * shown as a *result* — the blue end of the palette, inline or loaded from a
+ * reference — can be mistaken for what the user drew.
  */
 export const INPUT_STYLE = {
   fill: "#d97706",

@@ -57,6 +57,9 @@ the versions are recorded here rather than left to a commit message.
                 (finding 0058)                                        2026-09-25
               execution/preflight-execute-reflected-headers.http
                 (finding 0057)                                        2026-09-25
+              processes/breinstein-link.json,
+              process-list.json  (re-captured; all fourteen, now
+                with breinstein-link)                                 2026-09-26
 
 The `breinstein-*` descriptions are processes this repository adds to the
 pinned image (see `infra/README.md`). They are the only descriptions a browser
@@ -150,6 +153,30 @@ the evidence, these are the samples it is checked against:
   declared with a string `enum` (finding 0056); `Gdal_Warp`, optional booleans
   with no default.
 
+## `pdok/`
+
+Not a server under test: the third-party OGC API Features service that
+`breinstein-buildings` links to when asked for its output by reference. Kept
+so the web client's handling of what a reference points at can be tested
+without the network.
+
+    server    https://api.pdok.nl/kadaster/bag/ogc/v2, API-Version 2.0.0
+    captured  bag-pand-collection.http         the collection: `items` in the
+                                               short form, three media types
+              bag-pand-items-default-page.http 10 features, cursor `next`,
+                                               no numberMatched
+              bag-pand-items-epsg{4258,28992}.http
+                                               `crs=` honoured, Content-Crs set;
+                                               4258 is latitude first     2026-09-26
+
+The page `breinstein-buildings` actually links to is not kept: the example
+area of the process description, `limit=1000`. It is 1 082 394 bytes of
+`application/geo+json`, `Transfer-Encoding: chunked` with no Content-Length,
+`Content-Crs` CRS84, holding 815 `Polygon` features with `numberReturned: 815`,
+no `numberMatched` and no `next` link — a whole answer on one page. Its headers
+and member layout are those of `bag-pand-items-default-page.http`, which is the
+same query without `limit`: 10 features and a cursor `next`.
+
 ## `*/execution/`
 
 Captured 2026-09-01 against both servers, with `curl -isS -X POST` and
@@ -194,6 +221,40 @@ Captured 2026-09-01 against both servers, with `curl -isS -X POST` and
       saga-fractals-wrong-type-500.http            ANGLE "abc": HTML 500        0055
       saga-fractals-in-range-500.http              ANGLE 90 of max 90: HTML 500 0055
       hellopy-missing-required-400.http            the one check ZOO makes      0054
+
+    Task 8, 2026-09-26: outputs asked for with `transmissionMode: "reference"`.
+    A `*-file.http` is the `curl -i` of the href in the run beside it, sent
+    with `Origin: http://localhost:4173`.
+
+    pygeoapi/execution/
+      breinstein-buildings-reference-sync.http      200, results document, one
+                                                    link to a PDOK items query
+      breinstein-buildings-reference-raw.http       response:"raw": the same
+                                                    document, no 204, no Link
+      breinstein-buildings-reference-document.http  response:"document": the
+                                                    `outputs` array            0027
+
+    zoo-project/execution/
+      echo-reference.http               two outputs, each a bare { href }
+      echo-reference-{a,c}-file.http    the files: text/plain, no CORS headers;
+                                        the bbox arrives as four numbers, no crs
+      echo-reference-raw.http           raw, one output: the value, not a link 0026
+      echo-reference-raw-two.http       raw, two outputs: multipart/related,
+                                        Content-Location after each part's headers
+      buffer-reference-gml.http         default format: { href, format } → .xml
+      buffer-reference-gml-file.http    application/xml, no CORS headers
+      buffer-reference-json.http        format application/json: { href } → .js
+      buffer-reference-json-file.http   GeoJSON as application/javascript      0026
+      hellopy-reference.http            { href } → .txt
+      saga-fractals-reference-wfs.http  a MapServer WFS GetFeature URL
+
+    The body the WFS URL names is not kept: 10.8 MB, `Transfer-Encoding:
+    chunked` with no Content-Length, `text/xml`, and no CORS headers. It is a
+    WFS 1.0 `wfs:FeatureCollection` of 12 286 `gml:featureMember`s, each an
+    `ms:RESULT` holding one `gml:Polygon` with a `gml:Box`, every one
+    `srsName="EPSG:4326"`, over a box of -2.45…3.45 by 0…3.95 — the fractal's
+    own coordinates, not a place. It was captured once, on 2026-09-26, by
+    replaying the href in `saga-fractals-reference-wfs.http` with `curl -i`.
 
 `hello-world-*.http` carry a fresh job UUID and timestamp per capture, so they
 are read for shape and headers rather than compared byte-for-byte. Re-capture by
@@ -240,6 +301,13 @@ set uses `longProcess` and `failR`.
       job-list-limit2.http              `numberTotal`, `next` with skip=        0019
       preflight-delete.http             200 saying "CORS is enabled." with no
                                         CORS headers at all                     0040
+
+    Task 8, 2026-09-26:
+
+    pygeoapi/jobs/
+      breinstein-buildings-reference-async-201.http  201, body `null`       0004
+      breinstein-buildings-reference-results.http    the results document: the
+                                                     sync one, keys reordered
 
 Job ids and timestamps are fresh per capture, so these are read for shape and
 headers rather than compared byte-for-byte. Re-capture by replaying the `curl`

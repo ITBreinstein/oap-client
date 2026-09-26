@@ -24,6 +24,7 @@ import type {
 } from "@breinstein/oap-client";
 import type { FormValues } from "../forms/encode.js";
 import type { FormPlan } from "../forms/plan.js";
+import type { LoadedReference } from "../results/reference.js";
 import type { RenderableResult } from "../results/renderable.js";
 
 /**
@@ -71,6 +72,11 @@ interface ProcessOpen extends Connected {
   /** The core's parse warnings for this description, shown on the detail screen. */
   readonly warnings: readonly string[];
   readonly mode: ExecutionMode;
+  /**
+   * The outputs to ask for by reference (Task 8, T2). Empty by default: every
+   * output is asked for as the server prefers, as before.
+   */
+  readonly linkOutputs: readonly string[];
 }
 
 export type AsyncRun = { readonly mode: "async"; readonly jobRef?: string | undefined };
@@ -144,9 +150,20 @@ export type WorkflowAction =
   | { readonly type: "back-to-list" }
   | { readonly type: "set-value"; readonly id: string; readonly value: unknown }
   | { readonly type: "set-mode"; readonly mode: ExecutionMode }
+  | {
+      readonly type: "set-transmission";
+      readonly outputId: string;
+      readonly transmission: "value" | "reference";
+    }
   | { readonly type: "run-started"; readonly mode: ExecutionMode }
   | { readonly type: "job-started"; readonly jobRef: string }
   | { readonly type: "results"; readonly results: readonly RenderableResult[] }
+  /** What "Load" found behind one output given by reference (Task 8, T3). */
+  | {
+      readonly type: "reference-loaded";
+      readonly outputId: string;
+      readonly loaded: LoadedReference;
+    }
   | { readonly type: "run-failed"; readonly error: WorkflowError }
   | { readonly type: "edit" };
 
@@ -178,6 +195,7 @@ function openPart(state: ProcessOpen): ProcessOpen {
     values: state.values,
     warnings: state.warnings,
     mode: state.mode,
+    linkOutputs: state.linkOutputs,
   };
 }
 
@@ -248,6 +266,7 @@ export function workflowReducer(state: Workflow, action: WorkflowAction): Workfl
             values: action.values,
             warnings: action.warnings,
             mode: defaultMode(action.process),
+            linkOutputs: [],
           }
         : state;
 
@@ -276,6 +295,18 @@ export function workflowReducer(state: Workflow, action: WorkflowAction): Workfl
 
     case "set-mode":
       return state.stage === "process" ? { ...state, mode: action.mode } : state;
+
+    case "set-transmission":
+      return state.stage === "process" &&
+        state.process.outputs.some((output) => output.id === action.outputId)
+        ? {
+            ...state,
+            linkOutputs: [
+              ...state.linkOutputs.filter((id) => id !== action.outputId),
+              ...(action.transmission === "reference" ? [action.outputId] : []),
+            ],
+          }
+        : state;
 
     case "run-started":
       return state.stage === "process"
@@ -307,6 +338,23 @@ export function workflowReducer(state: Workflow, action: WorkflowAction): Workfl
     case "run-failed":
       return state.stage === "running"
         ? { stage: "process", ...openPart(state), error: action.error }
+        : state;
+
+    case "reference-loaded":
+      // Only onto the output it was loaded for, and only while that result is
+      // still the one on screen: a new run has cleared it (Task 8, T8).
+      return state.stage === "result" &&
+        state.results.some(
+          (result) => result.kind === "reference" && result.outputId === action.outputId,
+        )
+        ? {
+            ...state,
+            results: state.results.map((result) =>
+              result.kind === "reference" && result.outputId === action.outputId
+                ? { ...result, loaded: action.loaded }
+                : result,
+            ),
+          }
         : state;
 
     case "edit":

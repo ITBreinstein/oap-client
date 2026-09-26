@@ -1,0 +1,9 @@
+HTTP/1.1 200 Ok
+Date: Sat, 26 Sep 2026 19:44:01 GMT
+Server: Apache/2.4.29 (Ubuntu)
+X-Powered-By: ZOO-Project
+Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self';
+Content-Length: 122
+Content-Type: application/json;charset=UTF-8
+
+{"Result":{"href":"http:\/\/localhost:5090\/temp\/\/ZOO_DATA_HelloPy_Result_9f7b361a-b9e2-11f1-8947-3a9d4c7adc78_0.txt"}}

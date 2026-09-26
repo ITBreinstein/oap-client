@@ -1,0 +1,9 @@
+HTTP/1.1 200 Ok
+Date: Sat, 26 Sep 2026 19:43:25 GMT
+Server: Apache/2.4.29 (Ubuntu)
+X-Powered-By: ZOO-Project
+Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self';
+Content-Length: 156
+Content-Type: application/json;charset=UTF-8
+
+{"Result":{"href":"http:\/\/localhost:5090\/temp\/\/ZOO_DATA_Buffer_Result_8a3d3e1a-b9e2-11f1-9e63-3a9d4c7adc78_0.xml","format":{"mediaType":"text\/xml"}}}
