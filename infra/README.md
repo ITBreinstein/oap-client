@@ -203,6 +203,25 @@ process:` whatever the failure was.
 `breinstein-buildings` reach the network; the contract lane never runs them,
 and their browser tests skip when PDOK is not answering.
 
+### `breinstein-link`
+
+One output, always given by reference, to a static file on the _other_
+instance (2026-09-26, Task 8). It is the blocking lane's source of a reference
+a web page cannot read: `:5080` grants every preflight (finding 0057), PDOK
+sends CORS headers, and ZOO, whose references no page can read, is not in the
+blocking lane. The two instances differ in exactly that respect, and each
+serves its own `/static/`, so:
+
+| Instance | Links to                                    | From a page on another origin |
+| -------- | ------------------------------------------- | ----------------------------- |
+| `:5080`  | `http://localhost:5081/static/img/logo.png` | blocked: no CORS headers      |
+| `:5081`  | `http://localhost:5080/static/img/logo.png` | readable, `image/png`         |
+
+The target and its media type are `target` and `type` under `processor` in
+each config; the process takes no inputs and fetches nothing. It declares
+`outputTransmission: ["reference"]`, and pygeoapi describes it as `["value"]`
+(finding 0059).
+
 ## Re-creating the stack after a config change
 
 `up -d` alone will not pick up a change to a mounted config or a new plugin

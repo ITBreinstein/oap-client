@@ -131,3 +131,11 @@ resources:
     type: process
     processor:
       name: breinstein_buildings.BuildingsProcessor
+  # One output, always by reference, to a static file on the other instance:
+  # :5081, which sends no CORS headers. Source and rationale: infra/pygeoapi/plugins/breinstein_link.py.
+  breinstein-link:
+    type: process
+    processor:
+      name: breinstein_link.LinkProcessor
+      target: http://localhost:5081/static/img/logo.png
+      type: image/png

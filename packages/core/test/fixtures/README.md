@@ -57,6 +57,9 @@ the versions are recorded here rather than left to a commit message.
                 (finding 0058)                                        2026-09-25
               execution/preflight-execute-reflected-headers.http
                 (finding 0057)                                        2026-09-25
+              processes/breinstein-link.json,
+              process-list.json  (re-captured; all fourteen, now
+                with breinstein-link)                                 2026-09-26
 
 The `breinstein-*` descriptions are processes this repository adds to the
 pinned image (see `infra/README.md`). They are the only descriptions a browser

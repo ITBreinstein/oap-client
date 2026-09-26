@@ -810,6 +810,61 @@
                     "hreflang":"en-US"
                 }
             ]
+        },
+        {
+            "version":"1.0.0",
+            "id":"breinstein-link",
+            "title":"A link to a file on another server",
+            "description":"Takes nothing and returns one output by reference: a link to a static file on another server, set in this server's configuration.",
+            "jobControlOptions":[
+                "sync-execute",
+                "async-execute"
+            ],
+            "outputTransmission":[
+                "value"
+            ],
+            "keywords":[
+                "reference",
+                "cors",
+                "testbed"
+            ],
+            "links":[
+                {
+                    "type":"application/json",
+                    "rel":"self",
+                    "href":"http://localhost:5080/processes/breinstein-link?f=json",
+                    "title":"Process description as JSON",
+                    "hreflang":"en-US"
+                },
+                {
+                    "type":"text/html",
+                    "rel":"alternate",
+                    "href":"http://localhost:5080/processes/breinstein-link?f=html",
+                    "title":"Process description as HTML",
+                    "hreflang":"en-US"
+                },
+                {
+                    "type":"text/html",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/job-list",
+                    "href":"http://localhost:5080/jobs?f=html",
+                    "title":"Jobs list as HTML",
+                    "hreflang":"en-US"
+                },
+                {
+                    "type":"application/json",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/job-list",
+                    "href":"http://localhost:5080/jobs?f=json",
+                    "title":"Jobs list as JSON",
+                    "hreflang":"en-US"
+                },
+                {
+                    "type":"application/json",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/execute",
+                    "href":"http://localhost:5080/processes/breinstein-link/execution?f=json",
+                    "title":"Execution for this process as JSON",
+                    "hreflang":"en-US"
+                }
+            ]
         }
     ],
     "links":[
