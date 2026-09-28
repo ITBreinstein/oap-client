@@ -137,14 +137,16 @@ describe("loadRuntimeConfig", () => {
 });
 
 describe("the static site's config.json (deploy/static/)", () => {
-  it("is valid, with no relay and no presets", async () => {
-    const { readFile } = await import("node:fs/promises");
-    const { join } = await import("node:path");
-    // A path, not a URL: under jsdom the global URL is jsdom's, which node:fs refuses.
-    const text = await readFile(
-      join(import.meta.dirname, "../../../../deploy/static/config.json"),
-      "utf8",
+  it("is valid, with no relay and no presets", () => {
+    // Vite's glob import, as the form fixtures are read: the web project has
+    // no Node types, and the file stays where the deploy expects it.
+    const shipped = Object.values(
+      import.meta.glob<unknown>("../../../../deploy/static/config.json", {
+        eager: true,
+        import: "default",
+      }),
     );
-    expect(checkRuntimeConfig(JSON.parse(text))).toEqual({ ok: true, config: STATIC_ONLY });
+    expect(shipped).toHaveLength(1);
+    expect(checkRuntimeConfig(shipped[0])).toEqual({ ok: true, config: STATIC_ONLY });
   });
 });
