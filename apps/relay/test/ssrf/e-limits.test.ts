@@ -134,6 +134,8 @@ describe("E — methods and path shapes on /execute", () => {
     "/execute/testbed/a%5Cb",
     "/execute/testbed/@evil.example",
     "/execute/testbed/http:%2F%2Fevil.example",
+    "/execute/testbed/:p",
+    "/execute/testbed/%3Ap",
     "/execute/testbed/p%3Fx=1",
     "/execute/testbed/p%23x",
     "/execute/unknown/p",
@@ -169,6 +171,28 @@ describe("E — methods and path shapes on /execute", () => {
       ["POST", "https://testbed.example/ogc/processes/p.1~x/execution"],
     ]);
     expect(h.executed).toEqual(["async-only/p"]);
+  });
+
+  it("control: a namespaced id with colons is sent, percent-encoded into its own segment", async () => {
+    const h = countingApp(config);
+    // The browser encodes the colons; a literal colon must mean the same.
+    for (const id of ["ns%3Ap%3Av1", "ns:p:v1"]) {
+      await browserRequest(h.app, `/execute/testbed/${id}`, {
+        method: "POST",
+        headers: JSON_BODY,
+        body: "{}",
+      });
+    }
+    await browserRequest(h.app, "/execute/async-only/ns%3Ap%3Av1", {
+      method: "POST",
+      headers: { ...JSON_BODY, Prefer: "respond-async" },
+      body: "{}",
+    });
+    expect(h.forwarded.map((r) => [r.method, r.url.toString()])).toEqual([
+      ["POST", "https://testbed.example/ogc/processes/ns%3Ap%3Av1/execution"],
+      ["POST", "https://testbed.example/ogc/processes/ns%3Ap%3Av1/execution"],
+    ]);
+    expect(h.executed).toEqual(["async-only/ns:p:v1"]);
   });
 });
 

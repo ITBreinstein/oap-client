@@ -71,11 +71,14 @@ function isCallbackKind(value: string): value is CallbackKind {
 }
 
 /**
- * Server ids are chosen by the server, so this admits what both reference
- * servers use — ZOO's `OTB.BandMath` included — and nothing that could change
- * the shape of the URL it is placed into.
+ * Server ids are chosen by the server, and the specification does not restrict
+ * them. This admits ZOO's `OTB.BandMath` and namespaced ids such as
+ * `ns:process:v1`, and nothing that could change the shape of the URL it is
+ * placed into: no `/`, `\`, `?`, `#`, `%` or `@`, and no leading `.` or `:`.
+ * A colon is safe because `upstream.ts` percent-encodes the id into its own
+ * path segment; this pattern is the second guard, not the only one.
  */
-const PROCESS_ID = /^[A-Za-z0-9_][A-Za-z0-9._~-]{0,127}$/;
+const PROCESS_ID = /^[A-Za-z0-9_][A-Za-z0-9._~:-]{0,127}$/;
 
 /**
  * What happened, for tests and operators. Carries no token, no URL and no
