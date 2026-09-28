@@ -56,13 +56,12 @@ describe("E — methods and path shapes on the read route", () => {
     expect(h.forwarded).toEqual([]);
   });
 
-  // Fails today: Hono answers HEAD with the GET handler, so the read route
-  // sends a GET upstream — same target, body discarded. Not a new
-  // destination, but not the declared method set either.
-  it.fails("HEAD is refused, and nothing is sent", async () => {
+  // Hono answers HEAD with the GET handler, which would send a GET upstream.
+  it("HEAD is refused, and nothing is sent", async () => {
     const h = countingApp(config);
     const response = await browserRequest(h.app, "/read/testbed/processes", { method: "HEAD" });
-    expect(response.headers.get("X-Relay-Error")).not.toBeNull();
+    expect(response.status).toBe(404);
+    expect(response.headers.get("X-Relay-Error")).toBe("not-found");
     expect(h.forwarded).toEqual([]);
   });
 

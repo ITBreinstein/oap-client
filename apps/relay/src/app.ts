@@ -388,6 +388,9 @@ export function createApp(options: AppOptions = {}): Hono {
   // it, only under their base, and only with a live session. The web app sends
   // nothing here until the server failed directly and the user confirmed.
   const read = async (c: Context, method: "GET" | "DELETE"): Promise<Response> => {
+    // Hono answers HEAD with the GET handler. Refused like any other method
+    // the read route does not forward, rather than sent upstream as a GET.
+    if (c.req.method !== method) return problem(c, 404, "Not Found", "not-found");
     const endpoint = endpoints.get(c.req.param("endpointKey") ?? "");
     if (endpoint === undefined || !ENDPOINT_KEY.test(endpoint.key)) {
       return problem(c, 404, "Not Found", "unknown-endpoint", "unknown endpoint");
