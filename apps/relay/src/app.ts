@@ -98,12 +98,14 @@ export type RelayEvent =
 
 /**
  * One line per forwarded request on the read route, and per synchronous
- * execute forwarded for a read-route endpoint. Redacted at creation: the path
- * relative to the endpoint's base, and the *names* of query parameters, never
- * their values. No body, no token, no header.
+ * execute forwarded for a read-route endpoint (`"read-route"`); and one per
+ * asynchronous execute that produced no response (`"execute"`) — refused by
+ * the address guard, timed out, or failed to connect. Redacted at creation:
+ * the path relative to the endpoint's base, and the *names* of query
+ * parameters, never their values. No body, no token, no header.
  */
 export interface AuditLine {
-  readonly audit: "read-route";
+  readonly audit: "read-route" | "execute";
   readonly endpointKey: string;
   readonly method: "GET" | "DELETE" | "POST";
   readonly path: string;
@@ -157,12 +159,13 @@ function queryNames(search: string): string[] {
 
 /** The redacted half of an audit line that is known before anything is sent. */
 function auditBase(
+  kind: AuditLine["audit"],
   endpoint: EndpointConfig,
   request: ForwardRequest,
 ): Pick<AuditLine, "audit" | "endpointKey" | "method" | "path" | "queryNames"> {
   const basePath = new URL(endpoint.baseUrl).pathname.replace(/\/+$/, "");
   return {
-    audit: "read-route",
+    audit: kind,
     endpointKey: endpoint.key,
     method: request.method,
     path: request.url.pathname.slice(basePath.length) || "/",
@@ -335,7 +338,7 @@ export function createApp(options: AppOptions = {}): Hono {
   ): Response => {
     void forwarded.done.then((done) => {
       audit({
-        ...auditBase(endpoint, request),
+        ...auditBase("read-route", endpoint, request),
         upstreamStatus: forwarded.status,
         failure:
           done.capHit === "bytes"
@@ -360,6 +363,7 @@ export function createApp(options: AppOptions = {}): Hono {
   /** The relay's own 502 for an exchange that produced no response. */
   const upstreamFailed = (
     c: Context,
+    kind: AuditLine["audit"],
     endpoint: EndpointConfig,
     request: ForwardRequest,
     started: number,
@@ -368,7 +372,7 @@ export function createApp(options: AppOptions = {}): Hono {
     const reason: UpstreamFailure =
       error instanceof UpstreamError ? error.reason : "connection-failed";
     audit({
-      ...auditBase(endpoint, request),
+      ...auditBase(kind, endpoint, request),
       upstreamStatus: undefined,
       failure: reason,
       redirectsFollowed: 0,
@@ -435,7 +439,7 @@ export function createApp(options: AppOptions = {}): Hono {
     try {
       forwarded = await forward(endpoint, request);
     } catch (error) {
-      return upstreamFailed(c, endpoint, request, started, error);
+      return upstreamFailed(c, "read-route", endpoint, request, started, error);
     }
     return relayForwarded(endpoint, request, started, forwarded);
   };
@@ -628,7 +632,7 @@ export function createApp(options: AppOptions = {}): Hono {
             upstreamStatus: undefined,
             registered: false,
           });
-          return upstreamFailed(c, endpoint, request, started, error);
+          return upstreamFailed(c, "read-route", endpoint, request, started, error);
         }
         emit({
           kind: "execute",
@@ -669,24 +673,26 @@ export function createApp(options: AppOptions = {}): Hono {
       }
 
       let response: UpstreamResponse;
+      const started = clock.now();
       try {
         response = await upstream(endpoint, processId, JSON.stringify(body));
       } catch (error) {
         if (ref !== undefined) state.release(ref);
-        const reason: UpstreamFailure =
-          error instanceof UpstreamError ? error.reason : "connection-failed";
         emit({
           kind: "execute",
           endpointKey: endpoint.key,
-          outcome: reason,
+          outcome: error instanceof UpstreamError ? error.reason : "connection-failed",
           upstreamStatus: undefined,
           registered: false,
         });
-        return c.json({ type: "about:blank", title: "Bad Gateway", status: 502, reason }, 502, {
-          "Content-Type": "application/problem+json",
-          "Cache-Control": "no-store",
-          [RELAY_ERROR]: reason,
-        });
+        // The same redacted line and the same 502 as the read route. What was
+        // sent is fixed (see upstream.ts), so the line needs only its URL.
+        const sent: ForwardRequest = {
+          method: "POST",
+          url: executionUrl(endpoint, processId),
+          headers: new Headers(),
+        };
+        return upstreamFailed(c, "execute", endpoint, sent, started, error);
       }
 
       // No job, no doorbell. The registration would otherwise sit until its TTL.

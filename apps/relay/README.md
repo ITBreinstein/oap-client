@@ -177,6 +177,10 @@ The asynchronous execute. Everything about it is fixed:
 - A browser-supplied `subscriber` is refused; the relay mints its own.
 - No redirect is followed, so no hop goes unvalidated.
 - One deadline for the whole exchange, and a cap on the response body.
+- **Audit:** an exchange that produces no response — refused by the address
+  check, timed out, failed to connect — writes the read route's audit line,
+  with `"audit": "execute"` and `path: "/processes/{id}/execution"`. One the
+  server answered writes none.
 - Every address the endpoint's name resolves to is checked at connect time,
   and loopback, private, link-local, reserved, NAT64, 6to4 and cloud-metadata
   ranges are refused — unless the endpoint sets `allowPrivateNetwork`, which
