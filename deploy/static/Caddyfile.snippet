@@ -1,0 +1,50 @@
+# The static web client, with no relay. One site block, added to the host's
+# existing Caddyfile; it changes nothing for any other site on the host.
+# Replace oap.example.nl with the real hostname. See README.md.
+
+oap.example.nl {
+	# `current` is a relative symlink to releases/<id>, swapped atomically by
+	# deploy.sh. Relative, so it also resolves inside a container that mounts
+	# /srv/oap-web.
+	root * /srv/oap-web/current
+
+	# No relay yet. Answered here so that nothing else can answer it — the page
+	# must never read a relay path as a relay's response.
+	@api path /api /api/*
+	handle @api {
+		respond 404
+	}
+
+	handle {
+		# Vite puts a content hash in every file name under /assets/, so these
+		# files never change: cache them for a year.
+		@assets path /assets/*
+		header @assets Cache-Control "public, max-age=31536000, immutable"
+
+		# Everything else (index.html, config.json) is revalidated, so a new
+		# deploy shows up at once.
+		@notAssets not path /assets/*
+		header @notAssets Cache-Control "no-cache"
+
+		# No SPA fallback: the app has no client-side routes, and answering a
+		# missing /assets/ file with index.html would get that HTML cached for
+		# a year as the asset. A missing file is a 404.
+		encode zstd gzip
+		file_server
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		X-Frame-Options DENY
+		Permissions-Policy "geolocation=(), camera=(), microphone=()"
+		# Report-only first: violations show in the browser console and break
+		# nothing. Enforce after a clean end-to-end check (README.md).
+		# connect-src https: is deliberately broad: a visitor may connect to
+		# any HTTPS OGC API service.
+		Content-Security-Policy-Report-Only "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' https: data: blob:; connect-src 'self' https:; worker-src 'self'; font-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+	}
+
+	log
+}

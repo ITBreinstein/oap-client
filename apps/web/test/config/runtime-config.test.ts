@@ -135,3 +135,16 @@ describe("loadRuntimeConfig", () => {
     expect(loaded.warning).toMatch(/could not be loaded/);
   });
 });
+
+describe("the static site's config.json (deploy/static/)", () => {
+  it("is valid, with no relay and no presets", async () => {
+    const { readFile } = await import("node:fs/promises");
+    const { join } = await import("node:path");
+    // A path, not a URL: under jsdom the global URL is jsdom's, which node:fs refuses.
+    const text = await readFile(
+      join(import.meta.dirname, "../../../../deploy/static/config.json"),
+      "utf8",
+    );
+    expect(checkRuntimeConfig(JSON.parse(text))).toEqual({ ok: true, config: STATIC_ONLY });
+  });
+});
