@@ -150,7 +150,7 @@ For `readRoute: "relay"` endpoints only, with a live session:
   rewritten; absolute links under `baseUrl` stay as they are, and the web app
   maps them back onto this route.
 - **Redirects:** followed by hand for `GET` only, while the target is still
-  under `baseUrl`, at most three times. Any other redirect is handed back as the
+  under `baseUrl` (same origin, no userinfo), at most three times. Any other redirect is handed back as the
   server sent it.
 - **Address:** every hop goes through the address check below, on a fresh
   connection.
