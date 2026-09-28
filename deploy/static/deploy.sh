@@ -50,7 +50,8 @@ id="$(date -u +%Y%m%dT%H%M%SZ)-$sha"
 
 # Built in a detached worktree of HEAD, so nothing uncommitted or ignored — a
 # developer's own apps/web/public/config.json, say — can reach the release.
-work=$(mktemp -d "${TMPDIR:-/tmp}/oap-web-deploy.XXXXXX")
+tmp=${TMPDIR:-/tmp}
+work=$(mktemp -d "${tmp%/}/oap-web-deploy.XXXXXX")
 cleanup() {
   git -C "$repo" worktree remove --force "$work/src" >/dev/null 2>&1 || true
   rm -rf "$work"
