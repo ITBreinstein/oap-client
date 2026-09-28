@@ -12,8 +12,9 @@ import { describe, expect, it } from "vitest";
 import { createApp, type AuditLine } from "../../src/app.js";
 import type { EndpointConfig } from "../../src/config.js";
 import { forward } from "../../src/forward.js";
-import { postExecute } from "../../src/upstream.js";
+import { postExecute, UpstreamError } from "../../src/upstream.js";
 import {
+  countingApp,
   dialStub,
   never,
   ORIGIN,
@@ -175,9 +176,7 @@ describe("F — a blocked execute", () => {
     await expectBareRefusal(response, [INTERNAL_HOST, INTERNAL_IP, "8080", SECRET, token]);
   });
 
-  // Fails today: the asynchronous execute emits a `RelayEvent`, which has no
-  // default sink, and writes no audit line. Flips to `it` with the audit fix.
-  it.fails("asynchronous: one redacted audit line, as for a read", async () => {
+  it("asynchronous: one redacted audit line, as for a read", async () => {
     const audits: AuditLine[] = [];
     const app = blockingApp(
       publicEndpoint(`http://${INTERNAL_HOST}:8080/ogc`, { readRoute: "direct" }),
@@ -196,13 +195,47 @@ describe("F — a blocked execute", () => {
     });
     expect(audits).toEqual([
       expect.objectContaining({
+        audit: "execute",
         endpointKey: "testbed",
         method: "POST",
         path: "/processes/p/execution",
+        queryNames: [],
         upstreamStatus: undefined,
         failure: "blocked-address",
       }),
     ]);
     expectRedacted(audits[0], [INTERNAL_HOST, INTERNAL_IP, SECRET, token]);
+  });
+});
+
+describe("F — the asynchronous execute's audit line, beyond blocks", () => {
+  const endpoint = publicEndpoint("https://ogc.example.org/ogc", { readRoute: "direct" });
+  const execute = async (app: ReturnType<typeof createApp>): Promise<Response> =>
+    app.request("/execute/testbed/p", {
+      method: "POST",
+      headers: { Origin: ORIGIN, "Content-Type": "application/json", Prefer: "respond-async" },
+      body: "{}",
+    });
+
+  it("a timeout writes it too, naming the failure", async () => {
+    const audits: AuditLine[] = [];
+    const app = createApp({
+      config: relayConfig([endpoint]),
+      schedule: never,
+      upstream: () => Promise.reject(new UpstreamError("timeout")),
+      onAudit: (line) => audits.push(line),
+    });
+    const response = await execute(app);
+    expect(response.headers.get("X-Relay-Error")).toBe("timeout");
+    expect(audits).toEqual([
+      expect.objectContaining({ audit: "execute", failure: "timeout", capHit: "duration" }),
+    ]);
+  });
+
+  it("an execute the server answered writes none", async () => {
+    const h = countingApp(relayConfig([endpoint]));
+    const response = await execute(h.app);
+    expect(response.status).toBe(200);
+    expect(h.audits).toEqual([]);
   });
 });
