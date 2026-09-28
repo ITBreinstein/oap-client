@@ -85,19 +85,34 @@ describe("C — host literals, refused before any DNS", () => {
       expect(isBlockedAddress(spelling), spelling).toBe(true);
   });
 
-  // Fails today: `isBlockedHost` takes these for names and leaves them to DNS,
-  // where `getaddrinfo` turns them into 127.0.0.1 and the connect-time check
-  // refuses them. Safe, but the literal check should not rely on that. Flips
-  // to `it.each` with the isBlockedHost fix.
-  it.fails.each(UNNORMALISED_LOOPBACK)(
-    "un-normalised IPv4 as a raw host literal: %s",
-    (spelling) => {
-      expect(isBlockedHost(spelling)).toBe(true);
-    },
-  );
+  // Refused before DNS: left to it, `getaddrinfo` would read these as
+  // 127.0.0.1 and the connect-time check would refuse them there, but the
+  // literal check must not rely on that.
+  it.each(UNNORMALISED_LOOPBACK)("un-normalised IPv4 as a raw host literal: %s", (spelling) => {
+    expect(isBlockedHost(spelling)).toBe(true);
+  });
+
+  it("a numeric host that is no valid IPv4 address fails closed", () => {
+    for (const host of ["999.1.1.1", "1.2.3.4.5", "256.0.0.1", "0x100000000", "example.123"]) {
+      expect(isBlockedHost(host), host).toBe(true);
+    }
+  });
 
   it("control: public addresses and ordinary names pass the literal check", () => {
     for (const host of [...PUBLIC, "[2606:4700:4700::1111]", "ogc.example.org"]) {
+      expect(isBlockedHost(host), host).toBe(false);
+    }
+  });
+
+  it("control: a public address in another spelling, and names with digits in them, pass too", () => {
+    for (const host of [
+      "134744072",
+      "8.8.8.8.",
+      "0x8.0x8.0x8.0x8",
+      "1.example",
+      "ogc2.example.org",
+      "123abc.example",
+    ]) {
       expect(isBlockedHost(host), host).toBe(false);
     }
   });

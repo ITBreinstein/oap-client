@@ -77,6 +77,34 @@ function stripBrackets(host: string): string {
 }
 
 /**
+ * The URL standard's "ends in a number" test: a host whose last label is
+ * decimal digits or `0x` hex is an IPv4 address, in any of the spellings
+ * `inet_aton` accepts — `127.1`, `2130706433`, `0x7f000001`, `0177.0.0.1`.
+ * `isIP` knows only the dotted quad, so without this such a host would pass as
+ * a name and reach DNS, where `getaddrinfo` reads it the same way.
+ */
+function endsInNumber(host: string): boolean {
+  const labels = host.split(".");
+  if (labels.at(-1) === "" && labels.length > 1) labels.pop();
+  const last = labels.at(-1) ?? "";
+  return /^[0-9]+$/.test(last) || /^0x[0-9a-f]*$/i.test(last);
+}
+
+/**
+ * The dotted quad a URL parser makes of an ends-in-a-number host, or
+ * `undefined` when it makes none — which the URL parser would refuse, and so
+ * do we.
+ */
+function canonicalIpv4(host: string): string | undefined {
+  try {
+    const hostname = new URL(`http://${host}/`).hostname;
+    return isIP(hostname) === 4 ? hostname : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * True when `address` must not be connected to. Fails closed: anything that is
  * not a parseable IP literal is blocked, including a scoped IPv6 address.
  *
@@ -97,13 +125,22 @@ export function isBlockedAddress(address: string): boolean {
 
 /**
  * True when `host` — a URL's hostname — is refused without resolving it: a
- * blocked IP literal, or a name that only ever means this machine or a cloud
- * metadata service. A name that is not refused here still has every address
- * it resolves to checked by {@link guardedLookup}.
+ * blocked IP literal in any spelling, or a name that only ever means this
+ * machine or a cloud metadata service. A name that is not refused here still
+ * has every address it resolves to checked by {@link guardedLookup}.
+ *
+ * A URL's `hostname` is already canonical, but this is also the first check in
+ * the connection's lookup, and the relay must not depend on how its caller
+ * parsed the host. A numeric host that is not a valid IPv4 address
+ * (`999.1.1.1`, `1.2.3.4.5`) fails closed.
  */
 export function isBlockedHost(host: string): boolean {
   const bare = stripBrackets(host);
   if (isIP(bare) !== 0) return isBlockedAddress(bare);
+  if (endsInNumber(bare)) {
+    const ipv4 = canonicalIpv4(bare);
+    return ipv4 === undefined || isBlockedAddress(ipv4);
+  }
   return isBlockedName(bare);
 }
 
