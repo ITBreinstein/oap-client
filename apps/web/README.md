@@ -24,7 +24,7 @@ relay as well and tell the app where it is, in `apps/web/public/config.json`
 
 ```bash
 pnpm --filter @breinstein/relay build
-RELAY_CONFIG=../../infra/relay/ci.json PORT=8787 pnpm --filter @breinstein/relay start
+RELAY_CONFIG=../../infra/relay/ci.json RELAY_ALLOW_PRIVATE_ADDRESSES=1 PORT=8787 pnpm --filter @breinstein/relay start
 echo '{ "relay": { "url": "http://localhost:8787" } }' > apps/web/public/config.json
 pnpm --filter @breinstein/web dev
 ```

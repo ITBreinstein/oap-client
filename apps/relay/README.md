@@ -41,13 +41,30 @@ The client works without the relay: every job is still found by polling.
 
 ```bash
 pnpm --filter @breinstein/relay build
-RELAY_CONFIG=../../infra/relay/ci.json pnpm --filter @breinstein/relay start   # :8787
+RELAY_CONFIG=../../infra/relay/ci.json RELAY_ALLOW_PRIVATE_ADDRESSES=1 \
+  pnpm --filter @breinstein/relay start                                        # :8787
 
 docker build -f apps/relay/Dockerfile -t oap-relay .                           # from the repo root
 ```
 
 Configuration is one JSON file; see [infra/relay/](../../infra/relay/) for the
 CI config and a public-demo template, and `src/config.ts` for every field.
+
+### Private addresses take two keys
+
+An endpoint on plain `http:`, or on a loopback, private or otherwise reserved
+host, starts only when both keys are turned:
+
+- the endpoint sets `allowPrivateNetwork`, which switches the address check
+  off for that endpoint; and
+- the process runs with `RELAY_ALLOW_PRIVATE_ADDRESSES=1`.
+
+Neither does anything alone. Without both, the relay refuses to start and names
+the field. With both, it prints a warning naming every endpoint whose check is
+off. `ci.json` needs both, and Playwright sets the variable. A public
+deployment sets neither: copy `ci.json` into it and the relay will not start,
+rather than run with the check off. Any other value than `1`, `0` or unset is
+refused as a typo.
 
 ## The three per-endpoint decisions
 
@@ -184,7 +201,8 @@ The asynchronous execute. Everything about it is fixed:
 - Every address the endpoint's name resolves to is checked at connect time,
   and loopback, private, link-local, reserved, NAT64, 6to4 and cloud-metadata
   ranges are refused — unless the endpoint sets `allowPrivateNetwork`, which
-  only local and CI configs do. The check is adapted from GeoLibre's proxy
+  only local and CI configs do, and which needs `RELAY_ALLOW_PRIVATE_ADDRESSES=1`
+  (above). The check is adapted from GeoLibre's proxy
   guard (THIRD_PARTY.md).
 
 ## Not yet done — before the public demo

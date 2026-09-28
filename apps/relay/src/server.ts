@@ -4,6 +4,10 @@
  *   RELAY_CONFIG  path to the JSON config (see config.ts; examples in
  *                 infra/relay/). Without it the relay starts with no endpoints
  *                 and can only answer its health check.
+ *   RELAY_ALLOW_PRIVATE_ADDRESSES
+ *                 `1` lets endpoints that set `allowPrivateNetwork` start;
+ *                 without it such a config refuses to. Local development and
+ *                 CI only; warned about loudly at startup.
  *   PORT          default 8787
  *   HOST          default: every interface, IPv6 and IPv4 where the host has
  *                 both (Node's own default). The OGC servers must be able to
@@ -18,15 +22,13 @@
 import { readFileSync } from "node:fs";
 import { serve } from "@hono/node-server";
 import { createApp } from "./app.js";
-import { parseConfig } from "./config.js";
+import { loadStartup } from "./startup.js";
 import { RelayState, systemClock } from "./state.js";
 
 const SWEEP_INTERVAL_MS = 60_000;
 
-const configPath = process.env["RELAY_CONFIG"];
-const rawConfig: unknown =
-  configPath === undefined ? { endpoints: [] } : JSON.parse(readFileSync(configPath, "utf8"));
-const config = parseConfig(rawConfig);
+const { config, warnings } = loadStartup(process.env, (path) => readFileSync(path, "utf8"));
+for (const warning of warnings) console.warn(warning);
 
 const state = new RelayState(systemClock, {
   registrationTtlMs: config.registrationTtlMs,

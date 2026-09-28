@@ -18,9 +18,9 @@ const config = parseConfig({
   publicUrl: PUBLIC,
   allowedOrigins: [ORIGIN],
   endpoints: [
-    { key: "with-callbacks", baseUrl: "http://ogc.test", executeRoute: "relay", callbacks: true },
-    { key: "no-callbacks", baseUrl: "http://ogc.test", executeRoute: "relay" },
-    { key: "direct", baseUrl: "http://ogc.test", executeRoute: "direct" },
+    { key: "with-callbacks", baseUrl: "https://ogc.test", executeRoute: "relay", callbacks: true },
+    { key: "no-callbacks", baseUrl: "https://ogc.test", executeRoute: "relay" },
+    { key: "direct", baseUrl: "https://ogc.test", executeRoute: "direct" },
   ],
   limits: { maxExecuteBodyBytes: 4_096 },
   registrationTtlMs: 60_000,
@@ -29,7 +29,7 @@ const config = parseConfig({
 
 const CREATED: UpstreamResponse = {
   status: 201,
-  location: "http://ogc.test/jobs/abc",
+  location: "https://ogc.test/jobs/abc",
   contentType: "application/json",
   preferenceApplied: "respond-async",
   body: "null",
@@ -196,21 +196,21 @@ describe("GET /endpoints", () => {
       endpoints: [
         {
           key: "with-callbacks",
-          baseUrl: "http://ogc.test",
+          baseUrl: "https://ogc.test",
           executeRoute: "relay",
           readRoute: "direct",
           callbacks: true,
         },
         {
           key: "no-callbacks",
-          baseUrl: "http://ogc.test",
+          baseUrl: "https://ogc.test",
           executeRoute: "relay",
           readRoute: "direct",
           callbacks: false,
         },
         {
           key: "direct",
-          baseUrl: "http://ogc.test",
+          baseUrl: "https://ogc.test",
           executeRoute: "direct",
           readRoute: "direct",
           callbacks: false,

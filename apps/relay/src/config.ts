@@ -28,7 +28,28 @@
  * successful one into `failed` (finding 0047), so sending subscriber URLs makes
  * the relay's *availability* part of the job's correctness. Polling works
  * without it.
+ *
+ * ## Private addresses take two keys
+ *
+ * An endpoint on `http:`, or on a loopback, private or otherwise reserved
+ * host, is refused at startup unless **both** keys are turned: the endpoint
+ * sets `allowPrivateNetwork`, which switches the address guard off for it, and
+ * the deployment sets `RELAY_ALLOW_PRIVATE_ADDRESSES=1` (passed in here as
+ * `allowPrivateAddresses`). Neither enables anything alone, so a local or CI
+ * config copied into a public deployment fails to start instead of running
+ * with the guard off. Only a host literal can be judged here; a name is
+ * checked at connect time, on every address it resolves to.
  */
+
+import { isBlockedHost } from "./address-guard.js";
+
+/** The deployment's key: without it set to `1`, no endpoint may set `allowPrivateNetwork`. */
+export const PRIVATE_ADDRESS_ALLOWANCE = "RELAY_ALLOW_PRIVATE_ADDRESSES";
+
+export interface ParseOptions {
+  /** `RELAY_ALLOW_PRIVATE_ADDRESSES=1`. Off unless given. */
+  readonly allowPrivateAddresses?: boolean | undefined;
+}
 
 /** How the browser's execute request reaches this endpoint. */
 export type ExecuteRoute = "direct" | "relay";
@@ -47,9 +68,10 @@ export interface EndpointConfig {
   readonly callbacks: boolean;
   /**
    * Allow this endpoint to resolve to a loopback, private or otherwise
-   * reserved address. For local development and CI, where the reference
-   * servers are on `localhost`. A public deployment leaves it false, and then
-   * every address the name resolves to is checked, at connect time.
+   * reserved address, and to use plain `http:`. For local development and CI,
+   * where the reference servers are on `localhost`, and accepted only with
+   * `RELAY_ALLOW_PRIVATE_ADDRESSES=1`. A public deployment leaves it false, and
+   * then every address the name resolves to is checked, at connect time.
    */
   readonly allowPrivateNetwork: boolean;
 }
@@ -173,7 +195,7 @@ export function normaliseHttpUrl(value: string, path: string): string {
   return `${parsed.origin}${parsed.pathname}`.replace(/\/+$/, "");
 }
 
-function parseEndpoint(value: unknown, path: string): EndpointConfig {
+function parseEndpoint(value: unknown, path: string, options: ParseOptions): EndpointConfig {
   if (!isRecord(value)) throw new ConfigError(path, "must be an object");
   const key = readString(value, "key", path);
   if (!ENDPOINT_KEY.test(key)) {
@@ -190,13 +212,33 @@ function parseEndpoint(value: unknown, path: string): EndpointConfig {
   if (readRoute === "relay" && route !== "relay") {
     throw new ConfigError(`${path}.readRoute`, 'may be "relay" only with executeRoute "relay"');
   }
+  const baseUrl = normaliseHttpUrl(readString(value, "baseUrl", path), `${path}.baseUrl`);
+  const allowPrivateNetwork = readBoolean(value, "allowPrivateNetwork", path, false);
+  if (allowPrivateNetwork && options.allowPrivateAddresses !== true) {
+    throw new ConfigError(
+      `${path}.allowPrivateNetwork`,
+      `is accepted only with ${PRIVATE_ADDRESS_ALLOWANCE}=1 in the environment`,
+    );
+  }
+  if (!allowPrivateNetwork) {
+    const parsed = new URL(baseUrl);
+    if (parsed.protocol !== "https:") {
+      throw new ConfigError(`${path}.baseUrl`, "must be https unless allowPrivateNetwork is set");
+    }
+    if (isBlockedHost(parsed.hostname)) {
+      throw new ConfigError(
+        `${path}.baseUrl`,
+        "is a loopback, private or reserved host, which needs allowPrivateNetwork",
+      );
+    }
+  }
   return {
     key,
-    baseUrl: normaliseHttpUrl(readString(value, "baseUrl", path), `${path}.baseUrl`),
+    baseUrl,
     executeRoute: route,
     readRoute,
     callbacks: readBoolean(value, "callbacks", path, false),
-    allowPrivateNetwork: readBoolean(value, "allowPrivateNetwork", path, false),
+    allowPrivateNetwork,
   };
 }
 
@@ -213,13 +255,13 @@ function parseOrigin(value: unknown, path: string): string {
   return value;
 }
 
-export function parseConfig(input: unknown): RelayConfig {
+export function parseConfig(input: unknown, options: ParseOptions = {}): RelayConfig {
   if (!isRecord(input)) throw new ConfigError("(root)", "must be an object");
 
   const rawEndpoints = input["endpoints"];
   if (!Array.isArray(rawEndpoints)) throw new ConfigError("endpoints", "must be an array");
   const endpoints = rawEndpoints.map((entry, index) =>
-    parseEndpoint(entry, `endpoints[${String(index)}]`),
+    parseEndpoint(entry, `endpoints[${String(index)}]`, options),
   );
   const keys = new Set<string>();
   for (const endpoint of endpoints) {

@@ -37,24 +37,28 @@ beforeAll(async () => {
   } catch {
     up = false;
   }
-  const config = parseConfig({
-    allowedOrigins: [ORIGIN],
-    endpoints: [
-      {
-        key: "pygeoapi-nocors-relay",
-        baseUrl: NOCORS,
-        executeRoute: "relay",
-        readRoute: "relay",
-        allowPrivateNetwork: true,
-      },
-      {
-        key: "pygeoapi-nocors",
-        baseUrl: NOCORS,
-        executeRoute: "relay",
-        allowPrivateNetwork: true,
-      },
-    ],
-  });
+  const config = parseConfig(
+    {
+      allowedOrigins: [ORIGIN],
+      endpoints: [
+        {
+          key: "pygeoapi-nocors-relay",
+          baseUrl: NOCORS,
+          executeRoute: "relay",
+          readRoute: "relay",
+          allowPrivateNetwork: true,
+        },
+        {
+          key: "pygeoapi-nocors",
+          baseUrl: NOCORS,
+          executeRoute: "relay",
+          allowPrivateNetwork: true,
+        },
+      ],
+    },
+    // pygeoapi is on loopback: the second key, as CI's relay has it.
+    { allowPrivateAddresses: true },
+  );
   server = serve({
     fetch: createApp({ config, onAudit: (line) => audits.push(line) }).fetch,
     port: 0,

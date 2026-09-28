@@ -17,7 +17,14 @@ export default defineConfig({
       // :5081 and ZOO relay-routed so their browser failures are visible.
       // Needs `pnpm build` first; `pnpm verify` does that.
       command: "pnpm --filter @breinstein/relay start",
-      env: { RELAY_CONFIG: "../../infra/relay/ci.json", PORT: "8787" },
+      // ci.json's endpoints are on localhost, which takes both keys: their
+      // `allowPrivateNetwork`, and this variable. Without it the relay refuses
+      // to start.
+      env: {
+        RELAY_CONFIG: "../../infra/relay/ci.json",
+        RELAY_ALLOW_PRIVATE_ADDRESSES: "1",
+        PORT: "8787",
+      },
       url: `${RELAY}/healthz`,
       reuseExistingServer: !process.env["CI"],
     },
