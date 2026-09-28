@@ -24,18 +24,18 @@ const config = parseConfig({
   endpoints: [
     {
       key: "zoo",
-      baseUrl: "http://zoo.test/ogc-api",
+      baseUrl: "https://zoo.test/ogc-api",
       executeRoute: "relay",
       readRoute: "relay",
     },
-    { key: "async-only", baseUrl: "http://ogc.test", executeRoute: "relay" },
+    { key: "async-only", baseUrl: "https://ogc.test", executeRoute: "relay" },
   ],
   sessionIdleTtlMs: 60_000,
 });
 
 const CREATED: UpstreamResponse = {
   status: 201,
-  location: "http://zoo.test/ogc-api/jobs/abc",
+  location: "https://zoo.test/ogc-api/jobs/abc",
   contentType: "application/json",
   preferenceApplied: "respond-async",
   body: "{}",
@@ -59,7 +59,7 @@ function answer(
               controller.close();
             },
           }),
-    finalUrl: "http://zoo.test/ogc-api/",
+    finalUrl: "https://zoo.test/ogc-api/",
     redirectsFollowed: 0,
     done: Promise.resolve({ bytes: bytes?.byteLength ?? 0, capHit: undefined }),
   };
@@ -214,7 +214,7 @@ describe("GET /read — forwarding", () => {
     const h = harness();
     await read(h, "/read/zoo/processes?f=json&limit=10&q=a%20b");
     expect(h.forwarded.map((request) => [request.method, request.url.href])).toEqual([
-      ["GET", "http://zoo.test/ogc-api/processes?f=json&limit=10&q=a%20b"],
+      ["GET", "https://zoo.test/ogc-api/processes?f=json&limit=10&q=a%20b"],
     ]);
   });
 
@@ -223,8 +223,8 @@ describe("GET /read — forwarding", () => {
     await read(h, "/read/zoo");
     await read(h, "/read/zoo/");
     expect(h.forwarded.map((request) => request.url.href)).toEqual([
-      "http://zoo.test/ogc-api",
-      "http://zoo.test/ogc-api/",
+      "https://zoo.test/ogc-api",
+      "https://zoo.test/ogc-api/",
     ]);
   });
 
@@ -437,7 +437,7 @@ describe("POST /execute for a read-route endpoint", () => {
     expect(response.headers.get("Content-Type")).toBe("image/png");
     expect(new Uint8Array(await response.arrayBuffer())).toEqual(png);
     expect(h.forwarded.map((request) => [request.method, request.url.href, request.body])).toEqual([
-      ["POST", "http://zoo.test/ogc-api/processes/echo/execution", body],
+      ["POST", "https://zoo.test/ogc-api/processes/echo/execution", body],
     ]);
     expect(h.executed).toEqual([]);
     await Promise.resolve();

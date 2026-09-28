@@ -67,18 +67,22 @@ afterEach(async () => {
 });
 
 async function startRelay(port: number): Promise<RunningRelay> {
-  const config = parseConfig({
-    publicUrl: `http://${CALLBACK_HOST}:${String(port)}`,
-    endpoints: [
-      {
-        key: "pygeoapi",
-        baseUrl: PYGEOAPI,
-        executeRoute: "relay",
-        callbacks: true,
-        allowPrivateNetwork: true,
-      },
-    ],
-  });
+  const config = parseConfig(
+    {
+      publicUrl: `http://${CALLBACK_HOST}:${String(port)}`,
+      endpoints: [
+        {
+          key: "pygeoapi",
+          baseUrl: PYGEOAPI,
+          executeRoute: "relay",
+          callbacks: true,
+          allowPrivateNetwork: true,
+        },
+      ],
+    },
+    // pygeoapi is on loopback: the second key, as CI's relay has it.
+    { allowPrivateAddresses: true },
+  );
   const events: RelayEvent[] = [];
   const server: ServerType = serve({
     fetch: createApp({ config, onEvent: (event) => events.push(event) }).fetch,

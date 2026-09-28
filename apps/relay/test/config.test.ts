@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ConfigError, parseConfig } from "../src/config.js";
 
-const endpoint = { key: "pygeoapi", baseUrl: "http://localhost:5080" };
+const endpoint = { key: "pygeoapi", baseUrl: "https://ogc.example.org" };
 
 describe("parseConfig", () => {
   it("defaults to direct, no callbacks, no private network", () => {
@@ -9,7 +9,7 @@ describe("parseConfig", () => {
     expect(config.endpoints).toEqual([
       {
         key: "pygeoapi",
-        baseUrl: "http://localhost:5080",
+        baseUrl: "https://ogc.example.org",
         executeRoute: "direct",
         readRoute: "direct",
         callbacks: false,
@@ -19,15 +19,17 @@ describe("parseConfig", () => {
   });
 
   it("strips a trailing slash from the base", () => {
-    const config = parseConfig({ endpoints: [{ ...endpoint, baseUrl: "http://h/ogc-api/" }] });
-    expect(config.endpoints[0]?.baseUrl).toBe("http://h/ogc-api");
+    const config = parseConfig({
+      endpoints: [{ ...endpoint, baseUrl: "https://h.example/ogc-api/" }],
+    });
+    expect(config.endpoints[0]?.baseUrl).toBe("https://h.example/ogc-api");
   });
 
   it.each([
-    ["credentials", "http://user:pass@h"],
-    ["a username alone", "http://user@h"],
-    ["a query", "http://h/?token=1"],
-    ["a fragment", "http://h/#x"],
+    ["credentials", "https://user:pass@h.example"],
+    ["a username alone", "https://user@h.example"],
+    ["a query", "https://h.example/?token=1"],
+    ["a fragment", "https://h.example/#x"],
     ["a non-http scheme", "file:///etc/passwd"],
     ["garbage", "not a url"],
   ])("rejects a base URL with %s", (_, baseUrl) => {
