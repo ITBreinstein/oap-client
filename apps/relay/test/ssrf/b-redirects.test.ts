@@ -113,10 +113,9 @@ describe("B — redirects off the base: handed back unchanged, never followed", 
     expect(target.connections).toBe(0);
   });
 
-  // Fails today: `isUnderBase` compares origins, and `URL.origin` ignores
-  // userinfo, so the hop is followed and Node turns the userinfo into
-  // `Authorization: Basic`. Flips to `it` with the isUnderBase fix.
-  it.fails("B2: the same origin with userinfo in the target", async () => {
+  // `URL.origin` ignores userinfo, so this is under the base by origin alone;
+  // followed, Node would send the userinfo on as `Authorization: Basic`.
+  it("B2: the same origin with userinfo in the target", async () => {
     const location = `http://user:pw@${HOST}:${String(origin.port)}/ogc/landed`;
     origin.on("/ogc/away", redirect(302, location));
     origin.on("/ogc/landed", (_request, response) => {

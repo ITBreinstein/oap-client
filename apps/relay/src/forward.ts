@@ -16,7 +16,7 @@
  * - **Headers back:** only {@link RETURNED_RESPONSE_HEADERS} — the evidence the
  *   core reads — and nothing inside a body is rewritten.
  * - **Redirects:** followed by hand, for `GET` only, and only to a target still
- *   under `baseUrl`, at most {@link MAX_REDIRECTS} times. Anything else is
+ *   under `baseUrl` — same origin, no userinfo — at most {@link MAX_REDIRECTS} times. Anything else is
  *   handed back as the server sent it.
  * - **Address:** every hop connects through `guardedLookup`, on a fresh
  *   socket, unless the endpoint is configured for a private network.
@@ -73,14 +73,19 @@ export type ReadTargetRefusal =
   "absolute-url" | "dot-segment" | "encoded-separator" | "outside-base";
 
 /**
- * True when `url` is `baseUrl` or below it: same origin, and a path that is the
- * base path or continues it at a segment boundary. `/ogc-api-evil` is not under
- * `/ogc-api`. Both sides are parsed first, so this compares normalised URLs,
- * never raw strings.
+ * True when `url` is `baseUrl` or below it: same origin, no userinfo, and a
+ * path that is the base path or continues it at a segment boundary.
+ * `/ogc-api-evil` is not under `/ogc-api`. Both sides are parsed first, so this
+ * compares normalised URLs, never raw strings.
+ *
+ * Userinfo is checked on its own because `URL.origin` leaves it out: a
+ * redirect to `http://user:pw@{same origin}/…` has the base's origin, and Node
+ * would send its userinfo on as `Authorization: Basic`.
  */
 export function isUnderBase(url: URL, baseUrl: string): boolean {
   const base = new URL(baseUrl);
   if (url.origin !== base.origin) return false;
+  if (url.username !== "" || url.password !== "") return false;
   const basePath = base.pathname.replace(/\/+$/, "");
   return url.pathname === basePath || url.pathname.startsWith(`${basePath}/`);
 }

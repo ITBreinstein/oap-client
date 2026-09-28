@@ -159,6 +159,17 @@ describe("resolveReadTarget", () => {
     expect(isUnderBase(new URL("http://h/anything"), "http://h")).toBe(true);
   });
 
+  it("puts nothing with userinfo under the base, though URL.origin ignores it", () => {
+    for (const url of [
+      "http://u@localhost:5090/ogc-api/x",
+      "http://u:p@localhost:5090/ogc-api/x",
+      "http://:p@localhost:5090/ogc-api",
+    ]) {
+      expect(new URL(url).origin, url).toBe("http://localhost:5090");
+      expect(isUnderBase(new URL(url), zoo.baseUrl), url).toBe(false);
+    }
+  });
+
   it("names one job and nothing else as a job resource", () => {
     const at = (path: string): boolean => isJobResource(zoo, new URL(`${zoo.baseUrl}${path}`));
     expect(at("/jobs/abc-123")).toBe(true);
