@@ -17,3 +17,6 @@ infra/zoo/.conf/
 
 # Written by the interop lane and uploaded as a CI artifact, not committed.
 observations/
+
+# A developer's own runtime config; deployments bring theirs (deploy/static/).
+apps/web/public/config.json

@@ -51,6 +51,7 @@ import {
 import { classifyCrs } from "../forms/crs.js";
 import { shapesIn } from "../forms/geojson.js";
 import { isJsonObject } from "../forms/json.js";
+import { isMixedContent } from "../mixed-content.js";
 import { isUnder, relayRouteErrorIn } from "../relay/relay-fetch.js";
 
 /** How a Load ended (T9). `failed`: no usable answer, and not a CORS-shaped one. */
@@ -139,17 +140,6 @@ function ended(
   return { ...NOTHING, ...fields };
 }
 
-/** The addresses a browser treats as secure over plain HTTP. */
-function isLoopback(hostname: string): boolean {
-  const host = hostname.toLowerCase();
-  return (
-    host === "localhost" ||
-    host.endsWith(".localhost") ||
-    /^127(?:\.\d{1,3}){3}$/.test(host) ||
-    host === "[::1]"
-  );
-}
-
 /** Why an href is not fetched at all, or undefined when it may be (T7). */
 export function refusal(
   href: string,
@@ -162,9 +152,7 @@ export function refusal(
     return "unsupported-scheme";
   }
   if (url.protocol !== "http:" && url.protocol !== "https:") return "unsupported-scheme";
-  if (pageProtocol === "https:" && url.protocol === "http:" && !isLoopback(url.hostname)) {
-    return "mixed-content";
-  }
+  if (isMixedContent(url, pageProtocol)) return "mixed-content";
   return undefined;
 }
 

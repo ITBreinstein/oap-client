@@ -41,7 +41,8 @@ export function AsyncJobPanel({ relayUrl }: { readonly relayUrl: string | undefi
   const [snapshot, setSnapshot] = useState<JobSessionSnapshot | undefined>();
   const [endpoints, setEndpoints] = useState<RelayEndpoint[]>([]);
   const [endpointKey, setEndpointKey] = useState(MANUAL_KEY);
-  const [manualBase, setManualBase] = useState("http://localhost:5080");
+  // The local reference server in development; nothing in a production build.
+  const [manualBase, setManualBase] = useState(import.meta.env.DEV ? "http://localhost:5080" : "");
   const [processId, setProcessId] = useState("slow");
   const [inputs, setInputs] = useState('{"seconds": 3}');
   const [outputs, setOutputs] = useState("{}");

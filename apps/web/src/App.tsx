@@ -6,11 +6,10 @@ import { EndpointScreen } from "./app/EndpointScreen.js";
 import { MapPane } from "./app/MapPane.js";
 import { ProcessListScreen } from "./app/ProcessListScreen.js";
 import { ProcessScreen } from "./app/ProcessScreen.js";
+import { DEV_PRESETS } from "./app/dev-presets.js";
 import { RelayBanner, RelayOffer } from "./app/RelayRoute.js";
 import { useWorkflow } from "./app/useWorkflow.js";
-
-const configuredRelay = import.meta.env.VITE_RELAY_URL;
-const relayUrl = configuredRelay === "" ? undefined : configuredRelay;
+import { STATIC_ONLY, type RuntimeConfig } from "./config/runtime-config.js";
 
 function developerRequested(): boolean {
   try {
@@ -20,7 +19,21 @@ function developerRequested(): boolean {
   }
 }
 
-export function App() {
+export interface AppProps {
+  /** From `config.json`, read before the first render (`main.tsx`). */
+  readonly config?: RuntimeConfig | undefined;
+  /** Why the page fell back to running without the relay, if it did. */
+  readonly configWarning?: string | undefined;
+}
+
+export function App({ config = STATIC_ONLY, configWarning }: AppProps) {
+  const { relayUrl } = config;
+  // The local reference servers, in development only: `import.meta.env.DEV` is
+  // `false` in a production build, and the list is dropped from the bundle.
+  const presets = useMemo(
+    () => (import.meta.env.DEV ? [...DEV_PRESETS, ...config.presets] : config.presets),
+    [config.presets],
+  );
   const view = useWorkflow(relayUrl);
   const { state, commands } = view;
   const [developer] = useState(developerRequested);
@@ -64,6 +77,7 @@ export function App() {
         <EndpointScreen
           configured={view.configured}
           configuredError={view.configuredError}
+          presets={presets}
           connecting={state.connecting}
           error={state.error}
           onConnect={commands.connect}
@@ -117,6 +131,19 @@ export function App() {
             core {VERSION}
           </p>
         </header>
+        {configWarning !== undefined && (
+          <p className="notice config-warning" role="alert" data-testid="config-warning">
+            {configWarning}
+          </p>
+        )}
+        {relayUrl === undefined && (
+          <p className="muted static-only" data-testid="static-only">
+            This page runs without the relay: every request goes straight from your browser to the
+            service. A service must allow web pages to read it (CORS), and a background run is found
+            only where the service lets a page read the job&apos;s address. Callbacks, and reading
+            services that send no CORS headers, need the relay.
+          </p>
+        )}
         <div className="layout">
           <main className="panel" ref={panel}>
             {state.stage !== "choose-endpoint" && state.route === "relay" && <RelayBanner />}

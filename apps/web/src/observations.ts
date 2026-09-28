@@ -76,8 +76,12 @@ export interface EndpointAccessObservation {
    *   looks like from inside a browser (findings 0049, 0050). A server that is
    *   down looks the same; a relay attempt that reaches it tells them apart.
    * - `failed`: any other failure; `error` names its class.
+   * - `mixed-content`: nothing was sent. The page is on HTTPS and the address
+   *   is plain `http:` on a host that is not loopback, which the browser would
+   *   block. It says nothing about the server, so it is never counted as a
+   *   CORS failure, nor as the server failing.
    */
-  readonly outcome: "connected" | "cors-blocked" | "failed";
+  readonly outcome: "connected" | "cors-blocked" | "failed" | "mixed-content";
   /** The direct error's class name. Never its message, which may carry a URL. */
   readonly error: string | undefined;
   /** Whether the relay offers its read route for this endpoint at all. */

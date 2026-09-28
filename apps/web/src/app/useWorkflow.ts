@@ -30,6 +30,7 @@ import {
   type FormObservation,
   type RunFacts,
 } from "../observations.js";
+import { isMixedContent, pageProtocol } from "../mixed-content.js";
 import type { RelayEndpoint } from "../relay/contract.js";
 import {
   createJobSession,
@@ -133,14 +134,13 @@ function newRunId(): string {
   }
 }
 
-/** The page's protocol, for the mixed-content check; undefined off-browser. */
-function pageProtocol(): string | undefined {
-  try {
-    return globalThis.location.protocol;
-  } catch {
-    return undefined;
-  }
-}
+/** What a refused `http:` address says. Nothing was sent, so it names no server behaviour. */
+const MIXED_CONTENT_ERROR: WorkflowError = {
+  title:
+    "This page is served over HTTPS, so the browser blocks requests to a plain http:// address. Nothing was sent.",
+  detail:
+    "Use the service's https:// address if it has one. The attempt has been recorded as mixed content, not as a server failure.",
+};
 
 function transportMessage(cause: unknown, endpoint: EndpointRef): WorkflowError {
   if (directFailure(cause) === "cors-blocked") {
@@ -311,6 +311,22 @@ export function useWorkflow(relayUrl: string | undefined): WorkflowView {
       dispatch({ type: "connect", endpoint });
       pendingOffer.current = undefined;
       const at = new Date();
+      // Refused before sending: the browser would block it, and the opaque
+      // error it throws cross-origin is indistinguishable from CORS.
+      if (isMixedContent(new URL(endpoint.baseUrl), pageProtocol())) {
+        active.record(
+          endpoint.baseUrl,
+          accessRecord({
+            endpoint,
+            at,
+            relayAvailable,
+            direct: "mixed-content",
+            directError: undefined,
+          }),
+        );
+        dispatch({ type: "connect-failed", endpoint, error: MIXED_CONTENT_ERROR });
+        return;
+      }
       const connection = active.client(relayEndpointFor(endpoint), "direct");
       void (async () => {
         try {
