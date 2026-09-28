@@ -14,21 +14,54 @@ and on nothing else of this repository's except the relay's wire contract.
 pnpm --filter @breinstein/web dev          # http://localhost:5173
 ```
 
-That is enough for any server a browser may read. To run processes in the
-background against a server that hides `Location` from web pages — which is
-both reference servers (findings 0002, 0009) — start the relay as well and tell
-the app where it is:
+That is enough for any server a browser may read. In development the start
+screen offers the local reference servers; a production build never does.
+
+To run processes in the background against a server that hides `Location` from
+web pages — which is both reference servers (findings 0002, 0009) — start the
+relay as well and tell the app where it is, in `apps/web/public/config.json`
+(git-ignored):
 
 ```bash
 pnpm --filter @breinstein/relay build
 RELAY_CONFIG=../../infra/relay/ci.json PORT=8787 pnpm --filter @breinstein/relay start
-VITE_RELAY_URL=http://localhost:8787 pnpm --filter @breinstein/web dev
+echo '{ "relay": { "url": "http://localhost:8787" } }' > apps/web/public/config.json
+pnpm --filter @breinstein/web dev
 ```
 
-`VITE_RELAY_URL` is read at build time. Unset, there is no relay: every request
-goes straight to the server and background jobs are found by polling, where the
-server lets a page find them at all. See [apps/relay](../relay) and
-[infra/relay](../../infra/relay).
+### `config.json`: one build, any deployment
+
+The relay's address is not built in. The page reads `/config.json`, next to
+`index.html`, once before its first render
+([`src/config/runtime-config.ts`](src/config/runtime-config.ts)):
+
+```json
+{
+  "relay": null,
+  "presets": [{ "title": "Example", "url": "https://ogc.example.org/api" }]
+}
+```
+
+- `relay`: `null` or absent for none; otherwise `{ "url": … }`, an absolute
+  `https:` URL or a path on the same site such as `/api`. Plain `http:` only on
+  a loopback host, as browsers allow, for development and CI.
+- `presets`: `https:` services offered on the start screen, reached directly,
+  exactly as a typed address is.
+
+The file is checked whole. Missing, not JSON, an unknown member, a value of the
+wrong shape: the page runs **static-only** — no relay, no presets — and a
+warning under the header says why. With no relay, nothing is ever sent to one:
+no relay client exists, and a line under the header says what needs the relay.
+The hosted static site brings its own, from `deploy/static/`.
+
+### Plain `http:` from an HTTPS page
+
+A browser blocks a page served over HTTPS from reading plain `http:`, except on
+loopback (`localhost`, `127.0.0.0/8`, `[::1]`). Cross-origin, the failure is
+indistinguishable from a missing CORS header, so the page refuses such an
+address **before sending**, says why, and records `endpoint-access` with
+`outcome: "mixed-content"` — never `cors-blocked`, and never a failure of the
+server. Result links follow the same rule ([`src/mixed-content.ts`](src/mixed-content.ts)).
 
 The reference servers come from `infra/`:
 
@@ -39,12 +72,14 @@ docker compose -f infra/compose/pygeoapi.yml up -d --wait   # :5080 with CORS, :
 
 ## Where the endpoints come from (T8)
 
-1. **Configured**, from the relay's `GET /endpoints`, when `VITE_RELAY_URL` is
-   set. They keep their configured `executeRoute`: an endpoint marked `relay`
+1. **Configured**, from the relay's `GET /endpoints`, when `config.json` names
+   a relay. They keep their configured `executeRoute`: an endpoint marked `relay`
    sends its background runs through the relay, which is what lets a page name
    the job. One marked `readRoute: "relay"` may also be _read_ through the
    relay, but only as a fallback the user confirms (below).
-2. **Typed**, in the address field. A typed address is **always reached
+2. **Presets**, from `config.json`, and in development the local reference
+   servers. A preset is reached exactly as a typed address is.
+3. **Typed**, in the address field. A typed address is **always reached
    directly**: the relay only accepts the keys it was configured with, and is
    not a general proxy.
 

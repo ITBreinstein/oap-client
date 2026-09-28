@@ -83,6 +83,19 @@ body {
   font-size: 1.15rem;
 }
 
+/* Site-wide notes under the header: how this deployment is configured. */
+.config-warning,
+.static-only {
+  margin: 0;
+  padding: 0.45rem 1.25rem;
+  font-size: 0.9rem;
+}
+
+.config-warning {
+  border-width: 0 0 1px;
+  border-radius: 0;
+}
+
 .layout {
   display: grid;
   grid-template-columns: var(--panel-width) 1fr;

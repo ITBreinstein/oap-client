@@ -22,9 +22,11 @@ export default defineConfig({
       reuseExistingServer: !process.env["CI"],
     },
     {
-      // Rebuilt with the relay's URL, which Vite bakes in at build time.
-      command: "pnpm --filter @breinstein/web build && pnpm --filter @breinstein/web preview",
-      env: { VITE_RELAY_URL: RELAY },
+      // One production build for every spec. The relay's URL is not built in:
+      // it comes from config.json at run time, and this lane serves the relay
+      // one. The static-only spec answers /config.json itself.
+      command:
+        "pnpm --filter @breinstein/web build && cp e2e/config.relay.json apps/web/dist/config.json && pnpm --filter @breinstein/web preview",
       url: "http://localhost:4173",
       reuseExistingServer: !process.env["CI"],
     },

@@ -1,31 +1,39 @@
 /**
- * Choose a service (S2, T8): a configured endpoint from the relay, or any
- * address typed in. One form, one Connect button.
+ * Choose a service (S2, T8): a configured endpoint from the relay, a preset
+ * from the site's `config.json`, or any address typed in. One form, one
+ * Connect button. A preset is reached exactly as a typed address is: directly.
  */
 
 import { useId, useState, type SyntheticEvent } from "react";
+import type { Preset } from "../config/runtime-config.js";
 import type { RelayEndpoint } from "../relay/contract.js";
 import { typedEndpoint } from "./run.js";
 import type { EndpointRef, WorkflowError } from "./workflow.js";
 import { ErrorMessage } from "./ErrorMessage.js";
 
 const TYPED = "typed";
+const presetKey = (index: number): string => `preset:${String(index)}`;
 
 export interface EndpointScreenProps {
   readonly configured: readonly RelayEndpoint[];
   readonly configuredError: string | undefined;
+  readonly presets: readonly Preset[];
   readonly connecting: EndpointRef | undefined;
   readonly error: WorkflowError | undefined;
   readonly onConnect: (endpoint: EndpointRef) => void;
 }
 
 export function EndpointScreen(props: EndpointScreenProps) {
-  const { configured, configuredError, connecting, error, onConnect } = props;
+  const { configured, configuredError, presets, connecting, error, onConnect } = props;
   const base = useId();
   const [choice, setChoice] = useState<string>(TYPED);
   const [address, setAddress] = useState("");
   const [addressError, setAddressError] = useState<string | undefined>();
-  const selected = configured.some((entry) => entry.key === choice) ? choice : TYPED;
+  const selected =
+    configured.some((entry) => entry.key === choice) ||
+    presets.some((_, index) => presetKey(index) === choice)
+      ? choice
+      : TYPED;
 
   const onSubmit = (event: SyntheticEvent) => {
     event.preventDefault();
@@ -35,7 +43,8 @@ export function EndpointScreen(props: EndpointScreenProps) {
       onConnect({ source: "configured", ...entry });
       return;
     }
-    const typed = typedEndpoint(address);
+    const preset = presets.find((_, index) => presetKey(index) === selected);
+    const typed = typedEndpoint(preset?.url ?? address);
     if (typed === undefined) {
       setAddressError("Enter the full address of a service, starting with http:// or https://.");
       return;
@@ -70,7 +79,23 @@ export function EndpointScreen(props: EndpointScreenProps) {
               </span>
             </label>
           ))}
-          {configured.length > 0 && (
+          {presets.map((preset, index) => (
+            <label key={presetKey(index)} className="choice">
+              <input
+                type="radio"
+                name={`${base}-service`}
+                value={presetKey(index)}
+                checked={selected === presetKey(index)}
+                onChange={() => {
+                  setChoice(presetKey(index));
+                }}
+              />{" "}
+              <span>
+                <strong>{preset.title}</strong> <span className="muted">{preset.url}</span>
+              </span>
+            </label>
+          ))}
+          {configured.length + presets.length > 0 && (
             <label className="choice">
               <input
                 type="radio"
