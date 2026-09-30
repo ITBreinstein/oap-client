@@ -49,7 +49,16 @@ const singleRuntimeGlobals = [
   { name: "process", message: "core is runtime-neutral: no Node globals (inject config instead)" },
   { name: "__dirname", message: "core is runtime-neutral: no Node globals" },
   { name: "__filename", message: "core is runtime-neutral: no Node globals" },
+  // Review T7: both reach the network without the names the rules below
+  // watch — `self.fetch`, and a request of the browser's own.
+  { name: "self", message: "core is runtime-neutral: no browser or worker globals" },
+  { name: "XMLHttpRequest", message: "core is runtime-neutral: no browser globals" },
 ];
+
+const onlyHttpFetches = "only packages/core/src/http may call fetch: go through send()";
+
+// The map binding knows geometry, not the protocol (§5, rule 4).
+const mapKnowsNoProtocol = "apps/web/src/map knows geometry, not the protocol: no core imports";
 
 export default tseslint.config(
   {
@@ -146,16 +155,26 @@ export default tseslint.config(
         ...singleRuntimeGlobals,
         {
           name: "fetch",
-          message: "only packages/core/src/http may call fetch: go through send()",
+          message: onlyHttpFetches,
         },
       ],
       // no-restricted-globals only sees a bare identifier, and `globalThis.fetch`
-      // is exactly how you would sidestep it.
+      // is exactly how you would sidestep it — or `globalThis["fetch"]`, or
+      // `const { fetch } = globalThis` (review T7).
       "no-restricted-syntax": [
         "error",
         {
           selector: "MemberExpression[object.name='globalThis'][property.name='fetch']",
-          message: "only packages/core/src/http may call fetch: go through send()",
+          message: onlyHttpFetches,
+        },
+        {
+          selector: "MemberExpression[object.name='globalThis'][property.value='fetch']",
+          message: onlyHttpFetches,
+        },
+        {
+          selector:
+            "VariableDeclarator[init.name='globalThis'] > ObjectPattern > Property[key.name='fetch']",
+          message: onlyHttpFetches,
         },
       ],
     },
@@ -174,6 +193,25 @@ export default tseslint.config(
               group: ["maplibre-gl", "terra-draw*"],
               message: "only apps/web/src/map may import the map libraries",
             },
+          ],
+        },
+      ],
+    },
+  },
+
+  // §5, rule 4: the map binding never imports the core. A later block for the
+  // same files replaces an earlier rule config, and the block above ignores
+  // src/map, so nothing is lost. Type-only imports count (review T7).
+  {
+    files: ["apps/web/src/map/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [{ name: "@breinstein/oap-client", message: mapKnowsNoProtocol }],
+          patterns: [
+            { group: ["@breinstein/oap-client/*"], message: mapKnowsNoProtocol },
+            { group: ["**/packages/core/**"], message: mapKnowsNoProtocol },
           ],
         },
       ],
