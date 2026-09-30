@@ -15,6 +15,11 @@
  *   the stream was down are lost, by design; the caller reconciles on open.
  * - It never gives up. A relay that is down is retried with capped backoff,
  *   and the page keeps polling in the meantime.
+ * - After `close()`, nothing more is sent: no session is asked for, and no
+ *   stream opened. Every step that waits checks again once it resumes, and
+ *   the first step waits a turn, so that React's StrictMode — which closes
+ *   what an effect opened straight after opening it — costs the relay
+ *   nothing (review W11).
  */
 
 import { parseDoorbell } from "./contract.js";
@@ -132,21 +137,31 @@ export function openDoorbells(options: DoorbellOptions): DoorbellStream {
       };
     });
 
-  const newSession = async (): Promise<string> => {
-    const grant = await options.relay.createSession();
+  const newSession = async (signal?: AbortSignal): Promise<string> => {
+    const grant = await options.relay.createSession(signal);
     session = grant.token;
     renewed = opens > 0;
     return grant.token;
   };
 
   const run = async (): Promise<void> => {
+    // A close() in the same turn as the open — StrictMode's unmount, straight
+    // after its mount — lands before anything is sent.
+    await Promise.resolve();
     let unauthorisedInARow = 0;
-    while (!closed) {
+    while (!isClosed()) {
       setState("connecting");
       try {
-        const token = session ?? (await newSession());
-        stream = new AbortController();
-        const response = await options.relay.openEvents(token, stream.signal);
+        // Made before the session is asked for, so close() can abort that too.
+        const current = new AbortController();
+        stream = current;
+        const token = session ?? (await newSession(current.signal));
+        if (isClosed()) break;
+        const response = await options.relay.openEvents(token, current.signal);
+        if (isClosed()) {
+          await response.body?.cancel().catch(() => undefined);
+          break;
+        }
         if (response.status === 401) {
           // The relay forgot this session: it restarted, or the session idled
           // out. Open a new one straight away — once. A relay that forgets

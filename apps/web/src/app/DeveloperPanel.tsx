@@ -7,6 +7,11 @@
  *
  * Collapsed unless the page was opened with `?developer`, so the demo shows
  * the workflow and not its plumbing.
+ *
+ * The asynchronous-execution panel is mounted only while the section is open.
+ * It keeps a relay session and an event stream of its own, and a collapsed
+ * `<details>` still mounts what it holds: every visitor held two streams open
+ * to the relay, one of them for a panel nobody opened (review W10).
  */
 
 import { VERSION } from "@breinstein/oap-client";
@@ -71,6 +76,7 @@ export function DeveloperPanel({
   /** Absent while nothing is connected: there is no process list to walk. */
   readonly onDescribeAll: (() => void) | undefined;
 }) {
+  const [expanded, setExpanded] = useState(open);
   const [endpoint, setEndpoint] = useState("");
   const [kind, setKind] = useState("");
   const endpointId = useId();
@@ -83,7 +89,13 @@ export function DeveloperPanel({
   const shown = kind === "" ? scoped : scoped.filter((entry) => entry.observation.kind === kind);
   const latest = shown.slice(-SHOWN).reverse();
   return (
-    <details className="developer" open={open}>
+    <details
+      className="developer"
+      open={open}
+      onToggle={(event) => {
+        setExpanded(event.currentTarget.open);
+      }}
+    >
       <summary>Developer</summary>
       <p>
         {observations.length} observations this session, {forms} from form generation.
@@ -185,7 +197,7 @@ export function DeveloperPanel({
           </ol>
         </>
       )}
-      <AsyncJobPanel relayUrl={relayUrl} />
+      {expanded && <AsyncJobPanel relayUrl={relayUrl} />}
     </details>
   );
 }
