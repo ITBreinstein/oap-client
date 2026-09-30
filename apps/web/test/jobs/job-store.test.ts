@@ -134,3 +134,41 @@ describe("the job store", () => {
     }).not.toThrow();
   });
 });
+
+describe("hearing another tab (review W12)", () => {
+  function storageEvent(key: string | null): Event {
+    const event = new Event("storage");
+    Object.defineProperty(event, "key", { value: key });
+    return event;
+  }
+
+  it("calls back for this list's key, and for storage cleared whole, and for nothing else", () => {
+    const events = new EventTarget();
+    const store = createJobStore(
+      () => undefined,
+      () => events,
+    );
+    let heard = 0;
+    const stop = store.subscribe(() => {
+      heard += 1;
+    });
+    events.dispatchEvent(storageEvent(STORAGE_KEY));
+    events.dispatchEvent(storageEvent(null));
+    events.dispatchEvent(storageEvent("some-other-key"));
+    expect(heard).toBe(2);
+
+    stop();
+    events.dispatchEvent(storageEvent(STORAGE_KEY));
+    expect(heard).toBe(2);
+  });
+
+  it("listens to nothing where there is no window", () => {
+    const store = createJobStore(
+      () => undefined,
+      () => undefined,
+    );
+    expect(() => {
+      store.subscribe(() => undefined)();
+    }).not.toThrow();
+  });
+});

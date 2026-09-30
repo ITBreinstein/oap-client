@@ -64,6 +64,8 @@ function memoryStore(initial: StoredJob[] = []): JobStore & { saved: unknown[][]
       jobs = [...next];
       saved.push(JSON.parse(JSON.stringify(next)) as unknown[]);
     },
+    // One tab's store: no other tab changes it. See jobs-across-tabs.test.ts.
+    subscribe: () => () => undefined,
   };
 }
 
