@@ -338,6 +338,52 @@ test.describe("the workflow in a browser", () => {
     });
   });
 
+  test("keeps a loaded file while the map draws for the field, and shows it before it is sent", async ({
+    page,
+  }) => {
+    // The upload bug: with the map drawing for the field, a loaded file was
+    // shown on the map and the field emptied — whichever came first.
+    await connectTyped(page, PYGEOAPI);
+    await openProcess(page, "Rotate a polygon a quarter turn");
+    const polygon = page.locator('[data-input-id="polygon"]');
+    const geojson = polygon.getByRole("textbox", { name: "GeoJSON" });
+    const draw = polygon.getByRole("button", { name: "Draw on the map" });
+    const stop = polygon.getByRole("button", { name: "Stop drawing" });
+    const shape = {
+      type: "Polygon",
+      coordinates: [
+        [
+          [4.248652, 52.172447],
+          [4.248652, 51.691133],
+          [4.594165, 51.691133],
+          [4.594165, 52.172447],
+          [4.248652, 52.172447],
+        ],
+      ],
+    };
+    const file = {
+      name: "plugfest.geojson",
+      mimeType: "application/geo+json",
+      buffer: Buffer.from(JSON.stringify(shape)),
+    };
+
+    // Drawing first, then the file.
+    await draw.click();
+    await polygon.getByLabel("Or load a GeoJSON file").setInputFiles(file);
+    await expect(polygon.getByRole("status")).toHaveText("Loaded 1 shape.");
+    await page.waitForTimeout(500);
+    expect(JSON.parse(await geojson.inputValue())).toEqual(shape);
+
+    // Not drawing: the loaded shape is on the map as the input, not yet sent.
+    await stop.click();
+    await expect(page.getByTestId("map-legend")).toHaveText("The input, not yet sent.");
+
+    // The file first, then drawing.
+    await draw.click();
+    await page.waitForTimeout(500);
+    expect(JSON.parse(await geojson.inputValue())).toEqual(shape);
+  });
+
   test("draws a polygon, runs a geometry-in, geometry-out process, and plots the result", async ({
     page,
   }) => {
