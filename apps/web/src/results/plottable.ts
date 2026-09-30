@@ -21,6 +21,11 @@
  * descriptions, and a client can only infer it. With two images, or two
  * boxes, there is nothing to infer from, and nothing is placed.
  *
+ * A result with more positions than the page is configured to draw
+ * (`config.json`, `map.maxCoordinates`) is not plotted either, and says so as
+ * `too-many`: the numbers are still in the result, and its download is the
+ * way to them (review W3).
+ *
  * An output given by reference joins in once it is loaded (Task 8, T8): its
  * GeoJSON is plotted and its image placed by the same rules, on the same
  * path. Its `Content-Crs` comes first: EPSG:4326 is swapped back to longitude
@@ -41,8 +46,21 @@ export type PlotStatus =
     }
   /** GeoJSON, but its coordinates are outside longitude and latitude. */
   | { readonly kind: "projected" }
+  /** Plottable, but with more positions than the page draws. */
+  | { readonly kind: "too-many"; readonly positions: number; readonly limit: number }
   /** Not GeoJSON, or GeoJSON with no geometry in it. */
   | { readonly kind: "not-geojson" };
+
+/** How many positions the shapes hold: what drawing them costs. */
+export function positionCount(shapes: readonly Shape[]): number {
+  let count = 0;
+  for (const shape of shapes) {
+    if (shape.type === "Point") count += 1;
+    else if (shape.type === "LineString") count += shape.coordinates.length;
+    else for (const ring of shape.coordinates) count += ring.length;
+  }
+  return count;
+}
 
 function inDegrees(shape: Shape): boolean {
   const positions =
@@ -79,7 +97,11 @@ export function swapAxes(shape: Shape): Shape {
   }
 }
 
-export function plotStatus(result: RenderableResult): PlotStatus {
+/** `limit`: the most positions the map may be given for one result. */
+export function plotStatus(
+  result: RenderableResult,
+  limit: number = Number.POSITIVE_INFINITY,
+): PlotStatus {
   const value = jsonOf(result);
   if (value === undefined) return { kind: "not-geojson" };
   const found = shapesWithOriginIn(value);
@@ -89,6 +111,8 @@ export function plotStatus(result: RenderableResult): PlotStatus {
   if (axes === "not-plotted") return { kind: "projected" };
   const placed = axes === "swapped" ? shapes.map(swapAxes) : shapes;
   if (!placed.every(inDegrees)) return { kind: "projected" };
+  const positions = positionCount(placed);
+  if (positions > limit) return { kind: "too-many", positions, limit };
   return { kind: "plotted", shapes: placed, origins: found.map((entry) => entry.origin) };
 }
 
@@ -100,9 +124,12 @@ export interface PlottedFeature {
 }
 
 /** Every shape of every result that can be plotted, in output order, with its feature. */
-export function plottedFeatures(results: readonly RenderableResult[]): readonly PlottedFeature[] {
+export function plottedFeatures(
+  results: readonly RenderableResult[],
+  limit: number = Number.POSITIVE_INFINITY,
+): readonly PlottedFeature[] {
   return results.flatMap((result) => {
-    const status = plotStatus(result);
+    const status = plotStatus(result, limit);
     if (status.kind !== "plotted") return [];
     return status.shapes.map((shape, index) => ({
       outputId: result.outputId,
@@ -113,8 +140,11 @@ export function plottedFeatures(results: readonly RenderableResult[]): readonly 
 }
 
 /** Every shape of every result that can be plotted, in output order. */
-export function plottedShapes(results: readonly RenderableResult[]): readonly Shape[] {
-  return plottedFeatures(results).map((feature) => feature.shape);
+export function plottedShapes(
+  results: readonly RenderableResult[],
+  limit: number = Number.POSITIVE_INFINITY,
+): readonly Shape[] {
+  return plottedFeatures(results, limit).map((feature) => feature.shape);
 }
 
 /** Image types a browser shows by itself, so a map can too. */

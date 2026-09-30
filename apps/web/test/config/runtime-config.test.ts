@@ -39,6 +39,30 @@ describe("checkRuntimeConfig — valid", () => {
     });
   });
 
+  it("reads the map's coordinate limit, and leaves it out when absent", () => {
+    expect(checkRuntimeConfig({ map: { maxCoordinates: 50_000 } })).toEqual({
+      ok: true,
+      config: { relayUrl: undefined, presets: [], maxMapCoordinates: 50_000 },
+    });
+    expect(checkRuntimeConfig({ map: {} })).toEqual({
+      ok: true,
+      config: { relayUrl: undefined, presets: [] },
+    });
+  });
+
+  it.each([
+    [{ map: [] }, "map must be an object"],
+    [{ map: { maxCoordinates: 0 } }, "map.maxCoordinates must be a whole number"],
+    [{ map: { maxCoordinates: 1.5 } }, "map.maxCoordinates must be a whole number"],
+    [{ map: { maxCoordinates: "1000" } }, "map.maxCoordinates must be a whole number"],
+    [{ map: { maxCoordinates: 10_000_001 } }, "map.maxCoordinates must be a whole number"],
+    [{ map: { zoom: 3 } }, 'map has an unknown member "zoom"'],
+  ])("refuses %j", (input, problem) => {
+    const checked = checkRuntimeConfig(input);
+    expect(checked.ok).toBe(false);
+    expect(checked.ok ? "" : checked.problem).toContain(problem);
+  });
+
   it("keeps https presets, trimmed, in order", () => {
     const result = checkRuntimeConfig({
       relay: null,

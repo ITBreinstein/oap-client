@@ -13,7 +13,8 @@
  */
 
 import { DEFAULT_MAX_BUFFER_BYTES } from "@breinstein/oap-client";
-import { useId, useState } from "react";
+import { useContext, useId, useState } from "react";
+import { MapLimitsContext } from "./map-limits.js";
 import { saveBlob } from "./save.js";
 import { useDataUrl } from "./useDataUrl.js";
 import {
@@ -89,7 +90,9 @@ function ResultItem({
 }) {
   const [blob] = useState(() => blobOf(result));
   const filename = filenameOf(result, processId);
-  const plot = plotStatus(result).kind;
+  const { maxCoordinates } = useContext(MapLimitsContext);
+  const status = plotStatus(result, maxCoordinates);
+  const plot = status.kind;
   const imageOnMap = placed?.outputId === result.outputId;
   const boxOfImage = placed?.bboxOutputId === result.outputId;
   return (
@@ -108,6 +111,13 @@ function ResultItem({
         <p className="muted">
           GeoJSON, but its coordinates are not longitude and latitude, so it is not shown on the
           map.
+        </p>
+      )}
+      {status.kind === "too-many" && (
+        <p className="muted" data-testid="too-many-to-draw">
+          GeoJSON with {status.positions.toLocaleString("en")} coordinates, more than the{" "}
+          {status.limit.toLocaleString("en")} this page draws, so it is not shown on the map.
+          Download it to open it elsewhere.
         </p>
       )}
       {result.kind === "json" && (
@@ -262,7 +272,9 @@ function ReferenceItem({
   const [loading, setLoading] = useState(false);
   const { loaded } = result;
   const host = hostOf(result.href);
-  const plot = plotStatus(result).kind;
+  const { maxCoordinates } = useContext(MapLimitsContext);
+  const status = plotStatus(result, maxCoordinates);
+  const plot = status.kind;
   const image = shownImage(result);
   const imageOnMap = placed?.outputId === result.outputId;
   const page = loaded === undefined ? undefined : pageLine(loaded);
@@ -309,6 +321,13 @@ function ReferenceItem({
           GeoJSON, but not in longitude and latitude
           {loaded?.contentCrs === undefined ? "" : ` (Content-Crs ${loaded.contentCrs})`}, so it is
           not shown on the map. Nothing here reprojects.
+        </p>
+      )}
+      {status.kind === "too-many" && (
+        <p className="muted" data-testid="too-many-to-draw">
+          GeoJSON with {status.positions.toLocaleString("en")} coordinates, more than the{" "}
+          {status.limit.toLocaleString("en")} this page draws, so it is not shown on the map.
+          Download it to open it elsewhere.
         </p>
       )}
       {page !== undefined && <p data-truncated="true">{page}</p>}

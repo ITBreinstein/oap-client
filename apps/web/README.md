@@ -47,6 +47,13 @@ The relay's address is not built in. The page reads `/config.json`, next to
   a loopback host, as browsers allow, for development and CI.
 - `presets`: `https:` services offered on the start screen, reached directly,
   exactly as a typed address is.
+- `jobs.acceptedNoticeSeconds`: how long a background job may report `accepted`
+  before its row says no progress has been reported yet; 1 to 86 400, 60 when
+  absent.
+- `map.maxCoordinates`: the most positions one result, or one input, may have
+  for the map to draw it; 1 to 10 000 000, 250 000 when absent. Past it the
+  map pane and the result say it is not drawn, and the result's download is the
+  way to it.
 
 The file is checked whole. Missing, not JSON, an unknown member, a value of the
 wrong shape: the page runs **static-only** — no relay, no presets — and a

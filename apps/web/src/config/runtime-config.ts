@@ -21,6 +21,10 @@
  * - `jobs.acceptedNoticeSeconds`: how long a background job may report
  *   `accepted` before the page says no progress has been reported yet. A
  *   whole number of seconds, 1 to 86 400; 60 when absent.
+ * - `map.maxCoordinates`: the most positions one result, or one input, may
+ *   have for the page to draw it on the map. Above it the page says so and
+ *   offers the download instead. A whole number, 1 to 10 000 000;
+ *   {@link DEFAULT_MAX_MAP_COORDINATES} when absent.
  *
  * Anything else — a missing file, a file that is not JSON, an unknown member,
  * a value of the wrong shape — is refused whole, and the page runs without
@@ -41,7 +45,17 @@ export interface RuntimeConfig {
   readonly presets: readonly Preset[];
   /** `jobs.acceptedNoticeSeconds`, in milliseconds; undefined for the default. */
   readonly acceptedNoticeMs?: number | undefined;
+  /** `map.maxCoordinates`; undefined for {@link DEFAULT_MAX_MAP_COORDINATES}. */
+  readonly maxMapCoordinates?: number | undefined;
 }
+
+/**
+ * Positions the map draws for one result or input when `config.json` does not
+ * say. MapLibre draws this many without the page stalling on an ordinary
+ * laptop; what matters more is that past it the page declines and says so,
+ * rather than trying and going blank (review W3).
+ */
+export const DEFAULT_MAX_MAP_COORDINATES = 250_000;
 
 /** No relay, no presets: what the page runs with when the file cannot be used. */
 export const STATIC_ONLY: RuntimeConfig = { relayUrl: undefined, presets: [] };
@@ -140,10 +154,24 @@ function checkJobs(value: unknown): number | undefined | { readonly problem: str
   return seconds * 1000;
 }
 
+/** `map`, as the coordinate limit, or undefined when absent. */
+function checkMap(value: unknown): number | undefined | { readonly problem: string } {
+  if (value === undefined) return undefined;
+  if (!isRecord(value)) return { problem: "map must be an object" };
+  const extra = unknownMember(value, ["maxCoordinates"]);
+  if (extra !== undefined) return { problem: `map has an unknown member "${extra}"` };
+  const limit = value["maxCoordinates"];
+  if (limit === undefined) return undefined;
+  if (typeof limit !== "number" || !Number.isInteger(limit) || limit < 1 || limit > 10_000_000) {
+    return { problem: "map.maxCoordinates must be a whole number from 1 to 10000000" };
+  }
+  return limit;
+}
+
 /** Check a parsed `config.json`, whole. */
 export function checkRuntimeConfig(value: unknown): ConfigCheck {
   if (!isRecord(value)) return { ok: false, problem: "the file must hold a JSON object" };
-  const extra = unknownMember(value, ["relay", "presets", "jobs"]);
+  const extra = unknownMember(value, ["relay", "presets", "jobs", "map"]);
   if (extra !== undefined) return { ok: false, problem: `unknown member "${extra}"` };
 
   let relayUrl: string | undefined;
@@ -165,9 +193,17 @@ export function checkRuntimeConfig(value: unknown): ConfigCheck {
   const jobs = checkJobs(value["jobs"]);
   if (typeof jobs === "object") return { ok: false, ...jobs };
 
+  const map = checkMap(value["map"]);
+  if (typeof map === "object") return { ok: false, ...map };
+
   return {
     ok: true,
-    config: { relayUrl, presets, ...(jobs === undefined ? {} : { acceptedNoticeMs: jobs }) },
+    config: {
+      relayUrl,
+      presets,
+      ...(jobs === undefined ? {} : { acceptedNoticeMs: jobs }),
+      ...(map === undefined ? {} : { maxMapCoordinates: map }),
+    },
   };
 }
 

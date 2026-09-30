@@ -700,6 +700,52 @@ test.describe("the workflow in a browser", () => {
     );
   });
 
+  test("leaves a result with more coordinates than config.json allows off the map, and offers it as a download", async ({
+    page,
+  }) => {
+    // Review W3: past a limit the page declines to draw, and says so, rather
+    // than trying and going blank. The limit comes from config.json.
+    await page.route("**/config.json", (route) =>
+      route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({ relay: null, presets: [], map: { maxCoordinates: 4 } }),
+      }),
+    );
+    await connectTyped(page, PYGEOAPI);
+    await openProcess(page, "Rotate a polygon a quarter turn");
+    const square = {
+      type: "Polygon",
+      coordinates: [
+        [
+          [5.1, 52.1],
+          [5.2, 52.1],
+          [5.2, 52.2],
+          [5.1, 52.2],
+          [5.1, 52.1],
+        ],
+      ],
+    };
+    await page
+      .locator('[data-input-id="polygon"]')
+      .getByRole("textbox", { name: "GeoJSON" })
+      .fill(JSON.stringify(square));
+    await expect(page.getByTestId("map-left-off")).toContainText("more than 4 coordinates");
+    await page.getByRole("button", { name: "Run", exact: true }).click();
+
+    const result = page.locator('[data-output-id="rotated"]');
+    await expect(result.getByTestId("too-many-to-draw")).toContainText(
+      "GeoJSON with 5 coordinates, more than the 4 this page draws",
+    );
+    await expect(result).not.toHaveAttribute("data-plotted", "true");
+    await expect(page.locator(".map-canvas")).toHaveAttribute("data-result-shapes", "0");
+    await expect(page.getByTestId("map-left-off")).toContainText(
+      "A result can still be downloaded",
+    );
+    const download = page.waitForEvent("download");
+    await result.getByRole("button", { name: /Download/ }).click();
+    expect((await download).suggestedFilename()).toMatch(/rotated/);
+  });
+
   test("describes every process for the census, and exports one endpoint's observations", async ({
     page,
   }) => {
