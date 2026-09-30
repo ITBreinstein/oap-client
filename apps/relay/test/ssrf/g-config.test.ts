@@ -42,6 +42,10 @@ function withEndpoint(endpoint: Record<string, unknown>): unknown {
 }
 
 describe("G — without the allowance", () => {
+  it("e2e/relay.json, the browser lane's copy, refuses to start too", () => {
+    expect(() => parseConfig(readJson("e2e/relay.json"))).toThrow(ConfigError);
+  });
+
   it("infra/relay/ci.json refuses to start", () => {
     expect(() => parseConfig(readJson("infra/relay/ci.json"))).toThrow(ConfigError);
   });

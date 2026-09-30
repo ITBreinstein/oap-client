@@ -18,21 +18,14 @@
  */
 
 import { expect, test, type Page, type Route } from "@playwright/test";
+import { RELAY } from "./servers.js";
+import { requireNetwork, requireService } from "./services.js";
 import { readFile } from "node:fs/promises";
 
 const CORS = "http://localhost:5080";
 const NOCORS = "http://localhost:5081";
-const RELAY = "http://localhost:8787";
 const PDOK = "https://api.pdok.nl/";
 const FIXTURES = new URL("../packages/core/test/fixtures/", import.meta.url);
-
-async function answering(url: string): Promise<boolean> {
-  try {
-    return (await fetch(url, { signal: AbortSignal.timeout(5_000) })).ok;
-  } catch {
-    return false;
-  }
-}
 
 /** Answer a route with a `curl -i` capture: its status, headers and body. */
 async function fulfilFrom(route: Route, fixture: string) {
@@ -103,13 +96,13 @@ async function askForBuildingsByLink(page: Page) {
 
 test.describe("outputs given by reference", () => {
   test.beforeEach(async () => {
-    test.skip(!(await answering(`${CORS}/?f=json`)), "pygeoapi :5080 is not answering");
+    await requireService(`${CORS}/?f=json`, "pygeoapi :5080");
   });
 
   test("a link a page cannot read: nothing fetched until Load, then blocked, said and recorded", async ({
     page,
   }) => {
-    test.skip(!(await answering(`${NOCORS}/?f=json`)), "pygeoapi :5081 is not answering");
+    await requireService(`${NOCORS}/?f=json`, "pygeoapi :5081");
     const toNocors: string[] = [];
     page.on("request", (request) => {
       if (request.url().startsWith(`${NOCORS}/`)) toNocors.push(request.url());
@@ -155,8 +148,8 @@ test.describe("outputs given by reference", () => {
   test("a link a page can read, from a server it reads through the relay: loaded directly", async ({
     page,
   }) => {
-    test.skip(!(await answering(`${RELAY}/healthz`)), "the relay is not answering");
-    test.skip(!(await answering(`${NOCORS}/?f=json`)), "pygeoapi :5081 is not answering");
+    await requireService(`${RELAY}/healthz`, "the relay");
+    await requireService(`${NOCORS}/?f=json`, "pygeoapi :5081");
     await page.goto("/");
     await page.getByRole("radio", { name: /^pygeoapi-nocors-relay / }).check();
     await page.getByRole("button", { name: "Connect" }).click();
@@ -226,10 +219,7 @@ test.describe("outputs given by reference", () => {
 
   test("buildings by link from PDOK itself: the whole area on one page", async ({ page }) => {
     test.setTimeout(60_000);
-    test.skip(
-      !(await answering(`${PDOK}kadaster/bag/ogc/v2/collections/pand?f=json`)),
-      "PDOK is not answering",
-    );
+    await requireNetwork(`${PDOK}kadaster/bag/ogc/v2/collections/pand?f=json`, "PDOK");
     await connectTyped(page, CORS, "?developer");
     await askForBuildingsByLink(page);
     await page.getByRole("button", { name: "Run", exact: true }).click();

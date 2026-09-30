@@ -19,8 +19,10 @@ jobs:
       - run: docker compose -f infra/compose/pygeoapi.yml up -d --wait
       # The core's contract lane, then the relay's: real callbacks from pygeoapi.
       - run: pnpm test:contract
-      # Starts the relay with infra/relay/ci.json (callbacks on for pygeoapi)
-      # and a web build that knows its URL. See playwright.config.ts.
+      # The blocking browser lane: starts its own relay with e2e/relay.json
+      # (callbacks on for pygeoapi) and a web build that knows its URL, on the
+      # lane's own ports. ZOO has a lane of its own in interop.yml. See
+      # playwright.config.ts.
       - run: pnpm test:e2e
       - if: failure()
         uses: actions/upload-artifact@v4

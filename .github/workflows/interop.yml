@@ -18,3 +18,24 @@ jobs:
         continue-on-error: true
       - uses: actions/upload-artifact@v4
         with: { name: observations, path: observations/, if-no-files-found: warn }
+
+  # ZOO-Project from a browser: the Playwright specs that need ZOO, moved out
+  # of the blocking lane, where they only ever skipped. Reports, never blocks.
+  # Starts ZOO itself: with CI set, a spec whose server is not answering fails.
+  browser-zoo:
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: start ZOO
+        run: ./infra/zoo/zoo.sh up
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:e2e:zoo
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with: { name: playwright-report-zoo, path: .playwright/report/ }

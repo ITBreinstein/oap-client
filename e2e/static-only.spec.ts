@@ -3,30 +3,23 @@
  * relay, exactly as it is hosted. The page must work straight from the
  * browser — connect, describe, run synchronously — against the pygeoapi that
  * sends CORS headers, and must send nothing at all to a relay: not to the one
- * this lane runs on :8787, and not to a relay path on its own site.
+ * this lane runs (`servers.ts`), and not to a relay path on its own site.
  *
  * The same build serves the relay specs, with `e2e/config.relay.json`; this
  * spec answers `/config.json` itself.
  */
 
 import { expect, test } from "@playwright/test";
+import { RELAY } from "./servers.js";
+import { requireService } from "./services.js";
 
 const PYGEOAPI = "http://localhost:5080";
-const RELAY = "http://localhost:8787";
 /** The relay's routes, anywhere, and the path the static site keeps free for it. */
 const RELAY_PATH = /^\/(api|endpoints|sessions|execute|read|callbacks)(\/|$)/;
 
-async function answering(url: string): Promise<boolean> {
-  try {
-    return (await fetch(url, { signal: AbortSignal.timeout(3_000) })).ok;
-  } catch {
-    return false;
-  }
-}
-
 test.describe("the static site, without a relay", () => {
   test.beforeEach(async () => {
-    test.skip(!(await answering(`${PYGEOAPI}/?f=json`)), "pygeoapi :5080 is not answering");
+    await requireService(`${PYGEOAPI}/?f=json`, "pygeoapi :5080");
   });
 
   test("connects, describes and runs synchronously, and sends nothing to a relay", async ({

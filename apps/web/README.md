@@ -357,6 +357,11 @@ pnpm test          # Vitest: the form layer, the reducer, results, the map bindi
 pnpm test:e2e      # Playwright, Chromium, against pygeoapi :5080 and the relay
 ```
 
+`pnpm test:e2e:zoo` runs the ZOO-Project specs, against :5090, in a lane of
+their own that never blocks. Both lanes start their own relay and web build on
+ports of their own, and refuse one left running from another build
+(`e2e/global-setup.ts`).
+
 `test/forms/census.test.ts` snapshots the generator's output over every committed
 process description, so any change to a matcher shows up as a reviewed diff.
 

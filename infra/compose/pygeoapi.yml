@@ -21,6 +21,19 @@ services:
     volumes:
       - "../pygeoapi/config-cors.yml:/pygeoapi/local.config.yml:ro"
       - "../pygeoapi/plugins:/pygeoapi/plugins:ro"
+    # So `up --wait` returns once gunicorn answers, not once the container
+    # exists: the image has no healthcheck of its own, and a lane that started
+    # before pygeoapi listened used to skip its tests (review T3).
+    healthcheck: &answering
+      test:
+        - CMD
+        - python3
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:80/?f=json', timeout=5)"
+      interval: 5s
+      timeout: 6s
+      retries: 30
+      start_period: 5s
   pygeoapi-nocors:
     image: geopython/pygeoapi:0.21.0
     ports: ["5081:80"]
@@ -30,3 +43,4 @@ services:
     volumes:
       - "../pygeoapi/config-nocors.yml:/pygeoapi/local.config.yml:ro"
       - "../pygeoapi/plugins:/pygeoapi/plugins:ro"
+    healthcheck: *answering

@@ -13,20 +13,13 @@
  */
 
 import { expect, test, type Page } from "@playwright/test";
+import { RELAY } from "./servers.js";
+import { requireNetwork, requireService } from "./services.js";
 import { readFile } from "node:fs/promises";
 
 const PYGEOAPI = "http://localhost:5080";
 const NOCORS = "http://localhost:5081";
-const RELAY = "http://localhost:8787";
 const CRS84 = "http://www.opengis.net/def/crs/OGC/1.3/CRS84";
-
-async function answering(url: string): Promise<boolean> {
-  try {
-    return (await fetch(url, { signal: AbortSignal.timeout(3_000) })).ok;
-  } catch {
-    return false;
-  }
-}
 
 /** Connect to a typed address, which is always reached directly (T8). */
 async function connectTyped(page: Page, address: string) {
@@ -66,7 +59,7 @@ async function exportedObservations(
 
 test.describe("the workflow in a browser", () => {
   test.beforeEach(async () => {
-    test.skip(!(await answering(`${PYGEOAPI}/?f=json`)), "pygeoapi :5080 is not answering");
+    await requireService(`${PYGEOAPI}/?f=json`, "pygeoapi :5080");
   });
 
   test("draws a bounding box, sends it in CRS84 order, and downloads the result", async ({
@@ -494,11 +487,9 @@ test.describe("the workflow in a browser", () => {
     page,
   }) => {
     // The one process here that reaches the network: PDOK's aerial photograph.
-    test.skip(
-      !(await answering(
-        "https://service.pdok.nl/hwh/luchtfotorgb/wms/v1_0?request=GetCapabilities&service=WMS",
-      )),
-      "PDOK is not answering",
+    await requireNetwork(
+      "https://service.pdok.nl/hwh/luchtfotorgb/wms/v1_0?request=GetCapabilities&service=WMS",
+      "PDOK",
     );
     await connectTyped(page, PYGEOAPI);
     await openProcess(page, "Aerial photograph of an area");
@@ -594,7 +585,7 @@ test.describe("the workflow in a browser", () => {
   });
 
   test("runs in the background through the relay, then cancels a second run", async ({ page }) => {
-    test.skip(!(await answering(`${RELAY}/healthz`)), "the relay is not answering");
+    await requireService(`${RELAY}/healthz`, "the relay");
     await page.goto("/");
     await page.getByRole("radio", { name: /pygeoapi-cors/ }).check();
     await page.getByRole("button", { name: "Connect" }).click();
@@ -683,7 +674,7 @@ test.describe("the workflow in a browser", () => {
   });
 
   test("says a typed server allows no web page, and records the attempt", async ({ page }) => {
-    test.skip(!(await answering(`${NOCORS}/?f=json`)), "pygeoapi :5081 is not answering");
+    await requireService(`${NOCORS}/?f=json`, "pygeoapi :5081");
     await connectTyped(page, NOCORS);
 
     await expect(page.getByRole("alert")).toContainText(

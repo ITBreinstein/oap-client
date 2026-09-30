@@ -12,18 +12,11 @@
  */
 
 import { expect, test, type Page } from "@playwright/test";
+import { RELAY } from "./servers.js";
+import { requireService } from "./services.js";
 
 const PYGEOAPI = "http://localhost:5080";
-const RELAY = "http://localhost:8787";
 const JOB_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-
-async function answering(url: string): Promise<boolean> {
-  try {
-    return (await fetch(url, { signal: AbortSignal.timeout(3_000) })).ok;
-  } catch {
-    return false;
-  }
-}
 
 async function start(
   page: Page,
@@ -44,8 +37,8 @@ async function start(
 
 test.describe("asynchronous execution from a browser", () => {
   test.beforeEach(async () => {
-    test.skip(!(await answering(`${PYGEOAPI}/?f=json`)), "pygeoapi :5080 is not answering");
-    test.skip(!(await answering(`${RELAY}/healthz`)), "the relay is not answering");
+    await requireService(`${PYGEOAPI}/?f=json`, "pygeoapi :5080");
+    await requireService(`${RELAY}/healthz`, "the relay");
   });
 
   test("through the relay: the job is named at once and seen to complete", async ({ page }) => {
@@ -88,10 +81,7 @@ test.describe("asynchronous execution from a browser", () => {
   test("no-CORS port: the relay names the job, and the browser still cannot read it", async ({
     page,
   }) => {
-    test.skip(
-      !(await answering("http://localhost:5081/?f=json")),
-      "pygeoapi :5081 is not answering",
-    );
+    await requireService("http://localhost:5081/?f=json", "pygeoapi :5081");
     await start(page, "pygeoapi-nocors", "slow", '{"seconds": 1}');
 
     const job = page.getByTestId("job");

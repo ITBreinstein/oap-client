@@ -9,18 +9,11 @@
  */
 
 import { expect, test, type Page } from "@playwright/test";
+import { RELAY } from "./servers.js";
+import { requireNetwork, requireService } from "./services.js";
 
 const PYGEOAPI = "http://localhost:5080";
-const RELAY = "http://localhost:8787";
 const PDOK_BAG = "https://api.pdok.nl/kadaster/bag/ogc/v2/collections/pand";
-
-async function answering(url: string): Promise<boolean> {
-  try {
-    return (await fetch(url, { signal: AbortSignal.timeout(5_000) })).ok;
-  } catch {
-    return false;
-  }
-}
 
 /** Connect to a typed address, which is always reached directly. */
 async function connectTyped(page: Page) {
@@ -61,13 +54,13 @@ async function declareOnly(page: Page, processId: string, modes: string[]) {
 
 test.describe("the coverage processes", () => {
   test.beforeEach(async () => {
-    test.skip(!(await answering(`${PYGEOAPI}/?f=json`)), "pygeoapi :5080 is not answering");
+    await requireService(`${PYGEOAPI}/?f=json`, "pygeoapi :5080");
   });
 
   test("offers no choice for a process that runs in the background only, and runs it there", async ({
     page,
   }) => {
-    test.skip(!(await answering(`${RELAY}/healthz`)), "the relay is not answering");
+    await requireService(`${RELAY}/healthz`, "the relay");
     await declareOnly(page, "breinstein-async-only", ["async-execute"]);
     await connectConfigured(page);
     await openProcess(page, "Slow process, background only");
@@ -99,7 +92,7 @@ test.describe("the coverage processes", () => {
   });
 
   test("shows a background job that fails partway, with the server's reason", async ({ page }) => {
-    test.skip(!(await answering(`${RELAY}/healthz`)), "the relay is not answering");
+    await requireService(`${RELAY}/healthz`, "the relay");
     await connectConfigured(page);
     await openProcess(page, "Process that fails after a while");
 
@@ -144,7 +137,7 @@ test.describe("the coverage processes", () => {
   test("sends a FeatureCollection by reference, and shows the features on the map and as a table", async ({
     page,
   }) => {
-    test.skip(!(await answering(`${PDOK_BAG}?f=json`)), "PDOK is not answering");
+    await requireNetwork(`${PDOK_BAG}?f=json`, "PDOK");
     await connectTyped(page);
     await openProcess(page, "Area of each feature");
 
@@ -178,7 +171,7 @@ test.describe("the coverage processes", () => {
     page,
   }) => {
     test.setTimeout(60_000);
-    test.skip(!(await answering(`${PDOK_BAG}?f=json`)), "PDOK is not answering");
+    await requireNetwork(`${PDOK_BAG}?f=json`, "PDOK");
     await connectTyped(page);
     await openProcess(page, "Buildings in an area");
 

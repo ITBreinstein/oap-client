@@ -182,6 +182,13 @@ async function openEvents(app: Harness["app"], token: string) {
   return events;
 }
 
+it("says which build it is on the health check, when it was given one", async () => {
+  const given = await createApp({ buildId: "0123456789abcdef" }).request("/healthz");
+  expect(await given.json()).toEqual({ ok: true, build: "0123456789abcdef" });
+  const none = await createApp().request("/healthz");
+  expect(await none.json()).toEqual({ ok: true });
+});
+
 it("answers the health check", async () => {
   const res = await createApp().request("/healthz");
   expect(res.status).toBe(200);

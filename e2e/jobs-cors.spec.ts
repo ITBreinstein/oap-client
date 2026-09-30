@@ -30,6 +30,7 @@
  */
 
 import { expect, test, type Page } from "@playwright/test";
+import { requireService } from "./services.js";
 
 const CORS = "http://localhost:5080";
 const NOCORS = "http://localhost:5081";
@@ -44,16 +45,6 @@ interface ProbeResult {
 }
 
 /** Is the server answering at all? Decided outside the browser. */
-async function reachable(base: string): Promise<boolean> {
-  try {
-    const response = await fetch(`${base}/?f=json`, {
-      signal: AbortSignal.timeout(3_000),
-    });
-    return response.ok;
-  } catch {
-    return false;
-  }
-}
 
 /**
  * Start a job from Node, so the browser test is about *reading and dismissing*
@@ -100,7 +91,7 @@ test.describe("job endpoints from a browser", () => {
   });
 
   test("CORS port: a browser can read a job status", async ({ page }) => {
-    test.skip(!(await reachable(CORS)), "pygeoapi :5080 is not answering");
+    await requireService(`${CORS}/?f=json`, "pygeoapi :5080");
     const jobUrl = await startJob(CORS, 30);
 
     const result = await probe(page, jobUrl, "GET");
@@ -110,7 +101,7 @@ test.describe("job endpoints from a browser", () => {
   });
 
   test("CORS port: a browser CAN dismiss — the DELETE preflight succeeds", async ({ page }) => {
-    test.skip(!(await reachable(CORS)), "pygeoapi :5080 is not answering");
+    await requireService(`${CORS}/?f=json`, "pygeoapi :5080");
     const jobUrl = await startJob(CORS, 30);
 
     // The load-bearing assertion of this file. `DELETE` is not a simple
@@ -127,7 +118,7 @@ test.describe("job endpoints from a browser", () => {
   test("CORS port: a browser still cannot read Location — findings 0002 and 0009", async ({
     page,
   }) => {
-    test.skip(!(await reachable(CORS)), "pygeoapi :5080 is not answering");
+    await requireService(`${CORS}/?f=json`, "pygeoapi :5080");
 
     // The execute request itself, from the page, so the header question is
     // asked in the situation that actually matters.
@@ -159,7 +150,7 @@ test.describe("job endpoints from a browser", () => {
   });
 
   test("no-CORS port: a browser cannot read a job status at all", async ({ page }) => {
-    test.skip(!(await reachable(NOCORS)), "pygeoapi :5081 is not answering");
+    await requireService(`${NOCORS}/?f=json`, "pygeoapi :5081");
     const jobUrl = await startJob(NOCORS, 30);
 
     const result = await probe(page, jobUrl, "GET");
@@ -170,7 +161,7 @@ test.describe("job endpoints from a browser", () => {
   test("no-CORS port: the DELETE preflight fails, so dismissal is unreachable", async ({
     page,
   }) => {
-    test.skip(!(await reachable(NOCORS)), "pygeoapi :5081 is not answering");
+    await requireService(`${NOCORS}/?f=json`, "pygeoapi :5081");
     const jobUrl = await startJob(NOCORS, 30);
 
     // :5081 answers `OPTIONS` with a 200 and no CORS headers whatsoever, so the

@@ -149,6 +149,12 @@ export interface AppOptions {
   readonly forward?: ForwardCall | undefined;
   /** Where audit lines go. One JSON line on stdout by default. */
   readonly onAudit?: ((line: AuditLine) => void) | undefined;
+  /**
+   * What this relay was built from, reported on `/healthz` so a test lane can
+   * refuse a relay from another build. Absent unless the process was given
+   * one (`RELAY_BUILD_ID`); never a secret.
+   */
+  readonly buildId?: string | undefined;
 }
 
 /** `[a-z0-9-]`, as the config allows. Checked again here because it is placed in a path prefix. */
@@ -302,7 +308,9 @@ export function createApp(options: AppOptions = {}): Hono {
   });
   app.notFound((c) => problem(c, 404, "Not Found", "not-found"));
 
-  app.get("/healthz", (c) => c.json({ ok: true }));
+  app.get("/healthz", (c) =>
+    c.json(options.buildId === undefined ? { ok: true } : { ok: true, build: options.buildId }),
+  );
 
   // The browser-facing routes. The callback routes are server-to-server and
   // get no CORS headers at all.

@@ -5,16 +5,19 @@ What the relay is for, and every field, are in
 [apps/relay/src/config.ts](../../apps/relay/src/config.ts). This directory
 holds two configurations.
 
-## `ci.json` — CI, the E2E lane, and local development
+## `ci.json` — CI and local development
 
-Used by `playwright.config.ts`. The OGC servers call the relay back as
-`host.docker.internal:8787`.
+The relay's contract lane and local development run with it; the OGC servers
+call the relay back as `host.docker.internal:8787`. The browser lane uses
+[`e2e/relay.json`](../../e2e/relay.json): the same endpoints, for the lane's own
+ports (relay :8797, page :4183), so it never meets a developer's relay on :8787.
 
-| Endpoint          | Route | Callbacks | Why it is here                                                                        |
-| ----------------- | ----- | --------- | ------------------------------------------------------------------------------------- |
-| `pygeoapi-cors`   | relay | **on**    | Async via callbacks against pygeoapi, verified end to end in CI                       |
-| `pygeoapi-nocors` | relay | off       | So the E2E lane shows it failing: the relay names the job, the browser cannot read it |
-| `zoo`             | relay | off       | Same, against ZOO (finding 0050); skipped when ZOO is not running                     |
+| Endpoint                | Route            | Callbacks | Why it is here                                                                        |
+| ----------------------- | ---------------- | --------- | ------------------------------------------------------------------------------------- |
+| `pygeoapi-cors`         | relay            | **on**    | Async via callbacks against pygeoapi, verified end to end in CI                       |
+| `pygeoapi-nocors`       | relay            | off       | So the E2E lane shows it failing: the relay names the job, the browser cannot read it |
+| `pygeoapi-nocors-relay` | relay, reads too | off       | The read route, after the user confirms it (finding 0049)                             |
+| `zoo`                   | relay, reads too | off       | Against ZOO (finding 0050); in the ZOO browser lane, `pnpm test:e2e:zoo`              |
 
 Every endpoint sets `allowPrivateNetwork`, because the reference servers are on
 `localhost`. That switch turns off the relay's address checks for that
