@@ -57,7 +57,12 @@ vi.mock("terra-draw", () => {
       return this.state.mode;
     }
     clear() {
+      // As Terra Draw 1.35 does: `clear()` empties the store and then reports
+      // every id it held as deleted — and reports an empty list as deleted
+      // too. A stub that stayed silent here hid the upload bug below.
+      const ids = this.state.features.map((feature) => feature.id);
       this.state.features = [];
+      this.state.listeners.get("change")?.(ids, "delete");
     }
     addFeatures(features: Omit<FakeFeature, "id">[]) {
       this.state.features.push(
@@ -235,6 +240,31 @@ describe("the Terra Draw geometry engine", () => {
     ]);
     // A polygon is edited by the rectangle mode when that is all there is.
     expect(draw.features.map((entry) => entry.properties["mode"])).toEqual(["rectangle"]);
+  });
+
+  it("does not report a value shown from outside as the user deleting everything", () => {
+    // The GeoJSON upload bug: with the map drawing for a field, a loaded file
+    // was shown, Terra Draw's clear() reported a deletion, the engine emitted
+    // "nothing drawn", and the field was emptied.
+    const { created, draw } = engine(["Polygon"], false);
+    const seen: unknown[] = [];
+    created.onChange((shapes) => seen.push(shapes));
+    created.show([{ type: "Polygon", coordinates: triangle.coordinates }]);
+    created.show([{ type: "Polygon", coordinates: triangle.coordinates }]);
+    expect(seen).toEqual([]);
+    expect(draw.features).toHaveLength(1);
+  });
+
+  it("still reports a deletion Terra Draw makes for the user, after a value was shown", () => {
+    const { created, draw } = engine(["Polygon"], false);
+    const seen: unknown[] = [];
+    created.onChange((shapes) => seen.push(shapes));
+    created.show([{ type: "Polygon", coordinates: triangle.coordinates }]);
+    // The select mode's own Delete key: Terra Draw empties the store, then says so.
+    const ids = draw.features.map((entry) => entry.id);
+    draw.features = [];
+    draw.listeners.get("change")?.(ids, "delete");
+    expect(seen).toEqual([[]]);
   });
 
   it("rounds what it shows to the nine decimals Terra Draw accepts", () => {

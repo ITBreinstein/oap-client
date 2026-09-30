@@ -31,9 +31,12 @@ import {
   type RunFacts,
 } from "../observations.js";
 import { isMixedContent, pageProtocol } from "../mixed-content.js";
+import { createJobStore } from "../jobs/job-store.js";
 import type { RelayEndpoint } from "../relay/contract.js";
 import {
   createJobSession,
+  type DismissAdvertisedBy,
+  type JobRow,
   type JobSession,
   type JobSessionSnapshot,
   type Reads,
@@ -86,6 +89,10 @@ export interface WorkflowCommands {
    * catalogue and not only the processes someone happened to open.
    */
   readonly describeAll: () => void;
+  /** "Remove from list": this browser forgets the job. The server is not told. */
+  readonly removeJob: (statusUrl: string) => void;
+  /** "Dismiss", once confirmed: `DELETE` the job on the server. */
+  readonly dismissJob: (statusUrl: string) => void;
 }
 
 /**
@@ -112,7 +119,14 @@ export interface WorkflowView {
   /** A message about the running job that is not a stage change, e.g. a refused cancel. */
   readonly jobNotice: string | undefined;
   /** Whether Cancel job was advertised, and by whom (T6). */
-  readonly dismissAdvertisedBy: "process" | "service" | "observed-earlier" | "nothing";
+  readonly dismissAdvertisedBy: DismissAdvertisedBy;
+  /**
+   * The same question for one job in "My jobs", which may belong to another
+   * endpoint than the one open. `nothing` hides its Dismiss.
+   */
+  readonly dismissAdvertisedFor: (job: JobRow) => DismissAdvertisedBy;
+  /** What the last Dismiss of a job ended in, by status URL. */
+  readonly jobMessages: ReadonlyMap<string, string>;
   readonly census: CensusProgress | undefined;
 }
 
@@ -229,13 +243,14 @@ function formObservationsOf(
   ];
 }
 
-export function useWorkflow(relayUrl: string | undefined): WorkflowView {
+export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: number): WorkflowView {
   const [state, dispatch] = useReducer(workflowReducer, INITIAL_WORKFLOW);
   const [snapshot, setSnapshot] = useState<JobSessionSnapshot | undefined>();
   const [configured, setConfigured] = useState<RelayEndpoint[]>([]);
   const [configuredError, setConfiguredError] = useState<string | undefined>();
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>(NO_ERRORS);
   const [jobNotice, setJobNotice] = useState<string | undefined>();
+  const [jobMessages, setJobMessages] = useState<ReadonlyMap<string, string>>(() => new Map());
 
   // Made inside the effect, for the reason AsyncJobPanel gives: StrictMode
   // runs effects twice, and a memoised session would be disposed and reused.
@@ -266,7 +281,7 @@ export function useWorkflow(relayUrl: string | undefined): WorkflowView {
   }, []);
 
   useEffect(() => {
-    const created = createJobSession(relayUrl);
+    const created = createJobSession(relayUrl, { acceptedNoticeMs, store: createJobStore() });
     session.current = created;
     const unsubscribe = created.subscribe(setSnapshot);
     let live = true;
@@ -290,7 +305,7 @@ export function useWorkflow(relayUrl: string | undefined): WorkflowView {
       created.dispose();
       if (session.current === created) session.current = undefined;
     };
-  }, [relayUrl]);
+  }, [relayUrl, acceptedNoticeMs]);
 
   const record = useCallback((observations: readonly FormObservation[]) => {
     for (const observation of observations) {
@@ -504,7 +519,7 @@ export function useWorkflow(relayUrl: string | undefined): WorkflowView {
           // asynchronous one, and a sync request the server made async is
           // handed over here.
           if (mode === "sync") {
-            active.track(relayEndpoint, execution.job.statusUrl, connection.reads);
+            active.track(relayEndpoint, execution.job.statusUrl, connection.reads, process.id);
           }
           dispatch({ type: "job-started", jobRef: execution.job.statusUrl });
           return;
@@ -553,7 +568,11 @@ export function useWorkflow(relayUrl: string | undefined): WorkflowView {
     }
     const status = job.status;
     if (status === undefined || !status.terminal) return;
-    if (status.status !== "successful") {
+    // A job the server first called successful keeps its results even when
+    // the confirming read found the status changed (finding 0047): the screen
+    // shows both, and the results the server handed out.
+    const decided = job.confirmation?.state === "changed" ? job.confirmation.first : status;
+    if (decided.status !== "successful") {
       dispatch({
         type: "run-failed",
         error: {
@@ -573,7 +592,7 @@ export function useWorkflow(relayUrl: string | undefined): WorkflowView {
     const declared = declaredMediaTypes(state.process);
     void (async () => {
       try {
-        const { envelope } = await connection.client.getResults(jobRef, { status });
+        const { envelope } = await connection.client.getResults(jobRef, { status: decided });
         const results = await toRenderable(envelope, {
           outputIds,
           processId,
@@ -605,6 +624,72 @@ export function useWorkflow(relayUrl: string | undefined): WorkflowView {
           : dismissWorked.has(state.endpoint.baseUrl)
             ? "observed-earlier"
             : "nothing";
+
+  const dismissAdvertisedFor = (job: JobRow): DismissAdvertisedBy => {
+    if (state.stage !== "choose-endpoint" && state.endpoint.baseUrl === job.endpoint) {
+      if (
+        (state.stage === "process" || state.stage === "running" || state.stage === "result") &&
+        state.process.id === job.processId &&
+        state.process.execution.dismiss
+      ) {
+        return "process";
+      }
+      if (state.service.capabilities.dismiss) return "service";
+    }
+    return dismissWorked.has(job.endpoint) ? "observed-earlier" : "nothing";
+  };
+
+  const setJobMessage = (statusUrl: string, message: string | undefined) => {
+    setJobMessages((messages) => {
+      const next = new Map(messages);
+      if (message === undefined) next.delete(statusUrl);
+      else next.set(statusUrl, message);
+      return next;
+    });
+  };
+
+  const removeJob = (statusUrl: string) => {
+    setJobMessage(statusUrl, undefined);
+    session.current?.remove(statusUrl);
+  };
+
+  const dismissListedJob = (statusUrl: string) => {
+    const active = session.current;
+    const job = snapshot?.jobs.find((row) => row.statusUrl === statusUrl);
+    if (active === undefined || job === undefined) return;
+    const advertisedBy = dismissAdvertisedFor(job);
+    // Offered only where advertised or seen to work; a stale click is ignored.
+    if (advertisedBy === "nothing") return;
+    const base = {
+      kind: "cancel-job" as const,
+      endpoint: redactUrl(job.endpoint),
+      processId: job.processId ?? "",
+      advertisedBy,
+    };
+    setJobMessage(statusUrl, "Dismissing…");
+    void (async () => {
+      try {
+        const dismissal = await active.dismiss(statusUrl);
+        if (dismissal.kind === "dismissed") {
+          setDismissWorked((seen) => new Set([...seen, job.endpoint]));
+          active.record(job.endpoint, { ...base, outcome: "dismissed" });
+          setJobMessage(statusUrl, "Dismissed on the server.");
+        } else {
+          active.record(job.endpoint, { ...base, outcome: "unsupported" });
+          setJobMessage(
+            statusUrl,
+            `The server says it cannot dismiss jobs (HTTP ${String(dismissal.status)}).`,
+          );
+        }
+      } catch (cause) {
+        active.record(job.endpoint, { ...base, outcome: "failed" });
+        setJobMessage(
+          statusUrl,
+          `The job could not be dismissed: ${cause instanceof Error ? cause.message : String(cause)}.`,
+        );
+      }
+    })();
+  };
 
   const cancelJob = () => {
     const connection = client.current;
@@ -741,6 +826,8 @@ export function useWorkflow(relayUrl: string | undefined): WorkflowView {
     },
     loadReference,
     describeAll,
+    removeJob,
+    dismissJob: dismissListedJob,
   };
 
   return {
@@ -752,6 +839,8 @@ export function useWorkflow(relayUrl: string | undefined): WorkflowView {
     fieldErrors,
     jobNotice,
     dismissAdvertisedBy,
+    dismissAdvertisedFor,
+    jobMessages,
     census,
   };
 }

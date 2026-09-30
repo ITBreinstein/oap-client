@@ -14,9 +14,10 @@
  * Buffer and SAGA's polygon tools take GML or "an object".
  */
 
-import { useContext, useId } from "react";
+import { useContext, useId, useState } from "react";
 import type { ComplexValue } from "../forms/encode.js";
 import type { ComplexControl } from "../forms/plan.js";
+import { refuseJsonObject, refuseSize } from "../forms/upload.js";
 import { DrawContext } from "./draw.js";
 import type { ControlProps } from "./FormFields.js";
 
@@ -55,6 +56,7 @@ export function ComplexField(props: ControlProps<ComplexControl>) {
   const { control, value, onChange, describedBy, inputId } = props;
   const draw = useContext(DrawContext);
   const base = useId();
+  const [message, setMessage] = useState<string | undefined>();
   const current = asComplex(value);
   const format = control.formats[current.format] ?? control.formats[0];
   const byReference = current.href !== undefined;
@@ -145,6 +147,7 @@ export function ComplexField(props: ControlProps<ComplexControl>) {
               spellCheck={false}
               value={current.value ?? ""}
               onChange={(event) => {
+                setMessage(undefined);
                 onChange({ format: current.format, value: event.target.value });
               }}
             />
@@ -155,14 +158,45 @@ export function ComplexField(props: ControlProps<ComplexControl>) {
               id={`${base}-file`}
               type="file"
               onChange={(event) => {
-                const file = event.target.files?.[0];
+                const picker = event.currentTarget;
+                const file = picker.files?.[0];
+                // Emptied, so picking the same file again is a change again.
+                picker.value = "";
                 if (file === undefined) return;
-                void readFile(file, base64).then((text) => {
-                  onChange({ format: current.format, value: text });
-                });
+                // Refused unread: reading it is what would freeze the page.
+                const refused = refuseSize(file.size);
+                if (refused !== undefined) {
+                  setMessage(refused);
+                  return;
+                }
+                const { format: chosen } = current;
+                const object = format?.object === true;
+                void (async () => {
+                  let text: string;
+                  try {
+                    text = await readFile(file, base64);
+                  } catch {
+                    setMessage("That file could not be read, so the value was not changed.");
+                    return;
+                  }
+                  // A JSON-object format is sent as a parsed object: text that
+                  // does not parse would reach the server as a string instead.
+                  const notJson = object ? refuseJsonObject(text) : undefined;
+                  if (notJson !== undefined) {
+                    setMessage(notJson);
+                    return;
+                  }
+                  setMessage(undefined);
+                  onChange({ format: chosen, value: text });
+                })();
               }}
             />
           </p>
+          {message !== undefined && (
+            <p className="hint" role="status">
+              {message}
+            </p>
+          )}
           {canDraw && (
             <p className="actions">
               <button

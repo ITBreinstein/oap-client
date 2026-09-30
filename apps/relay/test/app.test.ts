@@ -426,6 +426,44 @@ describe("POST /callbacks", () => {
     await events.close();
   });
 
+  // The bodies the reference servers send (finding 0048). Whatever arrives,
+  // the job is the one the URL's token was minted for, and the browser hears
+  // only its ref.
+  it.each([
+    ["an empty object (pygeoapi in-progress and failed)", "success", "{}"],
+    [
+      "a bare output value (pygeoapi success)",
+      "success",
+      '{"id": "slept", "value": {"seconds": 8.0, "message": ""}}',
+    ],
+    [
+      "a full job document naming another job (ZOO in-progress)",
+      "in-progress",
+      JSON.stringify({
+        progress: 40,
+        id: "f6140fa6-0000-0000-0000-000000000000",
+        jobID: "f6140fa6-0000-0000-0000-000000000000",
+        type: "process",
+        processID: "longProcess",
+        status: "failed",
+        links: [{ rel: "monitor", href: "http://localhost:5090/ogc-api/jobs/f6140fa6" }],
+      }),
+    ],
+  ])("routes by the URL's token alone, whatever the body: %s", async (_label, kind, body) => {
+    const { app, events, ref, callbackToken, state } = await registered();
+    const response = await app.request(`/callbacks/${callbackToken}/${kind}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+    });
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("");
+    expect(await events.next()).toEqual({ event: "job", data: JSON.stringify({ ref }) });
+    // Nothing from the body was kept: one registration, as before.
+    expect(state.counts().registrations).toBe(1);
+    await events.close();
+  });
+
   it("accepts a duplicate callback, and rings again", async () => {
     const { app, events, ref, callbackToken } = await registered();
     for (let i = 0; i < 2; i += 1) {

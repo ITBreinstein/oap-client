@@ -26,7 +26,10 @@ without that, this config refuses to start.
 
 Callbacks **off**: a long-running demo relay will be redeployed, and
 against pygeoapi every redeploy is a window in which a job's callback can fail
-and damage the job (finding 0047). Polling finds every job regardless.
+and damage the job (finding 0047). Polling finds every job regardless. Turn
+callbacks on only for an endpoint where the relay's uptime is guaranteed for as
+long as its jobs run; the reasons are in
+[apps/relay/README.md](../../apps/relay/README.md#the-three-per-endpoint-decisions).
 
 `allowPrivateNetwork` is absent, so every address each endpoint resolves to is
 checked when the relay connects. Every endpoint must be `https:` on a public

@@ -15,6 +15,7 @@ import { isGeoJsonText, type GeoJsonText } from "../forms/encode.js";
 import { describeLoad, readGeoJson } from "../forms/geojson.js";
 import { drawableTypes, holdsSeveral, toGeoJson } from "../forms/geometry.js";
 import type { GeometryControl } from "../forms/plan.js";
+import { refuseSize } from "../forms/upload.js";
 import { DrawContext } from "./draw.js";
 import type { ControlProps } from "./FormFields.js";
 
@@ -80,9 +81,26 @@ export function GeometryField(props: ControlProps<GeometryControl>) {
           type="file"
           accept=".geojson,.json,application/geo+json,application/json"
           onChange={(event) => {
-            const file = event.target.files?.[0];
+            const picker = event.currentTarget;
+            const file = picker.files?.[0];
+            // Emptied, so picking the same file again is a change again.
+            picker.value = "";
             if (file === undefined) return;
-            void file.text().then((content) => {
+            // Refused unread: reading it is what would freeze the page.
+            const refused = refuseSize(file.size);
+            if (refused !== undefined) {
+              setMessage(refused);
+              return;
+            }
+            void (async () => {
+              let content: string;
+              try {
+                content = await file.text();
+              } catch {
+                setMessage("That file could not be read, so the value was not changed.");
+                return;
+              }
+              // Whatever goes wrong below, the field keeps the value it had.
               const read = readGeoJson(content);
               if (!read.ok) {
                 setMessage(read.message);
@@ -95,7 +113,7 @@ export function GeometryField(props: ControlProps<GeometryControl>) {
                   : describeLoad(shaped.used, shaped.ignored),
               );
               if (shaped.geojson !== undefined) set(JSON.stringify(shaped.geojson));
-            });
+            })();
           }}
         />
       </p>

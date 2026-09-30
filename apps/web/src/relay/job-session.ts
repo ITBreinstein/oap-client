@@ -13,8 +13,10 @@
 
 import {
   createClient,
+  dismissJob,
   getJob,
   redactUrl,
+  type Dismissal,
   type Client,
   type FetchLike,
   type ExecuteOutputSelection,
@@ -28,6 +30,7 @@ import { JobReconciler, type TrackedJob } from "./reconciler.js";
 import { createRelayClient, type RelayClient } from "./relay-client.js";
 import { createRelayFetch } from "./relay-fetch.js";
 import { createRoutedFetch } from "./routed-fetch.js";
+import { NO_STORE, type JobStore, type StoredJob } from "../jobs/job-store.js";
 
 /**
  * How this page reads one endpoint, decided per connection: `direct` always
@@ -38,8 +41,22 @@ export type Reads = "direct" | "relay";
 
 export interface JobRow extends TrackedJob {
   readonly endpointKey: string;
+  /** The endpoint's base URL. */
+  readonly endpoint: string;
   readonly route: "direct" | "relay" | undefined;
+  /** Undefined for a job this page was only asked to watch. */
+  readonly processId: string | undefined;
+  /** ISO 8601, when this browser started the job. */
+  readonly startedAt: string | undefined;
+  /** Found in storage after a reload, rather than started on this page. */
+  readonly restored: boolean;
 }
+
+/**
+ * Where the page learned that a job can be dismissed, if anywhere: the
+ * declared-versus-observed pair the matrix records for dismissal (T6).
+ */
+export type DismissAdvertisedBy = "process" | "service" | "observed-earlier" | "nothing";
 
 export interface JobSessionSnapshot {
   readonly relay: "off" | StreamState;
@@ -81,7 +98,14 @@ export interface JobSession {
     reads?: Reads,
   ): Promise<Execution>;
   /** Start reconciling a job the caller found some other way — a sync run the server made async. */
-  track(endpoint: RelayEndpoint, statusUrl: string, reads?: Reads): void;
+  track(endpoint: RelayEndpoint, statusUrl: string, reads?: Reads, processId?: string): void;
+  /** Take a job off this browser's list, and out of storage. The server is not told. */
+  remove(statusUrl: string): void;
+  /**
+   * Ask the server to dismiss a job (`DELETE`), through the route its reads
+   * take, then read it again. The core records the attempt.
+   */
+  dismiss(statusUrl: string): Promise<Dismissal>;
   /**
    * Add an observation the web app made itself (T4), or one the caller took
    * from a core call of its own, against the endpoint it was made for.
@@ -142,13 +166,30 @@ export function toOutputSelection(
   return selection;
 }
 
-export function createJobSession(relayUrl: string | undefined): JobSession {
+export interface JobSessionOptions {
+  /** How long a job may stay `accepted` before its row says so. */
+  readonly acceptedNoticeMs?: number | undefined;
+  /**
+   * Where the jobs this browser started are kept across a reload. None by
+   * default: only the page's own session persists, never a developer panel's.
+   */
+  readonly store?: JobStore | undefined;
+  /** This browser's clock, for a job's start time. */
+  readonly now?: (() => Date) | undefined;
+}
+
+export function createJobSession(
+  relayUrl: string | undefined,
+  options: JobSessionOptions = {},
+): JobSession {
   const relay: RelayClient | undefined =
     relayUrl === undefined || relayUrl === "" ? undefined : createRelayClient(relayUrl);
 
   let relayState: JobSessionSnapshot["relay"] = relay === undefined ? "off" : "connecting";
   let observations: SessionObservation[] = [];
   let dropped = 0;
+  const store = options.store ?? NO_STORE;
+  const now = options.now ?? (() => new Date());
   const meta = new Map<
     string,
     {
@@ -158,8 +199,26 @@ export function createJobSession(relayUrl: string | undefined): JobSession {
       route: "direct" | "relay" | undefined;
       /** The read route's wrapper, when this job's endpoint is read through the relay. */
       read: FetchLike | undefined;
+      processId: string | undefined;
+      startedAt: string | undefined;
+      restored: boolean;
     }
   >();
+
+  /** What storage gets: jobs with a process and a start time, in the order started. */
+  const persist = (): void => {
+    const kept: StoredJob[] = [];
+    for (const [statusUrl, job] of meta) {
+      if (job.processId === undefined || job.startedAt === undefined) continue;
+      kept.push({
+        endpoint: job.baseUrl,
+        statusUrl,
+        processId: job.processId,
+        startedAt: job.startedAt,
+      });
+    }
+    store.save(kept);
+  };
   const listeners = new Set<(snapshot: JobSessionSnapshot) => void>();
 
   const snapshot = (): JobSessionSnapshot => ({
@@ -167,7 +226,11 @@ export function createJobSession(relayUrl: string | undefined): JobSession {
     jobs: reconciler.jobs().map((job) => ({
       ...job,
       endpointKey: meta.get(job.statusUrl)?.endpointKey ?? "",
+      endpoint: meta.get(job.statusUrl)?.baseUrl ?? "",
       route: meta.get(job.statusUrl)?.route,
+      processId: meta.get(job.statusUrl)?.processId,
+      startedAt: meta.get(job.statusUrl)?.startedAt,
+      restored: meta.get(job.statusUrl)?.restored ?? false,
     })),
     observations,
     droppedObservations: dropped,
@@ -199,6 +262,7 @@ export function createJobSession(relayUrl: string | undefined): JobSession {
       });
     },
     onChange: publish,
+    acceptedNoticeMs: options.acceptedNoticeMs,
   });
 
   const doorbells: DoorbellStream | undefined =
@@ -232,6 +296,23 @@ export function createJobSession(relayUrl: string | undefined): JobSession {
         })
       : undefined;
 
+  // The jobs a previous page started. Polled again, each read direct first
+  // as every connection is, and without a doorbell: the relay registration
+  // belonged to a session this page never had, and whose token was never
+  // stored. A job already finished settles on its first read.
+  for (const stored of store.load()) {
+    meta.set(stored.statusUrl, {
+      endpointKey: "",
+      baseUrl: stored.endpoint,
+      route: "direct",
+      read: undefined,
+      processId: stored.processId,
+      startedAt: stored.startedAt,
+      restored: true,
+    });
+    reconciler.track(stored.statusUrl);
+  }
+
   return {
     async endpoints() {
       return relay === undefined ? [] : relay.endpoints();
@@ -255,15 +336,37 @@ export function createJobSession(relayUrl: string | undefined): JobSession {
       });
     },
 
-    track(endpoint, statusUrl, reads = "direct") {
+    track(endpoint, statusUrl, reads = "direct", processId) {
       const read = readFetch(endpoint, reads);
       meta.set(statusUrl, {
         endpointKey: endpoint.key,
         baseUrl: endpoint.baseUrl,
         route: read === undefined ? "direct" : "relay",
         read,
+        processId,
+        startedAt: now().toISOString(),
+        restored: false,
       });
+      persist();
       reconciler.track(statusUrl);
+    },
+
+    remove(statusUrl) {
+      if (!meta.has(statusUrl)) return;
+      reconciler.untrack(statusUrl);
+      meta.delete(statusUrl);
+      persist();
+      publish();
+    },
+
+    async dismiss(statusUrl) {
+      const job = meta.get(statusUrl);
+      const dismissal = await dismissJob(statusUrl, {
+        onObservation: observeFor(job?.baseUrl ?? statusUrl),
+        ...(job?.read === undefined ? {} : { fetch: job.read }),
+      });
+      reconciler.refresh(statusUrl);
+      return dismissal;
     },
 
     record(endpoint, observation) {
@@ -271,6 +374,7 @@ export function createJobSession(relayUrl: string | undefined): JobSession {
     },
 
     async run(endpoint, processId, inputs, outputs, description, reads = "direct") {
+      const startedAt = now().toISOString();
       const refs = new Map<string, string>();
       let route: "direct" | "relay" | undefined;
       const read = readFetch(endpoint, reads);
@@ -300,7 +404,16 @@ export function createJobSession(relayUrl: string | undefined): JobSession {
       });
       if (execution.kind === "job") {
         const { statusUrl } = execution.job;
-        meta.set(statusUrl, { endpointKey: endpoint.key, baseUrl: endpoint.baseUrl, route, read });
+        meta.set(statusUrl, {
+          endpointKey: endpoint.key,
+          baseUrl: endpoint.baseUrl,
+          route,
+          read,
+          processId,
+          startedAt,
+          restored: false,
+        });
+        persist();
         reconciler.track(statusUrl, refs.get(statusUrl));
       }
       return execution;

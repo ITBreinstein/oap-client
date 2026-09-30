@@ -17,7 +17,7 @@
  * this. Nothing in this module throws.
  */
 
-import { classifyCrs } from "./crs.js";
+import { classifyCrs, typedBboxCrs } from "./crs.js";
 import { isJsonArray, isJsonObject } from "./json.js";
 import type { BboxControl, ComplexControl, Control, FormPlan } from "./plan.js";
 
@@ -65,6 +65,29 @@ export interface RawJson {
 
 export function isRawJson(value: unknown): value is RawJson {
   return isJsonObject(value) && typeof value["rawJson"] === "string";
+}
+
+/** GeoJSON's registered media type (RFC 7946 §12). */
+export const GEOJSON_MEDIA_TYPE = "application/geo+json";
+
+/**
+ * A hint for the raw JSON editor, which sends exactly what was typed: said
+ * when the text is a JSON object that is none of the wrappers the standard
+ * gives an input — a qualified value, a reference, or a bounding box. Never
+ * a refusal: the editor is the escape hatch, and the server's answer is the
+ * test. Undefined when there is nothing to say, including for text that does
+ * not parse, which the validator reports.
+ */
+export function bareObjectHint(raw: RawJson): string | undefined {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw.rawJson);
+  } catch {
+    return undefined;
+  }
+  if (!isJsonObject(parsed)) return undefined;
+  if (["value", "href", "bbox"].some((key) => Object.hasOwn(parsed, key))) return undefined;
+  return 'This is a bare JSON object, and it will be sent as typed. OGC API - Processes 1.0 expects an object input wrapped as { "value": … }, or given by reference as { "href": … }.';
 }
 
 /**
@@ -172,12 +195,12 @@ function encodeBbox(
   value: unknown,
   note: (code: EncodeNote["code"], crs: string) => void,
 ): unknown {
-  // A bare array is four numbers in the default CRS: what a caller without a
-  // CRS picker would hand over.
+  // A bare array is four numbers in the CRS a typed box starts in: what a
+  // caller without a CRS picker would hand over.
   const box: BboxValue | undefined = isBboxValue(value)
     ? value
     : isJsonArray(value) && value.every((entry) => typeof entry === "number")
-      ? { coordinates: value, crs: control.defaultCrs }
+      ? { coordinates: value, crs: typedBboxCrs(control) }
       : undefined;
   if (box === undefined) return value;
 
@@ -258,8 +281,15 @@ function encodeControl(
       // This ends accepted limitation N4, which sent it bare while geometry
       // could only be typed as the wire value. pygeoapi hands the wrapper to
       // the process unopened (finding 0052); that is the server's to fix.
+      //
+      // A geometry control exists only where the description said GeoJSON — a
+      // `geojson-*` format, a `$ref` to a GeoJSON schema, or
+      // `contentMediaType: application/geo+json` (`matchers.ts`) — so the
+      // qualified value says so too: stating the format is what a qualified
+      // value is for. A complex input's bare `type: "object"` branch says
+      // nothing of the kind, and gets no media type.
       const geojson = isGeoJsonText(value) ? parseRaw({ rawJson: value.geojson }) : value;
-      return isJsonObject(geojson) ? { value: geojson } : geojson;
+      return isJsonObject(geojson) ? { value: geojson, mediaType: GEOJSON_MEDIA_TYPE } : geojson;
     }
     case "text":
     case "select":
