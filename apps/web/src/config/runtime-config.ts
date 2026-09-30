@@ -18,6 +18,9 @@
  *   and CI.
  * - `presets`: services offered on the start screen, each `https:`. Reached
  *   directly, exactly as if the address had been typed.
+ * - `jobs.acceptedNoticeSeconds`: how long a background job may report
+ *   `accepted` before the page says no progress has been reported yet. A
+ *   whole number of seconds, 1 to 86 400; 60 when absent.
  *
  * Anything else — a missing file, a file that is not JSON, an unknown member,
  * a value of the wrong shape — is refused whole, and the page runs without
@@ -36,6 +39,8 @@ export interface RuntimeConfig {
   /** The relay's base URL or same-site path; undefined for no relay. */
   readonly relayUrl: string | undefined;
   readonly presets: readonly Preset[];
+  /** `jobs.acceptedNoticeSeconds`, in milliseconds; undefined for the default. */
+  readonly acceptedNoticeMs?: number | undefined;
 }
 
 /** No relay, no presets: what the page runs with when the file cannot be used. */
@@ -116,10 +121,29 @@ function checkPresets(value: unknown): Preset[] | { readonly problem: string } {
   return presets;
 }
 
+/** `jobs`, as the notice threshold in milliseconds, or undefined when absent. */
+function checkJobs(value: unknown): number | undefined | { readonly problem: string } {
+  if (value === undefined) return undefined;
+  if (!isRecord(value)) return { problem: "jobs must be an object" };
+  const extra = unknownMember(value, ["acceptedNoticeSeconds"]);
+  if (extra !== undefined) return { problem: `jobs has an unknown member "${extra}"` };
+  const seconds = value["acceptedNoticeSeconds"];
+  if (seconds === undefined) return undefined;
+  if (
+    typeof seconds !== "number" ||
+    !Number.isInteger(seconds) ||
+    seconds < 1 ||
+    seconds > 86_400
+  ) {
+    return { problem: "jobs.acceptedNoticeSeconds must be a whole number from 1 to 86400" };
+  }
+  return seconds * 1000;
+}
+
 /** Check a parsed `config.json`, whole. */
 export function checkRuntimeConfig(value: unknown): ConfigCheck {
   if (!isRecord(value)) return { ok: false, problem: "the file must hold a JSON object" };
-  const extra = unknownMember(value, ["relay", "presets"]);
+  const extra = unknownMember(value, ["relay", "presets", "jobs"]);
   if (extra !== undefined) return { ok: false, problem: `unknown member "${extra}"` };
 
   let relayUrl: string | undefined;
@@ -137,7 +161,14 @@ export function checkRuntimeConfig(value: unknown): ConfigCheck {
 
   const presets = checkPresets(value["presets"]);
   if (!Array.isArray(presets)) return { ok: false, ...presets };
-  return { ok: true, config: { relayUrl, presets } };
+
+  const jobs = checkJobs(value["jobs"]);
+  if (typeof jobs === "object") return { ok: false, ...jobs };
+
+  return {
+    ok: true,
+    config: { relayUrl, presets, ...(jobs === undefined ? {} : { acceptedNoticeMs: jobs }) },
+  };
 }
 
 function fallback(why: string): ConfigLoad {

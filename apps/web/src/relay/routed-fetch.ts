@@ -59,6 +59,17 @@ export interface ExecuteRouteObservation {
   /** Relay route only: whether the OGC server's answer carried `Location`. */
   readonly locationPresent: boolean | undefined;
   readonly callbacksRegistered: boolean;
+  /**
+   * The relay's doorbell stream was not open when the job was started, so the
+   * execute went to the relay without a session: the relay registers no
+   * callbacks and sends no `subscriber`, and the job is found by polling only.
+   *
+   * On purpose. A server may let an undeliverable callback decide the job —
+   * pygeoapi leaves it `accepted` for ever, or rewrites `successful` to
+   * `failed` (finding 0047) — so a callback is asked for only while the relay
+   * is seen to be up. False on the direct route, which never has a session.
+   */
+  readonly sessionWithheld: boolean;
   /** The core's execute URL carried a query the relay does not forward. */
   readonly queryDropped: boolean;
   /** The relay's reason code, for the two relay outcomes. */
@@ -68,6 +79,12 @@ export interface ExecuteRouteObservation {
 /** Where the relay session comes from. The doorbell stream owns it. */
 export interface SessionSource {
   current(): string | undefined;
+  /**
+   * Whether the doorbell stream is open now: the relay answered, and a
+   * doorbell rung for a new job would reach this page. Optional, for a source
+   * that has no stream to report on; such a source is taken as open.
+   */
+  live?(): boolean;
   /** A fresh session after the relay forgot the last one. */
   renew(): Promise<string | undefined>;
 }
@@ -141,6 +158,7 @@ export function createRoutedFetch(options: RoutedFetchOptions): FetchLike {
           outcome: "refused",
           locationPresent: undefined,
           callbacksRegistered: false,
+          sessionWithheld: false,
           reason: "body-not-text",
         });
         throw new TypeError("the relay route carries JSON text bodies only");
@@ -178,6 +196,7 @@ export function createRoutedFetch(options: RoutedFetchOptions): FetchLike {
           outcome: refused ? "relay-refused" : "relay-failed",
           locationPresent: undefined,
           callbacksRegistered: false,
+          sessionWithheld: false,
           reason: error instanceof RelayRouteError ? error.code : "unreachable",
         });
         throw error;
@@ -189,6 +208,7 @@ export function createRoutedFetch(options: RoutedFetchOptions): FetchLike {
         outcome: "sent",
         locationPresent: response.headers.has("Location"),
         callbacksRegistered: false,
+        sessionWithheld: false,
         reason: undefined,
       });
       return response;
@@ -203,6 +223,7 @@ export function createRoutedFetch(options: RoutedFetchOptions): FetchLike {
         outcome: "sent",
         locationPresent: undefined,
         callbacksRegistered: false,
+        sessionWithheld: false,
         queryDropped: false,
         reason: undefined,
       });
@@ -218,6 +239,7 @@ export function createRoutedFetch(options: RoutedFetchOptions): FetchLike {
         outcome: "refused",
         locationPresent: undefined,
         callbacksRegistered: false,
+        sessionWithheld: false,
         reason: "body-not-text",
       });
       throw new TypeError("the relay route carries JSON text bodies only");
@@ -228,15 +250,24 @@ export function createRoutedFetch(options: RoutedFetchOptions): FetchLike {
     const send = (session: string | undefined) =>
       relay.execute(endpoint.key, processId, body, session, signal);
 
+    // A session is what makes the relay ask the server for callbacks. Sent only
+    // while the doorbell stream is open: a relay this page cannot reach now is
+    // one the server may not reach either, and a server may let a callback it
+    // cannot deliver decide the job (finding 0047). Without one, the job is
+    // found by polling, which is right on every server.
+    const sessionWithheld = options.session?.live?.() === false;
+    const session = sessionWithheld ? undefined : options.session?.current();
+
     let answer: RelayedExecute;
     try {
       try {
-        answer = await send(options.session?.current());
+        answer = await send(session);
       } catch (error) {
         if (
           !(error instanceof RelayError) ||
           error.status !== 401 ||
-          options.session === undefined
+          options.session === undefined ||
+          session === undefined
         ) {
           throw error;
         }
@@ -251,6 +282,7 @@ export function createRoutedFetch(options: RoutedFetchOptions): FetchLike {
         outcome: refused ? "relay-refused" : "relay-failed",
         locationPresent: undefined,
         callbacksRegistered: false,
+        sessionWithheld,
         reason: error instanceof RelayError ? error.code : "unreachable",
       });
       // A TypeError is what `fetch` throws for a request that produced no
@@ -272,6 +304,7 @@ export function createRoutedFetch(options: RoutedFetchOptions): FetchLike {
       outcome: "sent",
       locationPresent: upstream.location !== undefined,
       callbacksRegistered: ref !== undefined,
+      sessionWithheld,
       reason: undefined,
     });
     if (ref !== undefined) {

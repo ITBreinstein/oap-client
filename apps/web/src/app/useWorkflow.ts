@@ -229,7 +229,7 @@ function formObservationsOf(
   ];
 }
 
-export function useWorkflow(relayUrl: string | undefined): WorkflowView {
+export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: number): WorkflowView {
   const [state, dispatch] = useReducer(workflowReducer, INITIAL_WORKFLOW);
   const [snapshot, setSnapshot] = useState<JobSessionSnapshot | undefined>();
   const [configured, setConfigured] = useState<RelayEndpoint[]>([]);
@@ -266,7 +266,7 @@ export function useWorkflow(relayUrl: string | undefined): WorkflowView {
   }, []);
 
   useEffect(() => {
-    const created = createJobSession(relayUrl);
+    const created = createJobSession(relayUrl, { acceptedNoticeMs });
     session.current = created;
     const unsubscribe = created.subscribe(setSnapshot);
     let live = true;
@@ -290,7 +290,7 @@ export function useWorkflow(relayUrl: string | undefined): WorkflowView {
       created.dispose();
       if (session.current === created) session.current = undefined;
     };
-  }, [relayUrl]);
+  }, [relayUrl, acceptedNoticeMs]);
 
   const record = useCallback((observations: readonly FormObservation[]) => {
     for (const observation of observations) {
@@ -553,7 +553,11 @@ export function useWorkflow(relayUrl: string | undefined): WorkflowView {
     }
     const status = job.status;
     if (status === undefined || !status.terminal) return;
-    if (status.status !== "successful") {
+    // A job the server first called successful keeps its results even when
+    // the confirming read found the status changed (finding 0047): the screen
+    // shows both, and the results the server handed out.
+    const decided = job.confirmation?.state === "changed" ? job.confirmation.first : status;
+    if (decided.status !== "successful") {
       dispatch({
         type: "run-failed",
         error: {
@@ -573,7 +577,7 @@ export function useWorkflow(relayUrl: string | undefined): WorkflowView {
     const declared = declaredMediaTypes(state.process);
     void (async () => {
       try {
-        const { envelope } = await connection.client.getResults(jobRef, { status });
+        const { envelope } = await connection.client.getResults(jobRef, { status: decided });
         const results = await toRenderable(envelope, {
           outputIds,
           processId,

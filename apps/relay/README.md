@@ -87,6 +87,25 @@ All three are made in the config, before any request exists.
   relay's _availability_ becomes part of every job's correctness. Off for the
   public demo; on for pygeoapi in CI.
 
+  **Turn callbacks on only for an endpoint where the relay's uptime is
+  guaranteed for as long as that server's jobs run.** A callback is sent from
+  the OGC server to the relay, so while the relay is down — a restart, a
+  redeploy, a crash — the server's connection is refused. Measured again on
+  2026-09-30 against pygeoapi 0.21.0: a job whose callbacks all pointed at a
+  relay that was down stayed `accepted` and never ran; a job whose relay went
+  down before it finished was reported `successful` and rewritten to `failed`
+  0.2 s later. Polling cannot repair either: it reads the damaged status,
+  which is then the server's truth. Nothing the browser can check tells it the
+  relay will still be up when the job ends, so this is a deployment decision,
+  made here in the config.
+
+  The web app narrows the window it can see: it sends the relay a session —
+  the thing that makes the relay add a `subscriber` — only while its doorbell
+  stream is open, and otherwise starts the job for polling only
+  (`sessionWithheld` on the `execute-route` observation). And for a job it
+  started with callbacks, it reads a first `successful` once more, about two
+  seconds later, and shows both statuses if they differ.
+
 ## HTTP API
 
 | Route                                     | Caller     | Answers                                                                                                   |

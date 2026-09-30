@@ -28,6 +28,17 @@ describe("checkRuntimeConfig — valid", () => {
     expect(checkRuntimeConfig(input)).toEqual({ ok: true, config: { relayUrl, presets: [] } });
   });
 
+  it("reads the accepted-notice threshold in seconds, and leaves it out when absent", () => {
+    expect(checkRuntimeConfig({ jobs: { acceptedNoticeSeconds: 90 } })).toEqual({
+      ok: true,
+      config: { relayUrl: undefined, presets: [], acceptedNoticeMs: 90_000 },
+    });
+    expect(checkRuntimeConfig({ jobs: {} })).toEqual({
+      ok: true,
+      config: { relayUrl: undefined, presets: [] },
+    });
+  });
+
   it("keeps https presets, trimmed, in order", () => {
     const result = checkRuntimeConfig({
       relay: null,
@@ -72,6 +83,12 @@ describe("checkRuntimeConfig — refused whole", () => {
     ["a preset with an empty title", { presets: [{ title: " ", url: "https://a.example.org" }] }],
     ["a preset with no url", { presets: [{ title: "A" }] }],
     ["a preset with a query", { presets: [{ title: "A", url: "https://a.example.org/?k=1" }] }],
+    ["jobs as a number", { jobs: 60 }],
+    ["an unknown jobs member", { jobs: { acceptedNoticeMs: 60_000 } }],
+    ["a zero notice", { jobs: { acceptedNoticeSeconds: 0 } }],
+    ["a fractional notice", { jobs: { acceptedNoticeSeconds: 1.5 } }],
+    ["a notice over a day", { jobs: { acceptedNoticeSeconds: 86_401 } }],
+    ["a notice as a string", { jobs: { acceptedNoticeSeconds: "60" } }],
     [
       "a preset with an unknown member",
       { presets: [{ title: "A", url: "https://a.example.org", relay: true }] },

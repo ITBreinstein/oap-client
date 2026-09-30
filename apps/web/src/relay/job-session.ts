@@ -142,7 +142,15 @@ export function toOutputSelection(
   return selection;
 }
 
-export function createJobSession(relayUrl: string | undefined): JobSession {
+export interface JobSessionOptions {
+  /** How long a job may stay `accepted` before its row says so. */
+  readonly acceptedNoticeMs?: number | undefined;
+}
+
+export function createJobSession(
+  relayUrl: string | undefined,
+  options: JobSessionOptions = {},
+): JobSession {
   const relay: RelayClient | undefined =
     relayUrl === undefined || relayUrl === "" ? undefined : createRelayClient(relayUrl);
 
@@ -199,6 +207,7 @@ export function createJobSession(relayUrl: string | undefined): JobSession {
       });
     },
     onChange: publish,
+    acceptedNoticeMs: options.acceptedNoticeMs,
   });
 
   const doorbells: DoorbellStream | undefined =

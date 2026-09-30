@@ -34,7 +34,7 @@ export function App({ config = STATIC_ONLY, configWarning }: AppProps) {
     () => (import.meta.env.DEV ? [...DEV_PRESETS, ...config.presets] : config.presets),
     [config.presets],
   );
-  const view = useWorkflow(relayUrl);
+  const view = useWorkflow(relayUrl, config.acceptedNoticeMs);
   const { state, commands } = view;
   const [developer] = useState(developerRequested);
   const [mapAvailable, setMapAvailable] = useState(false);
@@ -124,7 +124,7 @@ export function App({ config = STATIC_ONLY, configWarning }: AppProps) {
 
   return (
     <DrawContext.Provider value={draw}>
-      <div className="app">
+      <div className="app" data-relay-stream={view.snapshot?.relay}>
         <header className="app-header">
           <h1>OGC API - Processes client</h1>
           <p className="muted" data-testid="core-version">

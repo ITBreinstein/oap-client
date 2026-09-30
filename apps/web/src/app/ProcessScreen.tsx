@@ -179,7 +179,40 @@ function JobStatusLine({ job }: { readonly job: JobRow | undefined }) {
       <strong data-job-status={job.status.status}>{job.status.rawStatus}</strong>
       {progress}
       {job.status.message !== undefined && <span className="muted"> — {job.status.message}</span>}
+      {job.acceptedLong && job.status.status === "accepted" && (
+        // Information, not a warning: nothing is known to be wrong, and the
+        // page keeps polling (finding 0032).
+        <span className="hint job-accepted-note" data-accepted-long="true">
+          <br />
+          No progress reported yet. Some servers report <code>accepted</code> until the job
+          finishes.
+        </span>
+      )}
     </>
+  );
+}
+
+/**
+ * The server said `successful`, and a second read shortly after said
+ * something else (finding 0047). Both are shown, and the results read after
+ * the first stay on screen: they are what the server handed out.
+ */
+function StatusChanged({ job }: { readonly job: JobRow | undefined }) {
+  if (job?.confirmation?.state !== "changed" || job.status === undefined) return null;
+  const { first } = job.confirmation;
+  const now = job.status;
+  return (
+    <div className="notice" role="status" data-status-changed={`${first.status}->${now.status}`}>
+      <p>
+        The server first reported this job <strong>{first.rawStatus}</strong>, and a moment later{" "}
+        <strong>{now.rawStatus}</strong>
+        {now.message !== undefined && <span className="muted"> — {now.message}</span>}.
+      </p>
+      <p>
+        The results below were read after the first report. The server&apos;s record of the job now
+        says {now.rawStatus}.
+      </p>
+    </div>
   );
 }
 
@@ -211,6 +244,10 @@ export function ProcessScreen(props: ProcessScreenProps) {
 
   const run = state.stage === "running" ? state.run : undefined;
   const job = run?.mode === "async" ? jobs.find((row) => row.statusUrl === run.jobRef) : undefined;
+  const resultJob =
+    state.stage === "result" && state.jobRef !== undefined
+      ? jobs.find((row) => row.statusUrl === state.jobRef)
+      : undefined;
 
   return (
     <section aria-labelledby={`${base}-heading`}>
@@ -317,6 +354,10 @@ export function ProcessScreen(props: ProcessScreenProps) {
           role="status"
           aria-live="polite"
           data-job-ref={state.run.mode === "async" ? state.run.jobRef : undefined}
+          data-doorbells={job?.doorbells}
+          data-callbacks={
+            job === undefined ? undefined : job.ref === undefined ? "none" : "registered"
+          }
         >
           {state.run.mode === "sync" ? (
             <p>Running… waiting for the server's answer.</p>
@@ -346,6 +387,7 @@ export function ProcessScreen(props: ProcessScreenProps) {
 
       {state.stage === "result" && (
         <>
+          <StatusChanged job={resultJob} />
           <ResultsView
             results={state.results}
             processId={process.id}
