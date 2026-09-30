@@ -166,6 +166,32 @@ describe("openDoorbells", () => {
     doorbells.close();
   });
 
+  it("is live only between the relay's ready and the stream dropping", async () => {
+    const relay = fakeRelay();
+    const timers = manualSchedule();
+    const doorbells = openDoorbells({
+      relay: relay.relay,
+      schedule: timers.schedule,
+      onDoorbell: () => undefined,
+      onOpen: () => undefined,
+    });
+    await settle();
+    // A session exists, but the relay has not said ready: not live yet.
+    expect(doorbells.current()).toBe("session-1");
+    expect(doorbells.live()).toBe(false);
+    relay.latest().send("event: ready\ndata: {}\n\n");
+    await settle();
+    expect(doorbells.live()).toBe(true);
+
+    relay.setDown(true);
+    relay.latest().end();
+    await settle();
+    // Down: the session is still held, and still not sent (see routed-fetch).
+    expect(doorbells.current()).toBe("session-1");
+    expect(doorbells.live()).toBe(false);
+    doorbells.close();
+  });
+
   it("backs off while the relay is down, capped, and never gives up", async () => {
     const relay = fakeRelay();
     relay.setDown(true);
@@ -269,6 +295,9 @@ describe("a relay restart in the middle of a job", () => {
     expect(relay.opened).toEqual(["session-1", "session-1", "session-2"]);
     expect(reads).toHaveLength(2);
     expect(reconciler.jobs()[0]?.status?.status).toBe("successful");
+    // The job had callbacks, so a first successful is read once more (0047).
+    await timers.advance(2_000);
+    expect(reads).toHaveLength(3);
     expect(reconciler.jobs()[0]?.settled).toBe(true);
     doorbells.close();
     reconciler.dispose();

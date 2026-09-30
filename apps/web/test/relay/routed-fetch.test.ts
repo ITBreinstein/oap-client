@@ -134,9 +134,80 @@ describe("createRoutedFetch", () => {
         outcome: "sent",
         locationPresent: true,
         callbacksRegistered: true,
+        sessionWithheld: false,
         queryDropped: false,
         reason: undefined,
       },
+    ]);
+  });
+
+  it("sends no session while the doorbell stream is not open, so no callbacks are asked for", async () => {
+    const relay = fakeRelay([{ ...CREATED, ref: undefined }]);
+    const routes: ExecuteRouteObservation[] = [];
+    const source = { ...sessions(["session-1"]), live: () => false };
+    const routed = createRoutedFetch({
+      endpoint: RELAYED,
+      relay,
+      session: source,
+      onRoute: (observation) => routes.push(observation),
+    });
+
+    const execution = await execute(`${BASE}/processes`, "slow", {
+      inputs: { seconds: 1 },
+      mode: "async",
+      fetch: routed,
+    });
+
+    // Still through the relay, which names the job; polling does the rest.
+    expect(execution.kind).toBe("job");
+    expect(relay.calls.map((call) => call.session)).toEqual([undefined]);
+    expect(routes).toEqual([
+      expect.objectContaining({
+        route: "relay",
+        outcome: "sent",
+        callbacksRegistered: false,
+        sessionWithheld: true,
+      }),
+    ]);
+  });
+
+  it("sends the session once the doorbell stream is open", async () => {
+    const relay = fakeRelay([CREATED]);
+    const routes: ExecuteRouteObservation[] = [];
+    const routed = createRoutedFetch({
+      endpoint: RELAYED,
+      relay,
+      session: { ...sessions(["session-1"]), live: () => true },
+      onRoute: (observation) => routes.push(observation),
+    });
+    await routed(`${BASE}/processes/slow/execution`, {
+      method: "POST",
+      headers: { Prefer: "respond-async" },
+      body: "{}",
+    });
+    expect(relay.calls.map((call) => call.session)).toEqual(["session-1"]);
+    expect(routes).toEqual([
+      expect.objectContaining({ callbacksRegistered: true, sessionWithheld: false }),
+    ]);
+  });
+
+  it("records a withheld session on a relay failure too", async () => {
+    const routes: ExecuteRouteObservation[] = [];
+    const routed = createRoutedFetch({
+      endpoint: RELAYED,
+      relay: fakeRelay([new TypeError("fetch failed")]),
+      session: { ...sessions(["session-1"]), live: () => false },
+      onRoute: (observation) => routes.push(observation),
+    });
+    await expect(
+      routed(`${BASE}/processes/slow/execution`, {
+        method: "POST",
+        headers: { Prefer: "respond-async" },
+        body: "{}",
+      }),
+    ).rejects.toThrow("relay route failed: unreachable");
+    expect(routes).toEqual([
+      expect.objectContaining({ outcome: "relay-failed", sessionWithheld: true }),
     ]);
   });
 

@@ -47,6 +47,8 @@ export interface DoorbellOptions {
 }
 
 export interface DoorbellStream extends SessionSource {
+  /** True from the relay's `ready` until the stream drops. */
+  live(): boolean;
   close(): void;
 }
 
@@ -115,8 +117,10 @@ export function openDoorbells(options: DoorbellOptions): DoorbellStream {
   // narrow it to false for the whole body, and close() changes it meanwhile.
   const isClosed = (): boolean => closed;
 
-  const setState = (state: StreamState): void => {
-    options.onState?.(state);
+  let state: StreamState = "connecting";
+  const setState = (next: StreamState): void => {
+    state = next;
+    options.onState?.(next);
   };
 
   const wait = (ms: number): Promise<void> =>
@@ -189,6 +193,7 @@ export function openDoorbells(options: DoorbellOptions): DoorbellStream {
 
   return {
     current: () => session,
+    live: () => state === "open",
     async renew() {
       try {
         const token = await newSession();

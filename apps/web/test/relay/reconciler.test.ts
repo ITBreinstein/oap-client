@@ -25,7 +25,10 @@ function server(states: readonly JobState[]) {
   return { readJob, reads };
 }
 
-function reconciler(readJob: (url: string) => Promise<JobStatus>) {
+function reconciler(
+  readJob: (url: string) => Promise<JobStatus>,
+  options: Partial<ConstructorParameters<typeof JobReconciler>[0]> = {},
+) {
   const timers = manualSchedule();
   const seen: TrackedJob[] = [];
   const instance = new JobReconciler({
@@ -35,6 +38,7 @@ function reconciler(readJob: (url: string) => Promise<JobStatus>) {
     baselineMs: 2_000,
     maxIntervalMs: 8_000,
     coalesceMs: 250,
+    ...options,
   });
   const current = (url = JOB) => instance.jobs().find((job) => job.statusUrl === url);
   return { instance, timers, seen, current };
@@ -138,8 +142,13 @@ describe("JobReconciler", () => {
     instance.doorbell("ref-1");
     await timers.advance(10_000);
 
-    expect(reads).toHaveLength(1);
+    // The first read and the confirming one (finding 0047); none for the doorbell.
+    expect(reads).toHaveLength(2);
     expect(current()?.status?.status).toBe("successful");
+    expect(current()?.settled).toBe(true);
+    instance.doorbell("ref-1");
+    await timers.advance(10_000);
+    expect(reads).toHaveLength(2);
     instance.dispose();
   });
 
@@ -227,6 +236,149 @@ describe("JobReconciler", () => {
       await timers.advance(next);
     }
     expect(waits).toEqual([2_000, 3_000, 4_500, 6_750, 8_000]);
+    instance.dispose();
+  });
+});
+
+describe("JobReconciler: the confirming read after a first successful (finding 0047)", () => {
+  it("reads a job with callbacks once more, and records a status the server changed", async () => {
+    const { readJob, reads } = server(["successful", "failed"]);
+    const { instance, timers, current } = reconciler(readJob, { confirmAfterMs: 2_000 });
+    instance.track(JOB, "ref-1");
+    await settle();
+
+    // The first successful is shown at once — results need not wait — but
+    // the job is not settled yet.
+    expect(current()?.status?.status).toBe("successful");
+    expect(current()?.settled).toBe(false);
+    expect(current()?.confirmation).toEqual({ state: "pending" });
+    expect(timers.pending()).toEqual([2_000]);
+
+    await timers.advance(2_000);
+    expect(reads).toHaveLength(2);
+    expect(current()?.status?.status).toBe("failed");
+    expect(current()?.settled).toBe(true);
+    const confirmation = current()?.confirmation;
+    expect(confirmation?.state).toBe("changed");
+    expect(confirmation?.state === "changed" ? confirmation.first.status : undefined).toBe(
+      "successful",
+    );
+    expect(timers.pending()).toEqual([]);
+    instance.dispose();
+  });
+
+  it("settles on an unchanged second read", async () => {
+    const { readJob, reads } = server(["successful"]);
+    const { instance, timers, current } = reconciler(readJob);
+    instance.track(JOB, "ref-1");
+    await settle();
+    await timers.advance(2_000);
+    expect(reads).toHaveLength(2);
+    expect(current()?.confirmation).toEqual({ state: "unchanged" });
+    expect(current()?.settled).toBe(true);
+    instance.dispose();
+  });
+
+  it("does not re-read a job without callbacks: nothing could have changed it that way", async () => {
+    const { readJob, reads } = server(["successful", "failed"]);
+    const { instance, timers, current } = reconciler(readJob);
+    instance.track(JOB);
+    await settle();
+    await timers.advance(10_000);
+    expect(reads).toHaveLength(1);
+    expect(current()?.confirmation).toBeUndefined();
+    expect(current()?.settled).toBe(true);
+    instance.dispose();
+  });
+
+  it("does not re-read a job that failed, or was dismissed", async () => {
+    for (const state of ["failed", "dismissed"] as const) {
+      const { readJob, reads } = server([state]);
+      const { instance, timers, current } = reconciler(readJob);
+      instance.track(JOB, "ref-1");
+      await settle();
+      await timers.advance(10_000);
+      expect(reads).toHaveLength(1);
+      expect(current()?.confirmation).toBeUndefined();
+      instance.dispose();
+    }
+  });
+
+  it("keeps its time: the success callback's doorbell and a reconnect do not pull it earlier", async () => {
+    const { readJob, reads } = server(["successful", "failed"]);
+    const { instance, timers, current } = reconciler(readJob);
+    instance.track(JOB, "ref-1");
+    await settle();
+    instance.doorbell("ref-1");
+    instance.reconnected();
+    await timers.advance(1_999);
+    expect(reads).toHaveLength(1);
+    expect(current()?.doorbells).toBe(1);
+    await timers.advance(1);
+    expect(reads).toHaveLength(2);
+    instance.dispose();
+  });
+
+  it("tries the confirming read again when it fails", async () => {
+    let calls = 0;
+    const readJob = (url: string): Promise<JobStatus> => {
+      calls += 1;
+      if (calls === 2) return Promise.reject(new TypeError("fetch failed"));
+      return Promise.resolve(status(calls === 1 ? "successful" : "failed", url));
+    };
+    const { instance, timers, current } = reconciler(readJob);
+    instance.track(JOB, "ref-1");
+    await settle();
+    await timers.advance(2_000);
+    expect(current()?.lastError).toBe("fetch failed");
+    expect(current()?.confirmation).toEqual({ state: "pending" });
+    await timers.advance(2_000);
+    expect(current()?.confirmation).toMatchObject({ state: "changed" });
+    expect(current()?.settled).toBe(true);
+    instance.dispose();
+  });
+});
+
+describe("JobReconciler: a job that stays accepted", () => {
+  it("says so once it has been accepted past the threshold, and keeps polling", async () => {
+    const { readJob } = server(["accepted"]);
+    let now = 0;
+    const { instance, timers, current } = reconciler(readJob, {
+      acceptedNoticeMs: 10_000,
+      now: () => now,
+    });
+    instance.track(JOB);
+    await settle();
+    expect(current()?.acceptedSince).toBe(0);
+    expect(current()?.acceptedLong).toBe(false);
+
+    now = 9_999;
+    await timers.advance(2_000);
+    expect(current()?.acceptedLong).toBe(false);
+    now = 10_000;
+    await timers.advance(3_000);
+    expect(current()?.acceptedLong).toBe(true);
+    expect(current()?.settled).toBe(false);
+    expect(timers.pending()).toHaveLength(1);
+    instance.dispose();
+  });
+
+  it("clears once the server reports anything else", async () => {
+    const { readJob } = server(["accepted", "accepted", "running"]);
+    let now = 0;
+    const { instance, timers, current } = reconciler(readJob, {
+      acceptedNoticeMs: 1_000,
+      now: () => now,
+    });
+    instance.track(JOB);
+    await settle();
+    now = 5_000;
+    await timers.advance(2_000);
+    expect(current()?.acceptedLong).toBe(true);
+    await timers.advance(3_000);
+    expect(current()?.status?.status).toBe("running");
+    expect(current()?.acceptedSince).toBeUndefined();
+    expect(current()?.acceptedLong).toBe(false);
     instance.dispose();
   });
 });
