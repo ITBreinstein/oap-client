@@ -13,7 +13,7 @@
 
 import { describe, expect, it } from "vitest";
 import { CRS84 } from "../../src/forms/crs.js";
-import { toExecuteBody, type FormValues } from "../../src/forms/encode.js";
+import { bareObjectHint, toExecuteBody, type FormValues } from "../../src/forms/encode.js";
 import { resolveFormPlan } from "../../src/forms/resolve.js";
 import { fixtureProcess, planFor } from "./helpers.js";
 
@@ -130,7 +130,7 @@ describe("toExecuteBody", () => {
         { area: { schema: { format: "geojson-geometry" } } },
         { area: { geojson: JSON.stringify(geometry) } },
       );
-      expect(inputs).toEqual({ area: { value: geometry } });
+      expect(inputs).toEqual({ area: { value: geometry, mediaType: "application/geo+json" } });
     });
 
     it("wraps a GeoJSON object handed over directly, too", () => {
@@ -139,7 +139,40 @@ describe("toExecuteBody", () => {
         { area: { schema: { format: "geojson-geometry" } } },
         { area: geometry },
       );
-      expect(inputs).toEqual({ area: { value: geometry } });
+      expect(inputs).toEqual({ area: { value: geometry, mediaType: "application/geo+json" } });
+    });
+
+    it("states the GeoJSON media type for every way the description can say GeoJSON", () => {
+      // The three signals `matchers.ts` reads. Each makes a geometry control,
+      // and a geometry control's qualified value names its format.
+      const geometry = { type: "Point", coordinates: [5.1, 52.1] };
+      for (const schema of [
+        { format: "geojson-point" },
+        {
+          $ref: "https://schemas.opengis.net/ogcapi/features/part1/1.0/openapi/schemas/geometryGeoJSON.yaml",
+        },
+        { type: "object", contentMediaType: "application/geo+json" },
+      ]) {
+        const inputs = inputsFor(
+          { area: { schema } },
+          { area: { geojson: JSON.stringify(geometry) } },
+        );
+        expect(inputs).toEqual({ area: { value: geometry, mediaType: "application/geo+json" } });
+      }
+    });
+
+    it("gives a complex input's bare object branch no media type: it did not say GeoJSON", () => {
+      const inputs = inputsFor(
+        {
+          shape: {
+            schema: {
+              oneOf: [{ type: "string", contentMediaType: "text/xml" }, { type: "object" }],
+            },
+          },
+        },
+        { shape: { format: 1, value: '{"type":"Point","coordinates":[5,52]}' } },
+      );
+      expect(inputs).toEqual({ shape: { value: { type: "Point", coordinates: [5, 52] } } });
     });
 
     it("leaves a geometry field out when it holds no text", () => {
@@ -183,7 +216,7 @@ describe("toExecuteBody", () => {
         },
         { area: { geojson: JSON.stringify(geometry) } },
       );
-      expect(inputs).toEqual({ area: { value: geometry } });
+      expect(inputs).toEqual({ area: { value: geometry, mediaType: "application/geo+json" } });
     });
   });
 
@@ -362,5 +395,29 @@ describe("toExecuteBody", () => {
         {},
       );
     });
+  });
+});
+
+describe("bareObjectHint: the raw JSON editor's non-blocking hint", () => {
+  it("speaks up for a bare object", () => {
+    expect(bareObjectHint({ rawJson: '{"type": "Point", "coordinates": [5, 52]}' })).toMatch(
+      /expects an object input wrapped as \{ "value": … \}/,
+    );
+  });
+
+  it("stays quiet for a qualified value, a reference, a bounding box, and anything not an object", () => {
+    for (const rawJson of [
+      '{"value": {"k": 1}}',
+      '{"href": "https://example.org/a.json"}',
+      '{"bbox": [1, 2, 3, 4], "crs": "x"}',
+      "[1, 2]",
+      "42",
+      '"text"',
+      "null",
+      "{ not json",
+      "",
+    ]) {
+      expect(bareObjectHint({ rawJson }), rawJson).toBeUndefined();
+    }
   });
 });

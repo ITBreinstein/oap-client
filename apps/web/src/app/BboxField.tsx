@@ -11,7 +11,7 @@
  */
 
 import { useContext, useId, useState } from "react";
-import { classifyCrs, drawableCrs, isDrawableCrs } from "../forms/crs.js";
+import { classifyCrs, drawableCrs, isDrawableCrs, typedBboxCrs } from "../forms/crs.js";
 import { isRawJson, type BboxValue } from "../forms/encode.js";
 import type { BboxControl } from "../forms/plan.js";
 import { DrawContext } from "./draw.js";
@@ -69,9 +69,7 @@ export function BboxField(props: ControlProps<BboxControl>) {
   const base = useId();
   const box = isBboxValue(value) ? value : undefined;
   const mapCrs = control.dimensions.includes(4) ? drawableCrs(control.crs) : undefined;
-  const crs =
-    box?.crs ??
-    (isDrawableCrs(control.defaultCrs) ? control.defaultCrs : (mapCrs ?? control.defaultCrs));
+  const crs = box?.crs ?? typedBboxCrs(control);
   const kind = classifyCrs(crs);
   const geographic = kind === "crs84" || kind === "epsg4326" || kind === "crs84h";
   const count = kind === "crs84h" || !control.dimensions.includes(4) ? 6 : 4;
