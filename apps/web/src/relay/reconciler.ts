@@ -186,6 +186,26 @@ export class JobReconciler {
     }
   }
 
+  /** Stop reconciling a job and forget it: removed from the page, not from the server. */
+  untrack(statusUrl: string): void {
+    const entry = this.#entries.get(statusUrl);
+    if (entry === undefined) return;
+    entry.cancelTimer?.();
+    this.#entries.delete(statusUrl);
+    if (entry.job.ref !== undefined) this.#byRef.delete(entry.job.ref);
+  }
+
+  /**
+   * Read a job again soon, settled or not: the page has just asked the server
+   * to change it (dismissal). What the read finds decides, as always.
+   */
+  refresh(statusUrl: string): void {
+    const entry = this.#entries.get(statusUrl);
+    if (entry === undefined) return;
+    if (entry.job.settled) this.#update(entry, { settled: false });
+    this.#pollEarly(entry);
+  }
+
   jobs(): TrackedJob[] {
     return [...this.#entries.values()].map((entry) => entry.job);
   }

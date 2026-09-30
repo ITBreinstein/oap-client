@@ -522,7 +522,9 @@ test.describe("the workflow in a browser", () => {
     await page.getByRole("checkbox", { name: "Run in the background" }).check();
     await page.getByRole("button", { name: "Run", exact: true }).click();
     // The job's status is the reconciler's, read from the server.
-    await expect(page.locator("[data-job-status]")).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator("[data-job-ref] [data-job-status]")).toBeVisible({
+      timeout: 15_000,
+    });
     await expect(page.locator('[data-output-id="slept"]')).toBeVisible({ timeout: 30_000 });
 
     await page.getByRole("button", { name: "Change the inputs" }).click();

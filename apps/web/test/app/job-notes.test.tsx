@@ -83,7 +83,11 @@ function row(change: Partial<JobRow>): JobRow {
     acceptedLong: false,
     confirmation: undefined,
     endpointKey: "pygeoapi-cors",
+    endpoint: "http://localhost:5080",
     route: "relay",
+    processId: "breinstein-inputs",
+    startedAt: "2026-09-30T10:00:00.000Z",
+    restored: false,
     ...change,
   };
 }
