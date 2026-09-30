@@ -73,11 +73,18 @@ test.describe("the asynchronous milestone", () => {
     const jobUrl = (await running.getAttribute("data-job-ref")) ?? "";
     expect(jobUrl).toMatch(/^http:\/\/localhost:5080\/jobs\//);
 
-    // 2 and 3. pygeoapi called the relay, and the relay rang this page.
-    await expect(running).toHaveAttribute("data-doorbells", /^[1-9]\d*$/, { timeout: 15_000 });
-
     // 5. The result is on screen.
-    await expect(page.locator('[data-output-id="slept"]')).toBeVisible({ timeout: 30_000 });
+    const result = page.locator(`[data-result-of="${jobUrl}"]`);
+    await expect(result.locator('[data-output-id="slept"]')).toBeVisible({ timeout: 30_000 });
+
+    // 2 and 3. pygeoapi called the relay, and the relay rang this page. Read
+    // from the result, not the running view. pygeoapi's in-progress callback
+    // can ring before the page is tracking the job (tracking starts with a
+    // read, so nothing is lost), and its success callback arrives together
+    // with the read that finds the job done — so the running view is gone
+    // before a check on it could see the count.
+    await expect(result).toHaveAttribute("data-callbacks", "registered");
+    await expect(result).toHaveAttribute("data-doorbells", /^[1-9]\d*$/, { timeout: 5_000 });
     // The confirming read found nothing changed (the relay was up throughout).
     await page.waitForTimeout(3_000);
     await expect(page.locator("[data-status-changed]")).toHaveCount(0);

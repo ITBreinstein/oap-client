@@ -216,6 +216,12 @@ function StatusChanged({ job }: { readonly job: JobRow | undefined }) {
   );
 }
 
+/** Whether the relay registered callbacks for a job; `undefined` for no job. */
+function callbacksOf(job: JobRow | undefined): "registered" | "none" | undefined {
+  if (job === undefined) return undefined;
+  return job.ref === undefined ? "none" : "registered";
+}
+
 export interface ProcessScreenProps {
   readonly state: Open;
   readonly commands: WorkflowCommands;
@@ -355,9 +361,7 @@ export function ProcessScreen(props: ProcessScreenProps) {
           aria-live="polite"
           data-job-ref={state.run.mode === "async" ? state.run.jobRef : undefined}
           data-doorbells={job?.doorbells}
-          data-callbacks={
-            job === undefined ? undefined : job.ref === undefined ? "none" : "registered"
-          }
+          data-callbacks={callbacksOf(job)}
         >
           {state.run.mode === "sync" ? (
             <p>Running… waiting for the server's answer.</p>
@@ -386,7 +390,14 @@ export function ProcessScreen(props: ProcessScreenProps) {
       )}
 
       {state.stage === "result" && (
-        <>
+        // The job's markers again, for after it finished: the running view is
+        // gone the moment a read finds the job done, which can be within
+        // milliseconds of the doorbell that prompted the read.
+        <div
+          data-result-of={state.jobRef}
+          data-doorbells={resultJob?.doorbells}
+          data-callbacks={callbacksOf(resultJob)}
+        >
           <StatusChanged job={resultJob} />
           <ResultsView
             results={state.results}
@@ -398,7 +409,7 @@ export function ProcessScreen(props: ProcessScreenProps) {
               Change the inputs
             </button>
           </p>
-        </>
+        </div>
       )}
     </section>
   );

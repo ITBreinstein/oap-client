@@ -159,6 +159,18 @@ describe("a status the server changed after a first successful (finding 0047)", 
     expect(page.querySelector('[data-output-id="echo"]')).not.toBeNull();
   });
 
+  it("keeps the job's callback and doorbell markers on the result", () => {
+    const page = screen(
+      withResults,
+      row({ status: status("successful", JOB), settled: true, doorbells: 1 }),
+    );
+    const result = page.querySelector("[data-result-of]");
+    expect(result?.getAttribute("data-result-of")).toBe(JOB);
+    expect(result?.getAttribute("data-callbacks")).toBe("registered");
+    expect(result?.getAttribute("data-doorbells")).toBe("1");
+    expect(result?.querySelector('[data-output-id="echo"]')).not.toBeNull();
+  });
+
   it("says nothing when the second read agreed", () => {
     const page = screen(
       withResults,
