@@ -7,6 +7,7 @@ import { MapPane } from "./app/MapPane.js";
 import { ProcessListScreen } from "./app/ProcessListScreen.js";
 import { ProcessScreen } from "./app/ProcessScreen.js";
 import { DEV_PRESETS } from "./app/dev-presets.js";
+import { JobsPanel } from "./jobs/JobsPanel.js";
 import { RelayBanner, RelayOffer } from "./app/RelayRoute.js";
 import { useWorkflow } from "./app/useWorkflow.js";
 import { STATIC_ONLY, type RuntimeConfig } from "./config/runtime-config.js";
@@ -151,6 +152,18 @@ export function App({ config = STATIC_ONLY, configWarning }: AppProps) {
             {state.stage === "choose-endpoint" && state.offer !== undefined && (
               <RelayOffer onConfirm={commands.confirmRelay} onDecline={commands.declineRelay} />
             )}
+            <JobsPanel
+              jobs={view.snapshot?.jobs ?? []}
+              activeJob={
+                state.stage === "running" && state.run.mode === "async"
+                  ? state.run.jobRef
+                  : undefined
+              }
+              dismissAdvertisedFor={view.dismissAdvertisedFor}
+              messages={view.jobMessages}
+              onRemove={commands.removeJob}
+              onDismiss={commands.dismissJob}
+            />
             <DeveloperPanel
               observations={view.snapshot?.observations ?? []}
               dropped={view.snapshot?.droppedObservations ?? 0}
