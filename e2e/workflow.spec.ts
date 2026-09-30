@@ -215,8 +215,9 @@ test.describe("the workflow in a browser", () => {
     const echo = page.locator('[data-output-id="echo"] pre');
     await expect(echo).toBeVisible();
     const received = JSON.parse(await echo.innerText()) as { area: unknown };
-    // pygeoapi hands the process the wrapper as sent (finding 0052).
-    expect(received.area).toEqual({ value: drawn });
+    // pygeoapi hands the process the wrapper as sent (finding 0052), media
+    // type included: the input is described by a $ref to a GeoJSON schema.
+    expect(received.area).toEqual({ value: drawn, mediaType: "application/geo+json" });
     for (const [lon = 0, lat = 0] of drawn.coordinates[0] ?? []) {
       expect(lon).toBeGreaterThan(3);
       expect(lon).toBeLessThan(8);
@@ -377,7 +378,7 @@ test.describe("the workflow in a browser", () => {
     await page.getByRole("button", { name: "Run", exact: true }).click();
     const response = await exchange;
     const sent = response.request().postDataJSON() as { inputs: { polygon: unknown } };
-    expect(sent.inputs.polygon).toEqual({ value: drawn });
+    expect(sent.inputs.polygon).toEqual({ value: drawn, mediaType: "application/geo+json" });
 
     // A quarter turn counter-clockwise about the centre of the drawn bounding
     // box, as seen on a map: longitude scaled by cos(latitude) and back.

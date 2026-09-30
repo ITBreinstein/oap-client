@@ -64,3 +64,22 @@ export function drawableCrs(offered: readonly string[]): string | undefined {
     offered.find((uri) => classifyCrs(uri) === "epsg4326")
   );
 }
+
+/**
+ * The CRS a typed bounding box starts in: CRS84 when the process offers it —
+ * longitude first, the order the fields and the map both use, so nothing is
+ * swapped — and CRS84h for an input that takes six numbers only. Otherwise as
+ * before: the declared default when a map-drawn box can be sent in it, else
+ * the CRS a drawn box would use, else the declared default.
+ */
+export function typedBboxCrs(control: {
+  readonly crs: readonly string[];
+  readonly defaultCrs: string;
+  readonly dimensions: readonly number[];
+}): string {
+  const four = control.dimensions.includes(4);
+  const preferred = control.crs.find((uri) => classifyCrs(uri) === (four ? "crs84" : "crs84h"));
+  if (preferred !== undefined) return preferred;
+  const mapCrs = four ? drawableCrs(control.crs) : undefined;
+  return isDrawableCrs(control.defaultCrs) ? control.defaultCrs : (mapCrs ?? control.defaultCrs);
+}

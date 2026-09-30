@@ -12,7 +12,7 @@
  */
 
 import { useId, type ReactNode } from "react";
-import { isRawJson, type FormValues } from "../forms/encode.js";
+import { bareObjectHint, isRawJson, type FormValues } from "../forms/encode.js";
 import type {
   CheckboxControl,
   Control,
@@ -164,19 +164,30 @@ function JsonInput({ id, value, describedBy, onChange }: ControlProps<JsonContro
     : value === undefined
       ? ""
       : JSON.stringify(value, null, 2);
+  // Said, never enforced: what is typed here is sent as typed.
+  const bare = bareObjectHint({ rawJson: text });
   return (
-    <textarea
-      id={id}
-      className="code"
-      rows={5}
-      spellCheck={false}
-      value={text}
-      aria-describedby={describedBy}
-      placeholder="JSON"
-      onChange={(event) => {
-        onChange({ rawJson: event.target.value });
-      }}
-    />
+    <>
+      <textarea
+        id={id}
+        className="code"
+        rows={5}
+        spellCheck={false}
+        value={text}
+        aria-describedby={
+          bare === undefined ? describedBy : `${describedBy ?? ""} ${id}-bare`.trim()
+        }
+        placeholder="JSON"
+        onChange={(event) => {
+          onChange({ rawJson: event.target.value });
+        }}
+      />
+      {bare !== undefined && (
+        <p id={`${id}-bare`} className="hint" data-bare-object-hint="true">
+          {bare}
+        </p>
+      )}
+    </>
   );
 }
 
