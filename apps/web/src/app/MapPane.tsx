@@ -17,6 +17,7 @@
  * beside it gives (`results/plottable.ts`).
  */
 
+import { useState } from "react";
 import { drawableCrs, isDrawableCrs } from "../forms/crs.js";
 import type { BboxValue, ComplexValue, GeoJsonText } from "../forms/encode.js";
 import {
@@ -32,7 +33,9 @@ import type { Bbox } from "../map/bbox.js";
 import type { MapShape, Tool } from "../map/geometry-engine.js";
 import { MapView } from "../map/MapView.js";
 import type { ShownShapes } from "../map/shape-layers.js";
-import { mapImage, plottedShapes } from "../results/plottable.js";
+import { mapImage, plottedFeatures, plottedShapes } from "../results/plottable.js";
+import type { RenderableResult } from "../results/renderable.js";
+import { FeatureProperties } from "./FeatureProperties.js";
 import type { GeometryDrawProps } from "../map/useGeometryDraw.js";
 import type { DrawTarget } from "./draw.js";
 import { useDataUrl } from "./useDataUrl.js";
@@ -171,6 +174,17 @@ export function MapPane({
         };
 
   const shown = shownFor(state);
+  // A click picks a result shape by its index among the plotted ones — the
+  // order `shownFor` shows them in. Held with the results it was made on, so
+  // a new run, or leaving the result, drops it without anything noticing.
+  const [picked, setPicked] = useState<
+    { readonly results: readonly RenderableResult[]; readonly index: number } | undefined
+  >();
+  const results = state.stage === "result" ? state.results : undefined;
+  const selected =
+    results !== undefined && picked?.results === results
+      ? plottedFeatures(results)[picked.index]
+      : undefined;
   const placed = state.stage === "result" ? mapImage(state.results) : undefined;
   const imageUrl = useDataUrl(placed?.blob);
   const image =
@@ -188,6 +202,9 @@ export function MapPane({
         geometry={geometry}
         shown={shown}
         image={image}
+        onResultClick={(index) => {
+          if (results !== undefined) setPicked({ results, index });
+        }}
         draw={{
           active: field !== undefined && control !== undefined,
           value: toBbox(current),
@@ -234,6 +251,21 @@ export function MapPane({
           )}
           .
         </p>
+      )}
+      {selected === undefined ? (
+        plotted &&
+        image === undefined && (
+          <p className="map-overlay" data-testid="feature-hint">
+            Click a result shape to see its properties.
+          </p>
+        )
+      ) : (
+        <FeatureProperties
+          feature={selected}
+          onClose={() => {
+            setPicked(undefined);
+          }}
+        />
       )}
     </aside>
   );

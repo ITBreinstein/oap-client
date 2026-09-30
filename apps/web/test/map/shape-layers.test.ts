@@ -4,9 +4,15 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { createMapLibreShapeLayers, featureCollectionOf } from "../../src/map/shape-layers.js";
+import {
+  clickedIndex,
+  createMapLibreShapeLayers,
+  featureCollectionOf,
+} from "../../src/map/shape-layers.js";
 
-/** Enough of a MapLibre map for the layers: sources, layers and `styledata`. */
+type Listener = (event: { point: { x: number; y: number } }) => void;
+
+/** Enough of a MapLibre map for the layers: sources, layers, `styledata` and clicks. */
 function fakeMap({ loaded }: { loaded: boolean }) {
   const sources = new Map<
     string,
@@ -14,10 +20,38 @@ function fakeMap({ loaded }: { loaded: boolean }) {
   >();
   const layers: string[] = [];
   const waiting: (() => void)[] = [];
+  /** Listeners added with `on`, by event, with the layer when one was given. */
+  const handlers: { event: string; layer: string | undefined; listener: Listener }[] = [];
+  /** What `queryRenderedFeatures` answers, and what it was asked. */
+  const rendered: { properties?: unknown }[] = [];
+  const queried: unknown[] = [];
+  const canvas = { style: { cursor: "" } };
   const map = {
     loaded,
     sources,
     layers,
+    handlers,
+    rendered,
+    queried,
+    canvas,
+    on(event: string, layerOrListener: string | Listener, maybe?: Listener) {
+      if (typeof layerOrListener === "string") {
+        if (maybe !== undefined) handlers.push({ event, layer: layerOrListener, listener: maybe });
+      } else {
+        handlers.push({ event, layer: undefined, listener: layerOrListener });
+      }
+    },
+    getCanvas: () => canvas,
+    queryRenderedFeatures(box: unknown, options: unknown) {
+      queried.push({ box, options });
+      return rendered;
+    },
+    /** A click at a pixel, as MapLibre fires it. */
+    click(x: number, y: number) {
+      for (const handler of handlers.filter((entry) => entry.event === "click")) {
+        handler.listener({ point: { x, y } });
+      }
+    },
     addSource(id: string, spec: { data?: unknown }) {
       if (!map.loaded) throw new Error("Style is not done loading.");
       const source = {
@@ -46,9 +80,14 @@ function fakeMap({ loaded }: { loaded: boolean }) {
     once(_event: string, listener: () => void) {
       waiting.push(listener);
     },
-    off(_event: string, listener: () => void) {
-      const index = waiting.indexOf(listener);
+    off(event: string, layerOrListener: string | Listener, maybe?: Listener) {
+      const listener = typeof layerOrListener === "string" ? maybe : layerOrListener;
+      const index = waiting.findIndex((entry) => entry === listener);
       if (index >= 0) waiting.splice(index, 1);
+      const at = handlers.findIndex(
+        (entry) => entry.event === event && entry.listener === listener,
+      );
+      if (at >= 0) handlers.splice(at, 1);
     },
     styleLoads() {
       map.loaded = true;
@@ -85,6 +124,76 @@ describe("featureCollectionOf", () => {
       ["input", "Polygon"],
       ["result", "Point"],
     ]);
+  });
+});
+
+describe("featureCollectionOf: the index a click reports", () => {
+  it("numbers each set's shapes from zero, and carries nothing else of theirs", () => {
+    const collection = featureCollectionOf([
+      { role: "input", shapes: [polygon] },
+      { role: "result", shapes: [polygon, { type: "Point", coordinates: [5, 52] }] },
+    ]);
+    expect(collection.features.map((feature) => feature.properties)).toEqual([
+      { role: "input", index: 0 },
+      { role: "result", index: 0 },
+      { role: "result", index: 1 },
+    ]);
+  });
+});
+
+describe("clickedIndex", () => {
+  it("takes the first feature with a whole, non-negative index", () => {
+    expect(
+      clickedIndex([
+        { properties: undefined },
+        { properties: { index: "2" } },
+        { properties: { index: -1 } },
+        { properties: { index: 1.5 } },
+        { properties: { index: 3 } },
+        { properties: { index: 4 } },
+      ]),
+    ).toBe(3);
+    expect(clickedIndex([])).toBeUndefined();
+  });
+});
+
+describe("clicking a result", () => {
+  it("reports the clicked result's index, asking MapLibre about result layers only", () => {
+    const map = fakeMap({ loaded: true });
+    const layers = createMapLibreShapeLayers(map as never);
+    const seen: number[] = [];
+    layers.onResultClick((index) => seen.push(index));
+    map.rendered.push({ properties: { role: "result", index: 2 } });
+    map.click(100, 50);
+    expect(seen).toEqual([2]);
+    expect(map.queried).toEqual([
+      {
+        box: [
+          [96, 46],
+          [104, 54],
+        ],
+        options: {
+          layers: ["oap-shown-result-fill", "oap-shown-result-line", "oap-shown-result-point"],
+        },
+      },
+    ]);
+  });
+
+  it("reports nothing for a click beside every result", () => {
+    const map = fakeMap({ loaded: true });
+    const layers = createMapLibreShapeLayers(map as never);
+    const seen: number[] = [];
+    layers.onResultClick((index) => seen.push(index));
+    map.click(10, 10);
+    expect(seen).toEqual([]);
+  });
+
+  it("stops listening when stopped", () => {
+    const map = fakeMap({ loaded: true });
+    const layers = createMapLibreShapeLayers(map as never);
+    expect(map.handlers.length).toBeGreaterThan(0);
+    layers.stop();
+    expect(map.handlers).toEqual([]);
   });
 });
 

@@ -52,11 +52,12 @@ export function useShownShapes(
   sets: readonly ShownShapes[],
   image: ShownImage | undefined,
   createLayers: CreateShapeLayers = createMapLibreShapeLayers,
+  onResultClick?: (index: number) => void,
 ): { readonly resultShapes: number; readonly resultImage: boolean } {
   const layers = useRef<ShapeLayers | undefined>(undefined);
-  const latest = useRef({ sets, image });
+  const latest = useRef({ sets, image, onResultClick });
   useEffect(() => {
-    latest.current = { sets, image };
+    latest.current = { sets, image, onResultClick };
   });
   const [ready, setReady] = useState(false);
 
@@ -74,6 +75,10 @@ export function useShownShapes(
     created.showImage(latest.current.image);
     created.onReady(() => {
       setReady(true);
+    });
+    // Through the ref, so a new handler each render does not rebuild the layers.
+    created.onResultClick((index) => {
+      latest.current.onResultClick?.(index);
     });
     return () => {
       created.stop();

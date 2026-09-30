@@ -28,12 +28,17 @@
  */
 
 import { CRS84 } from "../forms/crs.js";
-import { shapesIn, type Shape } from "../forms/geojson.js";
+import { shapesWithOriginIn, type Shape, type ShapeOrigin } from "../forms/geojson.js";
 import { isJsonArray, isJsonObject } from "../forms/json.js";
 import type { RenderableResult } from "./renderable.js";
 
 export type PlotStatus =
-  | { readonly kind: "plotted"; readonly shapes: readonly Shape[] }
+  | {
+      readonly kind: "plotted";
+      readonly shapes: readonly Shape[];
+      /** Where each shape came from, by index into `shapes`. */
+      readonly origins: readonly ShapeOrigin[];
+    }
   /** GeoJSON, but its coordinates are outside longitude and latitude. */
   | { readonly kind: "projected" }
   /** Not GeoJSON, or GeoJSON with no geometry in it. */
@@ -77,21 +82,39 @@ export function swapAxes(shape: Shape): Shape {
 export function plotStatus(result: RenderableResult): PlotStatus {
   const value = jsonOf(result);
   if (value === undefined) return { kind: "not-geojson" };
-  const shapes = shapesIn(value);
-  if (shapes === undefined || shapes.length === 0) return { kind: "not-geojson" };
+  const found = shapesWithOriginIn(value);
+  if (found === undefined || found.length === 0) return { kind: "not-geojson" };
+  const shapes = found.map((entry) => entry.shape);
   const axes = result.kind === "reference" ? result.loaded?.axes : undefined;
   if (axes === "not-plotted") return { kind: "projected" };
   const placed = axes === "swapped" ? shapes.map(swapAxes) : shapes;
   if (!placed.every(inDegrees)) return { kind: "projected" };
-  return { kind: "plotted", shapes: placed };
+  return { kind: "plotted", shapes: placed, origins: found.map((entry) => entry.origin) };
+}
+
+/** One shape on the map, and what a click on it shows (package 5). */
+export interface PlottedFeature {
+  readonly outputId: string;
+  readonly shape: Shape;
+  readonly origin: ShapeOrigin;
+}
+
+/** Every shape of every result that can be plotted, in output order, with its feature. */
+export function plottedFeatures(results: readonly RenderableResult[]): readonly PlottedFeature[] {
+  return results.flatMap((result) => {
+    const status = plotStatus(result);
+    if (status.kind !== "plotted") return [];
+    return status.shapes.map((shape, index) => ({
+      outputId: result.outputId,
+      shape,
+      origin: status.origins[index] ?? { kind: "bare-geometry" },
+    }));
+  });
 }
 
 /** Every shape of every result that can be plotted, in output order. */
 export function plottedShapes(results: readonly RenderableResult[]): readonly Shape[] {
-  return results.flatMap((result) => {
-    const status = plotStatus(result);
-    return status.kind === "plotted" ? status.shapes : [];
-  });
+  return plottedFeatures(results).map((feature) => feature.shape);
 }
 
 /** Image types a browser shows by itself, so a map can too. */

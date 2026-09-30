@@ -106,6 +106,8 @@ export interface MapViewProps {
   readonly shown?: readonly ShownShapes[] | undefined;
   /** An image result, over the area it covers. */
   readonly image?: ShownImage | undefined;
+  /** A result shape was clicked: its index in the `result` set of {@link shown}. */
+  readonly onResultClick?: ((index: number) => void) | undefined;
   /** Whether the map started, so the form can offer "Draw on the map" or not. */
   readonly onAvailable?: ((available: boolean) => void) | undefined;
   readonly createMap?: CreateMap | undefined;
@@ -121,6 +123,7 @@ export function MapView({
   geometry = NO_GEOMETRY,
   shown = NOTHING_SHOWN,
   image,
+  onResultClick,
   onAvailable,
   createMap = createPdokMap,
   createEngine,
@@ -161,7 +164,13 @@ export function MapView({
 
   useBoundingBoxDraw(map, draw, createEngine);
   const shapes = useGeometryDraw(map, geometry, createGeometryEngine);
-  const { resultShapes, resultImage } = useShownShapes(map, shown, image, createShapeLayers);
+  const { resultShapes, resultImage } = useShownShapes(
+    map,
+    shown,
+    image,
+    createShapeLayers,
+    onResultClick,
+  );
   const drawingShapes = geometry.active && map !== undefined;
 
   return (

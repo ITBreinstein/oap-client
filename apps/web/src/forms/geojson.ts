@@ -143,24 +143,57 @@ const GEOMETRY_TYPES: ReadonlySet<unknown> = new Set([
 ]);
 
 /**
- * The shapes in a GeoJSON document, whatever it arrived as: a
- * FeatureCollection, a lone Feature, a bare geometry, or a GeometryCollection.
- * `undefined` means it was none of them.
+ * Where a shape came from: the `properties` of the feature it belongs to, as
+ * sent — any JSON, or `null` — or `bare-geometry` when the document was a
+ * geometry with no feature around it, which has no properties to have.
  */
-export function shapesIn(document: unknown): readonly Shape[] | undefined {
+export type ShapeOrigin =
+  { readonly kind: "feature"; readonly properties: unknown } | { readonly kind: "bare-geometry" };
+
+export interface ShapeWithOrigin {
+  readonly shape: Shape;
+  readonly origin: ShapeOrigin;
+}
+
+const BARE: ShapeOrigin = { kind: "bare-geometry" };
+
+function featureOrigin(feature: Readonly<Record<string, unknown>>): ShapeOrigin {
+  // A Feature without the member is as good as `"properties": null`.
+  return { kind: "feature", properties: feature["properties"] ?? null };
+}
+
+/**
+ * The shapes in a GeoJSON document, each with the feature it belongs to, in
+ * the order {@link shapesIn} gives them — which is this, without the origin.
+ */
+export function shapesWithOriginIn(document: unknown): readonly ShapeWithOrigin[] | undefined {
   if (!isJsonObject(document)) return undefined;
   const type = document["type"];
+  const tag = (shapes: readonly Shape[], origin: ShapeOrigin) =>
+    shapes.map((shape) => ({ shape, origin }));
 
   if (type === "FeatureCollection") {
     const features = document["features"];
     if (!isJsonArray(features)) return undefined;
     return features.flatMap((feature) =>
-      isJsonObject(feature) ? shapesOfGeometry(feature["geometry"]) : [],
+      isJsonObject(feature)
+        ? tag(shapesOfGeometry(feature["geometry"]), featureOrigin(feature))
+        : [],
     );
   }
-  if (type === "Feature") return shapesOfGeometry(document["geometry"]);
-  if (GEOMETRY_TYPES.has(type)) return shapesOfGeometry(document);
+  if (type === "Feature")
+    return tag(shapesOfGeometry(document["geometry"]), featureOrigin(document));
+  if (GEOMETRY_TYPES.has(type)) return tag(shapesOfGeometry(document), BARE);
   return undefined;
+}
+
+/**
+ * The shapes in a GeoJSON document, whatever it arrived as: a
+ * FeatureCollection, a lone Feature, a bare geometry, or a GeometryCollection.
+ * `undefined` means it was none of them.
+ */
+export function shapesIn(document: unknown): readonly Shape[] | undefined {
+  return shapesWithOriginIn(document)?.map((entry) => entry.shape);
 }
 
 /**

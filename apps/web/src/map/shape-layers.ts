@@ -16,6 +16,7 @@ import type {
   ExpressionSpecification,
   GeoJSONSource,
   LayerSpecification,
+  MapMouseEvent,
   Map as MapLibreMap,
 } from "maplibre-gl";
 import { INPUT_STYLE, RESULT_STYLE } from "./basemap.js";
@@ -42,6 +43,11 @@ export interface ShapeLayers {
   showImage(image: ShownImage | undefined): void;
   /** Called once the layers are on the map, which waits for its style to load. */
   onReady(listener: () => void): void;
+  /**
+   * Called with a result shape's index in its set when the user clicks it.
+   * Only results: an input is what the user sent, and is not asked about.
+   */
+  onResultClick(listener: (index: number) => void): void;
   /** Remove the layers and the source. */
   stop(): void;
 }
@@ -70,9 +76,12 @@ export function featureCollectionOf(sets: readonly ShownShapes[]): GeoJSON.Featu
   return {
     type: "FeatureCollection",
     features: sets.flatMap((set) =>
-      set.shapes.map((shape): GeoJSON.Feature => ({
+      set.shapes.map((shape, index): GeoJSON.Feature => ({
         type: "Feature",
-        properties: { role: set.role },
+        // The role and a position, never the feature's own properties: the
+        // map knows geometry, and what a click shows is looked up above
+        // here by this index.
+        properties: { role: set.role, index },
         geometry: geometryOf(shape),
       })),
     ),
@@ -124,6 +133,23 @@ function layersFor(role: ShownRole): LayerSpecification[] {
 
 /** The input first, so a result that overlaps it is drawn on top. */
 const LAYERS = [...layersFor("input"), ...layersFor("result")];
+const RESULT_LAYERS = layersFor("result").map((layer) => layer.id);
+
+/** How far from a click, in pixels, a thin line or a small point still counts as hit. */
+const CLICK_TOLERANCE = 4;
+
+/** The index a clicked result feature carries, or undefined for anything else. */
+export function clickedIndex(features: readonly { properties?: unknown }[]): number | undefined {
+  for (const feature of features) {
+    const properties = feature.properties;
+    if (typeof properties !== "object" || properties === null || !("index" in properties)) {
+      continue;
+    }
+    const index = properties.index;
+    if (typeof index === "number" && Number.isInteger(index) && index >= 0) return index;
+  }
+  return undefined;
+}
 
 export const createMapLibreShapeLayers: CreateShapeLayers = (map) => {
   let data = featureCollectionOf([]);
@@ -131,6 +157,27 @@ export const createMapLibreShapeLayers: CreateShapeLayers = (map) => {
   let added = false;
   let stopped = false;
   let ready: (() => void) | undefined;
+  let clicked: ((index: number) => void) | undefined;
+
+  const onClick = (event: MapMouseEvent) => {
+    if (!added || clicked === undefined) return;
+    const { x, y } = event.point;
+    const hits = map.queryRenderedFeatures(
+      [
+        [x - CLICK_TOLERANCE, y - CLICK_TOLERANCE],
+        [x + CLICK_TOLERANCE, y + CLICK_TOLERANCE],
+      ],
+      { layers: RESULT_LAYERS },
+    );
+    const index = clickedIndex(hits);
+    if (index !== undefined) clicked(index);
+  };
+  const pointer = () => {
+    map.getCanvas().style.cursor = "pointer";
+  };
+  const plain = () => {
+    map.getCanvas().style.cursor = "";
+  };
 
   const add = () => {
     if (added || stopped) return;
@@ -150,6 +197,11 @@ export const createMapLibreShapeLayers: CreateShapeLayers = (map) => {
     }
     added = true;
     placeImage();
+    map.on("click", onClick);
+    for (const layer of RESULT_LAYERS) {
+      map.on("mouseenter", layer, pointer);
+      map.on("mouseleave", layer, plain);
+    }
     ready?.();
   };
 
@@ -204,9 +256,18 @@ export const createMapLibreShapeLayers: CreateShapeLayers = (map) => {
       ready = listener;
       if (added) listener();
     },
+    onResultClick: (listener) => {
+      clicked = listener;
+    },
     stop: () => {
       stopped = true;
+      clicked = undefined;
       map.off("styledata", add);
+      map.off("click", onClick);
+      for (const layer of RESULT_LAYERS) {
+        map.off("mouseenter", layer, pointer);
+        map.off("mouseleave", layer, plain);
+      }
       try {
         removeAll();
       } catch {
