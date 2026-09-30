@@ -306,16 +306,27 @@ export interface FieldViewProps {
   readonly index: number;
   readonly values: FormValues;
   readonly error: string | undefined;
+  /**
+   * Where the value is not what the input's schema asks for (package 6).
+   * Shown, never enforced; not shown beside an error, which says more.
+   */
+  readonly warnings?: readonly string[] | undefined;
   readonly onChange: (id: string, value: unknown) => void;
 }
 
-export function FieldView({ field, index, values, error, onChange }: FieldViewProps) {
+export function FieldView({ field, index, values, error, warnings, onChange }: FieldViewProps) {
   const base = useId();
   const id = `${base}-field-${String(index)}`;
   const help = field.description;
   const extra = hint(field);
+  const warned = error === undefined && warnings !== undefined && warnings.length > 0;
   const describedBy =
-    [help && `${id}-help`, extra && `${id}-hint`, error && `${id}-error`]
+    [
+      help && `${id}-help`,
+      extra && `${id}-hint`,
+      error && `${id}-error`,
+      warned && `${id}-warnings`,
+    ]
       .filter((part): part is string => typeof part === "string" && part !== "")
       .join(" ") || undefined;
   const value = Object.hasOwn(values, field.id) ? values[field.id] : undefined;
@@ -384,6 +395,16 @@ export function FieldView({ field, index, values, error, onChange }: FieldViewPr
         <p id={`${id}-error`} className="field-error">
           {error}
         </p>
+      )}
+      {warned && (
+        <div id={`${id}-warnings`} className="hint field-warnings" data-schema-warnings="true">
+          <p>Not what the process description asks for. It will still be sent as it is:</p>
+          <ul>
+            {warnings.map((warning) => (
+              <li key={warning}>{warning}</li>
+            ))}
+          </ul>
+        </div>
       )}
     </div>
   );

@@ -3,7 +3,8 @@
  * (S2–S4).
  */
 
-import { useId, type SyntheticEvent } from "react";
+import { useId, useMemo, type SyntheticEvent } from "react";
+import { schemaWarnings } from "../forms/schema-warnings.js";
 import type { FieldErrors } from "../forms/validate.js";
 import type { JobRow } from "../relay/job-session.js";
 import { ErrorMessage } from "./ErrorMessage.js";
@@ -203,6 +204,11 @@ export function ProcessScreen(props: ProcessScreenProps) {
   const onlyAsync = process.execution.async && !process.execution.sync;
   const editable = state.stage === "process";
   const errorCount = fieldErrors.size;
+  // Recomputed only when the values change, not on every job snapshot.
+  const schemaNotes = useMemo(
+    () => (editable ? schemaWarnings(process, plan, values).byField : undefined),
+    [editable, process, plan, values],
+  );
 
   const onSubmit = (event: SyntheticEvent) => {
     event.preventDefault();
@@ -263,6 +269,7 @@ export function ProcessScreen(props: ProcessScreenProps) {
               index={index}
               values={values}
               error={fieldErrors.get(field.id)}
+              warnings={schemaNotes?.get(field.id)}
               onChange={commands.setValue}
             />
           ))}
