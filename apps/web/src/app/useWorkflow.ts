@@ -22,6 +22,7 @@ import { drawableCrs } from "../forms/crs.js";
 import { initialValues } from "../forms/defaults.js";
 import type { BboxControl, Control, FormPlan } from "../forms/plan.js";
 import { resolveFormPlan } from "../forms/resolve.js";
+import { schemaWarnings } from "../forms/schema-warnings.js";
 import { validateForm, type FieldErrors } from "../forms/validate.js";
 import {
   formObservationsFor,
@@ -473,6 +474,19 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
 
     const { process, plan, mode, linkOutputs } = state;
     const request = runRequest(process, plan, state.values, linkOutputs);
+    // Package 6: the schema warnings were on screen and do not stop the run;
+    // an input whose value could not be checked is recorded, once.
+    record(
+      schemaWarnings(process, plan, state.values).notChecked.map(({ inputId, keyword }) => ({
+        kind: "form",
+        endpoint: redactUrl(connection.endpoint.baseUrl),
+        processId: process.id,
+        inputId,
+        code: "schema-not-checked",
+        keyword,
+        crs: undefined,
+      })),
+    );
     lastRun.current = {
       runId: newRunId(),
       endpoint: connection.endpoint.baseUrl,

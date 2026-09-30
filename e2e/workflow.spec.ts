@@ -633,6 +633,55 @@ test.describe("the workflow in a browser", () => {
     );
   });
 
+  test("warns about a value its schema does not allow, runs anyway, and records what it could not check", async ({
+    page,
+  }) => {
+    // pygeoapi validates nothing (finding 0054), so the page warns. Injected:
+    // a pattern on the optional `comment`, which the blocking checks ignore.
+    await page.route(
+      (url) => url.pathname === "/processes/breinstein-inputs",
+      async (route) => {
+        const response = await route.fetch();
+        const description = (await response.json()) as {
+          inputs: Record<string, { schema: Record<string, unknown> }>;
+        };
+        const comment = description.inputs["comment"];
+        if (comment !== undefined) comment.schema = { type: "string", pattern: "^[A-Z ]+$" };
+        await route.fulfill({ response, json: description });
+      },
+    );
+    await connectTyped(page, PYGEOAPI);
+    await openProcess(page, "Every input kind");
+    await fillRequiredInputs(page);
+
+    const comment = page.locator('[data-input-id="comment"]');
+    await comment.getByRole("textbox").fill("lower case");
+    await expect(comment.locator("[data-schema-warnings]")).toContainText(
+      "The value should match the pattern ^[A-Z ]+$.",
+    );
+    // The area's schema is a $ref this client does not fetch: not checked.
+    await page
+      .locator('[data-input-id="area"]')
+      .getByRole("textbox", { name: "GeoJSON" })
+      .fill('{"type": "Point", "coordinates": [5.1, 52.1]}');
+
+    await page.getByRole("button", { name: "Run", exact: true }).click();
+    const echo = page.locator('[data-output-id="echo"] pre');
+    await expect(echo).toBeVisible();
+    expect((JSON.parse(await echo.innerText()) as { comment: unknown }).comment).toBe("lower case");
+
+    const observations = await exportedObservations(page);
+    expect(observations).toContainEqual(
+      expect.objectContaining({
+        kind: "form",
+        processId: "breinstein-inputs",
+        inputId: "area",
+        code: "schema-not-checked",
+        keyword: "$ref",
+      }),
+    );
+  });
+
   test("says a typed server allows no web page, and records the attempt", async ({ page }) => {
     test.skip(!(await answering(`${NOCORS}/?f=json`)), "pygeoapi :5081 is not answering");
     await connectTyped(page, NOCORS);
