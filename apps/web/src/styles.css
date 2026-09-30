@@ -156,6 +156,45 @@ body {
   align-items: flex-start;
 }
 
+/*
+ * Over the map's top-left corner, where the drawing tools go while drawing:
+ * the two never show at once, since a result closes the form. The zoom
+ * buttons keep the top right, the attribution the bottom right, and the
+ * legend the bottom left.
+ */
+.map-overlay {
+  position: absolute;
+  z-index: 1;
+  top: 0.75rem;
+  left: 0.75rem;
+  max-width: min(24rem, calc(100% - 5rem));
+  max-height: calc(100% - 6.5rem);
+  overflow: auto;
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+
+.feature-properties h3 {
+  margin-top: 0;
+}
+
+.feature-properties-list dt {
+  font-weight: 600;
+}
+
+.feature-properties-list dd {
+  margin: 0 0 0.4rem;
+  overflow-wrap: anywhere;
+}
+
+.feature-properties-list pre {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
 .map-tools .map-hint {
   position: static;
   flex-basis: 100%;

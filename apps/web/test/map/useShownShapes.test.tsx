@@ -5,7 +5,7 @@
 
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { MapShape } from "../../src/map/geometry-engine.js";
 import type {
   CreateShapeLayers,
@@ -21,10 +21,13 @@ interface FakeLayers extends ShapeLayers {
   readonly create: CreateShapeLayers;
   stopped: boolean;
   becomeReady(): void;
+  /** What a click on result shape `index` would do. */
+  click(index: number): void;
 }
 
 function fakeLayers(): FakeLayers {
   let ready: (() => void) | undefined;
+  let clicked: ((index: number) => void) | undefined;
   const layers: FakeLayers = {
     shown: [],
     images: [],
@@ -35,10 +38,14 @@ function fakeLayers(): FakeLayers {
     onReady: (listener) => {
       ready = listener;
     },
+    onResultClick: (listener) => {
+      clicked = listener;
+    },
     stop: () => {
       layers.stopped = true;
     },
     becomeReady: () => ready?.(),
+    click: (index) => clicked?.(index),
   };
   return layers;
 }
@@ -74,12 +81,14 @@ function Harness(props: {
   sets: readonly ShownShapes[];
   image?: ShownImage;
   layers: FakeLayers;
+  onResultClick?: (index: number) => void;
 }) {
   const { resultShapes, resultImage } = useShownShapes(
     props.map as never,
     props.sets,
     props.image,
     props.layers.create,
+    props.onResultClick,
   );
   return <span data-count={resultShapes} data-image={String(resultImage)} />;
 }
@@ -131,6 +140,19 @@ describe("useShownShapes", () => {
       layers.becomeReady();
     });
     expect(count()).toBe(2);
+  });
+
+  it("hands a result click to the latest handler, without making the layers again", () => {
+    const layers = fakeLayers();
+    const { map } = fakeMap();
+    const first = vi.fn();
+    const second = vi.fn();
+    render(<Harness map={map} sets={[]} layers={layers} onResultClick={first} />);
+    render(<Harness map={map} sets={[]} layers={layers} onResultClick={second} />);
+    layers.click(3);
+    expect(first).not.toHaveBeenCalled();
+    expect(second).toHaveBeenCalledWith(3);
+    expect(layers.stopped).toBe(false);
   });
 
   it("does nothing without a map, and takes the layers off when unmounted", () => {

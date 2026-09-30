@@ -286,6 +286,42 @@ test.describe("the workflow in a browser", () => {
     expect(received.comment).toEqual({ value: drawn });
   });
 
+  test("shows a clicked result feature's properties as text", async ({ page }) => {
+    await connectTyped(page, PYGEOAPI);
+    await openProcess(page, "Bounding box to feature");
+    const box = [5.1, 52.05, 5.2, 52.12];
+    for (const [name, value] of [
+      ["West (minimum longitude)", box[0]],
+      ["South (minimum latitude)", box[1]],
+      ["East (maximum longitude)", box[2]],
+      ["North (maximum latitude)", box[3]],
+    ] as const) {
+      await page.getByRole("textbox", { name }).fill(String(value));
+    }
+    await page.getByRole("button", { name: "Run", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Result" })).toBeVisible();
+    await expect(page.getByTestId("feature-hint")).toBeVisible();
+
+    // The map moves to the result, so its middle is inside the polygon.
+    const canvas = page.locator(".map-canvas canvas").first();
+    const area = await canvas.boundingBox();
+    if (area === null) throw new Error("the map has no size");
+    await page.waitForTimeout(500);
+    await page.mouse.click(area.x + area.width / 2, area.y + area.height / 2);
+
+    const panel = page.getByTestId("feature-properties");
+    await expect(panel).toBeVisible();
+    await expect(panel).toContainText("From the result “feature”.");
+    const terms = await panel.locator("dt").allTextContents();
+    expect(terms).toEqual(["bbox", "crs"]);
+    const values = await panel.locator("dd").allTextContents();
+    expect(JSON.parse(values[0] ?? "null")).toEqual(box);
+    expect(values[1]).toMatch(/CRS84$/);
+
+    await panel.getByRole("button", { name: "Close" }).click();
+    await expect(panel).toHaveCount(0);
+  });
+
   test("loads a GeoJSON file into a geometry input, and refuses one in RD New", async ({
     page,
   }) => {

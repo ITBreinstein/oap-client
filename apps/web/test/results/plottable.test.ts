@@ -4,7 +4,13 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { crs84Box, mapImage, plotStatus, plottedShapes } from "../../src/results/plottable.js";
+import {
+  crs84Box,
+  mapImage,
+  plotStatus,
+  plottedFeatures,
+  plottedShapes,
+} from "../../src/results/plottable.js";
 import type { RenderableResult } from "../../src/results/renderable.js";
 
 const square = [
@@ -28,6 +34,7 @@ describe("plotStatus", () => {
     expect(plotStatus(json("rotated", { type: "Polygon", coordinates: square }))).toEqual({
       kind: "plotted",
       shapes: [{ type: "Polygon", coordinates: square }],
+      origins: [{ kind: "bare-geometry" }],
     });
   });
 
@@ -147,5 +154,49 @@ describe("mapImage", () => {
       reason: "not-text",
     };
     expect(mapImage([tiff, box])).toBeUndefined();
+  });
+});
+
+describe("plottedFeatures: what a click on the map shows (package 5)", () => {
+  it("pairs every plotted shape with its feature's properties, in the order shown", () => {
+    const collection = {
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          properties: { name: "a", nested: { depth: 1 } },
+          geometry: {
+            type: "MultiPoint",
+            coordinates: [
+              [5, 52],
+              [5.1, 52.1],
+            ],
+          },
+        },
+        { type: "Feature", properties: null, geometry: { type: "Point", coordinates: [5, 52] } },
+        { type: "Feature", geometry: { type: "Point", coordinates: [5.2, 52] } },
+      ],
+    };
+    const features = plottedFeatures([
+      json("bare", { type: "Polygon", coordinates: square }),
+      json("collection", collection),
+    ]);
+    expect(
+      features.map((feature) => [feature.outputId, feature.shape.type, feature.origin]),
+    ).toEqual([
+      ["bare", "Polygon", { kind: "bare-geometry" }],
+      // A MultiPoint is split into its points, and each keeps the feature's properties.
+      ["collection", "Point", { kind: "feature", properties: { name: "a", nested: { depth: 1 } } }],
+      ["collection", "Point", { kind: "feature", properties: { name: "a", nested: { depth: 1 } } }],
+      ["collection", "Point", { kind: "feature", properties: null }],
+      // No `properties` member at all reads as null.
+      ["collection", "Point", { kind: "feature", properties: null }],
+    ]);
+    expect(features.map((feature) => feature.shape)).toEqual(
+      plottedShapes([
+        json("bare", { type: "Polygon", coordinates: square }),
+        json("collection", collection),
+      ]),
+    );
   });
 });
