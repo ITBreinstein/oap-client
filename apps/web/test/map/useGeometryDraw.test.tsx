@@ -14,6 +14,13 @@ import type {
 } from "../../src/map/geometry-engine.js";
 import { useGeometryDraw, type GeometryDrawProps } from "../../src/map/useGeometryDraw.js";
 
+/**
+ * A stand-in for the engine, not for Terra Draw: it copies the
+ * `GeometryEngine` contract. `show()` records and never reports, which the
+ * real engine guarantees by running it as one of its own changes (pinned
+ * against the real Terra Draw in `geometry-engine.test.ts`); `emit` stands for
+ * the user finishing a draw, an edit or a delete.
+ */
 interface FakeEngine extends GeometryEngine {
   readonly calls: string[];
   readonly options: GeometryEngineOptions[];

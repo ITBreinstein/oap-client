@@ -34,7 +34,7 @@ export interface GeometryDrawControls extends GeometryDrawState {
   deleteSelected(): void;
 }
 
-const IDLE: GeometryDrawState = { placing: undefined, hasSelection: false };
+const IDLE: GeometryDrawState = { placing: undefined, hasSelection: false, notShown: 0 };
 
 function keyOf(shapes: readonly MapShape[]): string {
   return JSON.stringify(shapes);

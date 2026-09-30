@@ -292,7 +292,13 @@ rectangle, or click two corners, then move or resize it. A GeoJSON field's puts
 a toolbar on the map with the tools its input allows — point, line, area, box —
 and **Delete selected**; a finished shape is selected so it can be adjusted, and
 Terra Draw's own corner and midpoint handles are kept out of the value (Sam's
-fix). The drawn input is amber, so a result, which is blue, cannot be mistaken
+fix). Only the user's own drawing, moving, resizing and deleting reach the
+field: both draw engines run every change of their own — showing a typed or
+loaded value, replacing a shape, selecting one — through one guard
+(`terra-draw-common.ts`), because Terra Draw reports those exactly as it reports
+the user's. A shape the map cannot show (an area with a hole, a position with a
+height) stays in the value and is sent; the toolbar says how many there are.
+The drawn input is amber, so a result, which is blue, cannot be mistaken
 for it. The draw mode is removed when the field stops drawing, when
 another process is chosen, when a run starts, and on unmount.
 
@@ -353,7 +359,7 @@ tests drive it.
 ## Tests
 
 ```bash
-pnpm test          # Vitest: the form layer, the reducer, results, the map binding (stubbed)
+pnpm test          # Vitest: the form layer, the reducer, results, the map binding (real Terra Draw, stubbed MapLibre)
 pnpm test:e2e      # Playwright, Chromium, against pygeoapi :5080 and the relay
 ```
 

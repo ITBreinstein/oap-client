@@ -1,196 +1,133 @@
 /**
- * The Terra Draw engine against a stubbed Terra Draw: what it asks Terra Draw
- * to do, and what it reports back when a rectangle is finished.
+ * The bounding-box draw engine against the real Terra Draw (see
+ * `real-terra-draw.ts` for why, and for the one stand-in left, the map): what
+ * it reports when the user draws, moves or resizes a box, and what it keeps to
+ * itself.
  */
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import type { Bbox } from "../../src/map/bbox.js";
+import { drawnShapes, fakeMap, lastDraw, resetTerraDraw, user } from "./real-terra-draw.js";
 
-type Listener = (...args: unknown[]) => void;
-
-interface FakeDraw {
-  started: boolean;
-  mode: string;
-  features: { id: string; geometry: { type: string; coordinates: number[][][] } }[];
-  listeners: Map<string, Listener>;
-  calls: string[];
-}
-
-const instances: FakeDraw[] = [];
-
-vi.mock("terra-draw", () => {
-  class TerraDraw {
-    readonly state: FakeDraw;
-    constructor() {
-      this.state = {
-        started: false,
-        mode: "static",
-        features: [],
-        listeners: new Map(),
-        calls: [],
-      };
-      instances.push(this.state);
-    }
-    start() {
-      this.state.started = true;
-      this.state.calls.push("start");
-    }
-    stop() {
-      this.state.started = false;
-      this.state.calls.push("stop");
-    }
-    get enabled() {
-      return this.state.started;
-    }
-    setMode(mode: string) {
-      this.state.mode = mode;
-      this.state.calls.push(`mode:${mode}`);
-    }
-    getMode() {
-      return this.state.mode;
-    }
-    clear() {
-      this.state.features = [];
-      this.state.calls.push("clear");
-    }
-    addFeatures(features: FakeDraw["features"]) {
-      this.state.features.push(
-        ...features.map((feature, index) => ({ ...feature, id: `added-${String(index)}` })),
-      );
-      this.state.calls.push("add");
-      return [];
-    }
-    removeFeatures(ids: string[]) {
-      this.state.features = this.state.features.filter((feature) => !ids.includes(feature.id));
-    }
-    getSnapshot() {
-      return this.state.features;
-    }
-    on(event: string, listener: Listener) {
-      this.state.listeners.set(event, listener);
-    }
-  }
-  // Modes and the adapter are only constructed and handed over; a function
-  // called with `new` stands in for each.
-  function TerraDrawRectangleMode() {
-    return {};
-  }
-  function TerraDrawSelectMode() {
-    return {};
-  }
-  return { TerraDraw, TerraDrawRectangleMode, TerraDrawSelectMode };
-});
-
-vi.mock("terra-draw-maplibre-gl-adapter", () => ({
-  TerraDrawMapLibreGLAdapter: function TerraDrawMapLibreGLAdapter() {
-    return {};
-  },
-}));
+vi.mock("terra-draw", async (original) =>
+  (await import("./real-terra-draw.js")).spyOnTerraDraw(await original()),
+);
+vi.mock("terra-draw-maplibre-gl-adapter", async (original) =>
+  (await import("./real-terra-draw.js")).spyOnAdapter(await original()),
+);
 
 const { createTerraDrawEngine } = await import("../../src/map/draw-engine.js");
 
 function engine() {
-  const created = createTerraDrawEngine({} as never);
-  const draw = instances.at(-1);
-  if (draw === undefined) throw new Error("no Terra Draw instance");
-  return { created, draw };
+  const fake = fakeMap();
+  const created = createTerraDrawEngine(fake.map);
+  const reported: Bbox[] = [];
+  created.onChange((bbox) => reported.push(bbox));
+  return { created, draw: lastDraw(), reported, fake };
 }
 
-function finish(draw: FakeDraw, id: string, ring: number[][]) {
-  draw.features.push({ id, geometry: { type: "Polygon", coordinates: [ring] } });
-  draw.listeners.get("finish")?.(id, {});
+/** Draw a box by clicking two opposite corners, as the rectangle mode allows. */
+function drawBox(from: readonly [number, number], to: readonly [number, number]) {
+  user.click(...from);
+  user.click(...to);
 }
 
-beforeEach(() => {
-  instances.length = 0;
+function selected(draw: ReturnType<typeof lastDraw>): boolean {
+  return drawnShapes(draw).some((shape) => shape.properties["selected"] === true);
+}
+
+afterEach(() => {
+  resetTerraDraw();
 });
 
-describe("the Terra Draw engine", () => {
-  it("starts Terra Draw, and draws a rectangle when asked", () => {
+describe("the bounding-box engine, on the real Terra Draw", () => {
+  it("starts in no mode of its own, and draws a rectangle when asked", () => {
     const { created, draw } = engine();
     created.drawRectangle();
-    expect(draw.calls).toEqual(["start", "mode:rectangle"]);
+    expect(draw.getMode()).toBe("rectangle");
   });
 
-  it("reports a finished rectangle as [minX, minY, maxX, maxY], longitude first", () => {
-    const { created, draw } = engine();
-    const seen: unknown[] = [];
-    created.onChange((bbox) => seen.push(bbox));
-    // Drawn from the north-east corner to the south-west: the order must not matter.
-    finish(draw, "a", [
-      [7, 53.6],
-      [3, 53.6],
-      [3, 50.7],
-      [7, 50.7],
-      [7, 53.6],
-    ]);
-    expect(seen).toEqual([[3, 50.7, 7, 53.6]]);
-    expect(draw.mode).toBe("select");
+  it("reports a drawn box as [minX, minY, maxX, maxY], longitude first, then edits it", () => {
+    const { created, draw, reported } = engine();
+    created.drawRectangle();
+    // From the north-east corner to the south-west: the order must not matter.
+    drawBox([7, 53.6], [3, 50.7]);
+    expect(reported).toEqual([[3, 50.7, 7, 53.6]]);
+    expect(draw.getMode()).toBe("select");
   });
 
-  it("keeps one box: a second rectangle replaces the first", () => {
+  it("keeps one box: a second one replaces the first", () => {
     const { created, draw } = engine();
-    created.onChange(() => undefined);
-    finish(draw, "a", [
-      [1, 1],
-      [2, 1],
-      [2, 2],
-      [1, 2],
-      [1, 1],
-    ]);
-    finish(draw, "b", [
-      [3, 3],
-      [4, 3],
-      [4, 4],
-      [3, 4],
-      [3, 3],
-    ]);
-    expect(draw.features.map((feature) => feature.id)).toEqual(["b"]);
+    created.drawRectangle();
+    drawBox([1, 1], [2, 2]);
+    created.drawRectangle();
+    drawBox([3, 3], [4, 4]);
+    expect(drawnShapes(draw)).toHaveLength(1);
   });
 
-  it("reports an edit made in select mode", () => {
-    const { created, draw } = engine();
-    const seen: unknown[] = [];
-    created.onChange((bbox) => seen.push(bbox));
-    finish(draw, "a", [
-      [1, 1],
-      [2, 1],
-      [2, 2],
-      [1, 2],
-      [1, 1],
-    ]);
-    const feature = draw.features[0];
-    if (feature === undefined) throw new Error("no feature");
-    feature.geometry.coordinates = [
-      [
-        [1, 1],
-        [5, 1],
-        [5, 2],
-        [1, 2],
-        [1, 1],
-      ],
-    ];
-    draw.listeners.get("change")?.(["a"], "update");
-    expect(seen.at(-1)).toEqual([1, 1, 5, 2]);
+  it("reports the box the user moves", () => {
+    const { created, draw, reported } = engine();
+    created.drawRectangle();
+    drawBox([5, 52], [5.2, 52.2]);
+    const [box] = drawnShapes(draw);
+    draw.selectFeature(box?.id ?? "");
+    user.drag([5.1, 52.1], [5.3, 52.3]);
+    // Terra Draw moves a shape in Web Mercator, so latitudes land a little off.
+    const [west, south, east, north] = reported.at(-1) ?? [];
+    expect(west).toBeCloseTo(5.2, 6);
+    expect(east).toBeCloseTo(5.4, 6);
+    expect(south).toBeCloseTo(52.2, 2);
+    expect(north).toBeCloseTo(52.4, 2);
   });
 
-  it("shows a box set from outside, and clears it", () => {
+  it("keeps the box selected after a move, ready for the next one (W31)", () => {
     const { created, draw } = engine();
+    created.drawRectangle();
+    drawBox([5, 52], [5.2, 52.2]);
+    const [box] = drawnShapes(draw);
+    draw.selectFeature(box?.id ?? "");
+    user.drag([5.1, 52.1], [5.3, 52.3]);
+    expect(draw.getMode()).toBe("select");
+    expect(selected(draw)).toBe(true);
+  });
+
+  it("shows a box set from outside, and clears it, without reporting either", () => {
+    const { created, draw, reported } = engine();
     created.show([3, 50.7, 7, 53.6]);
-    expect(draw.features[0]?.geometry.coordinates[0]).toEqual([
-      [3, 50.7],
-      [7, 50.7],
-      [7, 53.6],
-      [3, 53.6],
-      [3, 50.7],
+    expect(drawnShapes(draw)[0]?.geometry.coordinates).toEqual([
+      [
+        [3, 50.7],
+        [7, 50.7],
+        [7, 53.6],
+        [3, 53.6],
+        [3, 50.7],
+      ],
     ]);
     created.show(undefined);
-    expect(draw.features).toEqual([]);
+    expect(drawnShapes(draw)).toEqual([]);
+    expect(reported).toEqual([]);
   });
 
-  it("stops Terra Draw, which removes its layers and listeners", () => {
-    const { created, draw } = engine();
+  it("stops Terra Draw, which removes its layers", () => {
+    const { created, draw, fake } = engine();
     created.stop();
-    expect(draw.calls.at(-1)).toBe("stop");
-    expect(draw.started).toBe(false);
+    expect(draw.enabled).toBe(false);
+    expect(fake.sources.size).toBe(0);
+  });
+});
+
+describe("a box shown while the drawn one is selected (W15)", () => {
+  it("is not reported back as the old box", () => {
+    const { created, draw, reported } = engine();
+    created.drawRectangle();
+    drawBox([5, 52], [5.2, 52.2]);
+    const [box] = drawnShapes(draw);
+    draw.selectFeature(box?.id ?? "");
+    reported.length = 0;
+
+    // Typed coordinates, then Clear: both shown by the hook, neither the user's drawing.
+    created.show([4, 51, 4.5, 51.5]);
+    created.show(undefined);
+    expect(reported).toEqual([]);
   });
 });

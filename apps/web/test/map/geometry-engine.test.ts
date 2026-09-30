@@ -1,109 +1,20 @@
 /**
- * The GeoJSON draw engine against a stubbed Terra Draw: what leaves it, and
- * what it asks Terra Draw to do. The first block is Sam's, from
- * `apps/web/test/map/draw-geometry.test.ts` on `feat/T3-prototype-interface-2`.
+ * The GeoJSON draw engine against the real Terra Draw (see `real-terra-draw.ts`
+ * for why, and for the one stand-in left, the map). The first block, what
+ * leaves the engine, is Sam's, from `apps/web/test/map/draw-geometry.test.ts`
+ * on `feat/T3-prototype-interface-2`.
  */
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import type { GeometryDrawState, MapShape, Tool } from "../../src/map/geometry-engine.js";
+import { drawnShapes, fakeMap, lastDraw, resetTerraDraw, user } from "./real-terra-draw.js";
 
-type Listener = (...args: unknown[]) => void;
-
-interface FakeFeature {
-  id: string;
-  geometry: { type: string; coordinates: unknown };
-  properties: Record<string, unknown>;
-}
-
-interface FakeDraw {
-  started: boolean;
-  mode: string;
-  modes: string[];
-  features: FakeFeature[];
-  listeners: Map<string, Listener>;
-  calls: string[];
-}
-
-const instances: FakeDraw[] = [];
-
-vi.mock("terra-draw", () => {
-  class TerraDraw {
-    readonly state: FakeDraw;
-    constructor(options: { modes: { mode: string }[] }) {
-      this.state = {
-        started: false,
-        mode: "static",
-        modes: options.modes.map((mode) => mode.mode),
-        features: [],
-        listeners: new Map(),
-        calls: [],
-      };
-      instances.push(this.state);
-    }
-    start() {
-      this.state.started = true;
-    }
-    stop() {
-      this.state.started = false;
-      this.state.calls.push("stop");
-    }
-    get enabled() {
-      return this.state.started;
-    }
-    setMode(mode: string) {
-      this.state.mode = mode;
-      this.state.calls.push(`mode:${mode}`);
-    }
-    getMode() {
-      return this.state.mode;
-    }
-    clear() {
-      // As Terra Draw 1.35 does: `clear()` empties the store and then reports
-      // every id it held as deleted — and reports an empty list as deleted
-      // too. A stub that stayed silent here hid the upload bug below.
-      const ids = this.state.features.map((feature) => feature.id);
-      this.state.features = [];
-      this.state.listeners.get("change")?.(ids, "delete");
-    }
-    addFeatures(features: Omit<FakeFeature, "id">[]) {
-      this.state.features.push(
-        ...features.map((feature, index) => ({ ...feature, id: `added-${String(index)}` })),
-      );
-      return [];
-    }
-    removeFeatures(ids: string[]) {
-      this.state.features = this.state.features.filter((feature) => !ids.includes(feature.id));
-    }
-    selectFeature(id: string) {
-      this.state.calls.push(`select:${id}`);
-      this.state.listeners.get("select")?.(id);
-    }
-    getSnapshot() {
-      return this.state.features;
-    }
-    on(event: string, listener: Listener) {
-      this.state.listeners.set(event, listener);
-    }
-  }
-  // Each mode is only constructed and handed over; its name is what matters.
-  const mode = (name: string) =>
-    function Mode() {
-      return { mode: name };
-    };
-  return {
-    TerraDraw,
-    TerraDrawPointMode: mode("point"),
-    TerraDrawLineStringMode: mode("linestring"),
-    TerraDrawPolygonMode: mode("polygon"),
-    TerraDrawRectangleMode: mode("rectangle"),
-    TerraDrawSelectMode: mode("select"),
-  };
-});
-
-vi.mock("terra-draw-maplibre-gl-adapter", () => ({
-  TerraDrawMapLibreGLAdapter: function TerraDrawMapLibreGLAdapter() {
-    return {};
-  },
-}));
+vi.mock("terra-draw", async (original) =>
+  (await import("./real-terra-draw.js")).spyOnTerraDraw(await original()),
+);
+vi.mock("terra-draw-maplibre-gl-adapter", async (original) =>
+  (await import("./real-terra-draw.js")).spyOnAdapter(await original()),
+);
 
 const { createTerraDrawGeometryEngine, shapesOfSnapshot } =
   await import("../../src/map/geometry-engine.js");
@@ -118,6 +29,38 @@ const triangle = {
       [5.9, 52.4],
       [4.6, 52.1],
     ],
+  ],
+} as const;
+const triangleShape: MapShape = {
+  type: "Polygon",
+  coordinates: triangle.coordinates.map((ring) => ring.map((position) => [...position])),
+};
+/** A square with a square hole: Terra Draw refuses holes. */
+const withHole: MapShape = {
+  type: "Polygon",
+  coordinates: [
+    [
+      [5.0, 52.0],
+      [5.4, 52.0],
+      [5.4, 52.4],
+      [5.0, 52.4],
+      [5.0, 52.0],
+    ],
+    [
+      [5.1, 52.1],
+      [5.1, 52.2],
+      [5.2, 52.2],
+      [5.2, 52.1],
+      [5.1, 52.1],
+    ],
+  ],
+};
+/** Terra Draw refuses a position with a height. */
+const lineWithHeights: MapShape = {
+  type: "LineString",
+  coordinates: [
+    [5.1, 52.1, 3],
+    [5.2, 52.2, 4],
   ],
 };
 
@@ -163,120 +106,233 @@ describe("what leaves the engine", () => {
   });
 });
 
-function engine(tools: ("Point" | "LineString" | "Polygon" | "Rectangle")[], several: boolean) {
-  const created = createTerraDrawGeometryEngine({} as never, { tools, several });
-  const draw = instances.at(-1);
-  if (draw === undefined) throw new Error("no Terra Draw instance");
-  return { created, draw };
+function engine(tools: Tool[], several: boolean) {
+  const created = createTerraDrawGeometryEngine(fakeMap().map, { tools, several });
+  const reported: (readonly MapShape[])[] = [];
+  const states: GeometryDrawState[] = [];
+  created.onChange((shapes) => reported.push(shapes));
+  created.onState((state) => states.push(state));
+  return { created, draw: lastDraw(), reported, states };
 }
 
-function finish(draw: FakeDraw, id: string, mode: string, geometry: FakeFeature["geometry"]) {
-  draw.features.push({ id, geometry, properties: { mode } });
-  draw.listeners.get("finish")?.(id, { mode, action: "draw" });
+/** Click each corner, then the first one again to close the area. */
+function drawArea(corners: readonly (readonly [number, number])[]) {
+  for (const [lng, lat] of corners) user.click(lng, lat);
+  const [first] = corners;
+  if (first !== undefined) user.click(...first);
 }
 
-beforeEach(() => {
-  instances.length = 0;
+/** Click two opposite corners. */
+function drawBox(from: readonly [number, number], to: readonly [number, number]) {
+  user.click(...from);
+  user.click(...to);
+}
+
+afterEach(() => {
+  resetTerraDraw();
 });
 
-describe("the Terra Draw geometry engine", () => {
+describe("the geometry engine, on the real Terra Draw", () => {
   it("registers only the offered tools, and rests in select mode", () => {
-    const { draw } = engine(["Polygon", "Rectangle"], false);
-    expect(draw.modes).toEqual(["polygon", "rectangle", "select"]);
-    expect(draw.mode).toBe("select");
-  });
-
-  it("ignores a tool that was not offered", () => {
     const { created, draw } = engine(["Polygon"], false);
+    expect(draw.getMode()).toBe("select");
     created.place("Point");
-    expect(draw.mode).toBe("select");
+    expect(draw.getMode()).toBe("select");
     created.place("Polygon");
-    expect(draw.mode).toBe("polygon");
+    expect(draw.getMode()).toBe("polygon");
   });
 
   it("reports a finished shape, returns to editing, and selects it", () => {
-    const { created, draw } = engine(["Polygon"], false);
-    const seen: unknown[] = [];
-    const states: unknown[] = [];
-    created.onChange((shapes) => seen.push(shapes));
-    created.onState((state) => states.push(state));
+    const { created, draw, reported, states } = engine(["Point"], false);
+    created.place("Point");
+    user.click(5, 52);
+    expect(reported).toEqual([[{ type: "Point", coordinates: [5, 52] }]]);
+    expect(draw.getMode()).toBe("select");
+    expect(states.at(-1)).toEqual({ placing: undefined, hasSelection: true, notShown: 0 });
+  });
+
+  it("Terra Draw reports our own calls synchronously, inside the call", () => {
+    // What makes a guard around our own calls work at all.
+    const { created, draw } = engine(["Polygon"], true);
+    const heard: string[] = [];
+    draw.on("change", (_ids, type) => heard.push(type));
+    created.show([triangleShape]);
+    expect(heard).toContain("create");
+  });
+});
+
+describe("an input that holds one shape (W1)", () => {
+  it("replaces an area it was shown with a box the user draws", () => {
+    const { created, draw, reported } = engine(["Polygon", "Rectangle"], false);
+    created.show([triangleShape]);
+    created.place("Rectangle");
+    expect(() => {
+      drawBox([5.5, 52.5], [5.6, 52.6]);
+    }).not.toThrow();
+    expect(reported).toHaveLength(1);
+    expect(reported[0]).toHaveLength(1);
+    expect(draw.getMode()).toBe("select");
+    expect(drawnShapes(draw)).toHaveLength(1);
+  });
+
+  it("replaces an area the user drew with a second one", () => {
+    const { created, draw, reported } = engine(["Polygon", "Rectangle"], false);
     created.place("Polygon");
-    finish(draw, "a", "polygon", triangle);
-    expect(seen).toEqual([[triangle]]);
-    expect(draw.mode).toBe("select");
-    expect(draw.calls).toContain("select:a");
-    expect(states.at(-1)).toEqual({ placing: undefined, hasSelection: true });
+    drawArea([
+      [5.0, 52.0],
+      [5.2, 52.0],
+      [5.1, 52.2],
+    ]);
+    created.place("Polygon");
+    expect(() => {
+      drawArea([
+        [6.0, 52.0],
+        [6.2, 52.0],
+        [6.1, 52.2],
+      ]);
+    }).not.toThrow();
+    expect(reported).toHaveLength(2);
+    const [second] = reported.at(-1) ?? [];
+    expect(second?.type).toBe("Polygon");
+    expect(second?.type === "Polygon" ? second.coordinates[0]?.[0] : undefined).toEqual([6, 52]);
+    expect(draw.getMode()).toBe("select");
+    expect(drawnShapes(draw)).toHaveLength(1);
   });
 
-  it("replaces the previous shape when the input holds one", () => {
-    const { draw } = engine(["Point"], false);
-    finish(draw, "a", "point", corner);
-    finish(draw, "b", "point", { type: "Point", coordinates: [5, 52] });
-    expect(draw.features.map((entry) => entry.id)).toEqual(["b"]);
+  it("replaces a point with the next point", () => {
+    const { created, draw } = engine(["Point"], false);
+    created.place("Point");
+    user.click(4.6, 52.1);
+    created.place("Point");
+    user.click(5, 52);
+    expect(drawnShapes(draw).map((shape) => shape.geometry)).toEqual([
+      { type: "Point", coordinates: [5, 52] },
+    ]);
   });
+});
 
-  it("keeps every shape when the input holds several", () => {
-    const { draw } = engine(["Point"], true);
-    finish(draw, "a", "point", corner);
-    finish(draw, "b", "point", { type: "Point", coordinates: [5, 52] });
-    expect(draw.features.map((entry) => entry.id)).toEqual(["a", "b"]);
+describe("an input that holds several shapes", () => {
+  it("keeps every shape drawn", () => {
+    const { created, draw, reported } = engine(["Point"], true);
+    created.place("Point");
+    user.click(4.6, 52.1);
+    created.place("Point");
+    user.click(5, 52);
+    expect(drawnShapes(draw)).toHaveLength(2);
+    expect(reported.at(-1)).toHaveLength(2);
   });
 
   it("deletes the selected shape, and reports what is left", () => {
-    const { created, draw } = engine(["Point"], true);
-    const seen: unknown[] = [];
-    created.onChange((shapes) => seen.push(shapes));
-    finish(draw, "a", "point", corner);
+    const { created, draw, reported } = engine(["Point"], true);
+    created.place("Point");
+    user.click(4.6, 52.1);
     created.deleteSelected();
-    expect(draw.features).toEqual([]);
-    expect(seen.at(-1)).toEqual([]);
+    expect(drawnShapes(draw)).toEqual([]);
+    expect(reported.at(-1)).toEqual([]);
+  });
+});
+
+describe("a value shown from outside", () => {
+  it("is not reported back as the user's doing (#24)", () => {
+    const { created, draw, reported } = engine(["Polygon"], false);
+    created.show([triangleShape]);
+    created.show([triangleShape]);
+    expect(reported).toEqual([]);
+    expect(drawnShapes(draw)).toHaveLength(1);
   });
 
-  it("shows a value from outside, leaving off shapes no offered tool edits", () => {
-    const { created, draw } = engine(["Rectangle"], true);
-    created.show([
-      { type: "Polygon", coordinates: triangle.coordinates },
-      { type: "Point", coordinates: [5, 52] },
-    ]);
-    // A polygon is edited by the rectangle mode when that is all there is.
-    expect(draw.features.map((entry) => entry.properties["mode"])).toEqual(["rectangle"]);
-  });
-
-  it("does not report a value shown from outside as the user deleting everything", () => {
-    // The GeoJSON upload bug: with the map drawing for a field, a loaded file
-    // was shown, Terra Draw's clear() reported a deletion, the engine emitted
-    // "nothing drawn", and the field was emptied.
-    const { created, draw } = engine(["Polygon"], false);
-    const seen: unknown[] = [];
-    created.onChange((shapes) => seen.push(shapes));
-    created.show([{ type: "Polygon", coordinates: triangle.coordinates }]);
-    created.show([{ type: "Polygon", coordinates: triangle.coordinates }]);
-    expect(seen).toEqual([]);
-    expect(draw.features).toHaveLength(1);
-  });
-
-  it("still reports a deletion Terra Draw makes for the user, after a value was shown", () => {
-    const { created, draw } = engine(["Polygon"], false);
-    const seen: unknown[] = [];
-    created.onChange((shapes) => seen.push(shapes));
-    created.show([{ type: "Polygon", coordinates: triangle.coordinates }]);
-    // The select mode's own Delete key: Terra Draw empties the store, then says so.
-    const ids = draw.features.map((entry) => entry.id);
-    draw.features = [];
-    draw.listeners.get("change")?.(ids, "delete");
-    expect(seen).toEqual([[]]);
-  });
-
-  it("rounds what it shows to the nine decimals Terra Draw accepts", () => {
+  it("is rounded to the nine decimals Terra Draw accepts", () => {
     const { created, draw } = engine(["Point"], false);
     created.show([{ type: "Point", coordinates: [5.1234567891234, 52] }]);
-    expect(draw.features[0]?.geometry.coordinates).toEqual([5.123456789, 52]);
+    expect(drawnShapes(draw)[0]?.geometry.coordinates).toEqual([5.123456789, 52]);
   });
 
-  it("removes the draw mode when stopped", () => {
-    const { created, draw } = engine(["Point"], false);
+  it("still lets a deletion Terra Draw makes for the user through", () => {
+    const { created, draw, reported } = engine(["Polygon"], false);
+    created.show([triangleShape]);
+    const [shown] = drawnShapes(draw);
+    // Not one of the engine's calls: as when Terra Draw deletes a shape itself.
+    draw.removeFeatures([shown?.id ?? ""]);
+    expect(reported).toEqual([[]]);
+  });
+});
+
+describe("selecting and deselecting is not an edit (W16)", () => {
+  it("reports nothing, so the field keeps its GeoJSON as it was", () => {
+    const { created, draw, reported } = engine(
+      ["Point", "LineString", "Polygon", "Rectangle"],
+      true,
+    );
+    created.show([triangleShape]);
+    const [shown] = drawnShapes(draw);
+    const id = shown?.id ?? "";
+    draw.selectFeature(id);
+    draw.deselectFeature(id);
+    expect(reported).toEqual([]);
+  });
+
+  it("does report a shape the user moves", () => {
+    const { created, draw, reported } = engine(["Point"], true);
+    created.show([{ type: "Point", coordinates: [5, 52] }]);
+    const [shown] = drawnShapes(draw);
+    draw.selectFeature(shown?.id ?? "");
+    user.drag([5, 52], [5.1, 52.1]);
+    expect(reported.at(-1)).toEqual([{ type: "Point", coordinates: [5.1, 52.1] }]);
+  });
+});
+
+describe("shapes the map cannot show are kept in the value (W17)", () => {
+  it("keeps an area with a hole beside the shapes drawn, and says so", () => {
+    const { created, draw, reported, states } = engine(
+      ["Point", "LineString", "Polygon", "Rectangle"],
+      true,
+    );
+    created.show([withHole, triangleShape]);
+    expect(drawnShapes(draw)).toHaveLength(1);
+    expect(states.at(-1)?.notShown).toBe(1);
+
+    created.place("Point");
+    user.click(6, 53);
+    const last = reported.at(-1) ?? [];
+    expect(last).toHaveLength(3);
+    expect(last).toContainEqual(withHole);
+  });
+
+  it("keeps positions with a height", () => {
+    const { created, reported } = engine(["Point", "LineString", "Polygon", "Rectangle"], true);
+    created.show([lineWithHeights, triangleShape]);
+    created.place("Point");
+    user.click(6, 53);
+    expect(reported.at(-1)).toContainEqual(lineWithHeights);
+  });
+
+  it("keeps a shape no offered tool draws", () => {
+    const { created, reported, states } = engine(["Point"], true);
+    created.show([triangleShape, { type: "Point", coordinates: [5, 52] }]);
+    expect(states.at(-1)?.notShown).toBe(1);
+    created.place("Point");
+    user.click(6, 53);
+    expect(reported.at(-1)).toContainEqual(triangleShape);
+  });
+
+  it("lets a newly drawn shape replace them, when the input holds one", () => {
+    const { created, reported, states } = engine(["Polygon", "Rectangle"], false);
+    created.show([withHole]);
+    created.place("Rectangle");
+    drawBox([5.5, 52.5], [5.6, 52.6]);
+    expect(reported.at(-1)).toHaveLength(1);
+    expect(reported.at(-1)).not.toContainEqual(withHole);
+    expect(states.at(-1)?.notShown).toBe(0);
+  });
+});
+
+describe("stopping", () => {
+  it("removes the draw mode and its layers", () => {
+    const fake = fakeMap();
+    const created = createTerraDrawGeometryEngine(fake.map, { tools: ["Point"], several: false });
+    expect(fake.sources.size).toBeGreaterThan(0);
     created.stop();
-    expect(draw.calls).toContain("stop");
-    expect(draw.started).toBe(false);
+    expect(lastDraw().enabled).toBe(false);
+    expect(fake.sources.size).toBe(0);
   });
 });
