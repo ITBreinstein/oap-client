@@ -229,6 +229,14 @@ export const createTerraDrawGeometryEngine: CreateGeometryEngine = (map, { tools
   const stateListeners = new Set<(state: GeometryDrawState) => void>();
   let placing: Tool | undefined;
   let selected: string | number | undefined;
+  /**
+   * True while `show()` replaces what is drawn. Terra Draw reports its own
+   * `clear()` as a deletion — every id it held, or none — and does so
+   * synchronously, inside the call. That is our doing, not the user's, and
+   * must not leave the engine: reported, it read as "the user deleted every
+   * shape" and emptied the field the value had just been loaded into.
+   */
+  let applying = false;
 
   const emit = () => {
     const shapes = shapesOfSnapshot(draw.getSnapshot());
@@ -262,6 +270,7 @@ export const createTerraDrawGeometryEngine: CreateGeometryEngine = (map, { tools
     emit();
   });
   draw.on("change", (_ids, type) => {
+    if (applying) return;
     if (type === "delete" && draw.getMode() === SELECT) emit();
   });
   draw.on("select", (id) => {
@@ -273,6 +282,25 @@ export const createTerraDrawGeometryEngine: CreateGeometryEngine = (map, { tools
     announce();
   });
 
+  /** Whatever is drawn, replaced by `shapes`. Called only with `applying` set. */
+  const replace = (shapes: readonly MapShape[]) => {
+    draw.clear();
+    selected = undefined;
+    const features = shapes.flatMap((shape): GeoJSONStoreFeatures[] => {
+      const mode = modeFor(shape, registered);
+      return mode === undefined
+        ? []
+        : [
+            {
+              type: "Feature",
+              geometry: fitPrecision(shape) as GeoJSONStoreFeatures["geometry"],
+              properties: { mode },
+            },
+          ];
+    });
+    if (features.length > 0) draw.addFeatures(features);
+  };
+
   return {
     place(tool) {
       if (!registered.has(MODE[tool])) return;
@@ -281,21 +309,12 @@ export const createTerraDrawGeometryEngine: CreateGeometryEngine = (map, { tools
       announce();
     },
     show(shapes) {
-      draw.clear();
-      selected = undefined;
-      const features = shapes.flatMap((shape): GeoJSONStoreFeatures[] => {
-        const mode = modeFor(shape, registered);
-        return mode === undefined
-          ? []
-          : [
-              {
-                type: "Feature",
-                geometry: fitPrecision(shape) as GeoJSONStoreFeatures["geometry"],
-                properties: { mode },
-              },
-            ];
-      });
-      if (features.length > 0) draw.addFeatures(features);
+      applying = true;
+      try {
+        replace(shapes);
+      } finally {
+        applying = false;
+      }
       announce();
     },
     deleteSelected() {

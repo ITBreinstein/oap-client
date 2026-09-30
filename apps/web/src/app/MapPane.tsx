@@ -11,9 +11,11 @@
  * - a geometry field, or a complex field's JSON-object format: shapes, turned
  *   into GeoJSON text in the wrapper and geometry types the plan allows.
  *
- * While a run is under way and once its result is in, nothing is drawn: the
- * map shows what was sent — every geometry the inputs hold — and, once it is
- * in, every result that is GeoJSON, and an image result over the area a box
+ * Every geometry the inputs hold is shown as the input layer — amber and
+ * dashed, apart from a result's blue — while the form is filled in, so a
+ * loaded file is seen before it is sent. While a run is under way and once
+ * its result is in, nothing is drawn: the map shows what was sent and, once it
+ * is in, every result that is GeoJSON, and an image result over the area a box
  * beside it gives (`results/plottable.ts`).
  */
 
@@ -104,10 +106,26 @@ function toolsFor(target: GeometryTarget): Tool[] {
   return types.includes("Polygon") ? [...types, "Rectangle"] : [...types];
 }
 
-/** What a run sent and, once it is in, what came back: the map's part of it. */
-function shownFor(state: Workflow): readonly ShownShapes[] {
-  if (state.stage !== "running" && state.stage !== "result") return [];
+/**
+ * The map's part of the form and of a run: every geometry the inputs hold —
+ * loaded, typed or drawn — and, once it is in, what came back.
+ *
+ * Shown while the form is being filled in too, so a loaded file is seen
+ * before it is sent. The field the map is drawing for is left out: the draw
+ * mode shows that one itself, editable, and showing it twice would put a
+ * stale copy under the one being edited.
+ *
+ * Derived from the workflow on every render, never stored: when another
+ * process is opened its fresh values hold no geometry, and a field that is
+ * gone contributes none, so the input layer empties without anything having
+ * to remove it.
+ */
+export function shownFor(state: Workflow, drawing?: string): readonly ShownShapes[] {
+  if (state.stage !== "process" && state.stage !== "running" && state.stage !== "result") {
+    return [];
+  }
   const input = state.plan.fields.flatMap((field) => {
+    if (state.stage === "process" && field.id === drawing) return [];
     const current = Object.hasOwn(state.values, field.id) ? state.values[field.id] : undefined;
     const binding = shapeBinding(field, current);
     return binding === undefined ? [] : shapesOfText(binding.text);
@@ -170,7 +188,7 @@ export function MapPane({
           },
         };
 
-  const shown = shownFor(state);
+  const shown = shownFor(state, field === undefined ? undefined : draw.fieldId);
   const placed = state.stage === "result" ? mapImage(state.results) : undefined;
   const imageUrl = useDataUrl(placed?.blob);
   const image =
@@ -229,7 +247,11 @@ export function MapPane({
           {drawnInput && (
             <span>
               <span className="swatch swatch-input" aria-hidden="true" />{" "}
-              {plotted ? "the input you sent" : "The input you sent"}
+              {state.stage === "process"
+                ? "The input, not yet sent"
+                : plotted
+                  ? "the input you sent"
+                  : "The input you sent"}
             </span>
           )}
           .
