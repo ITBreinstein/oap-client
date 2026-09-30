@@ -59,11 +59,18 @@ function stateAfter(...more: WorkflowAction[]): Workflow {
   const plan = resolveFormPlan(process);
   const actions: WorkflowAction[] = [
     { type: "connect", endpoint },
-    { type: "connected", endpoint, route: "direct", service, processes },
+    { type: "connected", connection: 1, endpoint, route: "direct", service, processes },
     { type: "open-process", processId: process.id },
-    { type: "process-loaded", process, plan, values: initialValues(plan), warnings: [] },
-    { type: "run-started", mode: "async" },
-    { type: "job-started", jobRef: JOB },
+    {
+      type: "process-loaded",
+      connection: 1,
+      process,
+      plan,
+      values: initialValues(plan),
+      warnings: [],
+    },
+    { type: "run-started", runId: "run-1", mode: "async" },
+    { type: "job-started", runId: "run-1", jobRef: JOB },
     ...more,
   ];
   return actions.reduce<Workflow>(workflowReducer, { stage: "choose-endpoint" });
@@ -138,6 +145,7 @@ function view(state: Workflow, job: JobRow) {
 describe("a status the server changed after a first successful (finding 0047)", () => {
   const withResults = stateAfter({
     type: "results",
+    runId: "run-1",
     results: [{ kind: "json", outputId: "echo", value: { ok: true } }],
   });
   const failed: JobStatus = { ...status("failed", JOB), message: "callback could not be sent" };

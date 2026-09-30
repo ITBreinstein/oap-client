@@ -9,6 +9,14 @@
  * that. It is how a late answer from an abandoned request cannot overwrite the
  * screen the user has since moved to.
  *
+ * Stage alone is not enough for that: the same stage can come round again
+ * with other content. A description the user asked of one server can arrive
+ * after they moved to another and opened a process of the same name there,
+ * and a "Load" of one run's output can finish on the next run's result screen
+ * (review W4, W5). So every answer to a request says what it was for — the
+ * connection it was sent on, or the run it belongs to — and the reducer drops
+ * any that does not match what is on screen.
+ *
  * What is *not* here: a job's status. For an asynchronous run the reducer holds
  * the job's reference, its status URL, and nothing else. Status is owned by
  * the `JobReconciler`, the single writer since Task 6, and the screen reads it
@@ -56,6 +64,11 @@ export interface WorkflowError {
 
 interface Connected {
   readonly endpoint: EndpointRef;
+  /**
+   * Which connection this is, counted by the page. A description fetched on
+   * another connection, even to the same endpoint, is not this one's.
+   */
+  readonly connection: number;
   /**
    * How this page reads the server for this connection: `direct`, or through
    * the relay after the user confirmed it. Shown as a banner the whole time.
@@ -108,9 +121,16 @@ export type Workflow =
       /** Why the last run did not produce a result. */
       readonly error?: WorkflowError | undefined;
     })
-  | (ProcessOpen & { readonly stage: "running"; readonly run: Run })
+  | (ProcessOpen & {
+      readonly stage: "running";
+      readonly run: Run;
+      /** This run's id; every answer to it carries the same one. */
+      readonly runId: string;
+    })
   | (ProcessOpen & {
       readonly stage: "result";
+      /** The run these results are from, so a late "Load" of another run's output is dropped. */
+      readonly runId: string;
       readonly results: readonly RenderableResult[];
       /** The job the results came from, for an asynchronous run. */
       readonly jobRef?: string | undefined;
@@ -121,6 +141,7 @@ export type WorkflowAction =
   | {
       readonly type: "connected";
       readonly endpoint: EndpointRef;
+      readonly connection: number;
       readonly route: "direct" | "relay";
       readonly service: ServiceDescription;
       readonly processes: ProcessList;
@@ -141,12 +162,18 @@ export type WorkflowAction =
   | { readonly type: "open-process"; readonly processId: string }
   | {
       readonly type: "process-loaded";
+      readonly connection: number;
       readonly process: ProcessDescription;
       readonly plan: FormPlan;
       readonly values: FormValues;
       readonly warnings: readonly string[];
     }
-  | { readonly type: "process-failed"; readonly processId: string; readonly error: WorkflowError }
+  | {
+      readonly type: "process-failed";
+      readonly connection: number;
+      readonly processId: string;
+      readonly error: WorkflowError;
+    }
   | { readonly type: "back-to-list" }
   | { readonly type: "set-value"; readonly id: string; readonly value: unknown }
   | { readonly type: "set-mode"; readonly mode: ExecutionMode }
@@ -155,16 +182,21 @@ export type WorkflowAction =
       readonly outputId: string;
       readonly transmission: "value" | "reference";
     }
-  | { readonly type: "run-started"; readonly mode: ExecutionMode }
-  | { readonly type: "job-started"; readonly jobRef: string }
-  | { readonly type: "results"; readonly results: readonly RenderableResult[] }
+  | { readonly type: "run-started"; readonly runId: string; readonly mode: ExecutionMode }
+  | { readonly type: "job-started"; readonly runId: string; readonly jobRef: string }
+  | {
+      readonly type: "results";
+      readonly runId: string;
+      readonly results: readonly RenderableResult[];
+    }
   /** What "Load" found behind one output given by reference (Task 8, T3). */
   | {
       readonly type: "reference-loaded";
+      readonly runId: string;
       readonly outputId: string;
       readonly loaded: LoadedReference;
     }
-  | { readonly type: "run-failed"; readonly error: WorkflowError }
+  | { readonly type: "run-failed"; readonly runId: string; readonly error: WorkflowError }
   | { readonly type: "edit" };
 
 export const INITIAL_WORKFLOW: Workflow = { stage: "choose-endpoint" };
@@ -181,6 +213,7 @@ function sameEndpoint(a: EndpointRef | undefined, b: EndpointRef): boolean {
 function connectedPart(state: Connected): Connected {
   return {
     endpoint: state.endpoint,
+    connection: state.connection,
     route: state.route,
     service: state.service,
     processes: state.processes,
@@ -216,6 +249,7 @@ export function workflowReducer(state: Workflow, action: WorkflowAction): Workfl
         ? {
             stage: "connected",
             endpoint: action.endpoint,
+            connection: action.connection,
             route: action.route,
             service: action.service,
             processes: action.processes,
@@ -257,7 +291,9 @@ export function workflowReducer(state: Workflow, action: WorkflowAction): Workfl
     case "process-loaded":
       // A fresh plan and fresh values, always: nothing of the previous
       // process's form survives into this one. Reduction test (c).
-      return state.stage === "connected" && state.opening === action.process.id
+      return state.stage === "connected" &&
+        state.connection === action.connection &&
+        state.opening === action.process.id
         ? {
             stage: "process",
             ...connectedPart(state),
@@ -271,7 +307,9 @@ export function workflowReducer(state: Workflow, action: WorkflowAction): Workfl
         : state;
 
     case "process-failed":
-      return state.stage === "connected" && state.opening === action.processId
+      return state.stage === "connected" &&
+        state.connection === action.connection &&
+        state.opening === action.processId
         ? { stage: "connected", ...connectedPart(state), error: action.error }
         : state;
 
@@ -314,6 +352,7 @@ export function workflowReducer(state: Workflow, action: WorkflowAction): Workfl
             stage: "running",
             ...openPart(state),
             run: action.mode === "sync" ? { mode: "sync" } : { mode: "async" },
+            runId: action.runId,
           }
         : state;
 
@@ -321,29 +360,32 @@ export function workflowReducer(state: Workflow, action: WorkflowAction): Workfl
       // A synchronous request the server answered with a job becomes an
       // asynchronous run: the server decides, and the screen follows.
       return state.stage === "running" &&
+        state.runId === action.runId &&
         (state.run.mode === "sync" || state.run.jobRef === undefined)
         ? { ...state, run: { mode: "async", jobRef: action.jobRef } }
         : state;
 
     case "results":
-      return state.stage === "running"
+      return state.stage === "running" && state.runId === action.runId
         ? {
             stage: "result",
             ...openPart(state),
+            runId: state.runId,
             results: action.results,
             jobRef: state.run.mode === "async" ? state.run.jobRef : undefined,
           }
         : state;
 
     case "run-failed":
-      return state.stage === "running"
+      return state.stage === "running" && state.runId === action.runId
         ? { stage: "process", ...openPart(state), error: action.error }
         : state;
 
     case "reference-loaded":
-      // Only onto the output it was loaded for, and only while that result is
-      // still the one on screen: a new run has cleared it (Task 8, T8).
+      // Only onto the output it was loaded for, and only while that run's
+      // result is still the one on screen (Task 8, T8; review W5).
       return state.stage === "result" &&
+        state.runId === action.runId &&
         state.results.some(
           (result) => result.kind === "reference" && result.outputId === action.outputId,
         )

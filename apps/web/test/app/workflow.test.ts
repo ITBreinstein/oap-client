@@ -41,7 +41,14 @@ const bboxProcess = fixtureProcess("pygeoapi/breinstein-bbox");
 
 function loaded(process = inputsProcess): WorkflowAction {
   const plan = resolveFormPlan(process);
-  return { type: "process-loaded", process, plan, values: initialValues(plan), warnings: [] };
+  return {
+    type: "process-loaded",
+    connection: 1,
+    process,
+    plan,
+    values: initialValues(plan),
+    warnings: [],
+  };
 }
 
 function reduce(state: Workflow, ...actions: WorkflowAction[]): Workflow {
@@ -51,12 +58,13 @@ function reduce(state: Workflow, ...actions: WorkflowAction[]): Workflow {
 const connected = reduce(
   INITIAL_WORKFLOW,
   { type: "connect", endpoint },
-  { type: "connected", endpoint, route: "direct", service, processes },
+  { type: "connected", connection: 1, endpoint, route: "direct", service, processes },
 );
 const open = reduce(connected, { type: "open-process", processId: "breinstein-inputs" }, loaded());
-const running = reduce(open, { type: "run-started", mode: "sync" });
+const running = reduce(open, { type: "run-started", runId: "run-1", mode: "sync" });
 const result = reduce(running, {
   type: "results",
+  runId: "run-1",
   results: [{ kind: "json", outputId: "echo", value: {} }],
 });
 
@@ -87,7 +95,7 @@ describe("workflowReducer: the legal path", () => {
     const failed = reduce(
       connected,
       { type: "open-process", processId: "x" },
-      { type: "process-failed", processId: "x", error: { title: "no" } },
+      { type: "process-failed", connection: 1, processId: "x", error: { title: "no" } },
     );
     expect(failed).toMatchObject({ stage: "connected", error: { title: "no" } });
   });
@@ -115,25 +123,25 @@ describe("workflowReducer: the legal path", () => {
   it("runs asynchronously, holding the job's reference and never its status", () => {
     const started = reduce(
       open,
-      { type: "run-started", mode: "async" },
-      { type: "job-started", jobRef: "http://localhost:5080/jobs/1" },
+      { type: "run-started", runId: "run-1", mode: "async" },
+      { type: "job-started", runId: "run-1", jobRef: "http://localhost:5080/jobs/1" },
     );
     expect(started).toEqual({
       ...started,
       run: { mode: "async", jobRef: "http://localhost:5080/jobs/1" },
     });
     expect(JSON.stringify(started)).not.toContain('"status"');
-    const done = reduce(started, { type: "results", results: [] });
+    const done = reduce(started, { type: "results", runId: "run-1", results: [] });
     expect(done).toMatchObject({ stage: "result", jobRef: "http://localhost:5080/jobs/1" });
   });
 
   it("follows a server that answers a synchronous request with a job", () => {
-    const became = reduce(running, { type: "job-started", jobRef: "j" });
+    const became = reduce(running, { type: "job-started", runId: "run-1", jobRef: "j" });
     expect(became).toMatchObject({ stage: "running", run: { mode: "async", jobRef: "j" } });
   });
 
   it("returns a failed run to the form, with the reason", () => {
-    const failed = reduce(running, { type: "run-failed", error: { title: "400" } });
+    const failed = reduce(running, { type: "run-failed", runId: "run-1", error: { title: "400" } });
     expect(failed).toMatchObject({ stage: "process", error: { title: "400" } });
   });
 
@@ -164,6 +172,7 @@ describe("workflowReducer: the relay offer", () => {
     expect(
       workflowReducer(offered, {
         type: "connected",
+        connection: 1,
         endpoint: zoo,
         route: "direct",
         service,
@@ -173,6 +182,7 @@ describe("workflowReducer: the relay offer", () => {
     expect(
       workflowReducer(offered, {
         type: "connected",
+        connection: 1,
         endpoint: zoo,
         route: "relay",
         service,
@@ -186,6 +196,7 @@ describe("workflowReducer: the relay offer", () => {
     expect(confirmed).toEqual({ stage: "choose-endpoint", connecting: zoo, viaRelay: true });
     const through = reduce(confirmed, {
       type: "connected",
+      connection: 1,
       endpoint: zoo,
       route: "relay",
       service,
@@ -206,6 +217,7 @@ describe("workflowReducer: the relay offer", () => {
     expect(
       workflowReducer(confirmed, {
         type: "connected",
+        connection: 1,
         endpoint: zoo,
         route: "direct",
         service,
@@ -222,6 +234,7 @@ describe("workflowReducer: the relay offer", () => {
     expect(
       workflowReducer(connecting, {
         type: "connected",
+        connection: 1,
         endpoint: zoo,
         route: "relay",
         service,
@@ -244,6 +257,7 @@ describe("workflowReducer: the relay offer", () => {
       { type: "relay-confirmed" },
       {
         type: "connected",
+        connection: 1,
         endpoint: zoo,
         route: "relay",
         service,
@@ -262,15 +276,19 @@ describe("workflowReducer: the relay offer", () => {
 
 describe("workflowReducer: what it refuses", () => {
   it.each<[string, Workflow, WorkflowAction]>([
-    ["a result without a run", result, { type: "results", results: [] }],
-    ["a job without a run", result, { type: "job-started", jobRef: "j" }],
+    ["a result without a run", result, { type: "results", runId: "run-1", results: [] }],
+    ["a job without a run", result, { type: "job-started", runId: "run-1", jobRef: "j" }],
     [
       "a second job for one run",
-      reduce(running, { type: "job-started", jobRef: "a" }),
-      { type: "job-started", jobRef: "b" },
+      reduce(running, { type: "job-started", runId: "run-1", jobRef: "a" }),
+      { type: "job-started", runId: "run-1", jobRef: "b" },
     ],
-    ["a run from a result, without editing first", result, { type: "run-started", mode: "sync" }],
-    ["a run while one is running", running, { type: "run-started", mode: "sync" }],
+    [
+      "a run from a result, without editing first",
+      result,
+      { type: "run-started", runId: "run-1", mode: "sync" },
+    ],
+    ["a run while one is running", running, { type: "run-started", runId: "run-1", mode: "sync" }],
     ["leaving a process mid-run", running, { type: "open-process", processId: "x" }],
     ["a value typed into a running form", running, { type: "set-value", id: "label", value: "x" }],
     ["a description nobody asked for", connected, loaded()],
@@ -279,6 +297,7 @@ describe("workflowReducer: what it refuses", () => {
       reduce(INITIAL_WORKFLOW, { type: "connect", endpoint }),
       {
         type: "connected",
+        connection: 1,
         endpoint: { source: "typed", baseUrl: "http://elsewhere" },
         route: "direct",
         service,
@@ -289,7 +308,7 @@ describe("workflowReducer: what it refuses", () => {
     [
       "a failure for a run that is not running",
       open,
-      { type: "run-failed", error: { title: "x" } },
+      { type: "run-failed", runId: "run-1", error: { title: "x" } },
     ],
   ])("%s", (_name, state, action) => {
     expect(workflowReducer(state, action)).toBe(state);
@@ -385,6 +404,7 @@ describe("outputs by reference (Task 8)", () => {
 
   const withLink = reduce(running, {
     type: "results",
+    runId: "run-1",
     results: [
       { kind: "reference", outputId: "echo", href: "https://x.test/a" },
       { kind: "json", outputId: "summary", value: {} },
@@ -406,14 +426,24 @@ describe("outputs by reference (Task 8)", () => {
   } as const;
 
   it("puts what Load found on its own output, and nowhere else", () => {
-    const after = reduce(withLink, { type: "reference-loaded", outputId: "echo", loaded: found });
+    const after = reduce(withLink, {
+      type: "reference-loaded",
+      runId: "run-1",
+      outputId: "echo",
+      loaded: found,
+    });
     if (after.stage !== "result") throw new Error("not a result");
     expect(after.results[0]).toMatchObject({ kind: "reference", loaded: found });
     expect(after.results[1]).toBe(withLink.stage === "result" ? withLink.results[1] : undefined);
   });
 
   it("ignores a Load that lands after the result has gone (T8)", () => {
-    const action = { type: "reference-loaded", outputId: "echo", loaded: found } as const;
+    const action = {
+      type: "reference-loaded",
+      runId: "run-1",
+      outputId: "echo",
+      loaded: found,
+    } as const;
     const edited = reduce(withLink, { type: "edit" });
     expect(reduce(edited, action)).toBe(edited);
     expect(reduce(result, action)).toBe(result);

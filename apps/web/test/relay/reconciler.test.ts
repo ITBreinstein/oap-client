@@ -382,3 +382,52 @@ describe("JobReconciler: a job that stays accepted", () => {
     instance.dispose();
   });
 });
+
+describe("a job removed while its read is in flight (review W8)", () => {
+  function heldServer() {
+    const reads: string[] = [];
+    const pending: ((value: JobStatus) => void)[] = [];
+    const readJob = (url: string): Promise<JobStatus> => {
+      reads.push(url);
+      return new Promise((resolve) => {
+        pending.push(resolve);
+      });
+    };
+    return { readJob, reads, answer: (state: JobState) => pending.shift()?.(status(state, JOB)) };
+  }
+
+  it("is not polled again once its read comes back", async () => {
+    const { readJob, reads, answer } = heldServer();
+    const { instance, timers } = reconciler(readJob);
+    instance.track(JOB);
+    expect(reads).toHaveLength(1);
+
+    instance.untrack(JOB); // "Remove from list"
+    answer("running");
+    await settle();
+
+    await timers.advance(60_000);
+    expect(reads).toHaveLength(1);
+    expect(timers.pending()).toEqual([]);
+    expect(instance.jobs()).toEqual([]);
+    instance.dispose();
+  });
+
+  it("does not let the old read speak for the job tracked again under the same URL", async () => {
+    const { readJob, reads, answer } = heldServer();
+    const { instance, current } = reconciler(readJob);
+    instance.track(JOB);
+    instance.untrack(JOB);
+    instance.track(JOB); // Tracked again: a new entry, and a read of its own.
+    expect(reads).toHaveLength(2);
+
+    answer("failed"); // The first entry's read, answering late.
+    await settle();
+    expect(current()?.status).toBeUndefined();
+
+    answer("running");
+    await settle();
+    expect(current()?.status?.status).toBe("running");
+    instance.dispose();
+  });
+});

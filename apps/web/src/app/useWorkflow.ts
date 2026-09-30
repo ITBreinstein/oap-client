@@ -257,8 +257,17 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
   // runs effects twice, and a memoised session would be disposed and reused.
   const session = useRef<JobSession | undefined>(undefined);
   const client = useRef<
-    { readonly endpoint: EndpointRef; readonly client: Client; readonly reads: Reads } | undefined
+    | {
+        readonly endpoint: EndpointRef;
+        readonly client: Client;
+        readonly reads: Reads;
+        /** Which connection this is: what an answer on it is told apart by (W4). */
+        readonly id: number;
+      }
+    | undefined
   >(undefined);
+  /** Connections made so far; each successful one takes the next number. */
+  const connections = useRef(0);
   /** The direct attempt behind an open offer, for the record its answer completes. */
   const pendingOffer = useRef<AttemptFacts | undefined>(undefined);
   const relayAvailable = relayUrl !== undefined && relayUrl !== "";
@@ -348,7 +357,9 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
         try {
           const service = await connection.inspect();
           const processes = await connection.listProcesses();
-          client.current = { endpoint, client: connection, reads: "direct" };
+          connections.current += 1;
+          const id = connections.current;
+          client.current = { endpoint, client: connection, reads: "direct", id };
           active.record(
             endpoint.baseUrl,
             accessRecord({
@@ -359,7 +370,14 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
               directError: undefined,
             }),
           );
-          dispatch({ type: "connected", endpoint, route: "direct", service, processes });
+          dispatch({
+            type: "connected",
+            endpoint,
+            connection: id,
+            route: "direct",
+            service,
+            processes,
+          });
         } catch (cause) {
           const direct = directFailure(cause);
           const facts = { endpoint, at, relayAvailable, direct, directError: errorName(cause) };
@@ -389,12 +407,21 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
       try {
         const service = await connection.inspect();
         const processes = await connection.listProcesses();
-        client.current = { endpoint, client: connection, reads: "relay" };
+        connections.current += 1;
+        const id = connections.current;
+        client.current = { endpoint, client: connection, reads: "relay", id };
         active.record(
           endpoint.baseUrl,
           accessRecord({ ...facts, confirmed: true, relay: relayAttempt(undefined) }),
         );
-        dispatch({ type: "connected", endpoint, route: "relay", service, processes });
+        dispatch({
+          type: "connected",
+          endpoint,
+          connection: id,
+          route: "relay",
+          service,
+          processes,
+        });
       } catch (cause) {
         const attempt = relayAttempt(cause);
         active.record(
@@ -440,6 +467,7 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
           record(formObservationsOf(connection.endpoint.baseUrl, process, plan));
           dispatch({
             type: "process-loaded",
+            connection: connection.id,
             process,
             plan,
             values: initialValues(plan),
@@ -448,6 +476,7 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
         } catch (cause) {
           dispatch({
             type: "process-failed",
+            connection: connection.id,
             processId: summary.id,
             error: {
               title:
@@ -487,8 +516,9 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
         crs: undefined,
       })),
     );
+    const runId = newRunId();
     lastRun.current = {
-      runId: newRunId(),
+      runId,
       endpoint: connection.endpoint.baseUrl,
       processId: process.id,
       declaredTransmission: process.outputTransmission,
@@ -506,7 +536,7 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
       })),
     );
     setJobNotice(undefined);
-    dispatch({ type: "run-started", mode });
+    dispatch({ type: "run-started", runId, mode });
 
     const outputIds = Object.keys(request.outputs);
     const relayEndpoint = relayEndpointFor(connection.endpoint);
@@ -535,7 +565,7 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
           if (mode === "sync") {
             active.track(relayEndpoint, execution.job.statusUrl, connection.reads, process.id);
           }
-          dispatch({ type: "job-started", jobRef: execution.job.statusUrl });
+          dispatch({ type: "job-started", runId, jobRef: execution.job.statusUrl });
           return;
         }
         const results = await toRenderable(execution.response, {
@@ -544,11 +574,12 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
           declaredMediaTypes: declaredMediaTypes(process),
         });
         recordResults(results);
-        dispatch({ type: "results", results });
+        dispatch({ type: "results", runId, results });
       } catch (cause) {
         if (cause instanceof AmbiguousExecutionResponseError) {
           dispatch({
             type: "run-failed",
+            runId,
             error: {
               title:
                 "The server started a job but did not tell this page where to find it. Run it in the foreground, or use an endpoint that runs through the relay.",
@@ -558,7 +589,7 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
           });
           return;
         }
-        dispatch({ type: "run-failed", error: runError(cause, plan) });
+        dispatch({ type: "run-failed", runId, error: runError(cause, plan) });
       }
     })();
   };
@@ -569,6 +600,7 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
     if (state.stage !== "running" || state.run.mode !== "async") return;
     const jobRef = state.run.jobRef;
     if (jobRef === undefined) return;
+    const { runId } = state;
     const job = snapshot?.jobs.find((row) => row.statusUrl === jobRef);
     const connection = client.current;
     if (job === undefined || connection === undefined) return;
@@ -576,6 +608,7 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
     if (job.gone) {
       dispatch({
         type: "run-failed",
+        runId,
         error: { title: "The server no longer has this job: it was cancelled or has expired." },
       });
       return;
@@ -589,6 +622,7 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
     if (decided.status !== "successful") {
       dispatch({
         type: "run-failed",
+        runId,
         error: {
           title:
             status.status === "dismissed"
@@ -613,10 +647,11 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
           declaredMediaTypes: declared,
         });
         recordResults(results);
-        dispatch({ type: "results", results });
+        dispatch({ type: "results", runId, results });
       } catch (cause) {
         dispatch({
           type: "run-failed",
+          runId,
           error: {
             title: "The job finished, but its results could not be read.",
             detail: cause instanceof Error ? cause.message : String(cause),
@@ -713,6 +748,7 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
     }
     if (connection === undefined || active === undefined) return;
     const jobRef = state.run.jobRef;
+    const { runId } = state;
     const endpointUrl = state.endpoint.baseUrl;
     const advertisedBy = dismissAdvertisedBy;
     const base = {
@@ -731,6 +767,7 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
           setJobNotice(undefined);
           dispatch({
             type: "run-failed",
+            runId,
             error: { title: "Job cancelled. The server has dismissed it.", notice: true },
           });
         } else {
@@ -793,6 +830,7 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
       (candidate) => candidate.kind === "reference" && candidate.outputId === outputId,
     );
     if (result?.kind !== "reference") return;
+    const { runId } = state;
     const loaded = await followReference(result, {
       endpoint: { baseUrl: connection.endpoint.baseUrl, reads: connection.reads },
       relayFetch: active.readFetch(relayEndpointFor(connection.endpoint), connection.reads),
@@ -801,7 +839,7 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
     if (run !== undefined) {
       active.record(connection.endpoint.baseUrl, loadedObservation(run, result, loaded));
     }
-    dispatch({ type: "reference-loaded", outputId, loaded });
+    dispatch({ type: "reference-loaded", runId, outputId, loaded });
   };
 
   const commands: WorkflowCommands = {
