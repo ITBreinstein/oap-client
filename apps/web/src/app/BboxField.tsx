@@ -49,6 +49,23 @@ function format(coordinate: number | undefined): string {
   return coordinate === undefined || Number.isNaN(coordinate) ? "" : String(coordinate);
 }
 
+/** How many numbers a box in `crs` takes: six with heights, four without. */
+function coordinateCount(control: BboxControl, crs: string): 4 | 6 {
+  return classifyCrs(crs) === "crs84h" || !control.dimensions.includes(4) ? 6 : 4;
+}
+
+/**
+ * The typed numbers laid out for another count, each kept in its place: two
+ * empty heights added after south and north, or the two heights dropped.
+ * [W, S, E, N] ⇄ [W, S, minimum height, E, N, maximum height].
+ */
+function relayout(texts: readonly string[], count: number): string[] {
+  const at = (index: number) => texts[index] ?? "";
+  if (texts.length === 4 && count === 6) return [at(0), at(1), "", at(2), at(3), ""];
+  if (texts.length === 6 && count === 4) return [at(0), at(1), at(3), at(4)];
+  return Array.from({ length: count }, (_, index) => at(index));
+}
+
 function crsLabel(uri: string): string {
   switch (classifyCrs(uri)) {
     case "crs84":
@@ -72,7 +89,7 @@ export function BboxField(props: ControlProps<BboxControl>) {
   const crs = box?.crs ?? typedBboxCrs(control);
   const kind = classifyCrs(crs);
   const geographic = kind === "crs84" || kind === "epsg4326" || kind === "crs84h";
-  const count = kind === "crs84h" || !control.dimensions.includes(4) ? 6 : 4;
+  const count = coordinateCount(control, crs);
   const labels =
     count === 4
       ? geographic
@@ -92,6 +109,10 @@ export function BboxField(props: ControlProps<BboxControl>) {
   const [texts, setTexts] = useState<string[]>(() =>
     Array.from({ length: count }, (_, index) => format(coordinates[index])),
   );
+  /** Said once, when starting to draw cleared numbers typed in another CRS (W21). */
+  const [notice, setNotice] = useState<string | undefined>();
+  // A CRS set from outside with a different count: the typed numbers follow it.
+  if (texts.length !== count) setTexts(relayout(texts, count));
   const drawnKey = JSON.stringify(coordinates);
   const [shown, setShown] = useState(drawnKey);
   if (shown !== drawnKey) {
@@ -106,8 +127,12 @@ export function BboxField(props: ControlProps<BboxControl>) {
   }
 
   const emit = (nextTexts: readonly string[], nextCrs: string) => {
+    setNotice(undefined);
     if (nextTexts.every((text) => text.trim() === "")) {
-      onChange(undefined);
+      // No numbers yet, but a CRS chosen is a choice, and must survive until
+      // they are typed (W2). An empty box counts as not given, and is not sent.
+      const empty: BboxValue = { coordinates: [], crs: nextCrs };
+      onChange(empty);
       return;
     }
     onChange({
@@ -136,6 +161,9 @@ export function BboxField(props: ControlProps<BboxControl>) {
           type="button"
           className="secondary"
           onClick={() => {
+            // The fields start empty: numbers typed before the JSON editor are
+            // not what the value is any more (W32).
+            setTexts(Array.from({ length: count }, () => ""));
             onChange(undefined);
           }}
         >
@@ -156,7 +184,11 @@ export function BboxField(props: ControlProps<BboxControl>) {
             onChange={(event) => {
               const next = event.target.value;
               if (drawing && !isDrawableCrs(next)) draw.stop();
-              emit(texts, next);
+              // Switching between two and three dimensions moves the typed
+              // numbers to their places in the other layout (W20).
+              const nextTexts = relayout(texts, coordinateCount(control, next));
+              setTexts(nextTexts);
+              emit(nextTexts, next);
             }}
           >
             {control.crs.map((uri) => (
@@ -197,6 +229,12 @@ export function BboxField(props: ControlProps<BboxControl>) {
         ))}
       </div>
 
+      {notice !== undefined && (
+        <p className="hint" role="status">
+          {notice}
+        </p>
+      )}
+
       <p className="actions">
         {canDraw && (
           <button
@@ -206,10 +244,23 @@ export function BboxField(props: ControlProps<BboxControl>) {
             onClick={() => {
               if (drawing) {
                 draw.stop();
-              } else {
-                if (!isDrawableCrs(crs)) emit(texts, mapCrs);
-                draw.start(inputId);
+                return;
               }
+              if (!isDrawableCrs(crs)) {
+                // The map draws in its own CRS, and numbers typed in this one
+                // are not relabelled as though they were in that one (W21).
+                // The CRS stays as chosen until a box is drawn.
+                const typed = texts.some((text) => text.trim() !== "");
+                const empty = Array.from({ length: count }, () => "");
+                setTexts(empty);
+                emit(empty, crs);
+                if (typed) {
+                  setNotice(
+                    `The numbers typed in ${crs} were cleared: a box drawn on the map is in ${mapCrs}, and this client does not reproject.`,
+                  );
+                }
+              }
+              draw.start(inputId);
             }}
           >
             {drawing ? "Stop drawing" : "Draw on the map"}

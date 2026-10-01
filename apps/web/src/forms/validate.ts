@@ -18,6 +18,7 @@
  * The messages say what is wrong and what to do; they never apologise (T11).
  */
 
+import { classifyCrs } from "./crs.js";
 import { isAbsent, isGeoJsonText, isRawJson, type FormValues } from "./encode.js";
 import { shapesOfText } from "./geometry.js";
 import { isJsonArray, isJsonObject } from "./json.js";
@@ -94,11 +95,23 @@ function checkControl(control: Control, value: unknown): string | undefined {
     case "bbox": {
       const coordinates: unknown =
         isJsonObject(value) && "coordinates" in value ? value["coordinates"] : value;
-      const counts = control.dimensions.join(" or ");
+      const crs: unknown = isJsonObject(value) ? value["crs"] : undefined;
+      // A CRS that says how many numbers a box has decides, where the input
+      // allows that many; otherwise any count the input allows. Six numbers
+      // labelled CRS84, or four labelled CRS84h, are refused rather than sent
+      // (W20).
+      const kind = typeof crs === "string" ? classifyCrs(crs) : "unknown";
+      const implied =
+        kind === "crs84h" ? 6 : kind === "crs84" || kind === "epsg4326" ? 4 : undefined;
+      const allowed =
+        implied !== undefined && control.dimensions.includes(implied)
+          ? [implied]
+          : control.dimensions;
+      const counts = allowed.join(" or ");
       if (
         !isJsonArray(coordinates) ||
         !coordinates.every((entry) => typeof entry === "number" && Number.isFinite(entry)) ||
-        !control.dimensions.some((count) => count === coordinates.length)
+        !allowed.some((count) => count === coordinates.length)
       ) {
         return `Draw a box on the map, or enter all ${counts} coordinates.`;
       }
