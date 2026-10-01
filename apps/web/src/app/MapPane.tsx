@@ -46,7 +46,7 @@ import type { RenderableResult } from "../results/renderable.js";
 import { FeatureProperties } from "./FeatureProperties.js";
 import type { GeometryDrawProps } from "../map/useGeometryDraw.js";
 import type { DrawTarget } from "./draw.js";
-import { MapLimitsContext } from "./map-limits.js";
+import { MapLimitsContext, tooManyToEdit } from "./map-limits.js";
 import { useDataUrl } from "./useDataUrl.js";
 import type { Workflow } from "./workflow.js";
 
@@ -222,9 +222,15 @@ export function MapPane({
       ? current.crs
       : undefined;
   const shapes = field === undefined ? undefined : shapeBinding(field, current);
+  const { maxCoordinates, maxEditableCoordinates } = useContext(MapLimitsContext);
+  // Never into the draw mode: Terra Draw keeps a feature per vertex and
+  // redraws them all on every move. Shown read-only on the input layer
+  // instead, and the field says why (map-limits.ts).
+  const editable =
+    shapes === undefined || tooManyToEdit(shapes.text, maxEditableCoordinates) === undefined;
 
   const geometry: GeometryDrawProps =
-    field === undefined || shapes === undefined
+    field === undefined || shapes === undefined || !editable
       ? INACTIVE
       : {
           active: true,
@@ -237,8 +243,11 @@ export function MapPane({
           },
         };
 
-  const { maxCoordinates } = useContext(MapLimitsContext);
-  const shown = shownFor(state, field === undefined ? undefined : draw.fieldId, maxCoordinates);
+  const shown = shownFor(
+    state,
+    field === undefined || !editable ? undefined : draw.fieldId,
+    maxCoordinates,
+  );
   const leftOff = leftOffTheMap(state, maxCoordinates);
   // A click picks a result shape by its index among the plotted ones — the
   // order `shownFor` shows them in. Held with the results it was made on, so

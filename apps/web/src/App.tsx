@@ -13,6 +13,7 @@ import { JobsPanel } from "./jobs/JobsPanel.js";
 import { RelayBanner, RelayOffer } from "./app/RelayRoute.js";
 import { useWorkflow } from "./app/useWorkflow.js";
 import {
+  DEFAULT_MAX_EDITABLE_COORDINATES,
   DEFAULT_MAX_MAP_COORDINATES,
   STATIC_ONLY,
   type RuntimeConfig,
@@ -43,8 +44,11 @@ export function App({ config = STATIC_ONLY, configWarning }: AppProps) {
   );
   const view = useWorkflow(relayUrl, config.acceptedNoticeMs);
   const mapLimits = useMemo<MapLimits>(
-    () => ({ maxCoordinates: config.maxMapCoordinates ?? DEFAULT_MAX_MAP_COORDINATES }),
-    [config.maxMapCoordinates],
+    () => ({
+      maxCoordinates: config.maxMapCoordinates ?? DEFAULT_MAX_MAP_COORDINATES,
+      maxEditableCoordinates: config.maxEditableCoordinates ?? DEFAULT_MAX_EDITABLE_COORDINATES,
+    }),
+    [config.maxMapCoordinates, config.maxEditableCoordinates],
   );
   const { state, commands } = view;
   const [developer] = useState(developerRequested);

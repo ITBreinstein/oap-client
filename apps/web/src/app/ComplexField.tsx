@@ -14,11 +14,12 @@
  * Buffer and SAGA's polygon tools take GML or "an object".
  */
 
-import { useContext, useId, useState } from "react";
+import { useContext, useEffect, useId, useState } from "react";
 import type { ComplexValue } from "../forms/encode.js";
 import type { ComplexControl } from "../forms/plan.js";
 import { refuseJsonObject, refuseSize } from "../forms/upload.js";
 import { DrawContext } from "./draw.js";
+import { tooManyToEditMessage, useTooManyToEdit } from "./map-limits.js";
 import type { ControlProps } from "./FormFields.js";
 
 function asComplex(value: unknown): ComplexValue {
@@ -64,6 +65,11 @@ export function ComplexField(props: ControlProps<ComplexControl>) {
   const drawing = inputId !== undefined && draw.fieldId === inputId;
   const canDraw =
     inputId !== undefined && draw.available && format?.object === true && !byReference;
+  const tooMany = useTooManyToEdit(format?.object === true ? (current.value ?? "") : "");
+  // A value too large to edit — loaded or pasted while drawing — ends drawing.
+  useEffect(() => {
+    if (drawing && tooMany !== undefined) draw.stop();
+  }, [drawing, tooMany, draw]);
 
   return (
     <div className="complex" aria-describedby={describedBy}>
@@ -197,12 +203,19 @@ export function ComplexField(props: ControlProps<ComplexControl>) {
               {message}
             </p>
           )}
+          {canDraw && tooMany !== undefined && (
+            <p id={`${base}-too-many`} className="hint" data-testid="too-many-to-edit">
+              {tooManyToEditMessage(tooMany)}
+            </p>
+          )}
           {canDraw && (
             <p className="actions">
               <button
                 type="button"
                 className={drawing ? "" : "secondary"}
                 aria-pressed={drawing}
+                disabled={tooMany !== undefined}
+                aria-describedby={tooMany === undefined ? undefined : `${base}-too-many`}
                 onClick={() => {
                   if (drawing) draw.stop();
                   else draw.start(inputId);
