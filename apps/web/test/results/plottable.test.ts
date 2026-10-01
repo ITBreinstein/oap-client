@@ -10,6 +10,7 @@ import {
   plotStatus,
   plottedFeatures,
   plottedShapes,
+  positionCount,
 } from "../../src/results/plottable.js";
 import type { RenderableResult } from "../../src/results/renderable.js";
 
@@ -198,5 +199,27 @@ describe("plottedFeatures: what a click on the map shows (package 5)", () => {
         json("collection", collection),
       ]),
     );
+  });
+});
+
+describe("the coordinate limit (review W3)", () => {
+  const polygon = json("area", { type: "Polygon", coordinates: square });
+
+  it("counts every position of every shape", () => {
+    expect(positionCount([{ type: "Polygon", coordinates: square }])).toBe(5);
+    expect(positionCount([{ type: "Point", coordinates: [5, 52] }])).toBe(1);
+  });
+
+  it("plots a result at the limit, and says a result over it has too many to draw", () => {
+    expect(plotStatus(polygon, 5).kind).toBe("plotted");
+    expect(plotStatus(polygon, 4)).toEqual({ kind: "too-many", positions: 5, limit: 4 });
+  });
+
+  it("leaves a result over the limit off the map, and keeps the others", () => {
+    const point = json("point", { type: "Point", coordinates: [5, 52] });
+    expect(plottedShapes([polygon, point], 4)).toEqual([{ type: "Point", coordinates: [5, 52] }]);
+    expect(plottedFeatures([polygon, point], 4).map((feature) => feature.outputId)).toEqual([
+      "point",
+    ]);
   });
 });

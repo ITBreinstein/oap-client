@@ -747,6 +747,117 @@ test.describe("the workflow in a browser", () => {
     );
   });
 
+  test("leaves a result with more coordinates than config.json allows off the map, and offers it as a download", async ({
+    page,
+  }) => {
+    // Review W3: past a limit the page declines to draw, and says so, rather
+    // than trying and going blank. The limit comes from config.json.
+    await page.route("**/config.json", (route) =>
+      route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({ relay: null, presets: [], map: { maxCoordinates: 4 } }),
+      }),
+    );
+    await connectTyped(page, PYGEOAPI);
+    await openProcess(page, "Rotate a polygon a quarter turn");
+    const square = {
+      type: "Polygon",
+      coordinates: [
+        [
+          [5.1, 52.1],
+          [5.2, 52.1],
+          [5.2, 52.2],
+          [5.1, 52.2],
+          [5.1, 52.1],
+        ],
+      ],
+    };
+    await page
+      .locator('[data-input-id="polygon"]')
+      .getByRole("textbox", { name: "GeoJSON" })
+      .fill(JSON.stringify(square));
+    await expect(page.getByTestId("map-left-off")).toContainText("more than 4 coordinates");
+    await page.getByRole("button", { name: "Run", exact: true }).click();
+
+    const result = page.locator('[data-output-id="rotated"]');
+    await expect(result.getByTestId("too-many-to-draw")).toContainText(
+      "GeoJSON with 5 coordinates, more than the 4 this page draws",
+    );
+    await expect(result).not.toHaveAttribute("data-plotted", "true");
+    await expect(page.locator(".map-canvas")).toHaveAttribute("data-result-shapes", "0");
+    await expect(page.getByTestId("map-left-off")).toContainText(
+      "A result can still be downloaded",
+    );
+    const download = page.waitForEvent("download");
+    await result.getByRole("button", { name: /Download/ }).click();
+    expect((await download).suggestedFilename()).toMatch(/rotated/);
+  });
+
+  test("shows an input too large to edit read-only, stops drawing for it, and sends it as it is", async ({
+    page,
+  }) => {
+    // Past map.maxEditableCoordinates the value never goes into Terra Draw:
+    // it is shown on the input layer, the field says why, and drawing is off.
+    await page.route("**/config.json", (route) =>
+      route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({ relay: null, presets: [], map: { maxEditableCoordinates: 4 } }),
+      }),
+    );
+    await connectTyped(page, PYGEOAPI);
+    await openProcess(page, "Rotate a polygon a quarter turn");
+    const polygon = page.locator('[data-input-id="polygon"]');
+    const geojson = polygon.getByRole("textbox", { name: "GeoJSON" });
+    const tools = page.getByRole("toolbar", { name: "Drawing tools" });
+    const triangle = {
+      type: "Polygon",
+      coordinates: [
+        [
+          [5.1, 52.1],
+          [5.2, 52.1],
+          [5.15, 52.2],
+          [5.1, 52.1],
+        ],
+      ],
+    };
+    const square = {
+      type: "Polygon",
+      coordinates: [
+        [
+          [5.1, 52.1],
+          [5.2, 52.1],
+          [5.2, 52.2],
+          [5.1, 52.2],
+          [5.1, 52.1],
+        ],
+      ],
+    };
+
+    // Four positions: drawable.
+    await geojson.fill(JSON.stringify(triangle));
+    await polygon.getByRole("button", { name: "Draw on the map" }).click();
+    await expect(tools).toBeVisible();
+
+    // Five, past the limit, while drawing: drawing ends and the value stays.
+    await geojson.fill(JSON.stringify(square));
+    await expect(tools).toHaveCount(0);
+    await expect(polygon.getByRole("button", { name: "Draw on the map" })).toBeDisabled();
+    await expect(polygon.getByTestId("too-many-to-edit")).toContainText(
+      "This input has 5 coordinates, more than the 4 the map edits at once",
+    );
+    await expect(page.getByTestId("map-legend")).toHaveText("The input, not yet sent.");
+    expect(JSON.parse(await geojson.inputValue())).toEqual(square);
+
+    const exchange = page.waitForResponse(
+      (candidate) =>
+        candidate.request().method() === "POST" &&
+        candidate.url().includes("/breinstein-rotate/execution"),
+    );
+    await page.getByRole("button", { name: "Run", exact: true }).click();
+    const sent = (await exchange).request().postDataJSON() as { inputs: { polygon: unknown } };
+    expect(sent.inputs.polygon).toEqual({ value: square, mediaType: "application/geo+json" });
+  });
+
   test("describes every process for the census, and exports one endpoint's observations", async ({
     page,
   }) => {

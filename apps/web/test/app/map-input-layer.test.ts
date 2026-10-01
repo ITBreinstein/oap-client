@@ -10,7 +10,7 @@ import {
   type ServiceDescription,
 } from "@breinstein/oap-client";
 import { describe, expect, it } from "vitest";
-import { shownFor } from "../../src/app/MapPane.js";
+import { leftOffTheMap, shownFor } from "../../src/app/MapPane.js";
 import {
   INITIAL_WORKFLOW,
   workflowReducer,
@@ -103,5 +103,16 @@ describe("the input layer", () => {
     const running = reduce(withArea, { type: "run-started", mode: "sync" });
     // Drawing has ended with the form: a stale field id changes nothing.
     expect(inputShapes(shownFor(running, "area"))).toEqual([square]);
+  });
+});
+
+describe("the coordinate limit on the input layer (review W3)", () => {
+  it("leaves an input with more positions than the limit off the map, and names it", () => {
+    expect(inputShapes(shownFor(withArea, undefined, 4))).toEqual([square]);
+    expect(inputShapes(shownFor(withArea, undefined, 3))).toEqual([]);
+    expect(leftOffTheMap(withArea, 3)).toEqual([
+      { name: expect.any(String) as unknown, positions: 4 },
+    ]);
+    expect(leftOffTheMap(withArea, 4)).toEqual([]);
   });
 });

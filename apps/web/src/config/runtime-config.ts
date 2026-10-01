@@ -21,6 +21,14 @@
  * - `jobs.acceptedNoticeSeconds`: how long a background job may report
  *   `accepted` before the page says no progress has been reported yet. A
  *   whole number of seconds, 1 to 86 400; 60 when absent.
+ * - `map.maxCoordinates`: the most positions one result, or one input, may
+ *   have for the page to draw it on the map. Above it the page says so and
+ *   offers the download instead. A whole number, 1 to 10 000 000;
+ *   {@link DEFAULT_MAX_MAP_COORDINATES} when absent.
+ * - `map.maxEditableCoordinates`: the most positions an input may have for
+ *   the map to edit it. Above it the input is shown on the map, read-only,
+ *   and "Draw on the map" is off for it. A whole number, 1 to 10 000 000;
+ *   {@link DEFAULT_MAX_EDITABLE_COORDINATES} when absent.
  *
  * Anything else — a missing file, a file that is not JSON, an unknown member,
  * a value of the wrong shape — is refused whole, and the page runs without
@@ -41,7 +49,31 @@ export interface RuntimeConfig {
   readonly presets: readonly Preset[];
   /** `jobs.acceptedNoticeSeconds`, in milliseconds; undefined for the default. */
   readonly acceptedNoticeMs?: number | undefined;
+  /** `map.maxCoordinates`; undefined for {@link DEFAULT_MAX_MAP_COORDINATES}. */
+  readonly maxMapCoordinates?: number | undefined;
+  /** `map.maxEditableCoordinates`; undefined for {@link DEFAULT_MAX_EDITABLE_COORDINATES}. */
+  readonly maxEditableCoordinates?: number | undefined;
 }
+
+/**
+ * Positions the map draws for one result or input when `config.json` does not
+ * say. MapLibre draws this many without the page stalling on an ordinary
+ * laptop; what matters more is that past it the page declines and says so,
+ * rather than trying and going blank (review W3).
+ */
+export const DEFAULT_MAX_MAP_COORDINATES = 250_000;
+
+/**
+ * Positions the map edits in one input when `config.json` does not say.
+ * Editing costs far more than showing: Terra Draw keeps a feature for every
+ * vertex (a coordinate point), and a selected shape gets a handle for every
+ * vertex too, all redrawn on each move. Measured on an Apple M1 (8 GB) in
+ * Chromium, a polygon of 1 000 vertices answers a click in about 120 ms and
+ * drags with no task over 100 ms; at 2 000 a click takes about 190 ms and each
+ * step of a drag about 165 ms; at 4 000 a click takes 0.76 s. Above the limit
+ * the input is shown read-only rather than edited badly.
+ */
+export const DEFAULT_MAX_EDITABLE_COORDINATES = 1_000;
 
 /** No relay, no presets: what the page runs with when the file cannot be used. */
 export const STATIC_ONLY: RuntimeConfig = { relayUrl: undefined, presets: [] };
@@ -140,10 +172,40 @@ function checkJobs(value: unknown): number | undefined | { readonly problem: str
   return seconds * 1000;
 }
 
+/** One of `map`'s limits: a whole number of positions, or undefined when absent. */
+function checkLimit(
+  map: Record<string, unknown>,
+  name: string,
+): number | undefined | { readonly problem: string } {
+  const limit = map[name];
+  if (limit === undefined) return undefined;
+  if (typeof limit !== "number" || !Number.isInteger(limit) || limit < 1 || limit > 10_000_000) {
+    return { problem: `map.${name} must be a whole number from 1 to 10000000` };
+  }
+  return limit;
+}
+
+/** `map`, as its two coordinate limits, each undefined when absent. */
+function checkMap(
+  value: unknown,
+):
+  | { readonly maxCoordinates?: number | undefined; readonly maxEditable?: number | undefined }
+  | { readonly problem: string } {
+  if (value === undefined) return {};
+  if (!isRecord(value)) return { problem: "map must be an object" };
+  const extra = unknownMember(value, ["maxCoordinates", "maxEditableCoordinates"]);
+  if (extra !== undefined) return { problem: `map has an unknown member "${extra}"` };
+  const maxCoordinates = checkLimit(value, "maxCoordinates");
+  if (typeof maxCoordinates === "object") return maxCoordinates;
+  const maxEditable = checkLimit(value, "maxEditableCoordinates");
+  if (typeof maxEditable === "object") return maxEditable;
+  return { maxCoordinates, maxEditable };
+}
+
 /** Check a parsed `config.json`, whole. */
 export function checkRuntimeConfig(value: unknown): ConfigCheck {
   if (!isRecord(value)) return { ok: false, problem: "the file must hold a JSON object" };
-  const extra = unknownMember(value, ["relay", "presets", "jobs"]);
+  const extra = unknownMember(value, ["relay", "presets", "jobs", "map"]);
   if (extra !== undefined) return { ok: false, problem: `unknown member "${extra}"` };
 
   let relayUrl: string | undefined;
@@ -165,9 +227,18 @@ export function checkRuntimeConfig(value: unknown): ConfigCheck {
   const jobs = checkJobs(value["jobs"]);
   if (typeof jobs === "object") return { ok: false, ...jobs };
 
+  const map = checkMap(value["map"]);
+  if ("problem" in map) return { ok: false, problem: map.problem };
+
   return {
     ok: true,
-    config: { relayUrl, presets, ...(jobs === undefined ? {} : { acceptedNoticeMs: jobs }) },
+    config: {
+      relayUrl,
+      presets,
+      ...(jobs === undefined ? {} : { acceptedNoticeMs: jobs }),
+      ...(map.maxCoordinates === undefined ? {} : { maxMapCoordinates: map.maxCoordinates }),
+      ...(map.maxEditable === undefined ? {} : { maxEditableCoordinates: map.maxEditable }),
+    },
   };
 }
 

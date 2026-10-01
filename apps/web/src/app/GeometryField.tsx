@@ -10,13 +10,14 @@
  * New rather than reading its metres as degrees.
  */
 
-import { useContext, useId, useState } from "react";
+import { useContext, useEffect, useId, useState } from "react";
 import { isGeoJsonText, type GeoJsonText } from "../forms/encode.js";
 import { describeLoad, readGeoJson } from "../forms/geojson.js";
 import { drawableTypes, holdsSeveral, toGeoJson } from "../forms/geometry.js";
 import type { GeometryControl } from "../forms/plan.js";
 import { refuseSize } from "../forms/upload.js";
 import { DrawContext } from "./draw.js";
+import { tooManyToEditMessage, useTooManyToEdit } from "./map-limits.js";
 import type { ControlProps } from "./FormFields.js";
 
 const SINGULAR = { Point: "point", LineString: "line", Polygon: "area" } as const;
@@ -50,6 +51,11 @@ export function GeometryField(props: ControlProps<GeometryControl>) {
   const text = isGeoJsonText(value) ? value.geojson : "";
   const drawing = inputId !== undefined && draw.fieldId === inputId;
   const canDraw = inputId !== undefined && draw.available && drawableTypes(control).length > 0;
+  const tooMany = useTooManyToEdit(text);
+  // A value too large to edit — loaded or pasted while drawing — ends drawing.
+  useEffect(() => {
+    if (drawing && tooMany !== undefined) draw.stop();
+  }, [drawing, tooMany, draw]);
 
   const set = (geojson: string) => {
     const next: GeoJsonText = { geojson };
@@ -122,12 +128,19 @@ export function GeometryField(props: ControlProps<GeometryControl>) {
           {message}
         </p>
       )}
+      {canDraw && tooMany !== undefined && (
+        <p id={`${base}-too-many`} className="hint" data-testid="too-many-to-edit">
+          {tooManyToEditMessage(tooMany)}
+        </p>
+      )}
       <p className="actions">
         {canDraw && (
           <button
             type="button"
             className={drawing ? "" : "secondary"}
             aria-pressed={drawing}
+            disabled={tooMany !== undefined}
+            aria-describedby={tooMany === undefined ? undefined : `${base}-too-many`}
             onClick={() => {
               if (drawing) draw.stop();
               else draw.start(inputId);

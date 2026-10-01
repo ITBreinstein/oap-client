@@ -3,6 +3,8 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { DeveloperPanel } from "./app/DeveloperPanel.js";
 import { activeDrawField, DrawContext, type DrawRequest, type DrawTarget } from "./app/draw.js";
 import { EndpointScreen } from "./app/EndpointScreen.js";
+import { MapBoundary } from "./app/MapBoundary.js";
+import { MapLimitsContext, type MapLimits } from "./app/map-limits.js";
 import { MapPane } from "./app/MapPane.js";
 import { ProcessListScreen } from "./app/ProcessListScreen.js";
 import { ProcessScreen } from "./app/ProcessScreen.js";
@@ -10,7 +12,12 @@ import { DEV_PRESETS } from "./app/dev-presets.js";
 import { JobsPanel } from "./jobs/JobsPanel.js";
 import { RelayBanner, RelayOffer } from "./app/RelayRoute.js";
 import { useWorkflow } from "./app/useWorkflow.js";
-import { STATIC_ONLY, type RuntimeConfig } from "./config/runtime-config.js";
+import {
+  DEFAULT_MAX_EDITABLE_COORDINATES,
+  DEFAULT_MAX_MAP_COORDINATES,
+  STATIC_ONLY,
+  type RuntimeConfig,
+} from "./config/runtime-config.js";
 
 function developerRequested(): boolean {
   try {
@@ -36,6 +43,13 @@ export function App({ config = STATIC_ONLY, configWarning }: AppProps) {
     [config.presets],
   );
   const view = useWorkflow(relayUrl, config.acceptedNoticeMs);
+  const mapLimits = useMemo<MapLimits>(
+    () => ({
+      maxCoordinates: config.maxMapCoordinates ?? DEFAULT_MAX_MAP_COORDINATES,
+      maxEditableCoordinates: config.maxEditableCoordinates ?? DEFAULT_MAX_EDITABLE_COORDINATES,
+    }),
+    [config.maxMapCoordinates, config.maxEditableCoordinates],
+  );
   const { state, commands } = view;
   const [developer] = useState(developerRequested);
   const [mapAvailable, setMapAvailable] = useState(false);
@@ -124,63 +138,67 @@ export function App({ config = STATIC_ONLY, configWarning }: AppProps) {
   }
 
   return (
-    <DrawContext.Provider value={draw}>
-      <div className="app" data-relay-stream={view.snapshot?.relay}>
-        <header className="app-header">
-          <h1>OGC API - Processes client</h1>
-          <p className="muted" data-testid="core-version">
-            core {VERSION}
-          </p>
-        </header>
-        {configWarning !== undefined && (
-          <p className="notice config-warning" role="alert" data-testid="config-warning">
-            {configWarning}
-          </p>
-        )}
-        {relayUrl === undefined && (
-          <p className="muted static-only" data-testid="static-only">
-            This page runs without the relay: every request goes straight from your browser to the
-            service. A service must allow web pages to read it (CORS), and a background run is found
-            only where the service lets a page read the job&apos;s address. Callbacks, and reading
-            services that send no CORS headers, need the relay.
-          </p>
-        )}
-        <div className="layout">
-          <main className="panel" ref={panel}>
-            {state.stage !== "choose-endpoint" && state.route === "relay" && <RelayBanner />}
-            {screen}
-            {state.stage === "choose-endpoint" && state.offer !== undefined && (
-              <RelayOffer onConfirm={commands.confirmRelay} onDecline={commands.declineRelay} />
-            )}
-            <JobsPanel
-              jobs={view.snapshot?.jobs ?? []}
-              activeJob={
-                state.stage === "running" && state.run.mode === "async"
-                  ? state.run.jobRef
-                  : undefined
-              }
-              dismissAdvertisedFor={view.dismissAdvertisedFor}
-              messages={view.jobMessages}
-              onRemove={commands.removeJob}
-              onDismiss={commands.dismissJob}
-            />
-            <DeveloperPanel
-              observations={view.snapshot?.observations ?? []}
-              dropped={view.snapshot?.droppedObservations ?? 0}
-              relayUrl={relayUrl}
-              open={developer}
-              census={view.census}
-              onDescribeAll={state.stage === "choose-endpoint" ? undefined : commands.describeAll}
-            />
-          </main>
-          <MapPane
-            state={state}
-            draw={draw}
-            setValue={commands.setValue}
-            onAvailable={setMapAvailable}
-          />
+    <MapLimitsContext value={mapLimits}>
+      <DrawContext.Provider value={draw}>
+        <div className="app" data-relay-stream={view.snapshot?.relay}>
+          <header className="app-header">
+            <h1>OGC API - Processes client</h1>
+            <p className="muted" data-testid="core-version">
+              core {VERSION}
+            </p>
+          </header>
+          {configWarning !== undefined && (
+            <p className="notice config-warning" role="alert" data-testid="config-warning">
+              {configWarning}
+            </p>
+          )}
+          {relayUrl === undefined && (
+            <p className="muted static-only" data-testid="static-only">
+              This page runs without the relay: every request goes straight from your browser to the
+              service. A service must allow web pages to read it (CORS), and a background run is
+              found only where the service lets a page read the job&apos;s address. Callbacks, and
+              reading services that send no CORS headers, need the relay.
+            </p>
+          )}
+          <div className="layout">
+            <main className="panel" ref={panel}>
+              {state.stage !== "choose-endpoint" && state.route === "relay" && <RelayBanner />}
+              {screen}
+              {state.stage === "choose-endpoint" && state.offer !== undefined && (
+                <RelayOffer onConfirm={commands.confirmRelay} onDecline={commands.declineRelay} />
+              )}
+              <JobsPanel
+                jobs={view.snapshot?.jobs ?? []}
+                activeJob={
+                  state.stage === "running" && state.run.mode === "async"
+                    ? state.run.jobRef
+                    : undefined
+                }
+                dismissAdvertisedFor={view.dismissAdvertisedFor}
+                messages={view.jobMessages}
+                onRemove={commands.removeJob}
+                onDismiss={commands.dismissJob}
+              />
+              <DeveloperPanel
+                observations={view.snapshot?.observations ?? []}
+                dropped={view.snapshot?.droppedObservations ?? 0}
+                relayUrl={relayUrl}
+                open={developer}
+                census={view.census}
+                onDescribeAll={state.stage === "choose-endpoint" ? undefined : commands.describeAll}
+              />
+            </main>
+            <MapBoundary>
+              <MapPane
+                state={state}
+                draw={draw}
+                setValue={commands.setValue}
+                onAvailable={setMapAvailable}
+              />
+            </MapBoundary>
+          </div>
         </div>
-      </div>
-    </DrawContext.Provider>
+      </DrawContext.Provider>
+    </MapLimitsContext>
   );
 }
