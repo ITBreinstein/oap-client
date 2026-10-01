@@ -130,7 +130,16 @@ module.exports = {
       from: { path: "^packages/core/src/vocabulary" },
       to: { path: "^packages/core/src", pathNot: "^packages/core/src/vocabulary/" },
     },
-    { name: "no-circular", severity: "error", from: {}, to: { circular: true } },
+    {
+      // A cycle is refused when it would run: every edge in it a runtime
+      // import. One `import type` edge is erased at compile time and breaks
+      // the loop, so such a cycle passes. The boundary rules above still
+      // count type-only imports; only this one looks past them.
+      name: "no-circular",
+      severity: "error",
+      from: {},
+      to: { circular: true, viaOnly: { dependencyTypesNot: ["type-only"] } },
+    },
     // pnpm makes an undeclared import unresolvable; make that a build failure
     // rather than something you notice after publishing.
     { name: "not-to-unresolvable", severity: "error", from: {}, to: { couldNotResolve: true } },
