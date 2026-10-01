@@ -205,19 +205,42 @@ export function createJobSession(
     }
   >();
 
-  /** What storage gets: jobs with a process and a start time, in the order started. */
+  /** Status URLs this tab took off the list: another tab's copy must not bring them back. */
+  const removedHere = new Set<string>();
+  /**
+   * The status URLs storage held when this tab last read it. Only a job that
+   * was there and no longer is was removed by another tab; one that never got
+   * in (a full quota, a refused write) is not taken for removed.
+   */
+  let lastStored = new Set<string>();
+  const readStorage = (): StoredJob[] => {
+    const stored = store.load();
+    lastStored = new Set(stored.map((job) => job.statusUrl));
+    return stored;
+  };
+
+  /**
+   * What storage gets: what is there already — other tabs' jobs too — less
+   * what this tab removed, plus this tab's jobs that have a process and a
+   * start time. Read again just before writing, so no tab's job is lost to
+   * another tab's save (W12).
+   */
   const persist = (): void => {
-    const kept: StoredJob[] = [];
+    const kept = new Map<string, StoredJob>();
+    for (const job of readStorage()) {
+      if (!removedHere.has(job.statusUrl)) kept.set(job.statusUrl, job);
+    }
     for (const [statusUrl, job] of meta) {
       if (job.processId === undefined || job.startedAt === undefined) continue;
-      kept.push({
+      kept.set(statusUrl, {
         endpoint: job.baseUrl,
         statusUrl,
         processId: job.processId,
         startedAt: job.startedAt,
       });
     }
-    store.save(kept);
+    store.save([...kept.values()]);
+    readStorage();
   };
   const listeners = new Set<(snapshot: JobSessionSnapshot) => void>();
 
@@ -300,7 +323,7 @@ export function createJobSession(
   // as every connection is, and without a doorbell: the relay registration
   // belonged to a session this page never had, and whose token was never
   // stored. A job already finished settles on its first read.
-  for (const stored of store.load()) {
+  const restore = (stored: StoredJob): void => {
     meta.set(stored.statusUrl, {
       endpointKey: "",
       baseUrl: stored.endpoint,
@@ -311,7 +334,28 @@ export function createJobSession(
       restored: true,
     });
     reconciler.track(stored.statusUrl);
-  }
+  };
+  for (const stored of readStorage()) restore(stored);
+
+  // Another tab changed the list: its new jobs appear here, polled like any
+  // restored one, and a job it removed goes from here too (W12).
+  const unsubscribeStore = store.subscribe(() => {
+    const before = lastStored;
+    const stored = readStorage();
+    let changed = false;
+    for (const job of stored) {
+      if (meta.has(job.statusUrl) || removedHere.has(job.statusUrl)) continue;
+      restore(job);
+      changed = true;
+    }
+    for (const statusUrl of before) {
+      if (lastStored.has(statusUrl) || !meta.has(statusUrl)) continue;
+      reconciler.untrack(statusUrl);
+      meta.delete(statusUrl);
+      changed = true;
+    }
+    if (changed) publish();
+  });
 
   return {
     async endpoints() {
@@ -355,6 +399,7 @@ export function createJobSession(
       if (!meta.has(statusUrl)) return;
       reconciler.untrack(statusUrl);
       meta.delete(statusUrl);
+      removedHere.add(statusUrl);
       persist();
       publish();
     },
@@ -428,6 +473,7 @@ export function createJobSession(
     },
 
     dispose() {
+      unsubscribeStore();
       doorbells?.close();
       reconciler.dispose();
       listeners.clear();

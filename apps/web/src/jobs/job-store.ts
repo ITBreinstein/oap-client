@@ -16,6 +16,12 @@
  * What comes back out is checked entry by entry, never asserted into shape:
  * another tab, an older version of this page or a person with the dev tools
  * may have written it.
+ *
+ * The list is shared by every tab of this origin. A tab that saves re-reads
+ * it first and changes only its own entries (`job-session.ts`), and hears,
+ * through the browser's `storage` event, when another tab changed it (review
+ * W12): before, the second tab to start a job saved its own list whole and
+ * the first tab's jobs dropped out.
  */
 
 import { isAbsoluteUrl } from "@breinstein/oap-client";
@@ -34,6 +40,11 @@ export interface JobStore {
   load(): StoredJob[];
   /** Replace what is stored. Silently does nothing when storage is unavailable. */
   save(jobs: readonly StoredJob[]): void;
+  /**
+   * Call `listener` whenever another tab changes what is stored. Never for
+   * this tab's own `save`. Returns the way to stop listening.
+   */
+  subscribe(listener: () => void): () => void;
 }
 
 /** Versioned, so a later shape can be told apart instead of misread. */
@@ -85,7 +96,15 @@ function browserStorage(): Storage | undefined {
   }
 }
 
-export function createJobStore(storage: () => Storage | undefined = browserStorage): JobStore {
+/** Where the browser announces another tab's storage changes, or undefined off-browser. */
+function browserWindow(): EventTarget | undefined {
+  return typeof window === "undefined" ? undefined : window;
+}
+
+export function createJobStore(
+  storage: () => Storage | undefined = browserStorage,
+  events: () => EventTarget | undefined = browserWindow,
+): JobStore {
   return {
     load() {
       let text: string | null;
@@ -131,8 +150,27 @@ export function createJobStore(storage: () => Storage | undefined = browserStora
         // Full, refused or gone: the list lasts as long as the page.
       }
     },
+
+    subscribe(listener) {
+      const target = events();
+      if (target === undefined) return () => undefined;
+      const onStorage = (event: Event) => {
+        // A StorageEvent's `key`: null when another tab cleared the whole of
+        // storage. Read without naming StorageEvent, which only browsers have.
+        const key: unknown = "key" in event ? event.key : null;
+        if (key === STORAGE_KEY || key === null) listener();
+      };
+      target.addEventListener("storage", onStorage);
+      return () => {
+        target.removeEventListener("storage", onStorage);
+      };
+    },
   };
 }
 
 /** A store that keeps nothing: for a session that must not persist, and for tests. */
-export const NO_STORE: JobStore = { load: () => [], save: () => undefined };
+export const NO_STORE: JobStore = {
+  load: () => [],
+  save: () => undefined,
+  subscribe: () => () => undefined,
+};
