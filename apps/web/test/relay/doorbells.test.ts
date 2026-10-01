@@ -303,3 +303,86 @@ describe("a relay restart in the middle of a job", () => {
     reconciler.dispose();
   });
 });
+
+describe("close() sends nothing more (review W11)", () => {
+  /** A relay whose session and stream answers the test gives by hand. */
+  function heldRelay() {
+    const sessions: { signal: AbortSignal | undefined; grant: (token: string) => void }[] = [];
+    const streams: { token: string; cancelled: () => boolean; answer: () => void }[] = [];
+    const relay: RelayClient = {
+      baseUrl: "http://relay.test",
+      endpoints: () => Promise.resolve([]),
+      execute: () => Promise.reject(new Error("not used")),
+      forward: () => Promise.reject(new Error("not used")),
+      createSession: (signal) =>
+        new Promise((resolve) => {
+          sessions.push({
+            signal,
+            grant: (token) => {
+              resolve({ token, expiresAt: 0 });
+            },
+          });
+        }),
+      openEvents: (token) =>
+        new Promise((resolve) => {
+          let cancelled = false;
+          const body = new ReadableStream<Uint8Array>({
+            cancel() {
+              cancelled = true;
+            },
+          });
+          streams.push({
+            token,
+            cancelled: () => cancelled,
+            answer: () => {
+              resolve(new Response(body, { status: 200 }));
+            },
+          });
+        }),
+    };
+    return { relay, sessions, streams };
+  }
+
+  function open(relay: RelayClient) {
+    return openDoorbells({
+      relay,
+      schedule: manualSchedule().schedule,
+      onDoorbell: () => undefined,
+      onOpen: () => undefined,
+    });
+  }
+
+  it("asks for no session when closed in the turn it was opened, as StrictMode does", async () => {
+    const { relay, sessions } = heldRelay();
+    open(relay).close();
+    await settle();
+    expect(sessions).toEqual([]);
+  });
+
+  it("aborts the session request, and opens no stream, when closed while asking", async () => {
+    const { relay, sessions, streams } = heldRelay();
+    const doorbells = open(relay);
+    await settle();
+    expect(sessions).toHaveLength(1);
+
+    doorbells.close();
+    expect(sessions[0]?.signal?.aborted).toBe(true);
+    sessions[0]?.grant("session-1"); // The relay answers anyway.
+    await settle();
+    expect(streams).toEqual([]);
+  });
+
+  it("lets go of a stream that answers only after close()", async () => {
+    const { relay, sessions, streams } = heldRelay();
+    const doorbells = open(relay);
+    await settle();
+    sessions[0]?.grant("session-1");
+    await settle();
+    expect(streams).toHaveLength(1);
+
+    doorbells.close();
+    streams[0]?.answer();
+    await settle();
+    expect(streams[0]?.cancelled()).toBe(true);
+  });
+});

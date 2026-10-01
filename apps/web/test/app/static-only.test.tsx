@@ -69,7 +69,16 @@ describe("static-only", () => {
     expect(view.querySelector("[data-testid='static-only']")?.textContent).toMatch(
       /without the relay/,
     );
+    // The job panel that shows the relay's state mounts with the developer section.
+    const developer = view.querySelector<HTMLDetailsElement>("details.developer");
+    if (developer === null) throw new Error("no developer panel");
+    await act(async () => {
+      developer.open = true;
+      developer.dispatchEvent(new Event("toggle"));
+      await Promise.resolve();
+    });
     expect(view.querySelector("[data-testid='relay-state']")?.textContent).toMatch(/off/);
+    expect(relayClients.made).toEqual([]);
     expect(view.querySelector("[data-testid='config-warning']")).toBeNull();
     // No offer to use the relay, and no banner saying it is in use.
     expect(view.textContent).not.toMatch(/Use relay/);
