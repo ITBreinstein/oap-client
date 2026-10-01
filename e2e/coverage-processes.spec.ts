@@ -9,18 +9,11 @@
  */
 
 import { expect, test, type Page } from "@playwright/test";
+import { RELAY } from "./servers.js";
+import { PDOK_LANE, requireService } from "./services.js";
 
 const PYGEOAPI = "http://localhost:5080";
-const RELAY = "http://localhost:8787";
 const PDOK_BAG = "https://api.pdok.nl/kadaster/bag/ogc/v2/collections/pand";
-
-async function answering(url: string): Promise<boolean> {
-  try {
-    return (await fetch(url, { signal: AbortSignal.timeout(5_000) })).ok;
-  } catch {
-    return false;
-  }
-}
 
 /** Connect to a typed address, which is always reached directly. */
 async function connectTyped(page: Page) {
@@ -61,13 +54,13 @@ async function declareOnly(page: Page, processId: string, modes: string[]) {
 
 test.describe("the coverage processes", () => {
   test.beforeEach(async () => {
-    test.skip(!(await answering(`${PYGEOAPI}/?f=json`)), "pygeoapi :5080 is not answering");
+    await requireService(`${PYGEOAPI}/?f=json`, "pygeoapi :5080");
   });
 
   test("offers no choice for a process that runs in the background only, and runs it there", async ({
     page,
   }) => {
-    test.skip(!(await answering(`${RELAY}/healthz`)), "the relay is not answering");
+    await requireService(`${RELAY}/healthz`, "the relay");
     await declareOnly(page, "breinstein-async-only", ["async-execute"]);
     await connectConfigured(page);
     await openProcess(page, "Slow process, background only");
@@ -99,7 +92,7 @@ test.describe("the coverage processes", () => {
   });
 
   test("shows a background job that fails partway, with the server's reason", async ({ page }) => {
-    test.skip(!(await answering(`${RELAY}/healthz`)), "the relay is not answering");
+    await requireService(`${RELAY}/healthz`, "the relay");
     await connectConfigured(page);
     await openProcess(page, "Process that fails after a while");
 
@@ -141,68 +134,72 @@ test.describe("the coverage processes", () => {
     await expect(understood).toContainText('"utc": "2026-11-03T08:00:00Z"');
   });
 
-  test("sends a FeatureCollection by reference, and shows the features on the map and as a table", async ({
-    page,
-  }) => {
-    test.skip(!(await answering(`${PDOK_BAG}?f=json`)), "PDOK is not answering");
-    await connectTyped(page);
-    await openProcess(page, "Area of each feature");
+  test(
+    "sends a FeatureCollection by reference, and shows the features on the map and as a table",
+    PDOK_LANE,
+    async ({ page }) => {
+      await requireService(`${PDOK_BAG}?f=json`, "PDOK");
+      await connectTyped(page);
+      await openProcess(page, "Area of each feature");
 
-    const features = page.locator('[data-input-id="features"]');
-    await expect(features).toHaveAttribute("data-control", "complex");
-    await features.getByRole("radio", { name: "Give a URL for the server to fetch" }).check();
-    // A few buildings in central Utrecht.
-    const href = `${PDOK_BAG}/items?f=json&bbox=5.120,52.090,5.121,52.091&limit=100`;
-    await features.getByRole("textbox", { name: "URL" }).fill(href);
+      const features = page.locator('[data-input-id="features"]');
+      await expect(features).toHaveAttribute("data-control", "complex");
+      await features.getByRole("radio", { name: "Give a URL for the server to fetch" }).check();
+      // A few buildings in central Utrecht.
+      const href = `${PDOK_BAG}/items?f=json&bbox=5.120,52.090,5.121,52.091&limit=100`;
+      await features.getByRole("textbox", { name: "URL" }).fill(href);
 
-    const request = page.waitForRequest(
-      (candidate) =>
-        candidate.method() === "POST" && candidate.url().includes("/breinstein-feature-area/"),
-    );
-    await page.getByRole("button", { name: "Run", exact: true }).click();
-    const sent = ((await request).postDataJSON() as { inputs: { features: { href: string } } })
-      .inputs.features;
-    expect(sent.href).toBe(href);
+      const request = page.waitForRequest(
+        (candidate) =>
+          candidate.method() === "POST" && candidate.url().includes("/breinstein-feature-area/"),
+      );
+      await page.getByRole("button", { name: "Run", exact: true }).click();
+      const sent = ((await request).postDataJSON() as { inputs: { features: { href: string } } })
+        .inputs.features;
+      expect(sent.href).toBe(href);
 
-    // The process fetched it (pygeoapi does not, finding 0058) and says so.
-    const measured = page.locator('[data-output-id="features"]');
-    await expect(measured).toHaveAttribute("data-plotted", "true", { timeout: 30_000 });
-    await expect(measured).toContainText('"by": "reference"');
-    const table = page.locator('[data-output-id="table"]');
-    await expect(table).toHaveAttribute("data-kind", "text");
-    await expect(table).toContainText("number,id,geometry,area_m2");
-    await expect(page.locator(".map-canvas")).not.toHaveAttribute("data-result-shapes", "0");
-  });
+      // The process fetched it (pygeoapi does not, finding 0058) and says so.
+      const measured = page.locator('[data-output-id="features"]');
+      await expect(measured).toHaveAttribute("data-plotted", "true", { timeout: 30_000 });
+      await expect(measured).toContainText('"by": "reference"');
+      const table = page.locator('[data-output-id="table"]');
+      await expect(table).toHaveAttribute("data-kind", "text");
+      await expect(table).toContainText("number,id,geometry,area_m2");
+      await expect(page.locator(".map-canvas")).not.toHaveAttribute("data-result-shapes", "0");
+    },
+  );
 
-  test("plots a GeoJSON result too large to show, and offers it as a download", async ({
-    page,
-  }) => {
-    test.setTimeout(60_000);
-    test.skip(!(await answering(`${PDOK_BAG}?f=json`)), "PDOK is not answering");
-    await connectTyped(page);
-    await openProcess(page, "Buildings in an area");
+  test(
+    "plots a GeoJSON result too large to show, and offers it as a download",
+    PDOK_LANE,
+    async ({ page }) => {
+      test.setTimeout(60_000);
+      await requireService(`${PDOK_BAG}?f=json`, "PDOK");
+      await connectTyped(page);
+      await openProcess(page, "Buildings in an area");
 
-    const area = page.locator('[data-input-id="area"]');
-    // About 400 by 450 m of central Utrecht: some 800 buildings, over 1 MB.
-    const ring = [
-      [5.118, 52.089],
-      [5.124, 52.089],
-      [5.124, 52.093],
-      [5.118, 52.093],
-      [5.118, 52.089],
-    ];
-    await area.getByLabel("Or load a GeoJSON file").setInputFiles({
-      name: "block.geojson",
-      mimeType: "application/geo+json",
-      buffer: Buffer.from(JSON.stringify({ type: "Polygon", coordinates: [ring] })),
-    });
-    await page.getByRole("button", { name: "Run", exact: true }).click();
+      const area = page.locator('[data-input-id="area"]');
+      // About 400 by 450 m of central Utrecht: some 800 buildings, over 1 MB.
+      const ring = [
+        [5.118, 52.089],
+        [5.124, 52.089],
+        [5.124, 52.093],
+        [5.118, 52.093],
+        [5.118, 52.089],
+      ];
+      await area.getByLabel("Or load a GeoJSON file").setInputFiles({
+        name: "block.geojson",
+        mimeType: "application/geo+json",
+        buffer: Buffer.from(JSON.stringify({ type: "Polygon", coordinates: [ring] })),
+      });
+      await page.getByRole("button", { name: "Run", exact: true }).click();
 
-    const buildings = page.locator('[data-output-id="buildings"]');
-    await expect(buildings).toHaveAttribute("data-kind", "download", { timeout: 45_000 });
-    await expect(buildings).toContainText("too large to show here");
-    await expect(buildings).toHaveAttribute("data-plotted", "true");
-    const shown = Number(await page.locator(".map-canvas").getAttribute("data-result-shapes"));
-    expect(shown).toBeGreaterThan(100);
-  });
+      const buildings = page.locator('[data-output-id="buildings"]');
+      await expect(buildings).toHaveAttribute("data-kind", "download", { timeout: 45_000 });
+      await expect(buildings).toContainText("too large to show here");
+      await expect(buildings).toHaveAttribute("data-plotted", "true");
+      const shown = Number(await page.locator(".map-canvas").getAttribute("data-result-shapes"));
+      expect(shown).toBeGreaterThan(100);
+    },
+  );
 });

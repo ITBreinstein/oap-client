@@ -19,19 +19,12 @@
  */
 
 import { expect, test, type Page } from "@playwright/test";
+import { RELAY } from "./servers.js";
+import { requireService } from "./services.js";
 import { readFile } from "node:fs/promises";
 
 const CORS = "http://localhost:5080";
 const NOCORS = "http://localhost:5081";
-const RELAY = "http://localhost:8787";
-
-async function answering(url: string): Promise<boolean> {
-  try {
-    return (await fetch(url, { signal: AbortSignal.timeout(3_000) })).ok;
-  } catch {
-    return false;
-  }
-}
 
 async function connectConfigured(page: Page, key: string) {
   await page.goto("/");
@@ -58,8 +51,8 @@ function accessRecords(observations: { kind: string; [key: string]: unknown }[])
 
 test.describe("the relay's read route", () => {
   test.beforeEach(async () => {
-    test.skip(!(await answering(`${RELAY}/healthz`)), "the relay is not answering");
-    test.skip(!(await answering(`${NOCORS}/?f=json`)), "pygeoapi :5081 is not answering");
+    await requireService(`${RELAY}/healthz`, "the relay");
+    await requireService(`${NOCORS}/?f=json`, "pygeoapi :5081");
   });
 
   test("asks before using the relay, then runs sync and async through it", async ({ page }) => {
@@ -170,7 +163,7 @@ test.describe("the relay's read route", () => {
   test("goes direct to a server that sends CORS headers, with no offer and no banner", async ({
     page,
   }) => {
-    test.skip(!(await answering(`${CORS}/?f=json`)), "pygeoapi :5080 is not answering");
+    await requireService(`${CORS}/?f=json`, "pygeoapi :5080");
     await connectConfigured(page, "pygeoapi-cors");
     await expect(page.getByRole("button", { name: "Hello World", exact: true })).toBeVisible();
     await expect(page.getByTestId("relay-offer")).toHaveCount(0);

@@ -37,6 +37,11 @@ beforeAll(async () => {
   } catch {
     up = false;
   }
+  // Locally the tests skip without pygeoapi; in CI a stack that did not come
+  // up fails the lane instead of passing it with nothing tested (review T3).
+  if (!up && process.env["CI"]) {
+    throw new Error("pygeoapi :5081 is not answering, and in CI the contract lane does not skip.");
+  }
   const config = parseConfig(
     {
       allowedOrigins: [ORIGIN],

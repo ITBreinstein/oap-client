@@ -41,6 +41,11 @@ beforeAll(async () => {
   } catch {
     pygeoapiUp = false;
   }
+  // Locally the tests skip without pygeoapi; in CI a stack that did not come
+  // up fails the lane instead of passing it with nothing tested (review T3).
+  if (!pygeoapiUp && process.env["CI"]) {
+    throw new Error("pygeoapi :5080 is not answering, and in CI the contract lane does not skip.");
+  }
 });
 
 /** A port nothing is listening on, found by listening on it and closing. */

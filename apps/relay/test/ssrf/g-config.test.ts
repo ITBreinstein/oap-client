@@ -42,6 +42,25 @@ function withEndpoint(endpoint: Record<string, unknown>): unknown {
 }
 
 describe("G — without the allowance", () => {
+  it("e2e/relay.json, the browser lane's copy, refuses to start too", () => {
+    expect(() => parseConfig(readJson("e2e/relay.json"))).toThrow(ConfigError);
+  });
+
+  it("e2e/relay.json is ci.json, but for where the browser lane listens", () => {
+    // The lane's copy may differ only in where it is reached from: its own
+    // relay port (publicUrl) and page origin (allowedOrigins). Endpoints,
+    // limits and anything added later must be ci.json's, or the browser lane
+    // tests a relay CI's other lanes do not run.
+    const placement = new Set(["publicUrl", "allowedOrigins"]);
+    const rest = (config: unknown) =>
+      Object.fromEntries(
+        Object.entries(typeof config === "object" && config !== null ? config : {}).filter(
+          ([key]) => !placement.has(key),
+        ),
+      );
+    expect(rest(readJson("e2e/relay.json"))).toEqual(rest(readJson("infra/relay/ci.json")));
+  });
+
   it("infra/relay/ci.json refuses to start", () => {
     expect(() => parseConfig(readJson("infra/relay/ci.json"))).toThrow(ConfigError);
   });

@@ -14,6 +14,13 @@ services:
     volumes:
       - ../.conf/main-5090.cfg:/usr/lib/cgi-bin/main.cfg
       - ../.conf/oas-5090.cfg:/usr/lib/cgi-bin/oas.cfg
+    # So `up --wait` returns once the kernel answers (review T3).
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://localhost/"]
+      interval: 5s
+      timeout: 6s
+      retries: 60
+      start_period: 10s
 
   zoofpm:
     image: ${ZOO_IMAGE:?run ./infra/zoo/zoo.sh, not docker compose directly}

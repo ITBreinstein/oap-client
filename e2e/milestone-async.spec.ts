@@ -9,8 +9,9 @@
  * 5. the result is shown.
  *
  * In the blocking lane: under CI it never skips, so a stack that did not come
- * up fails the build instead of passing it quietly. Locally it skips when
- * pygeoapi or the relay is not answering, as the other browser specs do.
+ * up fails the build instead of passing it quietly — as every browser spec now
+ * does (`services.ts`). Locally it skips when pygeoapi or the relay is not
+ * answering.
  *
  * And the other side of the rule the milestone rests on: with the relay's
  * event stream not open, the job is started without a session — so without a
@@ -19,17 +20,10 @@
 
 import { readFile } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
+import { RELAY } from "./servers.js";
+import { requireService } from "./services.js";
 
 const PYGEOAPI = "http://localhost:5080";
-const RELAY = "http://localhost:8787";
-
-async function answering(url: string): Promise<boolean> {
-  try {
-    return (await fetch(url, { signal: AbortSignal.timeout(3_000) })).ok;
-  } catch {
-    return false;
-  }
-}
 
 async function observations(page: Page): Promise<{ kind: string; [key: string]: unknown }[]> {
   await page.locator("details.developer > summary").click();
@@ -53,9 +47,8 @@ async function runSlowInBackground(page: Page) {
 
 test.describe("the asynchronous milestone", () => {
   test.beforeEach(async () => {
-    if (process.env["CI"]) return;
-    test.skip(!(await answering(`${PYGEOAPI}/?f=json`)), "pygeoapi :5080 is not answering");
-    test.skip(!(await answering(`${RELAY}/healthz`)), "the relay is not answering");
+    await requireService(`${PYGEOAPI}/?f=json`, "pygeoapi :5080");
+    await requireService(`${RELAY}/healthz`, "the relay");
   });
 
   test("callback, doorbell, poll, result — end to end", async ({ page }) => {

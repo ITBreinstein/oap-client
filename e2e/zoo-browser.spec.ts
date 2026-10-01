@@ -18,26 +18,15 @@
  */
 
 import { expect, test } from "@playwright/test";
+import { RELAY } from "./servers.js";
+import { requireService } from "./services.js";
 import { readFile } from "node:fs/promises";
 
 const ZOO = "http://localhost:5090/ogc-api";
-const RELAY = "http://localhost:8787";
-
-async function answering(url: string): Promise<boolean> {
-  try {
-    const response = await fetch(url, {
-      headers: { Accept: "application/json" },
-      signal: AbortSignal.timeout(3_000),
-    });
-    return response.ok;
-  } catch {
-    return false;
-  }
-}
 
 test.describe("ZOO-Project from a browser", () => {
   test.beforeEach(async ({ page }) => {
-    test.skip(!(await answering(`${ZOO}/`)), "ZOO :5090 is not answering");
+    await requireService(`${ZOO}/`, "ZOO :5090");
     // The Task 6 job panel is a developer view now, open with ?developer.
     await page.goto("/?developer");
   });
@@ -77,7 +66,7 @@ test.describe("ZOO-Project from a browser", () => {
   });
 
   test("through the relay: the job is named, and still cannot be read", async ({ page }) => {
-    test.skip(!(await answering(`${RELAY}/healthz`)), "the relay is not answering");
+    await requireService(`${RELAY}/healthz`, "the relay");
     await expect(page.getByTestId("relay-state")).toContainText("open");
     await page.getByTestId("endpoint").selectOption("zoo");
     await page.getByTestId("process-id").fill("echo");
@@ -94,7 +83,7 @@ test.describe("ZOO-Project from a browser", () => {
   test("through the read route, after the user confirms: list, banner, a sync run", async ({
     page,
   }) => {
-    test.skip(!(await answering(`${RELAY}/healthz`)), "the relay is not answering");
+    await requireService(`${RELAY}/healthz`, "the relay");
     // ZOO lists some 700 processes, every page of them now through the relay.
     test.setTimeout(90_000);
     await page.getByRole("radio", { name: /^zoo / }).check();

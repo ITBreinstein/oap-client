@@ -9,23 +9,16 @@
  */
 
 import { expect, test } from "@playwright/test";
+import { RELAY } from "./servers.js";
+import { requireService } from "./services.js";
 
 const PYGEOAPI = "http://localhost:5080";
-const RELAY = "http://localhost:8787";
 const STORAGE_KEY = "oap-client.jobs.v1";
-
-async function answering(url: string): Promise<boolean> {
-  try {
-    return (await fetch(url, { signal: AbortSignal.timeout(3_000) })).ok;
-  } catch {
-    return false;
-  }
-}
 
 test.describe("My jobs", () => {
   test.beforeEach(async () => {
-    test.skip(!(await answering(`${PYGEOAPI}/?f=json`)), "pygeoapi :5080 is not answering");
-    test.skip(!(await answering(`${RELAY}/healthz`)), "the relay is not answering");
+    await requireService(`${PYGEOAPI}/?f=json`, "pygeoapi :5080");
+    await requireService(`${RELAY}/healthz`, "the relay");
   });
 
   test("lists a background job, keeps it across a reload, and removes it for good", async ({

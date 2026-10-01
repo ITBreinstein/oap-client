@@ -14,6 +14,10 @@
  *                 reach the callback routes, and in CI they do so from a
  *                 container, whose `host.docker.internal` may resolve to
  *                 either family.
+ *   RELAY_BUILD_ID
+ *                 optional: reported on `/healthz` as `build`, so the browser
+ *                 test lane can tell a relay built from its own checkout from
+ *                 one left running from another (e2e/global-setup.ts).
  *
  * Nothing here logs a request. Paths carry callback tokens, and a relay that
  * never writes a path down cannot leak one that way.
@@ -40,8 +44,10 @@ const state = new RelayState(systemClock, {
 const port = Number(process.env["PORT"] ?? 8787);
 const hostname = process.env["HOST"];
 
+const buildId = process.env["RELAY_BUILD_ID"];
+
 const server = serve({
-  fetch: createApp({ config, state }).fetch,
+  fetch: createApp({ config, state, ...(buildId === undefined ? {} : { buildId }) }).fetch,
   port,
   ...(hostname === undefined ? {} : { hostname }),
 });

@@ -50,6 +50,11 @@ docker build -f apps/relay/Dockerfile -t oap-relay .                           #
 Configuration is one JSON file; see [infra/relay/](../../infra/relay/) for the
 CI config and a public-demo template, and `src/config.ts` for every field.
 
+`RELAY_BUILD_ID`, when set, is reported on `/healthz` as `build`. The browser
+test lane sets it to a hash of what it built the relay from, and refuses to run
+against a relay on its port that reports anything else
+([e2e/global-setup.ts](../../e2e/global-setup.ts)).
+
 ### Private addresses take two keys
 
 An endpoint on plain `http:`, or on a loopback, private or otherwise reserved
@@ -110,7 +115,7 @@ All three are made in the config, before any request exists.
 
 | Route                                     | Caller     | Answers                                                                                                   |
 | ----------------------------------------- | ---------- | --------------------------------------------------------------------------------------------------------- |
-| `GET /healthz`                            | operator   | `{ "ok": true }`                                                                                          |
+| `GET /healthz`                            | operator   | `{ "ok": true }`, and `"build"` when the process was started with `RELAY_BUILD_ID`                        |
 | `GET /endpoints`                          | browser    | each endpoint's `key`, `baseUrl`, `executeRoute`, `readRoute`, `callbacks`                                |
 | `POST /sessions`                          | browser    | `201 { token, expiresAt }` — the session token                                                            |
 | `GET /sessions/events`                    | browser    | `text/event-stream`: `ready`, then `job` events `{ "ref" }`                                               |

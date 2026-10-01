@@ -18,7 +18,9 @@
     "test:interop": "./infra/zoo/zoo.sh refresh && vitest run --config packages/core/vitest.interop.config.ts",
     "test:watchdog": "./infra/zoo/zoo.sh refresh && vitest run --config packages/core/vitest.watchdog.config.ts",
     "test:smoke": "node smoke/run.mjs",
-    "test:e2e": "playwright test",
+    "test:e2e": "playwright test --project=blocking",
+    "test:e2e:zoo": "playwright test --project=zoo",
+    "test:e2e:pdok": "playwright test --project=pdok",
     "build": "pnpm -r build",
     "verify": "pnpm typecheck && pnpm lint && pnpm boundaries && pnpm format:check && pnpm test && pnpm build"
   },
