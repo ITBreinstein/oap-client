@@ -33,6 +33,14 @@ module.exports = {
       to: { path: "^packages/core" },
     },
     {
+      // The rule above sees a direct import only: map → forms → core, or a
+      // type-only import, passed it (review T7). This one follows every path.
+      name: "map-binding-reaches-no-protocol",
+      severity: "error",
+      from: { path: "^apps/web/src/map" },
+      to: { path: "^packages/core", reachable: true },
+    },
+    {
       // The generated-forms layer is a promised extension point, and its next
       // home may be the core or a `forms` subpath export. It stays movable only
       // while it depends on nothing but itself and the core: no React, no map,
@@ -122,13 +130,25 @@ module.exports = {
       from: { path: "^packages/core/src/vocabulary" },
       to: { path: "^packages/core/src", pathNot: "^packages/core/src/vocabulary/" },
     },
-    { name: "no-circular", severity: "error", from: {}, to: { circular: true } },
+    {
+      // A cycle is refused when it would run: every edge in it a runtime
+      // import. One `import type` edge is erased at compile time and breaks
+      // the loop, so such a cycle passes. The boundary rules above still
+      // count type-only imports; only this one looks past them.
+      name: "no-circular",
+      severity: "error",
+      from: {},
+      to: { circular: true, viaOnly: { dependencyTypesNot: ["type-only"] } },
+    },
     // pnpm makes an undeclared import unresolvable; make that a build failure
     // rather than something you notice after publishing.
     { name: "not-to-unresolvable", severity: "error", from: {}, to: { couldNotResolve: true } },
   ],
   options: {
     tsConfig: { fileName: "tsconfig.base.json" },
+    // Type-only imports are edges too: a map module that imports a core type
+    // knows the protocol as surely as one that calls it (review T7).
+    tsPreCompilationDeps: true,
     doNotFollow: { path: "node_modules" },
     // Defaults miss .mjs/.cjs and the "exports"/"import" condition, which makes
     // legitimate imports look unresolvable and the rules above go quiet.
@@ -138,6 +158,9 @@ module.exports = {
       conditionNames: ["import", "require", "node", "default", "types"],
       mainFields: ["module", "main", "types", "typings"],
     },
-    exclude: { path: "(^|/)(dist|\\.tsbuild|coverage)(/|$)" },
+    // Our own build output only. Unanchored, this also matched
+    // node_modules/.pnpm/…/maplibre-gl/dist/…, which dropped every edge to the
+    // map libraries, and with them every rule about them (review T1).
+    exclude: { path: "^(apps|packages)/[^/]+/(dist|\\.tsbuild|coverage)/" },
   },
 };
