@@ -35,16 +35,36 @@ afterEach(() => {
   host = undefined;
 });
 
-/** Pick `file` in the only file input under `container`. */
-async function pick(container: HTMLElement, file: File): Promise<void> {
+const status = (container: HTMLElement) => container.querySelector('[role="status"]')?.textContent;
+
+/**
+ * Pick `file` in the only file input under `container`, and wait for what a
+ * pick always ends in: the value handed to `onChange`, or a message saying
+ * why it was not. Reading the file settles on later turns, and how many
+ * depends on the machine: a fixed wait was too short on a busy CI runner.
+ *
+ * The message is React state, rendered only when an `act` scope ends, so the
+ * wait is a run of short scopes with a look between each. Nothing but
+ * microtasks runs between two scopes, so the read always lands inside one.
+ */
+async function pick(
+  container: HTMLElement,
+  file: File,
+  onChange: ReturnType<typeof vi.fn>,
+): Promise<void> {
   const input = container.querySelector<HTMLInputElement>('input[type="file"]');
   if (input === null) throw new Error("no file input");
   Object.defineProperty(input, "files", { value: [file], configurable: true });
-  await act(async () => {
+  act(() => {
     input.dispatchEvent(new Event("change", { bubbles: true }));
-    // FileReader and Blob.text() settle on later turns.
-    await new Promise((resolve) => setTimeout(resolve, 20));
   });
+  const settled = () => onChange.mock.calls.length > 0 || status(container) !== undefined;
+  for (let turns = 0; !settled(); turns += 1) {
+    if (turns === 1_000) throw new Error("the pick never ended in a value or a message");
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    });
+  }
 }
 
 function oversized(): { file: File; read: ReturnType<typeof vi.fn> } {
@@ -56,8 +76,6 @@ function oversized(): { file: File; read: ReturnType<typeof vi.fn> } {
   Object.defineProperty(file, "stream", { value: read });
   return { file, read };
 }
-
-const status = (container: HTMLElement) => container.querySelector('[role="status"]')?.textContent;
 
 const polygon: GeometryControl = {
   kind: "geometry",
@@ -85,7 +103,7 @@ describe("loading a file into a GeoJSON input", () => {
     const onChange = vi.fn();
     const container = geometryField(onChange);
     const { file, read } = oversized();
-    await pick(container, file);
+    await pick(container, file, onChange);
     expect(read).not.toHaveBeenCalled();
     expect(onChange).not.toHaveBeenCalled();
     expect(status(container)).toMatch(
@@ -96,7 +114,7 @@ describe("loading a file into a GeoJSON input", () => {
   it("keeps the previous value when the file is not JSON", async () => {
     const onChange = vi.fn();
     const container = geometryField(onChange);
-    await pick(container, new File(["not json"], "broken.geojson"));
+    await pick(container, new File(["not json"], "broken.geojson"), onChange);
     expect(onChange).not.toHaveBeenCalled();
     expect(status(container)).toBe("That file is not valid JSON.");
   });
@@ -115,7 +133,7 @@ describe("loading a file into a GeoJSON input", () => {
         ],
       ],
     };
-    await pick(container, new File([JSON.stringify(square)], "square.geojson"));
+    await pick(container, new File([JSON.stringify(square)], "square.geojson"), onChange);
     expect(onChange).toHaveBeenCalledWith({ geojson: JSON.stringify(square) });
   });
 });
@@ -148,7 +166,7 @@ describe("loading a file into a complex input", () => {
     const onChange = vi.fn();
     const container = complexField(1, onChange);
     const { file, read } = oversized();
-    await pick(container, file);
+    await pick(container, file, onChange);
     expect(read).not.toHaveBeenCalled();
     expect(onChange).not.toHaveBeenCalled();
     expect(status(container)).toMatch(/so it was not opened\.$/);
@@ -157,7 +175,7 @@ describe("loading a file into a complex input", () => {
   it("keeps the previous value when a JSON-object format is given a file that is not JSON", async () => {
     const onChange = vi.fn();
     const container = complexField(0, onChange);
-    await pick(container, new File(["<gml:Polygon/>"], "shape.gml"));
+    await pick(container, new File(["<gml:Polygon/>"], "shape.gml"), onChange);
     expect(onChange).not.toHaveBeenCalled();
     expect(status(container)).toBe("That file is not valid JSON, so the value was not changed.");
   });
@@ -165,7 +183,11 @@ describe("loading a file into a complex input", () => {
   it("makes a JSON object file the value", async () => {
     const onChange = vi.fn();
     const container = complexField(0, onChange);
-    await pick(container, new File(['{"type":"FeatureCollection","features":[]}'], "fc.json"));
+    await pick(
+      container,
+      new File(['{"type":"FeatureCollection","features":[]}'], "fc.json"),
+      onChange,
+    );
     expect(onChange).toHaveBeenCalledWith({
       format: 0,
       value: '{"type":"FeatureCollection","features":[]}',
@@ -176,7 +198,7 @@ describe("loading a file into a complex input", () => {
   it("reads a text format as text, JSON or not", async () => {
     const onChange = vi.fn();
     const container = complexField(1, onChange);
-    await pick(container, new File(["<gml:Polygon/>"], "shape.gml"));
+    await pick(container, new File(["<gml:Polygon/>"], "shape.gml"), onChange);
     expect(onChange).toHaveBeenCalledWith({ format: 1, value: "<gml:Polygon/>" });
   });
 });

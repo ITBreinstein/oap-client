@@ -207,9 +207,23 @@ describe("inspect end to end", () => {
     const service = await inspect(CORS, { signal: AbortSignal.timeout(15_000) });
     expect(service.capabilities.sync).toBe(true);
 
-    await expect(inspect(CORS, { signal: AbortSignal.timeout(1) })).rejects.toHaveProperty(
-      "name",
-      "AbortError",
-    );
+    // Abort between the two: once the landing page is read and the
+    // conformance link chosen, before that request goes out. A timer could
+    // fire anywhere, mostly in the first request, which is not what this
+    // test is about.
+    const controller = new AbortController();
+    const observations: Observation[] = [];
+    const pending = inspect(CORS, {
+      signal: controller.signal,
+      onObservation: (observation) => {
+        observations.push(observation);
+        if (observation.kind === "conformance-link") controller.abort();
+      },
+    });
+
+    await expect(pending).rejects.toHaveProperty("name", "AbortError");
+    const kinds = observations.map((observation) => observation.kind);
+    expect(kinds).toContain("landing-page-fetched");
+    expect(kinds).not.toContain("conformance-fetched");
   });
 });
