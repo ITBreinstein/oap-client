@@ -13,6 +13,13 @@ import type { DrawEngine } from "../../src/map/draw-engine.js";
 import { MapView, type CreateMap } from "../../src/map/MapView.js";
 import { useBoundingBoxDraw, type BboxDrawProps } from "../../src/map/useBoundingBoxDraw.js";
 
+/**
+ * A stand-in for the engine, not for Terra Draw: it copies the `DrawEngine`
+ * contract. `show()` records and never reports, which the real engine
+ * guarantees by running it as one of its own changes (pinned against the real
+ * Terra Draw in `draw-engine.test.ts` and `useBoundingBoxDraw.real.test.tsx`);
+ * `emit` stands for the user finishing a box.
+ */
 interface FakeEngine extends DrawEngine {
   readonly calls: string[];
   emit(bbox: Bbox): void;

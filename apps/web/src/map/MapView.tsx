@@ -50,6 +50,16 @@ const TOOL_HINTS: Readonly<Record<Tool, string>> = {
   Rectangle: "Drag, or click two corners, to draw a box.",
 };
 
+/**
+ * Said beside the tools when the value holds shapes the map cannot draw: an
+ * area with a hole, a position with a height. They are still sent.
+ */
+function notShownHint(count: number): string {
+  return count === 1
+    ? "One shape in this input cannot be shown on the map (for example an area with a hole, or a point with a height). It stays in the input and is sent as it is."
+    : `${String(count)} shapes in this input cannot be shown on the map (for example an area with a hole, or a point with a height). They stay in the input and are sent as they are.`;
+}
+
 const NO_GEOMETRY: GeometryDrawProps = {
   active: false,
   tools: [],
@@ -204,6 +214,7 @@ export function MapView({
             {shapes.placing === undefined
               ? "Choose a tool to add a shape. Click a shape to select it; drag it or its corners to adjust."
               : TOOL_HINTS[shapes.placing]}
+            {shapes.notShown > 0 && ` ${notShownHint(shapes.notShown)}`}
           </p>
         </div>
       )}

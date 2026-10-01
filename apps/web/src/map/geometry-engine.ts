@@ -24,6 +24,7 @@ import {
 } from "terra-draw";
 import { TerraDrawMapLibreGLAdapter } from "terra-draw-maplibre-gl-adapter";
 import { INPUT_STYLE, SELECTED_INPUT_STYLES } from "./basemap.js";
+import { createOwnChanges, isHandle, shapeIds } from "./terra-draw-common.js";
 
 type Position = readonly number[];
 
@@ -41,15 +42,28 @@ export interface GeometryDrawState {
   readonly placing: Tool | undefined;
   /** A shape is selected, so it can be deleted. */
   readonly hasSelection: boolean;
+  /**
+   * Shapes in the value the map cannot show: ones Terra Draw refuses (an area
+   * with a hole, a position with a height) or no offered tool draws. They are
+   * kept in the value, beside whatever is drawn, and never shown or edited.
+   */
+  readonly notShown: number;
 }
 
 export interface GeometryEngine {
   /** Start placing one shape. Editing resumes once it is finished. */
   place(tool: Tool): void;
-  /** Show these shapes instead of whatever is drawn. Shapes no offered tool draws are left off. */
+  /**
+   * Show these shapes instead of whatever is drawn. Shapes the map cannot show
+   * are left off the map but kept in what the engine reports (`notShown`).
+   */
   show(shapes: readonly MapShape[]): void;
   deleteSelected(): void;
-  /** Called with everything drawn, after each finished draw, edit or delete. */
+  /**
+   * Called with every shape the value holds — drawn, and not shown — after each
+   * finished draw, edit or delete by the user. Never for the engine's own
+   * changes: showing a value, selecting, or a selection handle coming and going.
+   */
   onChange(listener: (shapes: readonly MapShape[]) => void): void;
   onState(listener: (state: GeometryDrawState) => void): void;
   /** Remove the draw mode: its layers, its listeners, its cursor. */
@@ -74,21 +88,6 @@ const MODE: Readonly<Record<Tool, string>> = {
   Rectangle: "rectangle",
 };
 const SELECT = "select";
-
-/**
- * Terra Draw's own handles carry one of these, and share the `mode` of the
- * shape they belong to — so the mode alone does not tell them apart (Sam's
- * finding: a drawn triangle came out as one polygon and three points). Its own
- * `GUIDANCE_POINT_PROPERTY_KEYS` also lists `edited`, which is wrong here: that
- * one is set on real shapes when a user moves them.
- */
-const HANDLE_PROPERTIES = [
-  "midPoint",
-  "selectionPoint",
-  "closingPoint",
-  "snappingPoint",
-  "coordinatePoint",
-] as const;
 
 /** Six decimals: about 0.1 m, the same as a drawn bounding box. */
 function round(position: Position): number[] {
@@ -116,9 +115,8 @@ export function shapesOfSnapshot(features: readonly GeoJSONStoreFeatures[]): Map
   const drawn = new Set(Object.values(MODE));
   const shapes: MapShape[] = [];
   for (const feature of features) {
-    const properties = feature.properties;
-    if (HANDLE_PROPERTIES.some((key) => properties[key] === true)) continue;
-    const mode = properties["mode"];
+    if (isHandle(feature)) continue;
+    const mode = feature.properties["mode"];
     if (typeof mode !== "string" || !drawn.has(mode)) continue;
     const geometry = feature.geometry;
     if (geometry.type === "Point") {
@@ -227,23 +225,28 @@ export const createTerraDrawGeometryEngine: CreateGeometryEngine = (map, { tools
 
   const changeListeners = new Set<(shapes: readonly MapShape[]) => void>();
   const stateListeners = new Set<(state: GeometryDrawState) => void>();
+  const own = createOwnChanges();
   let placing: Tool | undefined;
   let selected: string | number | undefined;
   /**
-   * True while `show()` replaces what is drawn. Terra Draw reports its own
-   * `clear()` as a deletion — every id it held, or none — and does so
-   * synchronously, inside the call. That is our doing, not the user's, and
-   * must not leave the engine: reported, it read as "the user deleted every
-   * shape" and emptied the field the value had just been loaded into.
+   * The shapes drawn when the engine last reported or showed a value, by id.
+   * A `delete` Terra Draw reports is an edit only when it names one of these:
+   * deselecting a shape also deletes, but only its selection handles (W16).
    */
-  let applying = false;
+  let drawnIds = new Set<string | number>();
+  /** Shapes of the value the map cannot show, kept so they are not lost (W17). */
+  let notShown: readonly MapShape[] = [];
 
+  const remember = () => {
+    drawnIds = new Set(shapeIds(draw.getSnapshot(), registered));
+  };
   const emit = () => {
-    const shapes = shapesOfSnapshot(draw.getSnapshot());
+    const shapes = [...shapesOfSnapshot(draw.getSnapshot()), ...notShown];
+    remember();
     for (const listener of changeListeners) listener(shapes);
   };
   const announce = () => {
-    const state = { placing, hasSelection: selected !== undefined };
+    const state = { placing, hasSelection: selected !== undefined, notShown: notShown.length };
     for (const listener of stateListeners) listener(state);
   };
 
@@ -252,26 +255,34 @@ export const createTerraDrawGeometryEngine: CreateGeometryEngine = (map, { tools
   // complete and after every edit; a deletion never finishes, so that one
   // comes from `change`.
   draw.on("finish", (id, context) => {
-    if (context.action === "draw") {
-      if (!several) {
-        const others = draw
-          .getSnapshot()
-          .map((feature) => feature.id)
-          .filter((other): other is string | number => other !== undefined && other !== id);
-        if (others.length > 0) draw.removeFeatures(others);
+    if (own.applying()) return;
+    try {
+      if (context.action === "draw") {
+        own.apply(() => {
+          if (!several) {
+            // Shapes only: the old shape's own handles go with it (W1).
+            const others = shapeIds(draw.getSnapshot(), registered).filter((other) => other !== id);
+            if (others.length > 0) draw.removeFeatures(others);
+            // A new shape replaces the value, the part the map could not show too.
+            notShown = [];
+          }
+          placing = undefined;
+          draw.setMode(SELECT);
+          // Adjusting what was just drawn is the common case; hunting for it
+          // with a click is not.
+          draw.selectFeature(id);
+        });
       }
-      placing = undefined;
-      draw.setMode(SELECT);
-      // Adjusting what was just drawn is the common case; hunting for it with
-      // a click is not.
-      draw.selectFeature(id);
+    } finally {
+      // Whatever happened above, the user finished something: say so.
+      emit();
       announce();
     }
-    emit();
   });
-  draw.on("change", (_ids, type) => {
-    if (applying) return;
-    if (type === "delete" && draw.getMode() === SELECT) emit();
+  draw.on("change", (ids, type) => {
+    if (own.applying()) return;
+    if (type !== "delete" || draw.getMode() !== SELECT) return;
+    if (ids.some((id) => drawnIds.has(id))) emit();
   });
   draw.on("select", (id) => {
     selected = id;
@@ -282,44 +293,57 @@ export const createTerraDrawGeometryEngine: CreateGeometryEngine = (map, { tools
     announce();
   });
 
-  /** Whatever is drawn, replaced by `shapes`. Called only with `applying` set. */
+  /** Whatever is drawn, replaced by `shapes`. Always run as one of our own changes. */
   const replace = (shapes: readonly MapShape[]) => {
     draw.clear();
     selected = undefined;
-    const features = shapes.flatMap((shape): GeoJSONStoreFeatures[] => {
+    const shown: MapShape[] = [];
+    const kept: MapShape[] = [];
+    const features: GeoJSONStoreFeatures[] = [];
+    for (const shape of shapes) {
       const mode = modeFor(shape, registered);
-      return mode === undefined
-        ? []
-        : [
-            {
-              type: "Feature",
-              geometry: fitPrecision(shape) as GeoJSONStoreFeatures["geometry"],
-              properties: { mode },
-            },
-          ];
+      if (mode === undefined) {
+        kept.push(shape);
+        continue;
+      }
+      shown.push(shape);
+      features.push({
+        type: "Feature",
+        geometry: fitPrecision(shape) as GeoJSONStoreFeatures["geometry"],
+        properties: { mode },
+      });
+    }
+    // Terra Draw validates each feature and silently leaves out any it
+    // refuses; its answer, one entry per feature in order, says which.
+    const answers = features.length > 0 ? draw.addFeatures(features) : [];
+    shown.forEach((shape, index) => {
+      if (answers[index]?.valid !== true) kept.push(shape);
     });
-    if (features.length > 0) draw.addFeatures(features);
+    notShown = kept;
+    remember();
   };
 
   return {
     place(tool) {
       if (!registered.has(MODE[tool])) return;
       placing = tool;
-      draw.setMode(MODE[tool]);
+      own.apply(() => {
+        draw.setMode(MODE[tool]);
+      });
       announce();
     },
     show(shapes) {
-      applying = true;
-      try {
+      own.apply(() => {
         replace(shapes);
-      } finally {
-        applying = false;
-      }
+      });
       announce();
     },
     deleteSelected() {
-      if (selected === undefined) return;
-      draw.removeFeatures([selected]);
+      const id = selected;
+      if (id === undefined) return;
+      own.apply(() => {
+        draw.removeFeatures([id]);
+      });
       selected = undefined;
       emit();
       announce();

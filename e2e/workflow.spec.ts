@@ -368,6 +368,60 @@ test.describe("the workflow in a browser", () => {
     });
   });
 
+  test("draws a second area over the first, and sends the second", async ({ page }) => {
+    // Review W1: on an input that holds one area, drawing another over it threw
+    // inside Terra Draw; the map showed the new area and the field kept, and
+    // sent, the old one.
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    await connectTyped(page, PYGEOAPI);
+    await openProcess(page, "Rotate a polygon a quarter turn");
+    const polygon = page.locator('[data-input-id="polygon"]');
+    const geojson = polygon.getByRole("textbox", { name: "GeoJSON" });
+    await polygon.getByRole("button", { name: "Draw on the map" }).click();
+
+    const canvas = page.locator(".map-canvas canvas").first();
+    const box = await canvas.boundingBox();
+    if (box === null) throw new Error("the map has no size");
+    const drawTriangle = async (dx: number) => {
+      await page
+        .getByRole("toolbar", { name: "Drawing tools" })
+        .getByRole("button", { name: "Add area" })
+        .click();
+      for (const [x, y] of [
+        [0.3 + dx, 0.45],
+        [0.45 + dx, 0.45],
+        [0.375 + dx, 0.55],
+        [0.3 + dx, 0.45],
+      ] as const) {
+        await page.mouse.click(box.x + box.width * x, box.y + box.height * y);
+        await page.waitForTimeout(150);
+      }
+    };
+
+    await drawTriangle(0);
+    await expect(geojson).not.toHaveValue("");
+    const first = await geojson.inputValue();
+    await drawTriangle(0.25);
+    await expect(geojson).not.toHaveValue(first);
+    const second = JSON.parse(await geojson.inputValue()) as unknown;
+    expect(errors).toEqual([]);
+    await expect(
+      page
+        .getByRole("toolbar", { name: "Drawing tools" })
+        .getByRole("button", { name: "Add area" }),
+    ).toHaveAttribute("aria-pressed", "false");
+
+    const exchange = page.waitForResponse(
+      (candidate) =>
+        candidate.request().method() === "POST" &&
+        candidate.url().includes("/breinstein-rotate/execution"),
+    );
+    await page.getByRole("button", { name: "Run", exact: true }).click();
+    const sent = (await exchange).request().postDataJSON() as { inputs: { polygon: unknown } };
+    expect(sent.inputs.polygon).toEqual({ value: second, mediaType: "application/geo+json" });
+  });
+
   test("keeps a loaded file while the map draws for the field, and shows it before it is sent", async ({
     page,
   }) => {
