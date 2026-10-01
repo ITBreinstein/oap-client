@@ -14,7 +14,7 @@
 
 import { expect, test, type Page } from "@playwright/test";
 import { RELAY } from "./servers.js";
-import { requireNetwork, requireService } from "./services.js";
+import { PDOK_LANE, requireService } from "./services.js";
 import { readFile } from "node:fs/promises";
 
 const PYGEOAPI = "http://localhost:5080";
@@ -483,56 +483,58 @@ test.describe("the workflow in a browser", () => {
     );
   });
 
-  test("puts an aerial photograph of the area on the map, over the area it covers", async ({
-    page,
-  }) => {
-    // The one process here that reaches the network: PDOK's aerial photograph.
-    await requireNetwork(
-      "https://service.pdok.nl/hwh/luchtfotorgb/wms/v1_0?request=GetCapabilities&service=WMS",
-      "PDOK",
-    );
-    await connectTyped(page, PYGEOAPI);
-    await openProcess(page, "Aerial photograph of an area");
+  test(
+    "puts an aerial photograph of the area on the map, over the area it covers",
+    PDOK_LANE,
+    async ({ page }) => {
+      // The one process here that reaches the network: PDOK's aerial photograph.
+      await requireService(
+        "https://service.pdok.nl/hwh/luchtfotorgb/wms/v1_0?request=GetCapabilities&service=WMS",
+        "PDOK",
+      );
+      await connectTyped(page, PYGEOAPI);
+      await openProcess(page, "Aerial photograph of an area");
 
-    const area = page.locator('[data-input-id="area"]');
-    await expect(area).toHaveAttribute("data-control", "geometry");
-    // Central Utrecht, about 2.7 by 2.8 km: a results document of about
-    // 600 kB, above the display limit, which must not hide the box beside it.
-    const ring = [
-      [5.1, 52.08],
-      [5.13, 52.075],
-      [5.14, 52.1],
-      [5.105, 52.1],
-      [5.1, 52.08],
-    ];
-    await area.getByLabel("Or load a GeoJSON file").setInputFiles({
-      name: "utrecht.geojson",
-      mimeType: "application/geo+json",
-      buffer: Buffer.from(JSON.stringify({ type: "Polygon", coordinates: [ring] })),
-    });
+      const area = page.locator('[data-input-id="area"]');
+      await expect(area).toHaveAttribute("data-control", "geometry");
+      // Central Utrecht, about 2.7 by 2.8 km: a results document of about
+      // 600 kB, above the display limit, which must not hide the box beside it.
+      const ring = [
+        [5.1, 52.08],
+        [5.13, 52.075],
+        [5.14, 52.1],
+        [5.105, 52.1],
+        [5.1, 52.08],
+      ];
+      await area.getByLabel("Or load a GeoJSON file").setInputFiles({
+        name: "utrecht.geojson",
+        mimeType: "application/geo+json",
+        buffer: Buffer.from(JSON.stringify({ type: "Polygon", coordinates: [ring] })),
+      });
 
-    await page.getByRole("button", { name: "Run", exact: true }).click();
-    const image = page.locator('[data-output-id="image"]');
-    await expect(image).toContainText("Shown on the map, over the area in “bbox”.", {
-      timeout: 30_000,
-    });
-    const preview = image.getByRole("img", { name: "The image result “image”" });
-    await expect(preview).toBeVisible();
-    // 1024 pixels on the longer side, as the process describes.
-    expect(
-      await preview.evaluate((element: HTMLImageElement) =>
-        Math.max(element.naturalWidth, element.naturalHeight),
-      ),
-    ).toBe(1024);
-    await expect(page.locator('[data-output-id="bbox"]')).toContainText(
-      "The area the image “image” covers.",
-    );
+      await page.getByRole("button", { name: "Run", exact: true }).click();
+      const image = page.locator('[data-output-id="image"]');
+      await expect(image).toContainText("Shown on the map, over the area in “bbox”.", {
+        timeout: 30_000,
+      });
+      const preview = image.getByRole("img", { name: "The image result “image”" });
+      await expect(preview).toBeVisible();
+      // 1024 pixels on the longer side, as the process describes.
+      expect(
+        await preview.evaluate((element: HTMLImageElement) =>
+          Math.max(element.naturalWidth, element.naturalHeight),
+        ),
+      ).toBe(1024);
+      await expect(page.locator('[data-output-id="bbox"]')).toContainText(
+        "The area the image “image” covers.",
+      );
 
-    await expect(page.locator(".map-canvas")).toHaveAttribute("data-result-image", "true");
-    await expect(page.getByTestId("map-legend")).toHaveText(
-      "The result’s image beside the input you sent.",
-    );
-  });
+      await expect(page.locator(".map-canvas")).toHaveAttribute("data-result-image", "true");
+      await expect(page.getByTestId("map-legend")).toHaveText(
+        "The result’s image beside the input you sent.",
+      );
+    },
+  );
 
   test("shows the raw JSON editor, with its reason, for an input it cannot handle, and still runs", async ({
     page,

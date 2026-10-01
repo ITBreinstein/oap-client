@@ -358,7 +358,8 @@ pnpm test:e2e      # Playwright, Chromium, against pygeoapi :5080 and the relay
 ```
 
 `pnpm test:e2e:zoo` runs the ZOO-Project specs, against :5090, in a lane of
-their own that never blocks. Both lanes start their own relay and web build on
+their own that never blocks. `pnpm test:e2e:pdok` runs the four specs that
+reach PDOK, opt-in, so that a third party's uptime never blocks a merge. Both lanes start their own relay and web build on
 ports of their own, and refuse one left running from another build
 (`e2e/global-setup.ts`).
 

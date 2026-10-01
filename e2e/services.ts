@@ -7,8 +7,12 @@
  * lane that quietly skipped its tests used to show green with nothing tested
  * (review T3).
  *
- * PDOK is not ours to start, so a spec that needs it skips everywhere, CI
- * included, and says so ({@link requireNetwork}).
+ * PDOK is the one exception, and an explicit one: no lane starts it, and a
+ * blocking lane must not depend on a third party's uptime. The tests that
+ * need it carry {@link PDOK_LANE} and run only in their own opt-in lane,
+ * `pnpm test:e2e:pdok` (weekly in interop.yml); the blocking lane leaves them
+ * out rather than skipping them. Inside that lane PDOK is a service like any
+ * other: in CI, not answering fails.
  */
 
 import { test } from "@playwright/test";
@@ -32,7 +36,8 @@ export async function requireService(url: string, name: string): Promise<void> {
   test.skip(true, `${name} is not answering at ${url}`);
 }
 
-/** A third-party service on the internet, which no lane starts. */
-export async function requireNetwork(url: string, name: string): Promise<void> {
-  test.skip(!(await answering(url)), `${name} is not answering at ${url}`);
-}
+/**
+ * The details that put a test in the PDOK lane, and keep it out of the
+ * blocking one: `test("…", PDOK_LANE, async ({ page }) => …)`.
+ */
+export const PDOK_LANE = { tag: "@pdok" } as const;

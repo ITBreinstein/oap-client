@@ -19,7 +19,7 @@
 
 import { expect, test, type Page, type Route } from "@playwright/test";
 import { RELAY } from "./servers.js";
-import { requireNetwork, requireService } from "./services.js";
+import { PDOK_LANE, requireService } from "./services.js";
 import { readFile } from "node:fs/promises";
 
 const CORS = "http://localhost:5080";
@@ -217,20 +217,24 @@ test.describe("outputs given by reference", () => {
     });
   });
 
-  test("buildings by link from PDOK itself: the whole area on one page", async ({ page }) => {
-    test.setTimeout(60_000);
-    await requireNetwork(`${PDOK}kadaster/bag/ogc/v2/collections/pand?f=json`, "PDOK");
-    await connectTyped(page, CORS, "?developer");
-    await askForBuildingsByLink(page);
-    await page.getByRole("button", { name: "Run", exact: true }).click();
+  test(
+    "buildings by link from PDOK itself: the whole area on one page",
+    PDOK_LANE,
+    async ({ page }) => {
+      test.setTimeout(60_000);
+      await requireService(`${PDOK}kadaster/bag/ogc/v2/collections/pand?f=json`, "PDOK");
+      await connectTyped(page, CORS, "?developer");
+      await askForBuildingsByLink(page);
+      await page.getByRole("button", { name: "Run", exact: true }).click();
 
-    const buildings = page.locator('[data-output-id="buildings"]');
-    await buildings.getByRole("button", { name: "Load" }).click();
-    await expect(buildings).toHaveAttribute("data-reference-outcome", "ok", { timeout: 45_000 });
-    await expect(buildings).toHaveAttribute("data-plotted", "true");
-    // 815 buildings on 2026-09-26, limit=1000, no `next`: nothing to say.
-    await expect(buildings.locator("[data-truncated]")).toHaveCount(0);
-    const shown = Number(await page.locator(".map-canvas").getAttribute("data-result-shapes"));
-    expect(shown).toBeGreaterThan(100);
-  });
+      const buildings = page.locator('[data-output-id="buildings"]');
+      await buildings.getByRole("button", { name: "Load" }).click();
+      await expect(buildings).toHaveAttribute("data-reference-outcome", "ok", { timeout: 45_000 });
+      await expect(buildings).toHaveAttribute("data-plotted", "true");
+      // 815 buildings on 2026-09-26, limit=1000, no `next`: nothing to say.
+      await expect(buildings.locator("[data-truncated]")).toHaveCount(0);
+      const shown = Number(await page.locator(".map-canvas").getAttribute("data-result-shapes"));
+      expect(shown).toBeGreaterThan(100);
+    },
+  );
 });

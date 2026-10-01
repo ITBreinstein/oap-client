@@ -25,6 +25,7 @@ Other entry points:
 pnpm --filter @breinstein/web dev     # interface on :5173
 pnpm test:e2e                         # Playwright, blocking lane: pygeoapi; its own relay :8797 and build :4183
 pnpm test:e2e:zoo                     # Playwright against ZOO-Project; reports, never blocks
+pnpm test:e2e:pdok                    # the specs that reach PDOK; opt-in, never blocks
 pnpm test:contract                    # pinned pygeoapi; needs the compose stack up
 pnpm test:interop                     # ZOO-Project and third-party servers; never blocking
 pnpm test:smoke                       # consumer tests against a packed tarball
