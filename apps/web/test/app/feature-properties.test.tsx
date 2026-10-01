@@ -135,11 +135,18 @@ describe("the map pane's feature pick", () => {
     const plan = resolveFormPlan(process);
     return [
       { type: "connect", endpoint },
-      { type: "connected", endpoint, route: "direct", service, processes },
+      { type: "connected", connection: 1, endpoint, route: "direct", service, processes },
       { type: "open-process", processId: process.id },
-      { type: "process-loaded", process, plan, values: initialValues(plan), warnings: [] },
-      { type: "run-started", mode: "sync" },
-      { type: "results", results },
+      {
+        type: "process-loaded",
+        connection: 1,
+        process,
+        plan,
+        values: initialValues(plan),
+        warnings: [],
+      },
+      { type: "run-started", runId: "run-1", mode: "sync" },
+      { type: "results", runId: "run-1", results },
     ].reduce(workflowReducer as never, { stage: "choose-endpoint" });
   }
 

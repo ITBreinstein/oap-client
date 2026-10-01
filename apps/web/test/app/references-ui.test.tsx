@@ -207,9 +207,16 @@ describe("the Value/Link choice (T2)", () => {
     const plan = resolveFormPlan(process);
     const actions: WorkflowAction[] = [
       { type: "connect", endpoint },
-      { type: "connected", endpoint, route: "direct", service, processes },
+      { type: "connected", connection: 1, endpoint, route: "direct", service, processes },
       { type: "open-process", processId: process.id },
-      { type: "process-loaded", process, plan, values: initialValues(plan), warnings: [] },
+      {
+        type: "process-loaded",
+        connection: 1,
+        process,
+        plan,
+        values: initialValues(plan),
+        warnings: [],
+      },
     ];
     const state = actions.reduce<Workflow>(workflowReducer, { stage: "choose-endpoint" });
     if (state.stage !== "process") throw new Error("not open");

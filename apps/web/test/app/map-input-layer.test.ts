@@ -33,7 +33,14 @@ const processes: ProcessList = { processes: [], links: [], pageCount: 1, truncat
 function loaded(key: string): WorkflowAction {
   const process = fixtureProcess(key);
   const plan = resolveFormPlan(process);
-  return { type: "process-loaded", process, plan, values: initialValues(plan), warnings: [] };
+  return {
+    type: "process-loaded",
+    connection: 1,
+    process,
+    plan,
+    values: initialValues(plan),
+    warnings: [],
+  };
 }
 
 function reduce(state: Workflow, ...actions: WorkflowAction[]): Workflow {
@@ -55,7 +62,7 @@ const square = {
 const connected = reduce(
   INITIAL_WORKFLOW,
   { type: "connect", endpoint },
-  { type: "connected", endpoint, route: "direct", service, processes },
+  { type: "connected", connection: 1, endpoint, route: "direct", service, processes },
 );
 const withArea = reduce(
   connected,
@@ -100,7 +107,7 @@ describe("the input layer", () => {
   });
 
   it("keeps showing what was sent while the run is under way", () => {
-    const running = reduce(withArea, { type: "run-started", mode: "sync" });
+    const running = reduce(withArea, { type: "run-started", runId: "run-1", mode: "sync" });
     // Drawing has ended with the form: a stale field id changes nothing.
     expect(inputShapes(shownFor(running, "area"))).toEqual([square]);
   });

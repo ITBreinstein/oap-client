@@ -257,6 +257,16 @@ export class JobReconciler {
     return entry.job.settled;
   }
 
+  /**
+   * Whether `entry` is still the one tracked for its job. A job removed while
+   * its read was in flight, or removed and tracked again, has a new entry or
+   * none, and the old read must stop where it is: it must not change what is
+   * shown, and above all must not arm the next poll (review W8).
+   */
+  #current(entry: Entry): boolean {
+    return this.#entries.get(entry.job.statusUrl) === entry;
+  }
+
   #acceptedChange(
     job: TrackedJob,
     status: JobStatus,
@@ -294,14 +304,16 @@ export class JobReconciler {
   }
 
   async #poll(entry: Entry): Promise<void> {
-    if (this.#settled(entry) || entry.inFlight || this.#aborted()) return;
+    if (!this.#current(entry) || this.#settled(entry) || entry.inFlight || this.#aborted()) {
+      return;
+    }
     entry.cancelTimer?.();
     entry.cancelTimer = undefined;
     entry.timerKind = undefined;
     entry.inFlight = true;
     try {
       const status = await this.#options.readJob(entry.job.statusUrl, this.#abort.signal);
-      if (this.#aborted()) return;
+      if (this.#aborted() || !this.#current(entry)) return;
       this.#update(entry, {
         status,
         polls: entry.job.polls + 1,
@@ -311,7 +323,7 @@ export class JobReconciler {
         ...this.#confirmationChange(entry.job, status),
       });
     } catch (error) {
-      if (this.#aborted()) return;
+      if (this.#aborted() || !this.#current(entry)) return;
       if (error instanceof JobNotFoundError) {
         this.#update(entry, { polls: entry.job.polls + 1, gone: true, settled: true });
       } else {
@@ -327,7 +339,7 @@ export class JobReconciler {
     }
     // No timer can be armed while a poll is in flight — an early request
     // then only sets `again` — so a settled job has nothing left to cancel.
-    if (this.#settled(entry)) return;
+    if (!this.#current(entry) || this.#settled(entry)) return;
     if (entry.job.confirmation?.state === "pending") {
       entry.again = false;
       this.#arm(entry, "confirm", this.#confirmAfterMs);
