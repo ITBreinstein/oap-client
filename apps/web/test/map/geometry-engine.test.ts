@@ -316,12 +316,34 @@ describe("shapes the map cannot show are kept in the value (W17)", () => {
   });
 
   it("lets a newly drawn shape replace them, when the input holds one", () => {
-    const { created, reported, states } = engine(["Polygon", "Rectangle"], false);
+    const { created, draw, reported, states } = engine(["Polygon", "Rectangle"], false);
     created.show([withHole]);
     created.place("Rectangle");
     drawBox([5.5, 52.5], [5.6, 52.6]);
-    expect(reported.at(-1)).toHaveLength(1);
-    expect(reported.at(-1)).not.toContainEqual(withHole);
+    // Exactly the new box: nothing kept, nothing shown before.
+    const drawn = shapesOfSnapshot(draw.getSnapshot());
+    expect(drawn).toHaveLength(1);
+    expect(reported.at(-1)).toEqual(drawn);
+    expect(states.at(-1)?.notShown).toBe(0);
+  });
+
+  it("replaces kept and shown shapes alike with the one area drawn, when the input holds one", () => {
+    const { created, draw, reported, states } = engine(["Polygon", "Rectangle"], false);
+    // A refused area, an area the map shows, and a point no offered tool draws.
+    created.show([withHole, triangleShape, { type: "Point", coordinates: [5, 52] }]);
+    expect(states.at(-1)?.notShown).toBe(2);
+
+    created.place("Polygon");
+    drawArea([
+      [6.0, 52.0],
+      [6.2, 52.0],
+      [6.1, 52.2],
+    ]);
+    const drawn = shapesOfSnapshot(draw.getSnapshot());
+    expect(drawn).toHaveLength(1);
+    expect(reported.at(-1)).toEqual(drawn);
+    const [area] = reported.at(-1) ?? [];
+    expect(area?.type === "Polygon" ? area.coordinates[0]?.[0] : undefined).toEqual([6, 52]);
     expect(states.at(-1)?.notShown).toBe(0);
   });
 });
