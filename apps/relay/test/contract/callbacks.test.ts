@@ -27,6 +27,7 @@ import { serve, type ServerType } from "@hono/node-server";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { createApp, type RelayEvent } from "../../src/app.js";
 import { parseConfig } from "../../src/config.js";
+import { relayServeOptions } from "../../src/serve-options.js";
 
 const PYGEOAPI = "http://localhost:5080";
 const CALLBACK_HOST = "host.docker.internal";
@@ -90,6 +91,7 @@ async function startRelay(port: number): Promise<RunningRelay> {
   );
   const events: RelayEvent[] = [];
   const server: ServerType = serve({
+    ...relayServeOptions,
     fetch: createApp({ config, onEvent: (event) => events.push(event) }).fetch,
     port,
   });
