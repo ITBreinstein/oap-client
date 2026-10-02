@@ -98,6 +98,8 @@ the set is a handful of files and the server is one pinned image.
               link-json-http{,s}.http  (finding 0022),
               execution/{getarea,buffer}-href-unreachable-*.http
                 (finding 0053)                                         2026-10-02
+              execution/getarea-gml-bare-polygon-500.http
+                (finding 0065)                                         2026-10-02
 
 Re-capture with `./infra/zoo/capture-fixtures.sh`, and only when the pinned SHA
 in `infra/zoo/pinned.env` changes. Read the diff before committing it.
@@ -309,6 +311,14 @@ Captured 2026-09-01 against both servers, with `curl -isS -X POST` and
       link-json-http.http                the `$ref` in every `extended-schema`:
                                          301 to https                        0022
       link-json-https.http               and there, GitHub Pages' 404        0022
+
+    Finding 0065, 2026-10-02:
+
+    zoo-project/execution/
+      getarea-gml-bare-polygon-500.http  a bare `gml:Polygon`, the shape its
+                                         `contentSchema` names: 500. The same
+                                         square in a feature collection is
+                                         `getarea-gml.http`: {"Area":100}    0065
 
 `hello-world-*.http` carry a fresh job UUID and timestamp per capture, so they
 are read for shape and headers rather than compared byte-for-byte. Re-capture by
