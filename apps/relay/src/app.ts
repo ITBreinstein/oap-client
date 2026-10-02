@@ -356,7 +356,9 @@ export function createApp(options: AppOptions = {}): Hono {
             ? "response-too-large"
             : done.capHit === "duration"
               ? "timeout"
-              : undefined,
+              : done.connectionFailed
+                ? "connection-failed"
+                : undefined,
         redirectsFollowed: forwarded.redirectsFollowed,
         bytes: done.bytes,
         ms: clock.now() - started,
@@ -365,10 +367,16 @@ export function createApp(options: AppOptions = {}): Hono {
     });
     const headers = new Headers(forwarded.headers);
     headers.set("Cache-Control", "no-store");
-    return new Response(NULL_BODY_STATUSES.has(forwarded.status) ? null : forwarded.body, {
-      status: forwarded.status,
-      headers,
-    });
+    const body = NULL_BODY_STATUSES.has(forwarded.status) ? null : forwarded.body;
+    // A body of undeclared length goes out chunked. Otherwise the listener
+    // (@hono/node-server) reads the first few chunks before writing anything,
+    // takes a read error there for the end of the body, and sends what it has
+    // with a matching Content-Length: a short body presented as whole. Chunked,
+    // a break mid-body destroys the socket and the browser sees a failed read.
+    if (body !== null && !headers.has("content-length")) {
+      headers.set("Transfer-Encoding", "chunked");
+    }
+    return new Response(body, { status: forwarded.status, headers });
   };
 
   /** The relay's own 502 for an exchange that produced no response. */
