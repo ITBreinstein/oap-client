@@ -1,0 +1,9 @@
+HTTP/1.1 200 Ok
+Date: Fri, 02 Oct 2026 10:50:14 GMT
+Server: Apache/2.4.29 (Ubuntu)
+X-Powered-By: ZOO-Project
+Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self';
+Content-Length: 13
+Content-Type: application/json;charset=UTF-8
+
+{"Area":100}

@@ -91,6 +91,8 @@ the set is a handful of files and the server is one pinned image.
               jobs/*.http                                              2026-09-16
               callbacks/*.http, execution/preflight-execute.http       2026-09-23
               processes/ — fifteen more (see "Task 7's additions")    2026-09-23
+              execution/getarea-*, execution/saga-crop-*
+                (findings 0061–0063)                                   2026-10-02
 
 Re-capture with `./infra/zoo/capture-fixtures.sh`, and only when the pinned SHA
 in `infra/zoo/pinned.env` changes. Read the diff before committing it.
@@ -255,6 +257,34 @@ Captured 2026-09-01 against both servers, with `curl -isS -X POST` and
     `srsName="EPSG:4326"`, over a box of -2.45…3.45 by 0…3.95 — the fractal's
     own coordinates, not a place. It was captured once, on 2026-09-26, by
     replaying the href in `saga-fractals-reference-wfs.http` with `curl -i`.
+
+    Findings 0061–0063, 2026-10-02: how ZOO resolves a by-reference input,
+    and what it does with the qualified value's `encoding`. The `*-file.http`
+    captures are `curl -i` of a throwaway `python3 -m http.server` on the
+    host, which ZOO reached as `host.docker.internal`.
+
+    zoo-project/execution/
+      getarea-href-cached-file-before.http  the href's file: a 10 × 10 square
+      getarea-href-cached-1.http            fetched: {"Area":100}
+      getarea-href-cached-file-after.http   the same URL, now a 20 × 20 square,
+                                            a newer Last-Modified
+      getarea-href-cached-2-stale.http      not fetched again: {"Area":100}   0061
+      getarea-href-cached-3-query.http      the URL plus `?n=2`: {"Area":400}
+      getarea-href-cached-six-days.http     a URL first fetched 2026-09-26,
+                                            answered from that copy, unasked 0061
+      saga-crop-base64-tiff.http            base64 GeoTIFF, encoding base64: 200
+      saga-crop-base64-tiff-no-encoding-500.http
+                                            the same, no `encoding`: SIGSEGV  0062
+      getarea-base64-gml.http               base64 GML, encoding base64: 100
+      getarea-base64-gml-no-encoding-400.http
+                                            no `encoding`: a clean 400        0062
+      getarea-base64-gml-encoding-binary-400.http
+                                            `"encoding": "binary"`: the same  0062
+      getarea-gml-encoding-utf8.http        plain GML, `"encoding": "UTF-8"`  0063
+      getarea-gml.http                      plain GML, no `encoding`: the same 0063
+
+    A cached reference stays cached: re-capturing the `getarea-href-cached-*`
+    set needs a URL ZOO has never fetched, or it will show the old copy.
 
 `hello-world-*.http` carry a fresh job UUID and timestamp per capture, so they
 are read for shape and headers rather than compared byte-for-byte. Re-capture by
