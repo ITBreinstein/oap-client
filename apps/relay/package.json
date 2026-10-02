@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node --watch src/server.ts",
+    "dev": "tsc -b && (tsc -b --watch --preserveWatchOutput & node --watch .tsbuild/src/server.js)",
     "build": "tsc -b",
     "start": "node .tsbuild/src/server.js"
   },

@@ -43,6 +43,8 @@ The client works without the relay: every job is still found by polling.
 pnpm --filter @breinstein/relay build
 RELAY_CONFIG=../../infra/relay/ci.json RELAY_ALLOW_PRIVATE_ADDRESSES=1 \
   pnpm --filter @breinstein/relay start                                        # :8787
+RELAY_CONFIG=../../infra/relay/ci.json RELAY_ALLOW_PRIVATE_ADDRESSES=1 \
+  pnpm --filter @breinstein/relay dev                                          # :8787, rebuilt and restarted on change
 
 docker build -f apps/relay/Dockerfile -t oap-relay .                           # from the repo root
 ```
