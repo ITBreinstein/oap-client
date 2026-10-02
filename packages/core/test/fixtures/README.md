@@ -60,6 +60,8 @@ the versions are recorded here rather than left to a commit message.
               processes/breinstein-link.json,
               process-list.json  (re-captured; all fourteen, now
                 with breinstein-link)                                 2026-09-26
+              execution/breinstein-inputs-{base64-not-decoded,
+                array-passed-through}.http  (finding 0052)            2026-10-02
 
 The `breinstein-*` descriptions are processes this repository adds to the
 pinned image (see `infra/README.md`). They are the only descriptions a browser
@@ -93,6 +95,9 @@ the set is a handful of files and the server is one pinned image.
               processes/ — fifteen more (see "Task 7's additions")    2026-09-23
               execution/getarea-*, execution/saga-crop-*
                 (findings 0061–0063)                                   2026-10-02
+              link-json-http{,s}.http  (finding 0022),
+              execution/{getarea,buffer}-href-unreachable-*.http
+                (finding 0053)                                         2026-10-02
 
 Re-capture with `./infra/zoo/capture-fixtures.sh`, and only when the pinned SHA
 in `infra/zoo/pinned.env` changes. Read the diff before committing it.
@@ -285,6 +290,25 @@ Captured 2026-09-01 against both servers, with `curl -isS -X POST` and
 
     A cached reference stays cached: re-capturing the `getarea-href-cached-*`
     set needs a URL ZOO has never fetched, or it will show the old copy.
+
+    Amendments to findings 0022, 0052 and 0053, 2026-10-02:
+
+    pygeoapi/execution/
+      breinstein-inputs-base64-not-decoded.http   `"encoding": "base64"` reaches
+                                                  the process undecoded      0052
+      breinstein-inputs-array-passed-through.http `[{ value, mediaType },
+                                                  { href }]` reaches it as sent 0052
+
+    zoo-project/execution/
+      getarea-href-unreachable-400.http  an unreachable href: 400 "Unable to
+                                         parse input geometry"               0053
+      buffer-href-unreachable-500.http   the same: 500 "Unable to open
+                                         datasource"                         0053
+
+    zoo-project/
+      link-json-http.http                the `$ref` in every `extended-schema`:
+                                         301 to https                        0022
+      link-json-https.http               and there, GitHub Pages' 404        0022
 
 `hello-world-*.http` carry a fresh job UUID and timestamp per capture, so they
 are read for shape and headers rather than compared byte-for-byte. Re-capture by
