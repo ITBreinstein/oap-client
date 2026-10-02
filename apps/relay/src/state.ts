@@ -14,6 +14,7 @@
  * so tests step time by hand.
  */
 
+import { DEFAULT_LIMITS, DEFAULT_SESSION_MAX_AGE_MS, type RelayConfig } from "./config.js";
 import { mintRef, mintSecretToken } from "./tokens.js";
 
 export interface Clock {
@@ -35,8 +36,10 @@ export interface Registration {
 
 interface Session {
   readonly token: string;
+  readonly createdAt: number;
   lastSeen: number;
-  readonly listeners: Set<DoorbellListener>;
+  /** Each open stream's listener, with the function that ends that stream. In opening order. */
+  readonly listeners: Map<DoorbellListener, () => void>;
   readonly refs: Set<string>;
 }
 
@@ -45,6 +48,25 @@ export interface StateOptions {
   readonly sessionIdleTtlMs: number;
   readonly maxSessions: number;
   readonly maxRegistrationsPerSession: number;
+  /** Defaults to {@link DEFAULT_SESSION_MAX_AGE_MS}. */
+  readonly sessionMaxAgeMs?: number;
+  /** Defaults to the config default; see `RelayLimits`. */
+  readonly maxStreamsPerSession?: number;
+  /** Defaults to the config default; see `RelayLimits`. */
+  readonly maxOpenStreams?: number;
+}
+
+/** The state's options as the config sets them. */
+export function stateOptionsFrom(config: RelayConfig): StateOptions {
+  return {
+    registrationTtlMs: config.registrationTtlMs,
+    sessionIdleTtlMs: config.sessionIdleTtlMs,
+    sessionMaxAgeMs: config.sessionMaxAgeMs,
+    maxSessions: config.limits.maxSessions,
+    maxRegistrationsPerSession: config.limits.maxRegistrationsPerSession,
+    maxStreamsPerSession: config.limits.maxStreamsPerSession,
+    maxOpenStreams: config.limits.maxOpenStreams,
+  };
 }
 
 /**
@@ -55,14 +77,20 @@ export type RingOutcome = "delivered" | "no-listener" | "unknown";
 
 export class RelayState {
   readonly #clock: Clock;
-  readonly #options: StateOptions;
+  readonly #options: Required<StateOptions>;
   readonly #sessions = new Map<string, Session>();
+  #openStreams = 0;
   readonly #byCallbackToken = new Map<string, Registration>();
   readonly #byRef = new Map<string, Registration>();
 
   constructor(clock: Clock, options: StateOptions) {
     this.#clock = clock;
-    this.#options = options;
+    this.#options = {
+      sessionMaxAgeMs: DEFAULT_SESSION_MAX_AGE_MS,
+      maxStreamsPerSession: DEFAULT_LIMITS.maxStreamsPerSession,
+      maxOpenStreams: DEFAULT_LIMITS.maxOpenStreams,
+      ...options,
+    };
   }
 
   /** A new session, or `undefined` when the relay is at its session cap. */
@@ -73,7 +101,13 @@ export class RelayState {
     }
     const now = this.#clock.now();
     const token = mintSecretToken();
-    this.#sessions.set(token, { token, lastSeen: now, listeners: new Set(), refs: new Set() });
+    this.#sessions.set(token, {
+      token,
+      createdAt: now,
+      lastSeen: now,
+      listeners: new Map(),
+      refs: new Set(),
+    });
     return { token, expiresAt: now + this.#options.sessionIdleTtlMs };
   }
 
@@ -86,17 +120,36 @@ export class RelayState {
   }
 
   /**
-   * Subscribe to a session's doorbells. Returns the unsubscribe function, or
-   * `undefined` when the session is unknown or expired — which the browser
-   * reads as "open a new session", not as an error.
+   * Subscribe a stream to a session's doorbells. `close` ends that stream: the
+   * state calls it when it closes the stream itself, to make room for a newer
+   * one on the same session or because the session ended.
+   *
+   * Returns the unsubscribe function; `unknown-session` when the session is
+   * unknown or expired, which the browser reads as "open a new session", not
+   * as an error; or `at-capacity` when the relay holds as many streams as it
+   * allows. Neither cap used to exist: one session could hold any number of
+   * streams, and a session with one open never ended (review R3).
    */
-  listen(token: string, listener: DoorbellListener): (() => void) | undefined {
+  listen(
+    token: string,
+    listener: DoorbellListener,
+    close: () => void,
+  ): (() => void) | "unknown-session" | "at-capacity" {
     const session = this.#liveSession(token);
-    if (session === undefined) return undefined;
+    if (session === undefined) return "unknown-session";
+    if (session.listeners.size >= this.#options.maxStreamsPerSession) {
+      // Make room on the session by closing its oldest stream. The total is
+      // unchanged, so the overall cap does not apply.
+      const oldest = session.listeners.entries().next();
+      if (!oldest.done) this.#closeStream(session, ...oldest.value);
+    } else if (this.#openStreams >= this.#options.maxOpenStreams) {
+      return "at-capacity";
+    }
     session.lastSeen = this.#clock.now();
-    session.listeners.add(listener);
+    session.listeners.set(listener, close);
+    this.#openStreams += 1;
     return () => {
-      session.listeners.delete(listener);
+      if (session.listeners.delete(listener)) this.#openStreams -= 1;
       // Idle time counts from the moment the last stream closed, not from
       // when it opened.
       session.lastSeen = this.#clock.now();
@@ -147,7 +200,7 @@ export class RelayState {
     const session = this.#liveSession(registration.sessionToken);
     if (session === undefined) return "unknown";
     if (session.listeners.size === 0) return "no-listener";
-    for (const listener of session.listeners) listener(registration.ref);
+    for (const listener of session.listeners.keys()) listener(registration.ref);
     return "delivered";
   }
 
@@ -174,14 +227,24 @@ export class RelayState {
 
   /** Sizes only, for the health endpoint and for tests. Never a token. */
   counts(): { sessions: number; registrations: number; listeners: number } {
-    let listeners = 0;
-    for (const session of this.#sessions.values()) listeners += session.listeners.size;
-    return { sessions: this.#sessions.size, registrations: this.#byRef.size, listeners };
+    return {
+      sessions: this.#sessions.size,
+      registrations: this.#byRef.size,
+      listeners: this.#openStreams,
+    };
   }
 
   #isExpired(session: Session, now: number): boolean {
-    // A session with an open stream is in use, however long ago it was made.
+    // However busy: an open stream used to keep a session for ever.
+    if (session.createdAt + this.#options.sessionMaxAgeMs <= now) return true;
+    // A session with an open stream is otherwise in use.
     return session.listeners.size === 0 && session.lastSeen + this.#options.sessionIdleTtlMs <= now;
+  }
+
+  #closeStream(session: Session, listener: DoorbellListener, close: () => void): void {
+    session.listeners.delete(listener);
+    this.#openStreams -= 1;
+    close();
   }
 
   #liveSession(token: string): Session | undefined {
@@ -206,6 +269,9 @@ export class RelayState {
   }
 
   #dropSession(session: Session): void {
+    for (const [listener, close] of [...session.listeners]) {
+      this.#closeStream(session, listener, close);
+    }
     for (const ref of session.refs) {
       const registration = this.#byRef.get(ref);
       if (registration !== undefined) {

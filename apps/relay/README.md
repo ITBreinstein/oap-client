@@ -142,8 +142,13 @@ Three kinds, so that knowing one grants nothing the others protect:
 - **ref** — 96 bits, not secret. Names a registration to the browser.
 
 All from the platform CSPRNG. Sessions expire after an idle hour without an
-open stream; registrations after 24 hours. State is in memory and swept every
-minute. Losing it — a restart — costs doorbells, never jobs; see below.
+open stream, and after 24 hours whatever they hold (`sessionMaxAgeMs`), which
+closes their streams; registrations after 24 hours. A session holds at most
+four event streams (`limits.maxStreamsPerSession`); a fifth closes the oldest.
+The relay holds at most 1 000 in all (`limits.maxOpenStreams`); one more is
+refused with `503`, `X-Relay-Error: stream-capacity`, and the page carries on
+polling. State is in memory and swept every minute. Losing it — a restart —
+costs doorbells, never jobs; see below.
 
 ### Callback receivers
 
@@ -234,14 +239,12 @@ The asynchronous execute. Everything about it is fixed:
 Known gaps, not hidden:
 
 - **No rate limiting.** Anyone can create sessions and send executes through
-  the relay; CORS only restrains browsers. Sessions are capped (10 000) and
-  expire after an idle hour, but a session with an open stream never idles, so
-  someone holding many streams open can use up the cap. Executes are only as
-  limited as the allowlisted servers are. Put the relay behind a reverse proxy
-  with per-client limits on `POST /sessions`, `GET /sessions/events` and
+  the relay; CORS only restrains browsers. Sessions (10 000) and streams
+  (1 000) are capped and no session outlives 24 hours, but one client can
+  still take every place until then. Executes are only as limited as the
+  allowlisted servers are. Put the relay behind a reverse proxy with
+  per-client limits on `POST /sessions`, `GET /sessions/events` and
   `POST /execute`, or add them here, before it faces the internet.
-- **No limit on streams per session.** Harmless to correctness, but part of the
-  point above.
 
 ## Tests
 

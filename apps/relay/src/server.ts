@@ -27,19 +27,14 @@ import { readFileSync } from "node:fs";
 import { serve } from "@hono/node-server";
 import { createApp } from "./app.js";
 import { loadStartup } from "./startup.js";
-import { RelayState, systemClock } from "./state.js";
+import { RelayState, stateOptionsFrom, systemClock } from "./state.js";
 
 const SWEEP_INTERVAL_MS = 60_000;
 
 const { config, warnings } = loadStartup(process.env, (path) => readFileSync(path, "utf8"));
 for (const warning of warnings) console.warn(warning);
 
-const state = new RelayState(systemClock, {
-  registrationTtlMs: config.registrationTtlMs,
-  sessionIdleTtlMs: config.sessionIdleTtlMs,
-  maxSessions: config.limits.maxSessions,
-  maxRegistrationsPerSession: config.limits.maxRegistrationsPerSession,
-});
+const state = new RelayState(systemClock, stateOptionsFrom(config));
 
 const port = Number(process.env["PORT"] ?? 8787);
 const hostname = process.env["HOST"];
