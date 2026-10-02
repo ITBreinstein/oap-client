@@ -160,6 +160,8 @@ export interface ForwardRequest {
 export interface ForwardDone {
   readonly bytes: number;
   readonly capHit: "bytes" | "duration" | undefined;
+  /** The server broke off mid-body: a socket error, or a close before `end`. Not a cap of ours. */
+  readonly connectionFailed?: true;
 }
 
 export interface ForwardedResponse {
@@ -361,7 +363,11 @@ function streamBody(response: IncomingMessage, maxBytes: number): StreamedBody {
     finished = true;
     if (error === undefined) controller?.close();
     else controller?.error(error);
-    resolveDone({ bytes, capHit });
+    resolveDone(
+      error !== undefined && capHit === undefined
+        ? { bytes, capHit, connectionFailed: true }
+        : { bytes, capHit },
+    );
   };
 
   const breakOff = (cap: "bytes" | "duration"): void => {
