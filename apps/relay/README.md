@@ -163,7 +163,9 @@ generates itself, rather than forwards, also carries `X-Relay-Error: <code>`:
 its refusals (`unknown-endpoint`, `read-route-off`, `unknown-session`,
 `absolute-url`, `dot-segment`, `encoded-separator`, `delete-not-a-job`, …) and
 its own `502`s (`timeout`, `connection-failed`, `blocked-address`,
-`response-too-large`, `redirect-limit`). Both are exposed to the page.
+`response-too-large`, `redirect-limit`). Both are exposed to the page. The one
+exception is the callback route's `404`, which no page ever sees: only OGC
+servers call that route, and pygeoapi ignores the status anyway (finding 0047).
 
 The web app reads them in that order. A response without `X-Relay` never came
 from the relay: a reverse proxy in front of it answers `502` or `504` by itself
@@ -212,7 +214,9 @@ redirectsFollowed, bytes, ms, capHit }`. The path is relative to the base,
 The asynchronous execute. Everything about it is fixed:
 
 - `POST`, to `{baseUrl}/processes/{processId}/execution`, the base from the
-  allowlist and the id restricted to `[A-Za-z0-9._~-]`.
+  allowlist. The id is one of `[A-Za-z0-9_]` followed by at most 127 of
+  `[A-Za-z0-9._~:-]`, so `ns:process:v1` passes and a leading `.` or `:` does
+  not, and it is percent-encoded into its own path segment.
 - `Content-Type: application/json`, `Accept: */*`, `Prefer: respond-async`.
   No browser header or cookie is forwarded.
 - A browser-supplied `subscriber` is refused; the relay mints its own.
