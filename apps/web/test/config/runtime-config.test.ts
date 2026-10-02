@@ -199,3 +199,18 @@ describe("loadRuntimeConfig", () => {
     expect(loaded.warning).toMatch(/could not be loaded/);
   });
 });
+
+describe("the static site's config.json (deploy/static/)", () => {
+  it("is valid, with no relay and no presets", () => {
+    // Vite's glob import, as the form fixtures are read: the web project has
+    // no Node types, and the file stays where the deploy expects it.
+    const shipped = Object.values(
+      import.meta.glob<unknown>("../../../../deploy/static/config.json", {
+        eager: true,
+        import: "default",
+      }),
+    );
+    expect(shipped).toHaveLength(1);
+    expect(checkRuntimeConfig(shipped[0])).toEqual({ ok: true, config: STATIC_ONLY });
+  });
+});
