@@ -22,6 +22,7 @@ import { serve, type ServerType } from "@hono/node-server";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createApp, type AuditLine } from "../../src/app.js";
 import { parseConfig } from "../../src/config.js";
+import { relayServeOptions } from "../../src/serve-options.js";
 
 const NOCORS = "http://localhost:5081";
 const ORIGIN = "http://localhost:4173";
@@ -65,6 +66,7 @@ beforeAll(async () => {
     { allowPrivateAddresses: true },
   );
   server = serve({
+    ...relayServeOptions,
     fetch: createApp({ config, onAudit: (line) => audits.push(line) }).fetch,
     port: 0,
   });

@@ -727,7 +727,9 @@ export function createApp(options: AppOptions = {}): Hono {
 
   // A notification from an OGC server. The token is checked before anything
   // else, and the request body is never read: not as job state, not as a job
-  // id, not at all. Node discards whatever the server sent after we answer.
+  // id, not at all. Node discards whatever the server sent after we answer,
+  // however long the upload takes, when the listener is started with
+  // `relayServeOptions` (serve-options.ts).
   //
   // An unknown or expired token is answered 404, never refused at the socket.
   // pygeoapi 0.21.0 ignores the status of a callback response but treats a
