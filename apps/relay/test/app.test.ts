@@ -7,7 +7,7 @@
 import { describe, expect, it } from "vitest";
 import { createApp, type RelayEvent, type UpstreamCall } from "../src/app.js";
 import { parseConfig } from "../src/config.js";
-import { RelayState, type Clock } from "../src/state.js";
+import { RelayState, type Clock, type StateOptions } from "../src/state.js";
 import { mintSecretToken } from "../src/tokens.js";
 import { UpstreamError, type UpstreamResponse } from "../src/upstream.js";
 
@@ -43,7 +43,7 @@ interface Harness {
   readonly events: RelayEvent[];
 }
 
-function harness(upstream?: UpstreamCall): Harness {
+function harness(upstream?: UpstreamCall, stateOverrides: Partial<StateOptions> = {}): Harness {
   let now = 1_000_000;
   const clock = {
     now: () => now,
@@ -56,6 +56,7 @@ function harness(upstream?: UpstreamCall): Harness {
     sessionIdleTtlMs: config.sessionIdleTtlMs,
     maxSessions: 10,
     maxRegistrationsPerSession: 10,
+    ...stateOverrides,
   });
   const sent: Harness["sent"] = [];
   const events: RelayEvent[] = [];
@@ -552,6 +553,40 @@ describe("GET /sessions/events", () => {
       });
       expect(response.status).toBe(401);
     }
+  });
+
+  it("closes a session's oldest stream when it opens one more than it may hold", async () => {
+    const h = harness();
+    const token = await newSession(h.app);
+    const streams = [];
+    for (let i = 0; i < 5; i += 1) streams.push(await openEvents(h.app, token));
+    await expect(streams[0]?.next()).rejects.toThrow("stream ended");
+    expect(h.state.counts().listeners).toBe(4);
+    for (const stream of streams.slice(1)) await stream.close();
+  });
+
+  it("refuses a stream, marked as the relay's own, when it holds as many as it allows", async () => {
+    const h = harness(undefined, { maxOpenStreams: 1 });
+    const first = await openEvents(h.app, await newSession(h.app));
+    const refused = await h.app.request("/sessions/events", {
+      headers: { Authorization: `Bearer ${await newSession(h.app)}` },
+    });
+    expect(refused.status).toBe(503);
+    expect(refused.headers.get("X-Relay-Error")).toBe("stream-capacity");
+    await first.close();
+  });
+
+  it("ends a session at its maximum age, open stream and all, so it stops holding a place", async () => {
+    const h = harness(undefined, { maxSessions: 2, sessionMaxAgeMs: 24 * 60 * 60 * 1000 });
+    const streams = [
+      await openEvents(h.app, await newSession(h.app)),
+      await openEvents(h.app, await newSession(h.app)),
+    ];
+    expect((await h.app.request("/sessions", { method: "POST" })).status).toBe(503);
+    h.clock.advance(24 * 60 * 60 * 1000);
+    expect((await h.app.request("/sessions", { method: "POST" })).status).toBe(201);
+    for (const stream of streams) await expect(stream.next()).rejects.toThrow("stream ended");
+    expect(h.state.counts().listeners).toBe(0);
   });
 
   it("coalesces a burst of doorbells for one job into one event", async () => {
