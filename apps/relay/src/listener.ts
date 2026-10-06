@@ -4,13 +4,10 @@
  */
 
 import type { ServerType } from "@hono/node-server";
-import type { RelayLimits } from "./config.js";
+import { MAX_TIMER_MS, type RelayLimits } from "./config.js";
 
 /** Headroom over the longest upstream deadline, so the relay's own 502 or 504 reaches the browser first. */
 const SOCKET_TIMEOUT_MARGIN_MS = 10_000;
-
-/** Node's timers hold a signed 32-bit millisecond count; anything longer fires at once. */
-const MAX_TIMER_MS = 2_147_483_647;
 
 /**
  * How long a browser's socket may sit silent. A read, or a synchronous

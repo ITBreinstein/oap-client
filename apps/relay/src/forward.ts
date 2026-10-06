@@ -17,7 +17,8 @@
  *   core reads — and nothing inside a body is rewritten.
  * - **Redirects:** followed by hand, for `GET` only, and only to a target still
  *   under `baseUrl` — same origin, no userinfo — at most {@link MAX_REDIRECTS} times. Anything else is
- *   handed back as the server sent it.
+ *   handed back as the server sent it. A redirect that is followed is dropped
+ *   with its body unread.
  * - **Address:** every hop connects through `guardedLookup`, on a fresh
  *   socket, unless the endpoint is configured for a private network.
  * - **Size and time:** the body is streamed, never buffered, under a byte cap
@@ -283,7 +284,10 @@ export function forward(
           const location = firstHeader(response.headers.location);
           const target = location === undefined ? undefined : safeUrl(location, url);
           if (target !== undefined && isUnderBase(target, endpoint.baseUrl)) {
-            response.resume();
+            // Dropped, not drained: its body counts against no cap, and the
+            // deadline moves on to the next hop (review R8). The socket was
+            // never pooled (`agent: false`), so nothing is lost by it.
+            response.destroy();
             settled = true;
             if (redirectsFollowed >= MAX_REDIRECTS) {
               rejectPromise(new UpstreamError("redirect-limit"));

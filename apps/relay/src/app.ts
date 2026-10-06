@@ -121,7 +121,7 @@ export interface AuditLine {
   readonly queryNames: readonly string[];
   /** Undefined when no response arrived. */
   readonly upstreamStatus: number | undefined;
-  /** Why no response arrived, or why the body was broken off. */
+  /** Why no response arrived, why the one that did was refused, or why its body was broken off. */
   readonly failure: UpstreamFailure | undefined;
   readonly redirectsFollowed: number;
   readonly bytes: number;
@@ -339,13 +339,38 @@ export function createApp(options: AppOptions = {}): Hono {
   app.use("/execute/*", forwardingCors);
   app.use("/read/*", forwardingCors);
 
+  /** The relay's own 502, for an exchange that produced no answer it can hand on. */
+  const badGateway = (c: Context, reason: UpstreamFailure): Response =>
+    c.json({ type: "about:blank", title: "Bad Gateway", status: 502, reason }, 502, {
+      "Content-Type": "application/problem+json",
+      "Cache-Control": "no-store",
+      [RELAY_ERROR]: reason,
+    });
+
   /** The relay's `Response` for a forwarded answer, and its audit line once the body is done. */
   const relayForwarded = (
+    c: Context,
     endpoint: EndpointConfig,
     request: ForwardRequest,
     started: number,
     forwarded: ForwardedResponse,
   ): Response => {
+    // `new Response` throws outside 200–599. Refused before that, with the
+    // body cancelled, which drops the upstream socket instead of holding it
+    // until the deadline (review R9).
+    if (forwarded.status < 200 || forwarded.status > 599) {
+      void forwarded.body?.cancel();
+      audit({
+        ...auditBase("read-route", endpoint, request),
+        upstreamStatus: forwarded.status,
+        failure: "bad-upstream-status",
+        redirectsFollowed: forwarded.redirectsFollowed,
+        bytes: 0,
+        ms: clock.now() - started,
+        capHit: undefined,
+      });
+      return badGateway(c, "bad-upstream-status");
+    }
     void forwarded.done.then((done) => {
       audit({
         ...auditBase("read-route", endpoint, request),
@@ -378,7 +403,7 @@ export function createApp(options: AppOptions = {}): Hono {
     return new Response(body, { status: forwarded.status, headers });
   };
 
-  /** The relay's own 502 for an exchange that produced no response. */
+  /** The audit line and the 502 for an exchange that produced no response. */
   const upstreamFailed = (
     c: Context,
     kind: AuditLine["audit"],
@@ -399,11 +424,7 @@ export function createApp(options: AppOptions = {}): Hono {
       capHit:
         reason === "response-too-large" ? "bytes" : reason === "timeout" ? "duration" : undefined,
     });
-    return c.json({ type: "about:blank", title: "Bad Gateway", status: 502, reason }, 502, {
-      "Content-Type": "application/problem+json",
-      "Cache-Control": "no-store",
-      [RELAY_ERROR]: reason,
-    });
+    return badGateway(c, reason);
   };
 
   // The read route (phase 3; finding 0050). Only for endpoints configured for
@@ -459,7 +480,7 @@ export function createApp(options: AppOptions = {}): Hono {
     } catch (error) {
       return upstreamFailed(c, "read-route", endpoint, request, started, error);
     }
-    return relayForwarded(endpoint, request, started, forwarded);
+    return relayForwarded(c, endpoint, request, started, forwarded);
   };
   app.get("/read/:endpointKey", (c) => read(c, "GET"));
   app.get("/read/:endpointKey/*", (c) => read(c, "GET"));
@@ -668,7 +689,7 @@ export function createApp(options: AppOptions = {}): Hono {
           upstreamStatus: forwarded.status,
           registered: false,
         });
-        return relayForwarded(endpoint, request, started, forwarded);
+        return relayForwarded(c, endpoint, request, started, forwarded);
       }
 
       let ref: string | undefined;

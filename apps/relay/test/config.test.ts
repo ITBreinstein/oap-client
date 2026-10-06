@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ConfigError, parseConfig } from "../src/config.js";
+import { ConfigError, MAX_TIMER_MS, parseConfig } from "../src/config.js";
 
 const endpoint = { key: "pygeoapi", baseUrl: "https://ogc.example.org" };
 
@@ -100,5 +100,16 @@ describe("parseConfig", () => {
       /limits/,
     );
     expect(() => parseConfig({ endpoints: [], limits: { maxSessions: 1.5 } })).toThrow(/limits/);
+  });
+
+  it("refuses a timeout longer than Node's timers hold, which would fire at once", () => {
+    for (const key of ["readTimeoutMs", "upstreamTimeoutMs"]) {
+      expect(() => parseConfig({ endpoints: [], limits: { [key]: MAX_TIMER_MS + 1 } })).toThrow(
+        new RegExp(`limits\\.${key} must be at most`),
+      );
+      expect(parseConfig({ endpoints: [], limits: { [key]: MAX_TIMER_MS } }).limits).toMatchObject({
+        [key]: MAX_TIMER_MS,
+      });
+    }
   });
 });

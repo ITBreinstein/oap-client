@@ -50,7 +50,10 @@ docker build -f apps/relay/Dockerfile -t oap-relay .                           #
 ```
 
 Configuration is one JSON file; see [infra/relay/](../../infra/relay/) for the
-CI config and a public-demo template, and `src/config.ts` for every field.
+CI config and a public-demo template, and `src/config.ts` for every field. The
+two deadlines, `limits.readTimeoutMs` and `limits.upstreamTimeoutMs`, may be at
+most 2 147 483 647 ms (about 24.8 days), the longest timer Node holds; a longer
+one would fire at once, so the relay refuses to start with it.
 
 `RELAY_BUILD_ID`, when set, is reported on `/healthz` as `build`. The browser
 test lane sets it to a hash of what it built the relay from, and refuses to run
@@ -170,7 +173,9 @@ generates itself, rather than forwards, also carries `X-Relay-Error: <code>`:
 its refusals (`unknown-endpoint`, `read-route-off`, `unknown-session`,
 `absolute-url`, `dot-segment`, `encoded-separator`, `delete-not-a-job`, …) and
 its own `502`s (`timeout`, `connection-failed`, `blocked-address`,
-`response-too-large`, `redirect-limit`). Both are exposed to the page. The one
+`response-too-large`, `redirect-limit`, and `bad-upstream-status` for a status
+line outside 200–599, which no browser can be handed). Both are exposed to the
+page. The one
 exception is the callback route's `404`, which no page ever sees: only OGC
 servers call that route, and pygeoapi ignores the status anyway (finding 0047).
 
@@ -201,7 +206,7 @@ For `readRoute: "relay"` endpoints only, with a live session:
   maps them back onto this route.
 - **Redirects:** followed by hand for `GET` only, while the target is still
   under `baseUrl` (same origin, no userinfo), at most three times. Any other redirect is handed back as the
-  server sent it.
+  server sent it. A redirect that is followed is dropped with its body unread.
 - **Address:** every hop goes through the address check below, on a fresh
   connection.
 - **Size and time:** the body is streamed, not buffered, up to

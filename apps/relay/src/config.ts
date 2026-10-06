@@ -170,6 +170,12 @@ function readBoolean(
   return value;
 }
 
+/**
+ * The longest delay Node's timers hold: a signed 32-bit millisecond count, a
+ * little under 25 days. A longer one fires after 1 ms instead (review R10).
+ */
+export const MAX_TIMER_MS = 2_147_483_647;
+
 function readPositiveInteger(
   record: Record<string, unknown>,
   key: string,
@@ -180,6 +186,20 @@ function readPositiveInteger(
   if (value === undefined) return fallback;
   if (typeof value !== "number" || !Number.isSafeInteger(value) || value <= 0) {
     throw new ConfigError(`${path}.${key}`, "must be a positive integer");
+  }
+  return value;
+}
+
+/** A deadline the relay arms as a timer, so no longer than {@link MAX_TIMER_MS}. */
+function readTimeoutMs(
+  record: Record<string, unknown>,
+  key: string,
+  path: string,
+  fallback: number,
+): number {
+  const value = readPositiveInteger(record, key, path, fallback);
+  if (value > MAX_TIMER_MS) {
+    throw new ConfigError(`${path}.${key}`, `must be at most ${String(MAX_TIMER_MS)} ms`);
   }
   return value;
 }
@@ -314,7 +334,7 @@ export function parseConfig(input: unknown, options: ParseOptions = {}): RelayCo
       "limits",
       DEFAULT_LIMITS.maxUpstreamResponseBytes,
     ),
-    upstreamTimeoutMs: readPositiveInteger(
+    upstreamTimeoutMs: readTimeoutMs(
       rawLimits,
       "upstreamTimeoutMs",
       "limits",
@@ -350,7 +370,7 @@ export function parseConfig(input: unknown, options: ParseOptions = {}): RelayCo
       "limits",
       DEFAULT_LIMITS.maxReadResponseBytes,
     ),
-    readTimeoutMs: readPositiveInteger(
+    readTimeoutMs: readTimeoutMs(
       rawLimits,
       "readTimeoutMs",
       "limits",
