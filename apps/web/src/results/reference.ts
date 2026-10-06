@@ -333,7 +333,9 @@ async function classifyAnswer(
   }
 
   const text = await envelope.text();
-  const blob = new Blob([text], { type: envelope.mediaType ?? "application/octet-stream" });
+  // The bytes as served, never rebuilt from the decoded text: a binary file
+  // labelled JSON would be saved as replacement characters (review W6).
+  const blob = await envelope.blob();
   let value: unknown;
   try {
     value = JSON.parse(text) as unknown;

@@ -55,7 +55,9 @@ function blobOf(result: ValueResult): Blob {
     case "json":
       return new Blob([JSON.stringify(result.value, null, 2)], { type: "application/json" });
     case "text":
-      return new Blob([result.value], { type: result.mediaType });
+      // The server's bytes, when there are any: re-encoding the decoded text
+      // would change a body in any charset but UTF-8.
+      return result.blob ?? new Blob([result.value], { type: result.mediaType });
     case "download":
       return result.blob;
   }

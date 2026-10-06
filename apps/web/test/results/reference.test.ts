@@ -199,6 +199,25 @@ describe("classification by evidence (T5)", () => {
     expect(await loaded.blob?.text()).toBe("plugfest");
   });
 
+  it("keeps a binary file labelled JSON as 'other', with the bytes the server sent (W6)", async () => {
+    // ZOO labels raw results application/json whatever they are (finding
+    // 0026). The blob used to be rebuilt from the decoded text.
+    const url = "http://localhost:5090/temp/out.js";
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0xff, 0xfe]);
+    const loaded = await loadReference(
+      { href: url },
+      {
+        endpoint: PYGEOAPI,
+        fetch: fakeFetch({
+          [url]: () => new Response(png, { headers: { "Content-Type": "application/json" } }),
+        }),
+      },
+    );
+
+    expect(loaded).toMatchObject({ outcome: "ok", representation: "other" });
+    expect(new Uint8Array((await loaded.blob?.arrayBuffer()) ?? new ArrayBuffer(0))).toEqual(png);
+  });
+
   it("does not try to parse XML: GML is 'other'", async () => {
     const url = "http://localhost:5090/temp//ZOO_DATA_Buffer_Result_0.xml";
     const loaded = await loadReference(
