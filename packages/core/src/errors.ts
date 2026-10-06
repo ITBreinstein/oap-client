@@ -177,6 +177,13 @@ export class AmbiguousExecutionResponseError extends Error {
   readonly mediaType: string | undefined;
   /** Relations found in the response body, so the reader can see what *was* there. */
   readonly bodyLinkRelations: readonly string[];
+  /**
+   * The job id the body named (`jobID`, or `id`), when it named one. Not a
+   * status URL, and never turned into one here, but `client.getJob()` accepts
+   * a bare id and resolves it through the service's job list: the honest
+   * route to a job whose `Location` was hidden (finding 0039).
+   */
+  readonly jobId: string | undefined;
 
   constructor(
     url: string,
@@ -184,6 +191,7 @@ export class AmbiguousExecutionResponseError extends Error {
     locationPresent: boolean,
     mediaType: string | undefined,
     bodyLinkRelations: readonly string[],
+    jobId?: string,
   ) {
     const rels =
       bodyLinkRelations.length === 0
@@ -193,13 +201,16 @@ export class AmbiguousExecutionResponseError extends Error {
       `Cannot tell what ${url} did with the execute request: status ${String(status)}, ` +
         `Location ${locationPresent ? "present" : "absent"}, ` +
         `media type ${mediaType ?? "undeclared"}, ${rels}. ` +
-        `The response looks like a job was created but carries no way to reach it.`,
+        (jobId === undefined
+          ? `The response looks like a job was created but carries no way to reach it.`
+          : `The body names job ${jobId} but carries no way to reach it.`),
     );
     this.url = url;
     this.status = status;
     this.locationPresent = locationPresent;
     this.mediaType = mediaType;
     this.bodyLinkRelations = Object.freeze([...bodyLinkRelations]);
+    this.jobId = jobId;
   }
 }
 

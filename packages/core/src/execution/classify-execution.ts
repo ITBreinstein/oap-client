@@ -162,14 +162,20 @@ export function isJobDocument(body: unknown): boolean {
   return typeof status === "string" && isJobState(status);
 }
 
+/** The id the body itself names: `jobID`, then `id`. */
+function bodyJobId(body: unknown): string | undefined {
+  if (!isRecord(body)) return undefined;
+  for (const key of ["jobID", "id"] as const) {
+    const value: unknown = body[key];
+    if (typeof value === "string" && value.trim() !== "") return value;
+  }
+  return undefined;
+}
+
 /** `jobID`, then `id`, then the last path segment of the status URL. */
 function readJobId(body: unknown, statusUrl: string): string | undefined {
-  if (isRecord(body)) {
-    for (const key of ["jobID", "id"] as const) {
-      const value: unknown = body[key];
-      if (typeof value === "string" && value.trim() !== "") return value;
-    }
-  }
+  const named = bodyJobId(body);
+  if (named !== undefined) return named;
   try {
     const segments = new URL(statusUrl).pathname.split("/").filter((part) => part !== "");
     const tail = segments[segments.length - 1];
@@ -239,6 +245,9 @@ export function classifyExecution(
       evidence.locationPresent,
       evidence.mediaType,
       evidence.bodyLinks.map((link) => link.rel),
+      // A spec-minimal statusInfo, `{"jobID", "status"}`, is all a browser
+      // sees once `Location` is hidden: the id is kept for the caller (review C8).
+      bodyJobId(evidence.body),
     );
   }
 
