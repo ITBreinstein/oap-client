@@ -105,6 +105,12 @@ export interface RoutedFetchOptions {
    * too. Never set without that confirmation.
    */
   readonly reads?: "direct" | "relay" | undefined;
+  /**
+   * Which route an execute took, called before its answer or its failure
+   * reaches the caller. Every attempt on the relay route is reported, whatever
+   * its outcome; a direct execute whose `fetch` failed is not. So an execute
+   * with no report went direct — which `job-session.ts` relies on (W13).
+   */
   readonly onRoute?: ((observation: ExecuteRouteObservation) => void) | undefined;
   /**
    * A job was started with callbacks registered under `ref`. `statusUrl` is
@@ -301,7 +307,22 @@ export function createRoutedFetch(options: RoutedFetchOptions): FetchLike {
     }
 
     if ("raw" in answer) {
-      const response = fromRelay(answer.raw);
+      let response: Response;
+      try {
+        response = fromRelay(answer.raw);
+      } catch (error) {
+        record({
+          ...base,
+          kind: "execute-route",
+          route: "relay",
+          outcome: "relay-failed",
+          locationPresent: undefined,
+          callbacksRegistered: false,
+          sessionWithheld,
+          reason: error instanceof RelayRouteError ? error.code : "unreachable",
+        });
+        throw error;
+      }
       record({
         ...base,
         kind: "execute-route",

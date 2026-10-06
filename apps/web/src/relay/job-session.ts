@@ -23,13 +23,13 @@ import {
   type Execution,
   type ProcessDescription,
 } from "@breinstein/oap-client";
-import type { SessionObservation, WebObservation } from "../observations.js";
+import type { ExecutionObservation, SessionObservation, WebObservation } from "../observations.js";
 import type { RelayEndpoint } from "./contract.js";
 import { openDoorbells, type DoorbellStream, type StreamState } from "./doorbells.js";
 import { JobReconciler, type TrackedJob } from "./reconciler.js";
 import { createRelayClient, type RelayClient } from "./relay-client.js";
 import { createRelayFetch } from "./relay-fetch.js";
-import { createRoutedFetch } from "./routed-fetch.js";
+import { createRoutedFetch, type RoutedFetchOptions } from "./routed-fetch.js";
 import { NO_STORE, type JobStore, type StoredJob } from "../jobs/job-store.js";
 
 /**
@@ -357,6 +357,51 @@ export function createJobSession(
     if (changed) publish();
   });
 
+  /**
+   * A core client for one endpoint, sending through the routed fetch and
+   * reporting into this session. Its `execution` records say which route the
+   * execute request took (W13): through the relay, `Location` and
+   * `Preference-Applied` are what the relay read and handed back, so the
+   * core's own fields describe the relay's view, not the page's.
+   *
+   * The routed fetch reports every relay attempt, whatever its outcome,
+   * before the core writes its `execution` record; a request it reports
+   * nothing for went direct. One client sends one execute at a time in
+   * practice, and two at once would take the same route anyway.
+   */
+  const routedClient = (
+    endpoint: RelayEndpoint,
+    read: FetchLike | undefined,
+    hooks: Pick<RoutedFetchOptions, "onRoute" | "onRegistration"> = {},
+  ): Client => {
+    const observe = observeFor(endpoint.baseUrl);
+    let reported: "direct" | "relay" | undefined;
+    return createClient({
+      baseUrl: endpoint.baseUrl,
+      onObservation: (observation) => {
+        if (observation.kind !== "execution") {
+          observe(observation);
+          return;
+        }
+        const tagged: ExecutionObservation = { ...observation, executeRoute: reported ?? "direct" };
+        reported = undefined;
+        observe(tagged);
+      },
+      fetch: createRoutedFetch({
+        endpoint,
+        relay,
+        session: doorbells,
+        ...(read === undefined ? {} : { fetch: read, reads: "relay" }),
+        onRoute: (observation) => {
+          reported = observation.route;
+          observe(observation);
+          hooks.onRoute?.(observation);
+        },
+        ...(hooks.onRegistration === undefined ? {} : { onRegistration: hooks.onRegistration }),
+      }),
+    });
+  };
+
   return {
     async endpoints() {
       return relay === undefined ? [] : relay.endpoints();
@@ -365,19 +410,7 @@ export function createJobSession(
     readFetch,
 
     client(endpoint, reads = "direct") {
-      const read = readFetch(endpoint, reads);
-      const observe = observeFor(endpoint.baseUrl);
-      return createClient({
-        baseUrl: endpoint.baseUrl,
-        onObservation: observe,
-        fetch: createRoutedFetch({
-          endpoint,
-          relay,
-          session: doorbells,
-          onRoute: observe,
-          ...(read === undefined ? {} : { fetch: read, reads: "relay" }),
-        }),
-      });
+      return routedClient(endpoint, readFetch(endpoint, reads));
     },
 
     track(endpoint, statusUrl, reads = "direct", processId) {
@@ -423,23 +456,13 @@ export function createJobSession(
       const refs = new Map<string, string>();
       let route: "direct" | "relay" | undefined;
       const read = readFetch(endpoint, reads);
-      const observe = observeFor(endpoint.baseUrl);
-      const client = createClient({
-        baseUrl: endpoint.baseUrl,
-        onObservation: observe,
-        fetch: createRoutedFetch({
-          endpoint,
-          relay,
-          session: doorbells,
-          ...(read === undefined ? {} : { fetch: read, reads: "relay" }),
-          onRoute: (observation) => {
-            route = observation.route;
-            observe(observation);
-          },
-          onRegistration: (ref, statusUrl) => {
-            if (statusUrl !== undefined) refs.set(statusUrl, ref);
-          },
-        }),
+      const client = routedClient(endpoint, read, {
+        onRoute: (observation) => {
+          route = observation.route;
+        },
+        onRegistration: (ref, statusUrl) => {
+          if (statusUrl !== undefined) refs.set(statusUrl, ref);
+        },
       });
       const execution = await client.execute(processId, {
         inputs,
