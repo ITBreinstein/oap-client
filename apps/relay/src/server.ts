@@ -25,6 +25,7 @@
 
 import { readFileSync } from "node:fs";
 import { serve } from "@hono/node-server";
+import { relayServeOptions } from "./serve-options.js";
 import { createApp } from "./app.js";
 import { socketTimeoutMs, stopListening } from "./listener.js";
 import { loadStartup } from "./startup.js";
@@ -43,6 +44,7 @@ const hostname = process.env["HOST"];
 const buildId = process.env["RELAY_BUILD_ID"];
 
 const server = serve({
+  ...relayServeOptions,
   fetch: createApp({ config, state, ...(buildId === undefined ? {} : { buildId }) }).fetch,
   port,
   ...(hostname === undefined ? {} : { hostname }),
