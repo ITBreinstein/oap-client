@@ -11,7 +11,7 @@
  * - No retry, no polling, no interpretation. The envelope is evidence.
  */
 
-import { BodyTooLargeError } from "./errors.js";
+import { AbortError, BodyTooLargeError, isAbortError } from "./errors.js";
 import { isJsonMediaType, parseContentDisposition, parseMediaType } from "./media-type.js";
 import { parseLinkHeader, resolve, type WebLink } from "./link-header.js";
 
@@ -85,6 +85,13 @@ export interface EnvelopeOptions {
   /** What the caller asked for; defaults to the response's own URL. */
   readonly requestedUrl?: string | undefined;
   readonly maxBufferBytes?: number | undefined;
+  /**
+   * The signal the request was sent with. When it fires while the body is
+   * still arriving, fetch errors the body stream, and the readers reject with
+   * {@link AbortError}, as `send` does for an abort before the headers, never
+   * with whatever the runtime put on the stream.
+   */
+  readonly signal?: AbortSignal | undefined;
 }
 
 /**
@@ -163,7 +170,19 @@ export function createEnvelope(
     const chunks: Uint8Array[] = [];
     let total = 0;
     for (;;) {
-      const { done, value } = await reader.read();
+      let chunk: ReadableStreamReadResult<Uint8Array>;
+      try {
+        chunk = await reader.read();
+      } catch (cause) {
+        // Aborted mid-body, by the caller or by a deadline: a cancelled read,
+        // not a broken document (review C2). Checked on the signal first, since
+        // a caller may abort with any reason at all.
+        if (options.signal?.aborted === true || isAbortError(cause)) {
+          throw new AbortError(url, { cause });
+        }
+        throw cause;
+      }
+      const { done, value } = chunk;
       if (done) break;
       total += value.byteLength;
       if (total > limit) {

@@ -8,6 +8,8 @@ import { describe, expect, it } from "vitest";
 import { server } from "../msw.setup.js";
 import { createEnvelope } from "../../src/http/envelope.js";
 import { MalformedDocumentError, NotJsonError } from "../../src/errors.js";
+import { AbortError, BodyTooLargeError } from "../../src/http/errors.js";
+import { stalledBody } from "../http/stalled-body.js";
 import { fetchJson, requireJson, withFormatJson } from "../../src/discovery/negotiate.js";
 
 const BASE = "https://service.test/oapi";
@@ -56,6 +58,44 @@ describe("requireJson", () => {
     expect(() => {
       requireJson(envelopeWith());
     }).toThrow(NotJsonError);
+  });
+});
+
+describe("fetchJson — a body that did not arrive whole is not malformed (C2)", () => {
+  it("reports the buffer limit as BodyTooLargeError, not 'did not parse as JSON'", async () => {
+    // Chunked: no Content-Length, so the limit trips while counting.
+    const fetch = (): Promise<Response> =>
+      Promise.resolve(
+        new Response(
+          new ReadableStream<Uint8Array>({
+            start(controller) {
+              controller.enqueue(
+                new TextEncoder().encode(`{"conformsTo":["${"x".repeat(2048)}"]}`),
+              );
+              controller.close();
+            },
+          }),
+          { headers: { "Content-Type": "application/json" } },
+        ),
+      );
+
+    await expect(
+      fetchJson("https://service.test/conformance", { fetch, maxBufferBytes: 1024 }),
+    ).rejects.toBeInstanceOf(BodyTooLargeError);
+  });
+
+  it("reports an abort mid-body as AbortError", async () => {
+    const controller = new AbortController();
+    const fetch = (_url: string, init: RequestInit = {}): Promise<Response> => {
+      queueMicrotask(() => {
+        controller.abort();
+      });
+      return Promise.resolve(stalledBody(init.signal));
+    };
+
+    await expect(
+      fetchJson("https://service.test/conformance", { fetch, signal: controller.signal }),
+    ).rejects.toBeInstanceOf(AbortError);
   });
 });
 

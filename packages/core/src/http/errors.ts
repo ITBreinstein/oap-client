@@ -27,6 +27,17 @@ export class AbortError extends Error {
 }
 
 /**
+ * True for the error an aborted signal produces, whatever runtime or caller
+ * made it: a DOM `AbortError`, this core's own, or the `TimeoutError` that
+ * `AbortSignal.timeout()` aborts with. Not exported from the package.
+ */
+export function isAbortError(cause: unknown): boolean {
+  if (typeof cause !== "object" || cause === null) return false;
+  const name: unknown = (cause as { name?: unknown }).name;
+  return name === "AbortError" || name === "TimeoutError";
+}
+
+/**
  * `fetch` itself rejected: DNS failure, connection refused, TLS failure, or a
  * browser CORS block. These are genuinely indistinguishable — every one of them
  * surfaces as an opaque `TypeError: Failed to fetch`, deliberately, so that a

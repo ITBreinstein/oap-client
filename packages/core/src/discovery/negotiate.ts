@@ -86,6 +86,10 @@ async function parseBody(envelope: ResponseEnvelope): Promise<unknown> {
   try {
     return await envelope.json();
   } catch (cause) {
+    // Only a body that arrived and is not JSON is malformed. An abort, a
+    // deadline or the buffer limit hit while it was arriving is that error,
+    // and goes on as it is (review C2).
+    if (!(cause instanceof SyntaxError)) throw cause;
     // The server declared JSON and sent something else. That is a different
     // failure from sending HTML, and it gets a different error.
     throw new MalformedDocumentError(envelope.url, "body did not parse as JSON", { cause });

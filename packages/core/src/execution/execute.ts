@@ -32,9 +32,11 @@ import { DEFAULT_EXECUTE_TIMEOUT_MS, type Execution, type ExecuteOptions } from 
  * `options.description` carries an `execute` link — which both reference
  * servers advertise — that link wins and this is not read.
  *
- * Returns as soon as the server answers. Whether that answer is the result or a
- * job is decided by {@link classifyExecution} from the response's own evidence,
- * and both outcomes are ordinary — neither is an error.
+ * Returns as soon as the server's answer is read as far as classifying it
+ * needs. `timeoutMs` and `signal` cover all of that, the body included. Whether
+ * that answer is the result or a job is decided by {@link classifyExecution}
+ * from the response's own evidence, and both outcomes are ordinary — neither
+ * is an error.
  */
 export async function execute(
   processesUrl: string,
@@ -93,59 +95,69 @@ export async function execute(
       problemPresent: false,
       unrecognisedKeys: [],
     });
-    // A deadline that fired reaches us as an AbortError from the transport,
-    // because that is what an aborted signal produces. Only this function knows
-    // it was ours rather than the caller's.
-    if (deadline.timedOut() && cause instanceof AbortError) {
-      throw new ExecutionTimeoutError(request.url, timeoutMs, { cause });
-    }
-    throw cause;
-  } finally {
     deadline.dispose();
+    throw ended(cause);
   }
 
   const elapsedMs = Date.now() - startedAt;
   const preferenceAppliedHeader = envelope.headers.has("preference-applied");
 
+  // The headers are in, and the body is still to come: the classifier, the
+  // problem check and the evidence all read it. The deadline and the caller's
+  // signal stay on until they have; released at the headers, they left a body
+  // that stalls able to hang this call for ever (review C1).
   try {
-    // T5. The classifier decides; we do not read the status ourselves. Finding
-    // 0016 is why: ZOO answers a rejected input with 500, so the status alone
-    // cannot say whether the server broke or the user typed something wrong,
-    // and the core must not pretend to resolve that. Whatever problem document
-    // exists travels on the error so the UI can show the server's own words.
-    // Finding 0014 also applies — ZOO answers an unknown path with 400, not
-    // 404 — so nothing here special-cases a status.
-    await requireOk(envelope);
+    return await settle(envelope);
   } catch (cause) {
-    observe(sink, {
-      ...base,
-      outcome: "error",
-      status: envelope.status,
-      mediaType: envelope.mediaType,
-      elapsedMs,
-      resultKind: undefined,
-      disagreedWithRequestedMode: false,
-      preferenceApplied: undefined,
-      preferenceAppliedHeader,
-      discoveredVia: undefined,
-      locationPresent: envelope.locationRaw !== undefined,
-      jobIdKnown: false,
-      problemPresent: cause instanceof ProcessesError && cause.problem !== undefined,
-      unrecognisedKeys: [],
-    });
-    throw cause;
+    if (cause instanceof AbortError) {
+      // The body broke off: an answer began, and never finished arriving.
+      observe(sink, {
+        ...base,
+        outcome: "transport-failure",
+        status: envelope.status,
+        mediaType: envelope.mediaType,
+        elapsedMs: Date.now() - startedAt,
+        resultKind: undefined,
+        disagreedWithRequestedMode: false,
+        preferenceApplied: undefined,
+        preferenceAppliedHeader,
+        discoveredVia: undefined,
+        locationPresent: envelope.locationRaw !== undefined,
+        jobIdKnown: false,
+        problemPresent: false,
+        unrecognisedKeys: [],
+      });
+    }
+    throw ended(cause);
+  } finally {
+    deadline.dispose();
   }
 
-  const evidence = await gatherEvidence(envelope, sink);
-  let execution: Execution;
-  try {
-    execution = classifyExecution(envelope, evidence, requestedMode);
-  } catch (cause) {
-    // A job was created and cannot be reached — pygeoapi's async 201 from a
-    // browser, whose `Location` is hidden and whose body is `null` (finding
-    // 0039). The server did answer, so this is recorded like any other answer
-    // rather than lost with the throw.
-    if (cause instanceof AmbiguousExecutionResponseError) {
+  /**
+   * An abort as the caller should see it. A deadline that fired reaches us as
+   * an AbortError, from the transport or from a body read, because that is
+   * what an aborted signal produces. Only this function knows it was ours
+   * rather than the caller's.
+   */
+  function ended(cause: unknown): unknown {
+    return deadline.timedOut() && cause instanceof AbortError
+      ? new ExecutionTimeoutError(request.url, timeoutMs, { cause })
+      : cause;
+  }
+
+  /** Everything after the headers: the classification, and its observation. */
+  async function settle(envelope: ResponseEnvelope): Promise<Execution> {
+    try {
+      // T5. The classifier decides; we do not read the status ourselves. Finding
+      // 0016 is why: ZOO answers a rejected input with 500, so the status alone
+      // cannot say whether the server broke or the user typed something wrong,
+      // and the core must not pretend to resolve that. Whatever problem document
+      // exists travels on the error so the UI can show the server's own words.
+      // Finding 0014 also applies — ZOO answers an unknown path with 400, not
+      // 404 — so nothing here special-cases a status.
+      await requireOk(envelope);
+    } catch (cause) {
+      if (cause instanceof AbortError) throw cause;
       observe(sink, {
         ...base,
         outcome: "error",
@@ -153,47 +165,77 @@ export async function execute(
         mediaType: envelope.mediaType,
         elapsedMs,
         resultKind: undefined,
-        disagreedWithRequestedMode: requestedMode === "sync",
-        preferenceApplied: preferenceOutcome(requestedMode, {
-          kind: "unreachable-job",
-          status: envelope.status,
-          locationPresent: evidence.locationPresent,
-        }),
+        disagreedWithRequestedMode: false,
+        preferenceApplied: undefined,
         preferenceAppliedHeader,
         discoveredVia: undefined,
-        locationPresent: evidence.locationPresent,
+        locationPresent: envelope.locationRaw !== undefined,
         jobIdKnown: false,
-        problemPresent: false,
-        unrecognisedKeys: evidence.unrecognisedKeys,
+        problemPresent: cause instanceof ProcessesError && cause.problem !== undefined,
+        unrecognisedKeys: [],
       });
+      throw cause;
     }
-    throw cause;
-  }
-  const asked = requestedMode === "async" ? "job" : "immediate";
 
-  observe(sink, {
-    ...base,
-    outcome: execution.kind,
-    status: envelope.status,
-    mediaType: envelope.mediaType,
-    elapsedMs,
-    resultKind: execution.kind,
-    // The divergence the interoperability matrix exists to hold: asked for one
-    // thing, got the other. Recordable only because both facts survive on the
-    // union.
-    disagreedWithRequestedMode: execution.kind !== asked,
-    preferenceApplied: preferenceOutcome(requestedMode, {
-      kind: execution.kind,
+    const evidence = await gatherEvidence(envelope, sink);
+    let execution: Execution;
+    try {
+      execution = classifyExecution(envelope, evidence, requestedMode);
+    } catch (cause) {
+      // A job was created and cannot be reached — pygeoapi's async 201 from a
+      // browser, whose `Location` is hidden and whose body is `null` (finding
+      // 0039). The server did answer, so this is recorded like any other answer
+      // rather than lost with the throw.
+      if (cause instanceof AmbiguousExecutionResponseError) {
+        observe(sink, {
+          ...base,
+          outcome: "error",
+          status: envelope.status,
+          mediaType: envelope.mediaType,
+          elapsedMs,
+          resultKind: undefined,
+          disagreedWithRequestedMode: requestedMode === "sync",
+          preferenceApplied: preferenceOutcome(requestedMode, {
+            kind: "unreachable-job",
+            status: envelope.status,
+            locationPresent: evidence.locationPresent,
+          }),
+          preferenceAppliedHeader,
+          discoveredVia: undefined,
+          locationPresent: evidence.locationPresent,
+          jobIdKnown: false,
+          problemPresent: false,
+          unrecognisedKeys: evidence.unrecognisedKeys,
+        });
+      }
+      throw cause;
+    }
+    const asked = requestedMode === "async" ? "job" : "immediate";
+
+    observe(sink, {
+      ...base,
+      outcome: execution.kind,
       status: envelope.status,
+      mediaType: envelope.mediaType,
+      elapsedMs,
+      resultKind: execution.kind,
+      // The divergence the interoperability matrix exists to hold: asked for one
+      // thing, got the other. Recordable only because both facts survive on the
+      // union.
+      disagreedWithRequestedMode: execution.kind !== asked,
+      preferenceApplied: preferenceOutcome(requestedMode, {
+        kind: execution.kind,
+        status: envelope.status,
+        locationPresent: evidence.locationPresent,
+      }),
+      preferenceAppliedHeader,
+      discoveredVia: execution.kind === "job" ? execution.job.discoveredVia : undefined,
       locationPresent: evidence.locationPresent,
-    }),
-    preferenceAppliedHeader,
-    discoveredVia: execution.kind === "job" ? execution.job.discoveredVia : undefined,
-    locationPresent: evidence.locationPresent,
-    jobIdKnown: execution.kind === "job" && execution.job.jobId !== undefined,
-    problemPresent: false,
-    unrecognisedKeys: evidence.unrecognisedKeys,
-  });
+      jobIdKnown: execution.kind === "job" && execution.job.jobId !== undefined,
+      problemPresent: false,
+      unrecognisedKeys: evidence.unrecognisedKeys,
+    });
 
-  return execution;
+    return execution;
+  }
 }

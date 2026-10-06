@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createEnvelope, DEFAULT_MAX_BUFFER_BYTES } from "../../src/http/envelope.js";
-import { BodyTooLargeError } from "../../src/http/errors.js";
+import { AbortError, BodyTooLargeError } from "../../src/http/errors.js";
+import { stalledBody } from "./stalled-body.js";
 
 const BASE = "https://example.org/ogc/jobs/abc";
 
@@ -223,6 +224,37 @@ describe("readers", () => {
     const bytes = new Uint8Array([0xe9, 0x63, 0x68, 0x6f]); // "écho" in latin1
     const env = envelope(bytes, { headers: { "content-type": "text/plain; charset=iso-8859-1" } });
     await expect(env.text()).resolves.toBe("écho");
+  });
+});
+
+describe("an abort while the body is arriving (C2)", () => {
+  it("rejects every reader with AbortError, whatever the stream errored with", async () => {
+    const controller = new AbortController();
+    // A caller may abort with any reason; the stream errors with exactly that.
+    const envelope = createEnvelope(stalledBody(controller.signal), {
+      requestedUrl: "https://service.test/x",
+      signal: controller.signal,
+    });
+    const reading = envelope.json();
+    controller.abort("the user moved on");
+
+    await expect(reading).rejects.toBeInstanceOf(AbortError);
+    await expect(envelope.text()).rejects.toBeInstanceOf(AbortError);
+  });
+
+  it("passes any other stream failure through unchanged", async () => {
+    const failure = new TypeError("terminated");
+    const envelope = createEnvelope(
+      new Response(
+        new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.error(failure);
+          },
+        }),
+      ),
+    );
+
+    await expect(envelope.text()).rejects.toBe(failure);
   });
 });
 

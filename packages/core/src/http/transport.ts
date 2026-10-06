@@ -34,7 +34,7 @@
  */
 
 import { createEnvelope, type ResponseEnvelope } from "./envelope.js";
-import { AbortError, TransportError } from "./errors.js";
+import { AbortError, isAbortError, TransportError } from "./errors.js";
 import { resolveFetch, type FetchLike } from "./fetch.js";
 
 export interface SendOptions extends RequestInit {
@@ -68,13 +68,6 @@ function isCrossOrigin(url: string): boolean | undefined {
   } catch {
     return undefined;
   }
-}
-
-function isAbortError(cause: unknown): boolean {
-  if (typeof cause !== "object" || cause === null) return false;
-  const name: unknown = (cause as { name?: unknown }).name;
-  // TimeoutError is what AbortSignal.timeout() produces.
-  return name === "AbortError" || name === "TimeoutError";
 }
 
 /** Methods that may be resent after a reset: safe, and so idempotent. */
@@ -143,5 +136,6 @@ export async function send(
   return createEnvelope(response, {
     requestedUrl,
     ...(maxBufferBytes === undefined ? {} : { maxBufferBytes }),
+    ...(options.signal === undefined || options.signal === null ? {} : { signal: options.signal }),
   });
 }

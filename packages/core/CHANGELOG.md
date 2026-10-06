@@ -14,6 +14,31 @@ at 0.5.0; earlier versions are recorded only in the git history.
   page address copied with `?f=json` became `?f=json/`, which pygeoapi answers
   with 400. `client.baseUrl` is now `https://host/ogc/?apikey=abc`, and the
   landing page is requested with the query intact.
+- `execute()`: `timeoutMs` and `signal` now also cover reading the body, as far
+  as classifying the answer reads it (the problem check and the evidence).
+  They were released when the headers arrived, so a server that sent its
+  headers and then stalled hung `execute()` for ever. Such a stall now ends in
+  `ExecutionTimeoutError`, a cancel in `AbortError`, and the `execution`
+  observation records `transport-failure` with the status that did arrive. A
+  body `execute()` does not read itself, such as a non-JSON result, is read by
+  the caller after it returns, as before.
+- An abort, a deadline or the buffer limit hit while a body is still arriving
+  is no longer reported as a malformed document. `fetchJson`, `listProcesses`,
+  `getProcess`, `listJobs`, `getJob` and `pollJob` now reject with
+  `AbortError`, with `BodyTooLargeError`, or, when `pollJob`'s own deadline
+  fires, with `JobPollTimeoutError` and `outcome: "timeout"`. Before, they
+  rejected with `MalformedDocumentError` or `MalformedJobDocumentError`.
+  `inspect()` rejects with `AbortError` where it resolved with every capability
+  unknown. Only a body that arrived whole and is not JSON is malformed now.
+- `classify()` lets such an abort through, rather than reading it as "no
+  problem document".
+
+### Added
+
+- `EnvelopeOptions.signal`: the signal the request was sent with. A body read
+  it cuts short rejects with `AbortError`, whatever the runtime errored the
+  stream with. `send()` passes its own; set it when you call `createEnvelope`
+  yourself.
 
 ## 0.5.0
 

@@ -4,8 +4,6 @@
 
 import { describe, expect, it } from "vitest";
 import { createEnvelope } from "../../src/http/envelope.js";
-import { BodyTooLargeError } from "../../src/http/errors.js";
-import { fetchJson } from "../../src/discovery/negotiate.js";
 
 describe("Retry-After: prose is ignored outright (README, Polling section)", () => {
   // V8's Date.parse accepts a word followed by a number: "wait 10" is read as
@@ -20,27 +18,6 @@ describe("Retry-After: prose is ignored outright (README, Polling section)", () 
       expect(envelope.retryAfterMs).toBeUndefined();
     });
   }
-});
-
-describe("fetchJson over the buffer limit", () => {
-  it.fails("C2: reports BodyTooLargeError, not 'did not parse as JSON'", async () => {
-    // Chunked body: no Content-Length, so the cap trips while counting.
-    const big = new ReadableStream<Uint8Array>({
-      start(controller) {
-        controller.enqueue(new TextEncoder().encode(`{"conformsTo":["${"x".repeat(2048)}"]}`));
-        controller.close();
-      },
-    });
-    const fetch = (): Promise<Response> =>
-      Promise.resolve(new Response(big, { headers: { "Content-Type": "application/json" } }));
-
-    const error = await fetchJson("https://service.test/conformance", {
-      fetch,
-      maxBufferBytes: 1024,
-    }).catch((caught: unknown) => caught);
-
-    expect(error).toBeInstanceOf(BodyTooLargeError);
-  });
 });
 
 describe("classify(): a declared problem document at 200", () => {
