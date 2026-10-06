@@ -95,6 +95,7 @@ the set is a handful of files and the server is one pinned image.
               processes/ — fifteen more (see "Task 7's additions")    2026-09-23
               execution/getarea-*, execution/saga-crop-*
                 (findings 0061–0063)                                   2026-10-02
+              execution/otb-*-500.http  (finding 0066)                 2026-10-02
               link-json-http{,s}.http  (finding 0022),
               execution/{getarea,buffer}-href-unreachable-*.http
                 (finding 0053)                                         2026-10-02
@@ -292,6 +293,13 @@ Captured 2026-09-01 against both servers, with `curl -isS -X POST` and
 
     A cached reference stays cached: re-capturing the `getarea-href-cached-*`
     set needs a URL ZOO has never fetched, or it will show the old copy.
+
+    Finding 0066, 2026-10-02:
+
+    zoo-project/execution/
+      otb-bandmath-500.http              three OTB processes, one vector and
+      otb-smoothing-500.http             two raster, each with valid inputs:
+      otb-concatenatevectordata-500.http 500 "No OTB Application found."  0066
 
     Amendments to findings 0022, 0052 and 0053, 2026-10-02:
 
