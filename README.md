@@ -75,6 +75,14 @@ A sixth rule keeps the HTTP boundary in one place: only
 `packages/core/src/http` may call `fetch`. Everything above it works in terms of
 a `ResponseEnvelope` and the classifier's verdict on it.
 
+## Interoperability matrix
+
+[docs/interoperability/matrix.md](docs/interoperability/matrix.md): what the
+client found on the two reference servers, pygeoapi and ZOO-Project, per
+capability, and what a browser run against them showed — browser access, the
+process census, and the execution mode each server used. The observations come
+from `pnpm capture:observations`. The file is generated; never edit it by hand.
+
 ## Toolchain
 
 Recorded in [docs/toolchain-and-project-setup.md](docs/toolchain-and-project-setup.md).
