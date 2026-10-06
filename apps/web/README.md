@@ -246,7 +246,9 @@ Ported from Sam's prototype on `feat/T3-prototype-interface`, reviewed first:
   A required field starts at its schema default; an optional one starts empty
   and is left out, with the server's default shown as a hint. An optional
   boolean has three states — not set, yes, no — so it never overrides a
-  server's default by being left alone.
+  server's default by being left alone. A repeatable input's rows follow the
+  same rule as the input, so an optional list left alone sends nothing. A
+  number field holding only spaces counts as empty.
 
 The directory imports nothing from React, the DOM, the map or the relay, which
 the `form-plan-is-framework-free` dependency-cruiser rule enforces. Promoting it

@@ -5,6 +5,7 @@
 
 import { describe, expect, it } from "vitest";
 import { initialValues } from "../../src/forms/defaults.js";
+import { toExecuteBody } from "../../src/forms/encode.js";
 import { validateForm } from "../../src/forms/validate.js";
 import { resolveFormPlan } from "../../src/forms/resolve.js";
 import { fixtureProcess, planFor } from "./helpers.js";
@@ -127,6 +128,41 @@ describe("validateForm", () => {
   });
 });
 
+describe("a number field holding only spaces (W27)", () => {
+  const plan = planFor({
+    distance: { schema: { type: "number", minimum: 1 } },
+    count: { schema: { type: "integer" }, minOccurs: 0 },
+  });
+
+  it("is refused before sending when required", () => {
+    // No bounds: Number(" ".trim()) is 0, a finite number, which passed.
+    const unbounded = planFor({ distance: { schema: { type: "number" } } });
+    expect(validateForm(unbounded, { distance: " " }).get("distance")).toBe(
+      "Required. Fill this in before running.",
+    );
+  });
+
+  it("is left out, not sent as a string, when optional", () => {
+    const values = { distance: "5", count: "  " };
+    expect(validateForm(plan, values).size).toBe(0);
+    expect(toExecuteBody(plan, values).inputs).toEqual({ distance: 5 });
+  });
+
+  it("is a blank row in a list of numbers, dropped rather than sent", () => {
+    const list = planFor({ n: { maxOccurs: 3, schema: { type: "number" } } });
+    expect(validateForm(list, { n: ["1", " "] }).size).toBe(0);
+    expect(toExecuteBody(list, { n: ["1", " "] }).inputs).toEqual({ n: [1] });
+    expect(validateForm(list, { n: [" "] }).get("n")).toBe(
+      "Required. Fill this in before running.",
+    );
+  });
+
+  it("leaves a text field's spaces alone: they are text", () => {
+    const text = planFor({ sep: { schema: { type: "string" } } });
+    expect(toExecuteBody(text, { sep: " " }).inputs).toEqual({ sep: " " });
+  });
+});
+
 describe("initialValues", () => {
   it("starts required fields at their default and leaves optional ones empty", () => {
     const plan = resolveFormPlan(fixtureProcess("pygeoapi/breinstein-inputs"));
@@ -154,5 +190,48 @@ describe("initialValues", () => {
   it("starts a complex input on its first format", () => {
     const plan = resolveFormPlan(fixtureProcess("zoo-project/Buffer"));
     expect(initialValues(plan)["InputPolygon"]).toEqual({ format: 0 });
+  });
+
+  describe("an optional repeatable input left alone (W18)", () => {
+    it("does not send [false] for booleans", () => {
+      const plan = planFor({
+        flags: { schema: { type: "boolean" }, minOccurs: 0, maxOccurs: 5 },
+      });
+      expect(plan.fields[0]?.control.kind).toBe("list");
+      expect(toExecuteBody(plan, initialValues(plan)).inputs).toEqual({});
+    });
+
+    it("does not send the item default for an enum", () => {
+      const plan = planFor({
+        layers: {
+          schema: { type: "string", enum: ["roads", "water"], default: "roads" },
+          minOccurs: 0,
+          maxOccurs: 3,
+        },
+      });
+      expect(toExecuteBody(plan, initialValues(plan)).inputs).toEqual({});
+    });
+
+    it("does not send the item default for an array of numbers", () => {
+      const plan = planFor({
+        weights: { schema: { type: "array", items: { type: "number", default: 1 } }, minOccurs: 0 },
+      });
+      expect(toExecuteBody(plan, initialValues(plan)).inputs).toEqual({});
+    });
+
+    it("still starts a required list's row at the item's default, which is sent", () => {
+      const plan = planFor({
+        flags: { schema: { type: "boolean" }, minOccurs: 1, maxOccurs: 5 },
+        layers: {
+          schema: { type: "string", enum: ["roads", "water"], default: "roads" },
+          minOccurs: 1,
+          maxOccurs: 3,
+        },
+      });
+      expect(toExecuteBody(plan, initialValues(plan)).inputs).toEqual({
+        flags: [false],
+        layers: ["roads"],
+      });
+    });
   });
 });
