@@ -6,9 +6,9 @@
  * route are both functions.
  */
 
-import { execute, type FetchLike } from "@breinstein/oap-client";
+import { execute, type FetchLike, type Observation } from "@breinstein/oap-client";
 import { describe, expect, it } from "vitest";
-import type { RelayedExecute, RelayEndpoint } from "../../src/relay/contract.js";
+import type { RawAnswer, RelayedExecute, RelayEndpoint } from "../../src/relay/contract.js";
 import { RelayError, type RelayClient } from "../../src/relay/relay-client.js";
 import {
   createRoutedFetch,
@@ -44,7 +44,9 @@ interface RelayCall {
   session: string | undefined;
 }
 
-function fakeRelay(answers: (RelayedExecute | Error)[]): RelayClient & { calls: RelayCall[] } {
+function fakeRelay(
+  answers: (RelayedExecute | RawAnswer | Error)[],
+): RelayClient & { calls: RelayCall[] } {
   const calls: RelayCall[] = [];
   return {
     calls,
@@ -384,6 +386,73 @@ describe("createRoutedFetch", () => {
       }),
     ).rejects.toThrow(TypeError);
     expect(relay.calls).toHaveLength(2);
+  });
+
+  it("hands the core an async execute's synchronous answer raw, so it sees what the server did (finding 0059)", async () => {
+    // The first bytes of a PNG: not valid UTF-8, so a text round trip would show.
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0xff, 0xfe]);
+    const relay = fakeRelay([
+      {
+        raw: new Response(png, {
+          status: 200,
+          headers: {
+            "Content-Type": "image/png",
+            "Preference-Applied": "wait",
+            "X-Relay": "1",
+            "X-Relay-Raw": "1",
+          },
+        }),
+      },
+    ]);
+    const routes: ExecuteRouteObservation[] = [];
+    const registrations: string[] = [];
+    const observations: Observation[] = [];
+    const routed = createRoutedFetch({
+      endpoint: RELAYED,
+      relay,
+      session: sessions(["session-1"]),
+      onRoute: (observation) => routes.push(observation),
+      onRegistration: (ref) => registrations.push(ref),
+    });
+
+    const execution = await execute(`${BASE}/processes`, "render", {
+      inputs: {},
+      mode: "async",
+      fetch: routed,
+      onObservation: (observation) => observations.push(observation),
+    });
+
+    expect(execution.kind).toBe("immediate");
+    if (execution.kind !== "immediate") return;
+    expect(execution.response.status).toBe(200);
+    expect(execution.response.mediaType).toBe("image/png");
+    const blob = await execution.response.blob();
+    expect(new Uint8Array(await blob.arrayBuffer())).toEqual(png);
+    // The server's choice survives as evidence, not smoothed over.
+    expect(observations).toContainEqual(
+      expect.objectContaining({
+        kind: "execution",
+        requestedMode: "async",
+        status: 200,
+        disagreedWithRequestedMode: true,
+        preferenceAppliedHeader: true,
+      }),
+    );
+    expect(registrations).toEqual([]);
+    expect(routes).toEqual([
+      {
+        kind: "execute-route",
+        endpointKey: "ogc",
+        route: "relay",
+        requestedMode: "async",
+        outcome: "sent",
+        locationPresent: false,
+        callbacksRegistered: false,
+        sessionWithheld: false,
+        queryDropped: false,
+        reason: undefined,
+      },
+    ]);
   });
 
   it("does not guess when the server sent no Location through the relay either", async () => {

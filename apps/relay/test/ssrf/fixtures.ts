@@ -24,7 +24,8 @@ import { guardedLookup, type Resolver } from "../../src/address-guard.js";
 import { createApp, type AuditLine } from "../../src/app.js";
 import { parseConfig, type EndpointConfig, type RelayConfig } from "../../src/config.js";
 import type { ForwardedResponse, ForwardRequest, Lookup } from "../../src/forward.js";
-import { UpstreamError, type Schedule, type UpstreamResponse } from "../../src/upstream.js";
+import { UpstreamError, type Schedule } from "../../src/exchange.js";
+import type { UpstreamResponse } from "../../src/upstream.js";
 
 export const ORIGIN = "http://localhost:4173";
 

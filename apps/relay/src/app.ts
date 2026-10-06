@@ -34,7 +34,9 @@
  * | `POST /callbacks/{token}/{kind}`        | OGC server  | callback token  |
  *
  * Every response carries `X-Relay: 1`; every response the relay generates
- * itself, rather than forwards, also carries `X-Relay-Error: <code>`.
+ * itself, rather than forwards, also carries `X-Relay-Error: <code>`; and an
+ * execute answered with the OGC server's own response rather than the relay's
+ * envelope carries `X-Relay-Raw: 1`.
  */
 
 import { Hono, type Context } from "hono";
@@ -43,9 +45,11 @@ import { cors } from "hono/cors";
 import { streamSSE } from "hono/streaming";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { parseConfig, type EndpointConfig, type RelayConfig } from "./config.js";
+import { systemSchedule, UpstreamError, type Schedule, type UpstreamFailure } from "./exchange.js";
 import {
   forward as forwardUpstream,
   isJobResource,
+  NULL_BODY_STATUSES,
   resolveReadTarget,
   type ForwardedResponse,
   type ForwardRequest,
@@ -58,15 +62,7 @@ import {
   type RingOutcome,
 } from "./state.js";
 import { isWellFormedSecretToken } from "./tokens.js";
-import {
-  executionUrl,
-  postExecute,
-  systemSchedule,
-  UpstreamError,
-  type Schedule,
-  type UpstreamFailure,
-  type UpstreamResponse,
-} from "./upstream.js";
+import { executionUrl, postExecute, type ExecuteAnswer } from "./upstream.js";
 
 /** The three `subscriber` members, as path segments. */
 export const CALLBACK_KINDS = ["success", "in-progress", "failed"] as const;
@@ -108,8 +104,9 @@ export type RelayEvent =
 /**
  * One line per forwarded request on the read route, and per synchronous
  * execute forwarded for a read-route endpoint (`"read-route"`); and one per
- * asynchronous execute that produced no response (`"execute"`) — refused by
- * the address guard, timed out, or failed to connect. Redacted at creation:
+ * asynchronous execute that produced no response — refused by the address
+ * guard, timed out, or failed to connect — or whose answer was passed back raw
+ * because it was not a job (`"execute"`). Redacted at creation:
  * the path relative to the endpoint's base, and the *names* of query
  * parameters, never their values. No body, no token, no header.
  */
@@ -133,7 +130,7 @@ export type UpstreamCall = (
   endpoint: EndpointConfig,
   processId: string,
   body: string,
-) => Promise<UpstreamResponse>;
+) => Promise<ExecuteAnswer>;
 
 /** The read route's outbound request. `forward` with the configured limits by default. */
 export type ForwardCall = (
@@ -165,8 +162,6 @@ export interface AppOptions {
 
 /** `[a-z0-9-]`, as the config allows. Checked again here because it is placed in a path prefix. */
 const ENDPOINT_KEY = /^[a-z0-9][a-z0-9-]{0,62}$/;
-
-const NULL_BODY_STATUSES: ReadonlySet<number> = new Set([101, 204, 205, 304]);
 
 function queryNames(search: string): string[] {
   return [...new Set(new URLSearchParams(search).keys())].sort();
@@ -206,7 +201,15 @@ export const RELAY_MARKER = "X-Relay";
  */
 export const RELAY_ERROR = "X-Relay-Error";
 
-/** What a browser may read off a forwarded response: the evidence, and the two markers. */
+/**
+ * On an execute's answer that is the OGC server's own response, passed on
+ * unchanged, rather than the relay's envelope: a synchronous execute for a
+ * read-route endpoint, and an asynchronous one the server answered with
+ * something other than a job — the result itself (finding 0059), or a refusal.
+ */
+export const RELAY_RAW = "X-Relay-Raw";
+
+/** What a browser may read off a forwarded response: the evidence, and the markers. */
 export const EXPOSED_HEADERS = [
   "Content-Type",
   "Content-Length",
@@ -218,6 +221,7 @@ export const EXPOSED_HEADERS = [
   "Preference-Applied",
   RELAY_MARKER,
   RELAY_ERROR,
+  RELAY_RAW,
 ];
 
 /**
@@ -263,6 +267,7 @@ export function createApp(options: AppOptions = {}): Hono {
       postExecute(endpoint, processId, body, {
         timeoutMs: config.limits.upstreamTimeoutMs,
         maxResponseBytes: config.limits.maxUpstreamResponseBytes,
+        maxRawResponseBytes: config.limits.maxReadResponseBytes,
       }));
   const forward: ForwardCall =
     options.forward ??
@@ -347,13 +352,18 @@ export function createApp(options: AppOptions = {}): Hono {
       [RELAY_ERROR]: reason,
     });
 
-  /** The relay's `Response` for a forwarded answer, and its audit line once the body is done. */
+  /**
+   * The relay's `Response` for a forwarded answer, with `marks` added, and its
+   * audit line once the body is done.
+   */
   const relayForwarded = (
     c: Context,
+    kind: AuditLine["audit"],
     endpoint: EndpointConfig,
     request: ForwardRequest,
     started: number,
     forwarded: ForwardedResponse,
+    marks: Readonly<Record<string, string>> = {},
   ): Response => {
     // `new Response` throws outside 200–599. Refused before that, with the
     // body cancelled, which drops the upstream socket instead of holding it
@@ -361,7 +371,7 @@ export function createApp(options: AppOptions = {}): Hono {
     if (forwarded.status < 200 || forwarded.status > 599) {
       void forwarded.body?.cancel();
       audit({
-        ...auditBase("read-route", endpoint, request),
+        ...auditBase(kind, endpoint, request),
         upstreamStatus: forwarded.status,
         failure: "bad-upstream-status",
         redirectsFollowed: forwarded.redirectsFollowed,
@@ -373,7 +383,7 @@ export function createApp(options: AppOptions = {}): Hono {
     }
     void forwarded.done.then((done) => {
       audit({
-        ...auditBase("read-route", endpoint, request),
+        ...auditBase(kind, endpoint, request),
         upstreamStatus: forwarded.status,
         failure:
           done.capHit === "bytes"
@@ -391,6 +401,7 @@ export function createApp(options: AppOptions = {}): Hono {
     });
     const headers = new Headers(forwarded.headers);
     headers.set("Cache-Control", "no-store");
+    for (const [name, value] of Object.entries(marks)) headers.set(name, value);
     const body = NULL_BODY_STATUSES.has(forwarded.status) ? null : forwarded.body;
     // A body of undeclared length goes out chunked. Otherwise the listener
     // (@hono/node-server) reads the first few chunks before writing anything,
@@ -480,7 +491,7 @@ export function createApp(options: AppOptions = {}): Hono {
     } catch (error) {
       return upstreamFailed(c, "read-route", endpoint, request, started, error);
     }
-    return relayForwarded(c, endpoint, request, started, forwarded);
+    return relayForwarded(c, "read-route", endpoint, request, started, forwarded);
   };
   app.get("/read/:endpointKey", (c) => read(c, "GET"));
   app.get("/read/:endpointKey/*", (c) => read(c, "GET"));
@@ -689,7 +700,9 @@ export function createApp(options: AppOptions = {}): Hono {
           upstreamStatus: forwarded.status,
           registered: false,
         });
-        return relayForwarded(c, endpoint, request, started, forwarded);
+        return relayForwarded(c, "read-route", endpoint, request, started, forwarded, {
+          [RELAY_RAW]: "1",
+        });
       }
 
       let ref: string | undefined;
@@ -720,10 +733,17 @@ export function createApp(options: AppOptions = {}): Hono {
         };
       }
 
-      let response: UpstreamResponse;
+      // What was sent is fixed (see upstream.ts), so the audit line needs only
+      // its URL.
+      const sent: ForwardRequest = {
+        method: "POST",
+        url: executionUrl(endpoint, processId),
+        headers: new Headers(),
+      };
+      let answer: ExecuteAnswer;
       const started = clock.now();
       try {
-        response = await upstream(endpoint, processId, JSON.stringify(body));
+        answer = await upstream(endpoint, processId, JSON.stringify(body));
       } catch (error) {
         if (ref !== undefined) state.release(ref);
         emit({
@@ -733,16 +753,29 @@ export function createApp(options: AppOptions = {}): Hono {
           upstreamStatus: undefined,
           registered: false,
         });
-        // The same redacted line and the same 502 as the read route. What was
-        // sent is fixed (see upstream.ts), so the line needs only its URL.
-        const sent: ForwardRequest = {
-          method: "POST",
-          url: executionUrl(endpoint, processId),
-          headers: new Headers(),
-        };
+        // The same redacted line and the same 502 as the read route.
         return upstreamFailed(c, "execute", endpoint, sent, started, error);
       }
 
+      // Not a job: the result itself, from a server that ran the process
+      // synchronously anyway (finding 0059), or a refusal. Passed on as the
+      // server sent it, marked so the page does not look for the envelope
+      // (review R7). No job, so no doorbell.
+      if ("raw" in answer) {
+        if (ref !== undefined) state.release(ref);
+        emit({
+          kind: "execute",
+          endpointKey: endpoint.key,
+          outcome: "relayed",
+          upstreamStatus: answer.raw.status,
+          registered: false,
+        });
+        return relayForwarded(c, "execute", endpoint, sent, started, answer.raw, {
+          [RELAY_RAW]: "1",
+        });
+      }
+
+      const response = answer;
       // No job, no doorbell. The registration would otherwise sit until its TTL.
       const created = response.status >= 200 && response.status < 300;
       if (!created && ref !== undefined) {

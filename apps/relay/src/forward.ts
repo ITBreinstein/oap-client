@@ -40,7 +40,7 @@ import {
   type Resolver,
 } from "./address-guard.js";
 import type { EndpointConfig } from "./config.js";
-import { systemSchedule, UpstreamError, type Schedule } from "./upstream.js";
+import { systemSchedule, UpstreamError, type Schedule } from "./exchange.js";
 
 /** Request headers the browser may send upstream. Everything else is dropped. */
 export const FORWARDED_REQUEST_HEADERS = [
@@ -67,7 +67,7 @@ export const MAX_REDIRECTS = 3;
 const REDIRECT_STATUSES: ReadonlySet<number> = new Set([301, 302, 303, 307, 308]);
 
 /** Statuses that may not carry a body, which `new Response` refuses one for. */
-const NULL_BODY_STATUSES: ReadonlySet<number> = new Set([101, 204, 205, 304]);
+export const NULL_BODY_STATUSES: ReadonlySet<number> = new Set([101, 204, 205, 304]);
 
 /** Why a relative path was not turned into an upstream URL. */
 export type ReadTargetRefusal =
@@ -206,7 +206,8 @@ function outboundHeaders(
   return headers;
 }
 
-function returnedHeaders(response: IncomingMessage): Headers {
+/** The allowlisted headers of an answer passed back raw. */
+export function returnedHeaders(response: IncomingMessage): Headers {
   const headers = new Headers();
   for (const name of RETURNED_RESPONSE_HEADERS) {
     const value = firstHeader(response.headers[name]);
@@ -342,7 +343,7 @@ function safeUrl(location: string, base: URL): URL | undefined {
   }
 }
 
-interface StreamedBody {
+export interface StreamedBody {
   readonly body: ReadableStream<Uint8Array>;
   readonly done: Promise<ForwardDone>;
   breakOff(cap: "bytes" | "duration"): void;
@@ -351,9 +352,10 @@ interface StreamedBody {
 /**
  * The upstream body as a web stream, with backpressure: the socket is paused
  * while the browser is not reading, so a slow reader costs a paused socket
- * rather than a buffered body.
+ * rather than a buffered body. Also how `upstream.ts` passes on an execute's
+ * answer that is not a job.
  */
-function streamBody(response: IncomingMessage, maxBytes: number): StreamedBody {
+export function streamBody(response: IncomingMessage, maxBytes: number): StreamedBody {
   let bytes = 0;
   let finished = false;
   let resolveDone: (done: ForwardDone) => void = () => undefined;

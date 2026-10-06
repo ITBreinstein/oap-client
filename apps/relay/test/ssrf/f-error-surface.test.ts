@@ -12,7 +12,8 @@ import { describe, expect, it } from "vitest";
 import { createApp, type AuditLine } from "../../src/app.js";
 import type { EndpointConfig } from "../../src/config.js";
 import { forward } from "../../src/forward.js";
-import { postExecute, UpstreamError } from "../../src/upstream.js";
+import { UpstreamError } from "../../src/exchange.js";
+import { postExecute } from "../../src/upstream.js";
 import {
   countingApp,
   dialStub,

@@ -5,11 +5,13 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { createApp, type RelayEvent, type UpstreamCall } from "../src/app.js";
+import { createApp, type AuditLine, type RelayEvent, type UpstreamCall } from "../src/app.js";
 import { parseConfig } from "../src/config.js";
 import { RelayState, type Clock, type StateOptions } from "../src/state.js";
 import { mintSecretToken } from "../src/tokens.js";
-import { UpstreamError, type UpstreamResponse } from "../src/upstream.js";
+import { UpstreamError } from "../src/exchange.js";
+import type { ForwardedResponse } from "../src/forward.js";
+import type { RawAnswer, UpstreamResponse } from "../src/upstream.js";
 
 const ORIGIN = "http://localhost:4173";
 const PUBLIC = "http://relay.test:8787";
@@ -35,12 +37,40 @@ const CREATED: UpstreamResponse = {
   body: "null",
 };
 
+/** An answer that is not a job, as `postExecute` hands it back: still streaming. */
+function rawAnswer(
+  status: number,
+  body: string | Uint8Array,
+  headers: Record<string, string> = {},
+): RawAnswer & { readonly cancelled: () => boolean } {
+  const bytes = typeof body === "string" ? new TextEncoder().encode(body) : body;
+  let cancelled = false;
+  const raw: ForwardedResponse = {
+    status,
+    headers: new Headers(headers),
+    body: new ReadableStream<Uint8Array>({
+      pull(controller) {
+        controller.enqueue(bytes);
+        controller.close();
+      },
+      cancel() {
+        cancelled = true;
+      },
+    }),
+    finalUrl: "https://ogc.test/processes/slow/execution",
+    redirectsFollowed: 0,
+    done: Promise.resolve({ bytes: bytes.byteLength, capHit: undefined }),
+  };
+  return { raw, cancelled: () => cancelled };
+}
+
 interface Harness {
   readonly app: ReturnType<typeof createApp>;
   readonly state: RelayState;
   readonly clock: Clock & { advance(ms: number): void };
   readonly sent: { endpointKey: string; processId: string; body: unknown }[];
   readonly events: RelayEvent[];
+  readonly audits: AuditLine[];
 }
 
 function harness(upstream?: UpstreamCall, stateOverrides: Partial<StateOptions> = {}): Harness {
@@ -60,6 +90,7 @@ function harness(upstream?: UpstreamCall, stateOverrides: Partial<StateOptions> 
   });
   const sent: Harness["sent"] = [];
   const events: RelayEvent[] = [];
+  const audits: AuditLine[] = [];
   const app = createApp({
     config,
     state,
@@ -67,6 +98,7 @@ function harness(upstream?: UpstreamCall, stateOverrides: Partial<StateOptions> 
     // The heartbeat never fires here; the scheduler hands back a no-op.
     schedule: () => () => undefined,
     onEvent: (event) => events.push(event),
+    onAudit: (line) => audits.push(line),
     upstream:
       upstream ??
       ((endpoint, processId, body) => {
@@ -74,7 +106,7 @@ function harness(upstream?: UpstreamCall, stateOverrides: Partial<StateOptions> 
         return Promise.resolve(CREATED);
       }),
   });
-  return { app, state, clock, sent, events };
+  return { app, state, clock, sent, events, audits };
 }
 
 async function newSession(app: Harness["app"]): Promise<string> {
@@ -332,6 +364,7 @@ describe("POST /execute — relayed", () => {
     const h = harness();
     const response = await execute(h.app, "/execute/no-callbacks/slow", '{"inputs":{"seconds":1}}');
     expect(response.status).toBe(200);
+    expect(response.headers.get("X-Relay-Raw")).toBeNull();
     const body: unknown = await response.json();
     expect(body).toEqual({ upstream: CREATED, registration: null });
     expect(h.sent).toEqual([
@@ -377,17 +410,82 @@ describe("POST /execute — relayed", () => {
     expect(h.sent[0]?.body).toEqual({});
   });
 
-  it("passes an upstream refusal through, and drops the registration it made", async () => {
+  it("passes an upstream refusal on raw, marked, and drops the registration it made", async () => {
+    const problem = '{"type":"about:blank","title":"bad"}';
     const h = harness(() =>
-      Promise.resolve({ ...CREATED, status: 400, location: undefined, body: '{"title":"bad"}' }),
+      Promise.resolve(rawAnswer(400, problem, { "Content-Type": "application/problem+json" })),
     );
     const token = await newSession(h.app);
     const response = await execute(h.app, "/execute/with-callbacks/slow", "{}", {
       Authorization: `Bearer ${token}`,
     });
-    expect(response.status).toBe(200);
-    expect(await refFrom(response)).toBeNull();
+    expect(response.status).toBe(400);
+    expect(response.headers.get("X-Relay-Raw")).toBe("1");
+    expect(response.headers.get("X-Relay-Error")).toBeNull();
+    expect(response.headers.get("Content-Type")).toBe("application/problem+json");
+    expect(await response.text()).toBe(problem);
     expect(h.state.counts().registrations).toBe(0);
+  });
+
+  it("passes a synchronous result on byte for byte when the server ignored respond-async (finding 0059)", async () => {
+    // The first bytes of a PNG: not valid UTF-8, so a text round trip would show.
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0xff, 0xfe]);
+    const h = harness(() =>
+      Promise.resolve(
+        rawAnswer(200, png, { "Content-Type": "image/png", "Preference-Applied": "wait" }),
+      ),
+    );
+    const token = await newSession(h.app);
+    const response = await execute(h.app, "/execute/with-callbacks/slow", "{}", {
+      Authorization: `Bearer ${token}`,
+      Origin: ORIGIN,
+    });
+    expect(response.status).toBe(200);
+    expect(response.headers.get("X-Relay")).toBe("1");
+    expect(response.headers.get("X-Relay-Raw")).toBe("1");
+    expect(response.headers.get("Content-Type")).toBe("image/png");
+    expect(response.headers.get("Preference-Applied")).toBe("wait");
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    expect(response.headers.get("Access-Control-Expose-Headers")).toContain("X-Relay-Raw");
+    expect(new Uint8Array(await response.arrayBuffer())).toEqual(png);
+    // No job, so no doorbell.
+    expect(h.state.counts().registrations).toBe(0);
+    expect(h.events.at(-1)).toEqual({
+      kind: "execute",
+      endpointKey: "with-callbacks",
+      outcome: "relayed",
+      upstreamStatus: 200,
+      registered: false,
+    });
+    await Promise.resolve();
+    expect(h.audits).toEqual([
+      {
+        audit: "execute",
+        endpointKey: "with-callbacks",
+        method: "POST",
+        path: "/processes/slow/execution",
+        queryNames: [],
+        upstreamStatus: 200,
+        failure: undefined,
+        redirectsFollowed: 0,
+        bytes: png.byteLength,
+        ms: 0,
+        capHit: undefined,
+      },
+    ]);
+  });
+
+  it("answers 502 for a raw answer with a status no browser can be handed, and drops its body", async () => {
+    const answer = rawAnswer(999, "odd");
+    const h = harness(() => Promise.resolve(answer));
+    const response = await execute(h.app, "/execute/no-callbacks/slow", "{}");
+    expect(response.status).toBe(502);
+    expect(response.headers.get("X-Relay-Error")).toBe("bad-upstream-status");
+    expect(response.headers.get("X-Relay-Raw")).toBeNull();
+    expect(answer.cancelled()).toBe(true);
+    expect(h.audits).toMatchObject([
+      { audit: "execute", upstreamStatus: 999, failure: "bad-upstream-status" },
+    ]);
   });
 
   it("answers 502 with a reason code when the exchange fails, and drops the registration", async () => {

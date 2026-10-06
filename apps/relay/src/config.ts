@@ -79,9 +79,18 @@ export interface EndpointConfig {
 export interface RelayLimits {
   /** Largest execute body accepted from the browser. */
   readonly maxExecuteBodyBytes: number;
-  /** Largest upstream response body relayed back. */
+  /**
+   * Largest body of an asynchronous execute's job answer (`201`/`202`), which
+   * is read whole into the relay's envelope. Any other answer is streamed back
+   * raw, under {@link maxReadResponseBytes}.
+   */
   readonly maxUpstreamResponseBytes: number;
-  /** Deadline for the whole upstream exchange, connect to last byte. */
+  /**
+   * Deadline for the whole asynchronous execute, connect to last byte — a body
+   * streamed back raw included. As long as the read route's by default, since
+   * a server that runs the process synchronously anyway answers only once it
+   * has finished (finding 0059).
+   */
   readonly upstreamTimeoutMs: number;
   readonly maxSessions: number;
   readonly maxRegistrationsPerSession: number;
@@ -94,8 +103,9 @@ export interface RelayLimits {
   /** Event streams open across all sessions. One more is refused with a 503. */
   readonly maxOpenStreams: number;
   /**
-   * Largest body the read route passes back — reads and synchronous executes.
-   * Streamed, not buffered, so this bounds traffic rather than memory.
+   * Largest body passed back raw — reads, synchronous executes, and an
+   * asynchronous execute answered with something other than a job. Streamed,
+   * not buffered, so this bounds traffic rather than memory.
    */
   readonly maxReadResponseBytes: number;
   /** Deadline for one read-route exchange, connect to last byte. */
@@ -123,7 +133,7 @@ export interface RelayConfig {
 export const DEFAULT_LIMITS: RelayLimits = {
   maxExecuteBodyBytes: 1024 * 1024,
   maxUpstreamResponseBytes: 256 * 1024,
-  upstreamTimeoutMs: 30_000,
+  upstreamTimeoutMs: 120_000,
   maxSessions: 10_000,
   maxRegistrationsPerSession: 100,
   maxStreamsPerSession: 4,

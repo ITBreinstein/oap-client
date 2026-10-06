@@ -125,7 +125,8 @@ All three are made in the config, before any request exists.
 | `POST /sessions`                          | browser    | `201 { token, expiresAt }` — the session token                                                            |
 | `GET /sessions/events`                    | browser    | `text/event-stream`: `ready`, then `job` events `{ "ref" }`                                               |
 | `POST /execute/{endpointKey}/{processId}` | browser    | `{ upstream: { status, location, contentType, preferenceApplied, body }, registration: { ref } \| null }` |
-|                                           |            | — or, for a `readRoute: "relay"` endpoint and no `Prefer: respond-async`: the server's answer, raw        |
+|                                           |            | when the server created a job (`201`/`202`); otherwise the server's answer, raw, with `X-Relay-Raw: 1`    |
+|                                           |            | — and always raw for a `readRoute: "relay"` endpoint and no `Prefer: respond-async`                       |
 | `GET /read/{endpointKey}/{path*}`         | browser    | the server's answer to `GET {baseUrl}/{path}?{query}`, raw; session token required                        |
 | `DELETE /read/{endpointKey}/jobs/{id}`    | browser    | the server's answer to dismissing that job, raw; session token required                                   |
 | `POST /callbacks/{token}/{kind}`          | OGC server | `200`, or `404` for a token it does not know                                                              |
@@ -186,6 +187,11 @@ not the OGC server. Only a response with `X-Relay` and without `X-Relay-Error`
 is the server's own answer — its `404` and `500` included — and only that
 reaches the core.
 
+`/execute` adds a third marker, `X-Relay-Raw: 1`, also exposed, on an answer
+that is the server's own response rather than the relay's envelope. The web
+app checks it before the status: a raw answer's status is the server's, and a
+synchronous result is a `200` like the envelope.
+
 ### Outbound: the read route
 
 For `readRoute: "relay"` endpoints only, with a live session:
@@ -233,11 +239,23 @@ The asynchronous execute. Everything about it is fixed:
   No browser header or cookie is forwarded.
 - A browser-supplied `subscriber` is refused; the relay mints its own.
 - No redirect is followed, so no hop goes unvalidated.
-- One deadline for the whole exchange, and a cap on the response body.
+- **The answer:** a `201` or `202` names a job. Its body is read whole, up to
+  `limits.maxUpstreamResponseBytes` (256 KiB), and handed back in the envelope
+  with `Location`. Any other answer is not a job: the result itself, from a
+  server that ran the process synchronously anyway — pygeoapi does for a
+  process that declares `sync-execute` only (finding 0059) — or a refusal. It
+  is passed on as the read route passes one on: the evidence headers only, the
+  body streamed and unchanged, up to `limits.maxReadResponseBytes` (50 MB),
+  marked `X-Relay-Raw: 1`. Any registration made for it is dropped, since
+  there is no job to ring for.
+- One deadline for the whole exchange, `limits.upstreamTimeoutMs` (120 s), a
+  raw body still streaming included. As long as the read route's, because a
+  server that runs the process synchronously answers only when it has
+  finished.
 - **Audit:** an exchange that produces no response — refused by the address
-  check, timed out, failed to connect — writes the read route's audit line,
-  with `"audit": "execute"` and `path: "/processes/{id}/execution"`. One the
-  server answered writes none.
+  check, timed out, failed to connect — and one answered raw write the read
+  route's audit line, with `"audit": "execute"` and
+  `path: "/processes/{id}/execution"`. A job writes none.
 - Every address the endpoint's name resolves to is checked at connect time,
   and loopback, private, link-local, reserved, NAT64, 6to4 and cloud-metadata
   ranges are refused — unless the endpoint sets `allowPrivateNetwork`, which

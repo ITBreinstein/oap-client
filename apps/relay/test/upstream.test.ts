@@ -9,7 +9,9 @@ import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import type { EndpointConfig } from "../src/config.js";
-import { postExecute, UpstreamError, type Schedule } from "../src/upstream.js";
+import { UpstreamError, type Schedule } from "../src/exchange.js";
+import type { ForwardedResponse } from "../src/forward.js";
+import { postExecute, type ExecuteAnswer } from "../src/upstream.js";
 
 const server = setupServer();
 beforeAll(() => {
@@ -33,6 +35,12 @@ const endpoint: EndpointConfig = {
 };
 
 const options = { timeoutMs: 5_000, maxResponseBytes: 1_024 };
+
+/** The raw answer, or a failed test: the job arm has no stream to read. */
+function raw(answer: ExecuteAnswer): ForwardedResponse {
+  if (!("raw" in answer)) throw new Error(`expected a raw answer, got ${String(answer.status)}`);
+  return answer.raw;
+}
 
 async function failure(promise: Promise<unknown>): Promise<string> {
   try {
@@ -201,5 +209,117 @@ describe("postExecute", () => {
     const guarded: EndpointConfig = { ...endpoint, baseUrl, allowPrivateNetwork: false };
     expect(await failure(postExecute(guarded, "p", "{}", options))).toBe("blocked-address");
     expect(reached).toBe(false);
+  });
+});
+
+describe("postExecute — an answer that is not a job (finding 0059, review R7)", () => {
+  // The first bytes of a PNG: not valid UTF-8, so a text round trip would show.
+  const PNG = new Uint8Array([
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0xff, 0xfe, 0x80,
+  ]);
+
+  it("hands a synchronous result back raw, byte for byte, with the evidence headers only", async () => {
+    server.use(
+      http.post(
+        "http://ogc.example/*",
+        () =>
+          new HttpResponse(PNG, {
+            status: 200,
+            headers: {
+              "Content-Type": "image/png",
+              "Preference-Applied": "wait",
+              "Set-Cookie": "session=abc",
+            },
+          }),
+      ),
+    );
+    const answer = raw(await postExecute(endpoint, "p", "{}", options));
+    expect(answer.status).toBe(200);
+    expect(answer.headers.get("content-type")).toBe("image/png");
+    expect(answer.headers.get("preference-applied")).toBe("wait");
+    expect(answer.headers.get("set-cookie")).toBeNull();
+    expect(new Uint8Array(await new Response(answer.body).arrayBuffer())).toEqual(PNG);
+    await expect(answer.done).resolves.toEqual({ bytes: PNG.byteLength, capHit: undefined });
+  });
+
+  it("hands back a result over the job cap whole, under the raw cap", async () => {
+    const result = JSON.stringify({ value: "x".repeat(300 * 1024) });
+    server.use(
+      http.post(
+        "http://ogc.example/*",
+        () => new HttpResponse(result, { headers: { "Content-Type": "application/json" } }),
+      ),
+    );
+    const answer = raw(
+      await postExecute(endpoint, "p", "{}", { ...options, maxRawResponseBytes: 1024 * 1024 }),
+    );
+    expect(await new Response(answer.body).text()).toBe(result);
+  });
+
+  it("hands a refusal back raw, as the server sent it", async () => {
+    const problem = '{"type":"about:blank","title":"no such input"}';
+    server.use(
+      http.post(
+        "http://ogc.example/*",
+        () =>
+          new HttpResponse(problem, {
+            status: 400,
+            headers: { "Content-Type": "application/problem+json" },
+          }),
+      ),
+    );
+    const answer = raw(await postExecute(endpoint, "p", "{}", options));
+    expect(answer.status).toBe(400);
+    expect(await new Response(answer.body).text()).toBe(problem);
+  });
+
+  it("refuses a raw answer that declares more than the raw cap", async () => {
+    server.use(
+      http.post(
+        "http://ogc.example/*",
+        () => new HttpResponse("x".repeat(2_048), { headers: { "Content-Length": "2048" } }),
+      ),
+    );
+    expect(
+      await failure(postExecute(endpoint, "p", "{}", { ...options, maxRawResponseBytes: 1_024 })),
+    ).toBe("response-too-large");
+  });
+
+  it("keeps the deadline on a raw body still streaming, and cancels it once the body is done", async () => {
+    let fire: () => void = () => undefined;
+    let cancelled = 0;
+    const schedule: Schedule = (callback) => {
+      fire = callback;
+      return () => {
+        cancelled += 1;
+      };
+    };
+    server.use(
+      http.post("http://ogc.example/api/processes/trickle/execution", () => {
+        const body = new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode("first chunk"));
+          },
+        });
+        return new HttpResponse(body, { status: 200 });
+      }),
+      http.post(
+        "http://ogc.example/api/processes/whole/execution",
+        () => new HttpResponse("all of it", { status: 200 }),
+      ),
+    );
+
+    const trickle = raw(await postExecute(endpoint, "trickle", "{}", { ...options, schedule }));
+    expect(cancelled).toBe(0);
+    const text = new Response(trickle.body).text();
+    fire();
+    await expect(text).rejects.toThrow();
+    await expect(trickle.done).resolves.toMatchObject({ capHit: "duration" });
+
+    cancelled = 0;
+    const whole = raw(await postExecute(endpoint, "whole", "{}", { ...options, schedule }));
+    expect(await new Response(whole.body).text()).toBe("all of it");
+    await whole.done;
+    expect(cancelled).toBe(1);
   });
 });

@@ -353,13 +353,16 @@ describe("E — on the wire", () => {
   });
 
   /** 600-byte chunks, never ended: only a cap can finish this, never the end of the body. */
-  function endless(_request: http.IncomingMessage, response: http.ServerResponse): void {
-    response.writeHead(200, { "Content-Type": "application/octet-stream" });
-    for (let i = 0; i < 4; i++) response.write("x".repeat(600));
+  /** A body that outgrows a 1 KiB cap and never ends, under `status`. */
+  function endless(status = 200) {
+    return (_request: http.IncomingMessage, response: http.ServerResponse): void => {
+      response.writeHead(status, { "Content-Type": "application/octet-stream" });
+      for (let i = 0; i < 4; i++) response.write("x".repeat(600));
+    };
   }
 
   it("the read route's response cap is enforced while streaming, not after", async () => {
-    stub.on("/ogc/endless", endless);
+    stub.on("/ogc/endless", endless());
     const forwarded = await forward(
       publicEndpoint(base()),
       { method: "GET", url: new URL(`${base()}/endless`), headers: new Headers() },
@@ -369,8 +372,8 @@ describe("E — on the wire", () => {
     await expect(forwarded.done).resolves.toMatchObject({ capHit: "bytes" });
   });
 
-  it("the asynchronous execute's response cap is enforced while streaming, not after", async () => {
-    stub.on("/ogc/processes/p/execution", endless);
+  it("the asynchronous execute's job-answer cap is enforced while streaming, not after", async () => {
+    stub.on("/ogc/processes/p/execution", endless(201));
     const reason = await failure(
       postExecute(
         publicEndpoint(`http://127.0.0.1:${String(stub.port)}/ogc`, { allowPrivateNetwork: true }),
@@ -380,6 +383,19 @@ describe("E — on the wire", () => {
       ),
     );
     expect(reason).toBe("response-too-large");
+  });
+
+  it("the asynchronous execute's raw-answer cap is enforced while streaming, not after", async () => {
+    stub.on("/ogc/processes/p/execution", endless(200));
+    const answer = await postExecute(
+      publicEndpoint(`http://127.0.0.1:${String(stub.port)}/ogc`, { allowPrivateNetwork: true }),
+      "p",
+      "{}",
+      { timeoutMs: 5_000, maxResponseBytes: 256, maxRawResponseBytes: 1_024, schedule: never },
+    );
+    if (!("raw" in answer)) throw new Error("expected a raw answer");
+    await expect(new Response(answer.raw.body).arrayBuffer()).rejects.toThrow();
+    await expect(answer.raw.done).resolves.toMatchObject({ capHit: "bytes", bytes: 1_200 });
   });
 
   /** Holds the request open, and says when it arrived and when its socket closed. */

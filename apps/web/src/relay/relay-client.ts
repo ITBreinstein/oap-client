@@ -11,6 +11,8 @@ import {
   parseRelayedExecute,
   parseSessionGrant,
   readRefusalReason,
+  RELAY_RAW,
+  type RawAnswer,
   type RelayEndpoint,
   type RelayedExecute,
   type SessionGrant,
@@ -44,13 +46,17 @@ export interface RelayClient {
   createSession(signal?: AbortSignal): Promise<SessionGrant>;
   /** Open the doorbell stream. The caller reads the body. */
   openEvents(sessionToken: string, signal?: AbortSignal): Promise<Response>;
+  /**
+   * The relay's envelope when the server created a job; the server's own
+   * answer, raw, when it did not.
+   */
   execute(
     endpointKey: string,
     processId: string,
     body: string,
     sessionToken: string | undefined,
     signal?: AbortSignal,
-  ): Promise<RelayedExecute>;
+  ): Promise<RelayedExecute | RawAnswer>;
   /**
    * One request to a path on the relay, answered raw: the read route and the
    * synchronous execute of a read-route endpoint. The caller reads the markers
@@ -125,6 +131,10 @@ export function createRelayClient(baseUrl: string, fetchImpl: FetchLike = fetch)
           ...(signal === undefined ? {} : { signal }),
         },
       );
+      // Not a job: the result itself, from a server that ran the process
+      // synchronously anyway (finding 0059), or a refusal. Checked before the
+      // status, which is the server's here, and may well be 200.
+      if (response.headers.has(RELAY_RAW)) return { raw: response };
       if (response.status === 200) return parseRelayedExecute(await readJson(response));
       const code = readRefusalReason(await readJson(response)) ?? String(response.status);
       throw new RelayError(response.status, code, REFUSED_BEFORE_UPSTREAM.has(response.status));
