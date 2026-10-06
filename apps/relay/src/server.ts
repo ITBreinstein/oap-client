@@ -26,6 +26,7 @@
 import { readFileSync } from "node:fs";
 import { serve } from "@hono/node-server";
 import { createApp } from "./app.js";
+import { socketTimeoutMs, stopListening } from "./listener.js";
 import { loadStartup } from "./startup.js";
 import { RelayState, stateOptionsFrom, systemClock } from "./state.js";
 
@@ -46,16 +47,15 @@ const server = serve({
   port,
   ...(hostname === undefined ? {} : { hostname }),
 });
-// A slow sender cannot hold a socket for ever. Callback bodies are never read,
-// but Node drains them after we answer, and this bounds that too.
-server.setTimeout(60_000);
+// A silent socket is closed once it has outlasted every upstream deadline.
+server.setTimeout(socketTimeoutMs(config.limits));
 
 const sweeper = setInterval(() => state.sweep(), SWEEP_INTERVAL_MS);
 sweeper.unref();
 
 const shutdown = (): void => {
   clearInterval(sweeper);
-  server.close();
+  stopListening(server, () => process.exit(0));
 };
 process.on("SIGTERM", shutdown);
 process.on("SIGINT", shutdown);
