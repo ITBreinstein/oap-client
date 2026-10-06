@@ -21,8 +21,8 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MIN_RETRY_AFTER_MS, pollJob, waitForJob } from "../../src/jobs/poll-job.js";
-import { JobPollTimeoutError } from "../../src/errors.js";
-import { AbortError } from "../../src/http/errors.js";
+import { JobNotFoundError, JobPollTimeoutError } from "../../src/errors.js";
+import { AbortError, ProcessesError } from "../../src/http/errors.js";
 import type { JobStatus } from "../../src/jobs/types.js";
 import type { Observation } from "../../src/observations.js";
 import { stallingFetch } from "../http/stalled-body.js";
@@ -448,6 +448,49 @@ describe("progress reporting", () => {
 
     expect(report.outcome).toBe("terminal");
     expect(report.status?.status).toBe("successful");
+  });
+});
+
+describe("a busy server: 429 or 503 with Retry-After (C10)", () => {
+  for (const status of [503, 429]) {
+    it(`waits as a ${String(status)} asks and polls again, rather than ending`, async () => {
+      const fake = scripted([
+        () => new Response("busy", { status, headers: { "Retry-After": "2" } }),
+        () => json(jobBody("successful")),
+      ]);
+      const settled = pollJob(JOB_URL, { fetch: fake.fetch });
+
+      await vi.advanceTimersByTimeAsync(1_999);
+      expect(fake.calls).toHaveLength(1);
+      await vi.advanceTimersByTimeAsync(1);
+
+      await expect(settled).resolves.toMatchObject({
+        outcome: "terminal",
+        statusSequence: [String(status), "successful"],
+        retryAfterHonoured: true,
+      });
+    });
+  }
+
+  it("still ends with the error when the 503 says nothing about when to ask again", async () => {
+    const fake = scripted([() => new Response("down", { status: 503 })]);
+    const settled = pollJob(JOB_URL, { fetch: fake.fetch }).catch((error: unknown) => error);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(await settled).toBeInstanceOf(ProcessesError);
+  });
+});
+
+describe("waitForJob promises a final status (C5)", () => {
+  it("throws JobNotFoundError when the job goes away mid-poll, rather than returning 'running'", async () => {
+    const fake = scripted([
+      () => json(jobBody("running")),
+      () => json(JSON.stringify({ title: "gone" }), 404),
+    ]);
+    const settled = waitForJob(JOB_URL, { fetch: fake.fetch }).catch((error: unknown) => error);
+
+    await vi.advanceTimersByTimeAsync(60_000);
+
+    expect(await settled).toBeInstanceOf(JobNotFoundError);
   });
 });
 

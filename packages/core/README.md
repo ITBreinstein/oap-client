@@ -563,7 +563,8 @@ entire purpose is to show what the server said. `waitForJob()` resolves for
 `failed` and `dismissed` too; whether a failure is an error is the caller's
 decision. It does throw `JobPollTimeoutError` when polling stops at `maxPolls`
 with the job still not terminal — `pollJob()` reports that as a `timeout`
-outcome, but a status that is still `running` is not the final one.
+outcome, but a status that is still `running` is not the final one — and
+`JobNotFoundError` when the job went away while it was being polled.
 
 What _does_ throw: a 404 (`JobNotFoundError`), a 5xx (`ProcessesError`), a
 transport failure, an abort, and a body with no usable `status`
@@ -622,9 +623,12 @@ const report = await client.pollJob(url, {
   so one second is the shortest wait a server can express: the minimum overrides
   only `Retry-After: 0` and dates already in the past, and honours every other
   instruction exactly. A value this client cannot read as one of RFC 9110's two
-  forms — negative, fractional, signed, or prose — is ignored outright, and the
-  backoff takes over; the raw header is recorded on a `retry-after` observation
-  either way.
+  forms — negative, fractional, signed, or prose, and a date only in one of the
+  three HTTP-date forms — is ignored outright, and the backoff takes over; the
+  raw header is recorded on a `retry-after` observation either way. A 429 or 503
+  status read that carries one is a server asking to be polled later, not an
+  error: the loop waits and polls again, and records the code in
+  `statusSequence`.
 - **Otherwise a bounded backoff**: 1 s, growing to a 10 s ceiling, with a 500 ms
   floor. Because that floor is _below_ the one-second `Retry-After` minimum, a
   server can currently only ever lengthen a wait, never shorten one.

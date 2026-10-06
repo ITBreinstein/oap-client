@@ -109,6 +109,30 @@ export interface EnvelopeOptions {
  * available. A value that is trying to be a number and failing is a broken
  * header, not a date, and is refused as one.
  */
+const DAY = "(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)";
+const LONG_DAY = "(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)";
+const MONTH = "(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)";
+const TIME = "\\d{2}:\\d{2}:\\d{2}";
+/** RFC 9110 §5.6.7's preferred form: `Sun, 06 Nov 1994 08:49:37 GMT`. */
+const IMF_FIXDATE = new RegExp(`^${DAY}, \\d{2} ${MONTH} \\d{4} ${TIME} GMT$`);
+/** The obsolete RFC 850 form: `Sunday, 06-Nov-94 08:49:37 GMT`. */
+const RFC850_DATE = new RegExp(`^${LONG_DAY}, \\d{2}-${MONTH}-\\d{2} ${TIME} GMT$`);
+/** C's `asctime()` form, in GMT though it does not say so: `Sun Nov  6 08:49:37 1994`. */
+const ASCTIME_DATE = new RegExp(`^${DAY} ${MONTH} (?:\\d{2}| \\d) ${TIME} \\d{4}$`);
+
+/**
+ * An HTTP-date in one of the three forms RFC 9110 has recipients accept, as an
+ * epoch time; `NaN` for anything else. Matched before `Date.parse` is asked,
+ * because `Date.parse` accepts nearly anything: V8 reads `"wait 10"` as a date
+ * in 2001 and `"later 2027"` as one in 2027 (review C9), the same failure as
+ * finding 0045's `"-5"`.
+ */
+function parseHttpDate(value: string): number {
+  if (IMF_FIXDATE.test(value) || RFC850_DATE.test(value)) return Date.parse(value);
+  if (ASCTIME_DATE.test(value)) return Date.parse(`${value} GMT`);
+  return Number.NaN;
+}
+
 function parseRetryAfter(header: string | null): number | undefined {
   if (header === null) return undefined;
   const value = header.trim();
@@ -120,7 +144,7 @@ function parseRetryAfter(header: string | null): number | undefined {
   if (numericish) return /^\d+$/.test(value) ? Number(value) * 1000 : undefined;
 
   // HTTP-date. Already-elapsed dates clamp to 0 rather than going negative.
-  const at = Date.parse(value);
+  const at = parseHttpDate(value);
   if (Number.isNaN(at)) return undefined;
   return Math.max(0, at - Date.now());
 }
