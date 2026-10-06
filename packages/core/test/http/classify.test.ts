@@ -173,9 +173,36 @@ describe("classify", () => {
     });
   });
 
-  it("ignores a non-string type or title", async () => {
+  it("reads a declared problem document with a non-string type or title as about:blank (C7)", async () => {
+    // RFC 9457 §3.1: a member of the wrong type is treated as absent, and an
+    // absent `type` is `about:blank`. Declared, it is still a problem document.
     const result = await classify(json({ type: 7, title: null }, { status: 400 }));
+    expect(result.kind).toBe("exception");
+    if (result.kind !== "exception") return;
+    expect(result.problem).toMatchObject({ type: "about:blank", title: undefined });
+  });
+
+  it("ignores a non-string type or title on a body not declared as a problem", async () => {
+    const result = await classify(
+      json(
+        { type: 7, title: null },
+        { status: 400, headers: { "content-type": "application/json" } },
+      ),
+    );
     expect(result.kind).toBe("http-error");
+  });
+
+  it("takes a declared problem document at 200 with only detail and status for a failure (C7)", async () => {
+    // Served at 200, it used to be classified ok, and execute() handed it over
+    // as the result.
+    const result = await classify(json({ detail: "backend unavailable", status: 503 }));
+    expect(result.kind).toBe("exception");
+    if (result.kind !== "exception") return;
+    expect(result.problem).toMatchObject({
+      type: "about:blank",
+      detail: "backend unavailable",
+      status: 503,
+    });
   });
 
   it("classifies a 500 with an HTML body as http-error, with a preview", async () => {

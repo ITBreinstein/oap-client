@@ -100,11 +100,13 @@ export function toProblemDetails(
   const record = body as Record<string, unknown>;
   if (!looksLikeProblem(record, context)) return undefined;
 
+  // A declared problem+json with neither `type` nor `title` is still a problem
+  // document: RFC 9457 §3.1.1 reads a missing `type` as `about:blank`. Dropped,
+  // `{"detail":"backend unavailable","status":503}` served at 200 was taken
+  // for a result (review C7). An undeclared body without either never gets
+  // here: `looksLikeProblem` refuses it.
   const type = stringOrUndefined(record["type"]);
   const title = stringOrUndefined(record["title"]);
-  // A declared problem+json with neither member is still a problem document,
-  // but one with no usable content is not worth reporting as an exception.
-  if (type === undefined && title === undefined) return undefined;
 
   const extensions: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(record)) {

@@ -224,6 +224,18 @@ describe("what execute() returns", () => {
     expect(executionRecord(seen).disagreedWithRequestedMode).toBe(true);
   });
 
+  it("keeps the job id a spec-minimal body names on the error, rather than discarding it (C8)", async () => {
+    // statusInfo requires only jobID and status. With Location hidden
+    // cross-origin, this is all a browser sees; client.getJob() accepts the id.
+    const fake = fakeFetch(json({ type: "process", jobID: "abc", status: "accepted" }, 201));
+    const error = await execute(LIST, "p", { inputs: {}, mode: "async", fetch: fake.fetch }).catch(
+      (caught: unknown) => caught,
+    );
+
+    expect(error).toBeInstanceOf(AmbiguousExecutionResponseError);
+    expect(error).toMatchObject({ jobId: "abc" });
+  });
+
   it("throws AmbiguousExecutionResponseError rather than guessing a job URL", async () => {
     const fake = fakeFetch(json(null, 201));
 

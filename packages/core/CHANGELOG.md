@@ -66,8 +66,20 @@ at 0.5.0; earlier versions are recorded only in the git history.
   so `"wait 10"` became a date in 2001 (0 ms) and `"later 2027"` one months
   away. Anything else is now ignored, so `retryAfterMs` is `undefined`.
 
+- A response declared `application/problem+json` is a problem document even
+  without `type` or `title`: as RFC 9457 says, a missing (or non-string) `type`
+  is `about:blank`. Such a body served at 200, say
+  `{"detail":"backend unavailable","status":503}`, was classified `ok`, and
+  `execute()` handed it over as the result. It is now an `exception`. A body
+  not declared as a problem document is judged as before.
+
 ### Added
 
+- `AmbiguousExecutionResponseError.jobId`: the job id the body named (`jobID`,
+  or `id`), when it named one. A spec-minimal `{"jobID", "status"}` with
+  `Location` hidden cross-origin is all a browser sees (finding 0039), and the id
+  used to be discarded. `client.getJob()` accepts it as a bare id. The
+  constructor takes it as an optional sixth argument.
 - `EnvelopeOptions.signal`: the signal the request was sent with. A body read
   it cuts short rejects with `AbortError`, whatever the runtime errored the
   stream with. `send()` passes its own; set it when you call `createEnvelope`

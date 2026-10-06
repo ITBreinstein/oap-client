@@ -87,25 +87,6 @@ describe("JobHandle.statusUrl is documented as absolute", () => {
   );
 });
 
-describe("Location hidden cross-origin, job named in the body", () => {
-  it.fails("C8: does not discard the jobID a spec-minimal statusInfo body carries", async () => {
-    // 18-062r2 statusInfo requires jobID and status; links are optional. With
-    // Location filtered out by CORS this is all a browser sees.
-    const fetch = (): Promise<Response> =>
-      Promise.resolve(json({ type: "process", jobID: "abc", status: "accepted" }, 201));
-    const outcome = await settle(
-      execute("https://service.test/processes", "p", { inputs: {}, mode: "async", fetch }),
-    );
-
-    const carried =
-      outcome instanceof Error
-        ? Object.values(outcome).some((value) => value === "abc")
-        : outcome.kind === "job" && outcome.job.jobId === "abc";
-    // client.getJob() accepts a bare id precisely for this situation.
-    expect(carried).toBe(true);
-  });
-});
-
 describe("JobStatus.exception", () => {
   it.fails(
     "C14: is populated when the job body itself is problem-shaped, as its doc comment says",
