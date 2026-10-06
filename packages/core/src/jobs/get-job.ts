@@ -118,6 +118,10 @@ export async function readJobStatus(
   try {
     body = await envelope.json();
   } catch (cause) {
+    // An abort, a deadline or the buffer limit hit mid-body is not a malformed
+    // document: `pollJob` must see its own timeout, and a caller their abort
+    // (review C2).
+    if (!(cause instanceof SyntaxError)) throw cause;
     throw new MalformedJobDocumentError(envelope.url, "body did not parse as JSON", undefined, {
       cause,
     });

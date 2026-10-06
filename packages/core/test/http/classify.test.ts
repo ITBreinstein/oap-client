@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { BODY_PREVIEW_LIMIT, classify, requireOk } from "../../src/http/classify.js";
 import { createEnvelope } from "../../src/http/envelope.js";
-import { ProcessesError } from "../../src/http/errors.js";
+import { AbortError, ProcessesError } from "../../src/http/errors.js";
+import { stalledBody } from "./stalled-body.js";
 
 const URL_UNDER_TEST = "https://example.org/ogc/processes/echo/execution";
 
@@ -232,6 +233,23 @@ describe("classify", () => {
   it("leaves a 404 with no body as http-error rather than an exception", async () => {
     const result = await classify(envelope(null, { status: 404 }));
     expect(result.kind).toBe("http-error");
+  });
+});
+
+describe("classify — an abort while the body is arriving", () => {
+  it("lets the abort through, rather than reading it as no problem document", async () => {
+    const controller = new AbortController();
+    const envelope = createEnvelope(
+      stalledBody(controller.signal, "application/problem+json", 400),
+      {
+        requestedUrl: "https://service.test/x",
+        signal: controller.signal,
+      },
+    );
+    const classifying = classify(envelope);
+    controller.abort();
+
+    await expect(classifying).rejects.toBeInstanceOf(AbortError);
   });
 });
 

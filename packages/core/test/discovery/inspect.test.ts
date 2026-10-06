@@ -15,6 +15,8 @@ import { inspect } from "../../src/discovery/inspect.js";
 import { MalformedDocumentError, NotJsonError } from "../../src/errors.js";
 import { findLink } from "../../src/links/find.js";
 import type { Observation } from "../../src/observations.js";
+import { AbortError } from "../../src/http/errors.js";
+import { stalledBody } from "../http/stalled-body.js";
 
 const ORIGIN = "https://service.test";
 const BASE = `${ORIGIN}/oapi/`;
@@ -251,6 +253,50 @@ describe("inspect — cancellation", () => {
       (caught: unknown) => caught,
     );
     expect((error as Error).name).toBe("AbortError");
+  });
+});
+
+describe("inspect — an abort while a body is arriving (C2)", () => {
+  it("rejects with AbortError during the landing page body", async () => {
+    const controller = new AbortController();
+    const fetch = (_url: string, init: RequestInit = {}): Promise<Response> => {
+      queueMicrotask(() => {
+        controller.abort();
+      });
+      return Promise.resolve(stalledBody(init.signal));
+    };
+
+    await expect(
+      inspect("https://service.test/", { signal: controller.signal, fetch }),
+    ).rejects.toBeInstanceOf(AbortError);
+  });
+
+  it("rejects during the conformance body, rather than degrading to unknown capabilities", async () => {
+    const controller = new AbortController();
+    const fetch = (url: string, init: RequestInit = {}): Promise<Response> => {
+      if (url.endsWith("/conformance")) {
+        queueMicrotask(() => {
+          controller.abort();
+        });
+        return Promise.resolve(stalledBody(init.signal));
+      }
+      return Promise.resolve(
+        Response.json({
+          title: "t",
+          links: [
+            {
+              rel: "conformance",
+              href: "https://service.test/conformance",
+              type: "application/json",
+            },
+          ],
+        }),
+      );
+    };
+
+    await expect(
+      inspect("https://service.test/", { signal: controller.signal, fetch }),
+    ).rejects.toBeInstanceOf(AbortError);
   });
 });
 

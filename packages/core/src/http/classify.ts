@@ -17,7 +17,7 @@
 
 import type { ResponseEnvelope } from "./envelope.js";
 import { toProblemDetails, type ProblemDetails } from "./problem.js";
-import { ProcessesError } from "./errors.js";
+import { AbortError, ProcessesError } from "./errors.js";
 
 /** Enough of the body to diagnose an HTML error page without logging the whole thing. */
 export const BODY_PREVIEW_LIMIT = 500;
@@ -47,9 +47,10 @@ export interface HttpErrorClassification {
 export type Classification = OkClassification | ExceptionClassification | HttpErrorClassification;
 
 /**
- * Wrapped so that *any* failure — not JSON, truncated, wrong shape, body
- * already gone, over the buffer limit — means "not a problem document" and
- * falls through, rather than escaping as an error of our own.
+ * Wrapped so that *any* failure of the document — not JSON, truncated, wrong
+ * shape, body already gone, over the buffer limit — means "not a problem
+ * document" and falls through, rather than escaping as an error of our own.
+ * An abort is not a failure of the document, and goes on to the caller.
  */
 async function readProblem(envelope: ResponseEnvelope): Promise<ProblemDetails | undefined> {
   if (!envelope.isJson) return undefined;
@@ -58,7 +59,8 @@ async function readProblem(envelope: ResponseEnvelope): Promise<ProblemDetails |
       declared: envelope.mediaType === "application/problem+json",
       wireStatus: envelope.status,
     });
-  } catch {
+  } catch (cause) {
+    if (cause instanceof AbortError) throw cause;
     return undefined;
   }
 }
@@ -67,7 +69,8 @@ async function readPreview(envelope: ResponseEnvelope): Promise<string> {
   try {
     const body = await envelope.text();
     return body.length > BODY_PREVIEW_LIMIT ? `${body.slice(0, BODY_PREVIEW_LIMIT)}…` : body;
-  } catch {
+  } catch (cause) {
+    if (cause instanceof AbortError) throw cause;
     // An unreadable body is not itself a classification failure.
     return "";
   }

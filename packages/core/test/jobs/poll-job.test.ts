@@ -25,6 +25,7 @@ import { JobPollTimeoutError } from "../../src/errors.js";
 import { AbortError } from "../../src/http/errors.js";
 import type { JobStatus } from "../../src/jobs/types.js";
 import type { Observation } from "../../src/observations.js";
+import { stallingFetch } from "../http/stalled-body.js";
 
 const JOB_URL = "https://service.test/oapi/jobs/abc";
 
@@ -342,6 +343,39 @@ describe("cancellation", () => {
 
     const polled = seen.find((entry) => entry.kind === "job-polled");
     expect(polled).toMatchObject({ outcome: "aborted", pollCount: 1 });
+  });
+});
+
+describe("a status body cut short", () => {
+  it("reports the deadline firing mid-body as a timeout, not a malformed document (C2)", async () => {
+    const { sink, seen } = collect();
+    const settled = pollJob(JOB_URL, {
+      fetch: stallingFetch(),
+      timeoutMs: 5_000,
+      onObservation: sink,
+    }).catch((error: unknown) => error);
+
+    await vi.advanceTimersByTimeAsync(5_000);
+
+    expect(await settled).toBeInstanceOf(JobPollTimeoutError);
+    expect(seen.find((entry) => entry.kind === "job-polled")).toMatchObject({ outcome: "timeout" });
+  });
+
+  it("reports the caller's abort mid-body as an abort, not a malformed document (C2)", async () => {
+    const controller = new AbortController();
+    const { sink, seen } = collect();
+    const settled = pollJob(JOB_URL, {
+      fetch: stallingFetch(),
+      signal: controller.signal,
+      onObservation: sink,
+    }).catch((error: unknown) => error);
+
+    await vi.advanceTimersByTimeAsync(0);
+    controller.abort();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(await settled).toBeInstanceOf(AbortError);
+    expect(seen.find((entry) => entry.kind === "job-polled")).toMatchObject({ outcome: "aborted" });
   });
 });
 

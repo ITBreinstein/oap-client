@@ -49,6 +49,7 @@
 
 import { AmbiguousExecutionResponseError } from "../errors.js";
 import type { ResponseEnvelope } from "../http/envelope.js";
+import { AbortError } from "../http/errors.js";
 import { readBodyLinks, resolveBodyLinks } from "../links/resolve.js";
 import { findLink } from "../links/find.js";
 import type { Link } from "../links/types.js";
@@ -113,7 +114,10 @@ async function readJsonBody(envelope: ResponseEnvelope): Promise<unknown> {
   if (!envelope.isJson) return undefined;
   try {
     return await envelope.json();
-  } catch {
+  } catch (cause) {
+    // Cut short by the caller or the deadline: that ends the execute. Read
+    // as "no JSON body", it was classified as a result (review C1).
+    if (cause instanceof AbortError) throw cause;
     return undefined;
   }
 }

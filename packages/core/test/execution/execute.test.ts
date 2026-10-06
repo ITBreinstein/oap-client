@@ -13,6 +13,7 @@ import { AbortError, ProcessesError } from "../../src/http/errors.js";
 import { parseDescription } from "../../src/processes/parse-description.js";
 import type { ProcessDescription } from "../../src/processes/types.js";
 import type { Observation } from "../../src/observations.js";
+import { abortAfter, HUNG, settleWithin, stallingFetch } from "../http/stalled-body.js";
 import helloWorld from "../fixtures/pygeoapi/processes/hello-world.json" with { type: "json" };
 
 const LIST = "https://service.test/oapi/processes";
@@ -309,6 +310,39 @@ describe("the deadline and the caller's signal stay separable", () => {
     controller.abort();
 
     await expect(pending).rejects.toThrow(AbortError);
+  });
+
+  it("ends with ExecutionTimeoutError when the body stalls after the headers (C1)", async () => {
+    // The deadline used to be released at the headers, leaving the body read
+    // that classification needs able to hang the call for ever.
+    const outcome = await settleWithin(
+      execute(LIST, "slow", { inputs: {}, timeoutMs: 100, fetch: stallingFetch() }),
+      1_500,
+    );
+
+    expect(outcome).not.toBe(HUNG);
+    expect(outcome).toBeInstanceOf(ExecutionTimeoutError);
+  });
+
+  it("ends with AbortError when the caller cancels while the body stalls (C1)", async () => {
+    const { sink, seen } = collect();
+    const outcome = await settleWithin(
+      execute(LIST, "slow", {
+        inputs: {},
+        signal: abortAfter(100).signal,
+        fetch: stallingFetch(),
+        onObservation: sink,
+      }),
+      1_500,
+    );
+
+    expect(outcome).toBeInstanceOf(AbortError);
+    // An answer began and never finished: no response to judge, but its status is known.
+    expect(executionRecord(seen)).toMatchObject({
+      outcome: "transport-failure",
+      status: 200,
+      preferenceApplied: undefined,
+    });
   });
 
   it("clears its timer, so a fast call does not keep the process alive", async () => {
