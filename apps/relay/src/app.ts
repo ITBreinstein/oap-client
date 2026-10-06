@@ -520,12 +520,9 @@ export function createApp(options: AppOptions = {}): Hono {
         }, heartbeatMs);
       };
 
-      const closed = new Promise<void>((resolve) => {
-        stream.onAbort(() => {
-          flags.open = false;
-          resolve();
-          wake?.();
-        });
+      stream.onAbort(() => {
+        flags.open = false;
+        wake?.();
       });
 
       try {
@@ -543,12 +540,13 @@ export function createApp(options: AppOptions = {}): Hono {
             await stream.write(": keepalive\n\n");
             continue;
           }
-          await Promise.race([
-            closed,
-            new Promise<void>((resolve) => {
-              wake = resolve;
-            }),
-          ]);
+          // Only `wake` ends this wait, and `onAbort` calls it. Racing against a
+          // promise of the stream's end instead would add a reaction to that
+          // promise on every pass, all kept until the stream closes: memory
+          // that grew with every doorbell and heartbeat (review R2).
+          await new Promise<void>((resolve) => {
+            wake = resolve;
+          });
           wake = undefined;
         }
       } finally {
