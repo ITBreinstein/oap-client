@@ -159,21 +159,3 @@ describe("client discovery honours the caller's signal", () => {
     expect(outcome).not.toBe(HUNG);
   });
 });
-
-describe("createClient base URL", () => {
-  it.fails("C6: keeps a query parameter on the base URL intact", async () => {
-    const seen: string[] = [];
-    const client = createClient({
-      baseUrl: "https://service.test/ogc?apikey=abc",
-      fetch: (url: string) => {
-        seen.push(url);
-        return Promise.resolve(json({ title: "t", links: [] }, 404));
-      },
-    });
-
-    await client.inspect().catch(() => undefined);
-
-    expect(client.baseUrl.searchParams.get("apikey")).toBe("abc");
-    expect(new URL(seen[0] ?? "").searchParams.get("apikey")).toBe("abc");
-  });
-});

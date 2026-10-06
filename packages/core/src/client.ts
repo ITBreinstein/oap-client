@@ -260,9 +260,11 @@ function untilAborted<T>(
 
 export function createClient(options: ClientOptions): Client {
   // A trailing slash matters: without it, `new URL("processes", base)` drops the
-  // last path segment of the base.
-  const baseHref = options.baseUrl.toString();
-  const baseUrl = new URL(baseHref.endsWith("/") ? baseHref : `${baseHref}/`);
+  // last path segment of the base. It goes on the path: appended to the whole
+  // string, it landed on a query instead — `…/ogc?apikey=abc/` — and an address
+  // copied from a JSON landing page, `…/?f=json`, became `?f=json/` (review C6).
+  const baseUrl = new URL(options.baseUrl.toString());
+  if (!baseUrl.pathname.endsWith("/")) baseUrl.pathname = `${baseUrl.pathname}/`;
   // Resolved once, here, so a runtime with no fetch fails at construction
   // rather than on the first request.
   const doFetch = resolveFetch(options.fetch);
