@@ -10,7 +10,8 @@
 import { describe, expect, it } from "vitest";
 import type { EndpointConfig } from "../src/config.js";
 import type { Resolver } from "../src/address-guard.js";
-import { postExecute, UpstreamError } from "../src/upstream.js";
+import { UpstreamError } from "../src/exchange.js";
+import { postExecute } from "../src/upstream.js";
 
 describe("postExecute's connect-time address check", () => {
   it("refuses an allowlisted name that resolves to a private address", async () => {

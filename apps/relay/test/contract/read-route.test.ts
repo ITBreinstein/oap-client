@@ -3,7 +3,7 @@
  * HTTP both ways. Nothing is mocked: the unit lane proves what the relay
  * decides, and this lane proves that what it forwards is what the server said.
  *
- * Four claims:
+ * Five claims:
  *
  * 1. A read reaches the server and comes back with the server's status, the
  *    evidence headers and nothing else, marked `X-Relay: 1` and never
@@ -15,6 +15,9 @@
  *    blocked without it.
  * 4. An endpoint configured direct-only gets nothing forwarded, and the
  *    refusal is marked as the relay's own.
+ * 5. An asynchronous execute that the server answers synchronously anyway
+ *    (finding 0059) comes back as the server's own answer, marked
+ *    `X-Relay-Raw: 1`, not wrapped in the relay's envelope (review R7).
  */
 
 import { once } from "node:events";
@@ -197,5 +200,35 @@ describe("the read route against pygeoapi without CORS", () => {
     expect(audits.slice(before).filter((line) => line.endpointKey === "pygeoapi-nocors")).toEqual(
       [],
     );
+  });
+
+  it("passes on raw an asynchronous execute the server answered synchronously (finding 0059)", async (context) => {
+    if (!up) context.skip();
+    // Declares sync-execute only; pygeoapi answers `respond-async` with the result.
+    const body = JSON.stringify({ inputs: { seconds: 0 } });
+    const headers = { "Content-Type": "application/json", Prefer: "respond-async" };
+    const path = "/processes/breinstein-sync-only/execution";
+    const [relayed, straight] = await Promise.all([
+      fetch(`${base}/execute/pygeoapi-nocors/breinstein-sync-only`, {
+        method: "POST",
+        headers: { ...headers, Origin: ORIGIN },
+        body,
+      }),
+      fetch(`${NOCORS}${path}`, { method: "POST", headers, body }),
+    ]);
+    expect(straight.status).toBe(200);
+    expect(relayed.status).toBe(200);
+    expect(relayed.headers.get("X-Relay")).toBe("1");
+    expect(relayed.headers.get("X-Relay-Raw")).toBe("1");
+    expect(relayed.headers.get("X-Relay-Error")).toBeNull();
+    expect(relayed.headers.get("Access-Control-Expose-Headers")).toContain("X-Relay-Raw");
+    expect(relayed.headers.get("Preference-Applied")).toBe(
+      straight.headers.get("Preference-Applied"),
+    );
+    expect(relayed.headers.get("Content-Type")).toBe(straight.headers.get("Content-Type"));
+    expect(await relayed.json()).toEqual(await straight.json());
+
+    const line = audits.findLast((entry) => entry.audit === "execute");
+    expect(line).toMatchObject({ method: "POST", path, upstreamStatus: 200, failure: undefined });
   });
 });

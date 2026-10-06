@@ -17,7 +17,11 @@
  * the endpoint's configuration and the requested mode, both known before the
  * request exists, and a failure on the chosen route is reported, not rerouted.
  *
- * - `executeRoute: "relay"` and an asynchronous execute → the relay.
+ * - `executeRoute: "relay"` and an asynchronous execute → the relay. When the
+ *   server created a job, the relay answers with its envelope, `Location`
+ *   included. When it did not — a server that ran the process synchronously
+ *   anyway (finding 0059), or one that refused — the relay passes the server's
+ *   own answer on raw, and so does this wrapper.
  * - a synchronous execute, once the user confirmed the read route for this
  *   endpoint → the relay, answered raw: the result itself is what the browser
  *   cannot read from this server.
@@ -34,7 +38,7 @@
  */
 
 import type { FetchLike } from "@breinstein/oap-client";
-import type { RelayedExecute, RelayEndpoint } from "./contract.js";
+import type { RawAnswer, RelayedExecute, RelayEndpoint } from "./contract.js";
 import { fromRelay, RelayRouteError } from "./relay-fetch.js";
 import { RelayError, type RelayClient } from "./relay-client.js";
 
@@ -258,7 +262,7 @@ export function createRoutedFetch(options: RoutedFetchOptions): FetchLike {
     const sessionWithheld = options.session?.live?.() === false;
     const session = sessionWithheld ? undefined : options.session?.current();
 
-    let answer: RelayedExecute;
+    let answer: RelayedExecute | RawAnswer;
     try {
       try {
         answer = await send(session);
@@ -294,6 +298,21 @@ export function createRoutedFetch(options: RoutedFetchOptions): FetchLike {
           cause: error,
         },
       );
+    }
+
+    if ("raw" in answer) {
+      const response = fromRelay(answer.raw);
+      record({
+        ...base,
+        kind: "execute-route",
+        route: "relay",
+        outcome: "sent",
+        locationPresent: response.headers.has("Location"),
+        callbacksRegistered: false,
+        sessionWithheld,
+        reason: undefined,
+      });
+      return response;
     }
 
     const { upstream, ref } = answer;

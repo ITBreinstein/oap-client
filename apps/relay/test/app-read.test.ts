@@ -15,7 +15,8 @@ import {
 import { parseConfig } from "../src/config.js";
 import type { ForwardedResponse, ForwardRequest } from "../src/forward.js";
 import { RelayState, type Clock } from "../src/state.js";
-import { UpstreamError, type UpstreamResponse } from "../src/upstream.js";
+import { UpstreamError } from "../src/exchange.js";
+import type { UpstreamResponse } from "../src/upstream.js";
 
 const ORIGIN = "http://localhost:4173";
 
@@ -259,7 +260,7 @@ describe("GET /read — forwarding", () => {
     expect(response.headers.get("X-Relay-Error")).toBeNull();
   });
 
-  it("exposes every evidence header, and both markers, to the page", async () => {
+  it("exposes every evidence header, and the markers, to the page", async () => {
     const h = harness();
     const response = await read(h, "/read/zoo/processes");
     expect(response.headers.get("Access-Control-Allow-Origin")).toBe(ORIGIN);
@@ -277,10 +278,11 @@ describe("GET /read — forwarding", () => {
       "preference-applied",
       "x-relay",
       "x-relay-error",
+      "x-relay-raw",
     ]) {
       expect(exposed).toContain(name);
     }
-    expect(EXPOSED_HEADERS).toHaveLength(10);
+    expect(EXPOSED_HEADERS).toHaveLength(11);
   });
 
   it("answers a preflight for GET and DELETE with the forwarded request headers", async () => {
@@ -458,6 +460,7 @@ describe("POST /execute for a read-route endpoint", () => {
     });
     expect(response.status).toBe(200);
     expect(response.headers.get("Content-Type")).toBe("image/png");
+    expect(response.headers.get("X-Relay-Raw")).toBe("1");
     expect(new Uint8Array(await response.arrayBuffer())).toEqual(png);
     expect(h.forwarded.map((request) => [request.method, request.url.href, request.body])).toEqual([
       ["POST", "https://zoo.test/ogc-api/processes/echo/execution", body],
@@ -475,6 +478,7 @@ describe("POST /execute for a read-route endpoint", () => {
       body,
     });
     expect(response.status).toBe(200);
+    expect(response.headers.get("X-Relay-Raw")).toBeNull();
     await expect(response.json()).resolves.toMatchObject({ upstream: CREATED });
     expect(h.executed).toEqual(["zoo"]);
     expect(h.forwarded).toEqual([]);

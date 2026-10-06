@@ -32,6 +32,12 @@ export interface RelayEndpoint {
 export const RELAY_MARKER = "X-Relay";
 /** On every response the relay generated itself: its refusals and its own 502s. */
 export const RELAY_ERROR = "X-Relay-Error";
+/**
+ * On an execute the relay answered with the OGC server's own response rather
+ * than its envelope. For an asynchronous execute: the server did not create a
+ * job, but answered with the result itself (finding 0059) or a refusal.
+ */
+export const RELAY_RAW = "X-Relay-Raw";
 
 export interface SessionGrant {
   readonly token: string;
@@ -45,6 +51,14 @@ export interface UpstreamAnswer {
   readonly contentType: string | undefined;
   readonly preferenceApplied: string | undefined;
   readonly body: string;
+}
+
+/**
+ * The OGC server's own answer to an asynchronous execute, which the relay
+ * passed on raw because it was not a job. Its markers are still to be read.
+ */
+export interface RawAnswer {
+  readonly raw: Response;
 }
 
 export interface RelayedExecute {

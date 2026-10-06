@@ -1,6 +1,6 @@
 /**
- * The relay's one outbound request: an asynchronous execute, sent on the
- * browser's behalf so that `Location` can be read (finding 0039).
+ * The relay's asynchronous execute, sent on the browser's behalf so that
+ * `Location` can be read (finding 0039).
  *
  * Everything about the request is fixed here or comes from the config. The
  * browser contributes a process id, already checked against a narrow pattern,
@@ -18,8 +18,18 @@
  * - **Redirects:** none followed. A 3xx fails the exchange. Validating every
  *   hop of a redirect chain is a policy with many edges; following zero hops
  *   has none, and no reference server redirects an execute.
- * - **Size and time:** the response body is capped and the whole exchange,
- *   connect to last byte, has one deadline.
+ * - **The answer:** a `201` or `202` names a job. Its body — a status
+ *   document, or nothing — is read whole, under a small cap, and handed back as
+ *   an {@link UpstreamResponse} for the relay's envelope. Any other answer is
+ *   not a job: the result itself, from a server that ran the process
+ *   synchronously anyway (finding 0059), or a refusal. It is handed back as a
+ *   {@link RawAnswer}, its body streamed the way the read route streams one,
+ *   under the read route's larger cap, for the relay to pass on unchanged.
+ *   Read as text, a binary result was corrupted, and under the small cap a
+ *   result the server had already produced was refused (review R7).
+ * - **Size and time:** each kind of body has its cap, and the whole exchange,
+ *   connect to last byte, has one deadline — a raw body still streaming
+ *   included.
  */
 
 import { Buffer } from "node:buffer";
@@ -33,7 +43,15 @@ import {
   type LookupCallback,
   type Resolver,
 } from "./address-guard.js";
+import { systemSchedule, UpstreamError, type Schedule } from "./exchange.js";
+import {
+  NULL_BODY_STATUSES,
+  returnedHeaders,
+  streamBody,
+  type ForwardedResponse,
+} from "./forward.js";
 
+/** A job: a `201` or `202`, read whole, for the relay's envelope. */
 export interface UpstreamResponse {
   readonly status: number;
   readonly location: string | undefined;
@@ -42,52 +60,26 @@ export interface UpstreamResponse {
   readonly body: string;
 }
 
-/**
- * Why the exchange produced no usable response. Codes, not messages: they go
- * back to the browser, and a message could carry an address or a hostname the
- * browser has no business learning.
- */
-export type UpstreamFailure =
-  | "blocked-address"
-  | "timeout"
-  | "redirect-refused"
-  /** Read route: more redirects under `baseUrl` than it follows. */
-  | "redirect-limit"
-  | "response-too-large"
-  | "connection-failed"
-  /**
-   * Read route: a status line outside 200–599. Node's client accepts any
-   * three digits; a browser cannot be handed one of those (review R9).
-   */
-  | "bad-upstream-status";
-
-export class UpstreamError extends Error {
-  readonly reason: UpstreamFailure;
-
-  constructor(reason: UpstreamFailure, options?: ErrorOptions) {
-    super(`upstream exchange failed: ${reason}`, options);
-    this.name = "UpstreamError";
-    this.reason = reason;
-  }
+/** Any other answer, its body still streaming, to be passed on unchanged. */
+export interface RawAnswer {
+  readonly raw: ForwardedResponse;
 }
 
-/** Run `callback` after `ms`; the returned function cancels it. */
-export type Schedule = (callback: () => void, ms: number) => () => void;
-
-export const systemSchedule: Schedule = (callback, ms) => {
-  const handle = setTimeout(callback, ms);
-  return () => {
-    clearTimeout(handle);
-  };
-};
+export type ExecuteAnswer = UpstreamResponse | RawAnswer;
 
 export interface UpstreamOptions {
   readonly timeoutMs: number;
+  /** Cap on a job's body, which is read whole. */
   readonly maxResponseBytes: number;
+  /** Cap on a {@link RawAnswer}'s body, which is streamed. `maxResponseBytes` unless given. */
+  readonly maxRawResponseBytes?: number | undefined;
   /** Injected in tests; `dns.lookup` otherwise. */
   readonly resolve?: Resolver | undefined;
   readonly schedule?: Schedule | undefined;
 }
+
+/** The answers that name a job: `201 Created`, which the standard asks for, or `202 Accepted`. */
+const JOB_STATUSES: ReadonlySet<number> = new Set([201, 202]);
 
 const REDIRECT_STATUSES: ReadonlySet<number> = new Set([301, 302, 303, 307, 308]);
 
@@ -104,7 +96,7 @@ export function postExecute(
   processId: string,
   body: string,
   options: UpstreamOptions,
-): Promise<UpstreamResponse> {
+): Promise<ExecuteAnswer> {
   const url = executionUrl(endpoint, processId);
   const schedule = options.schedule ?? systemSchedule;
   const payload = Buffer.from(body, "utf8");
@@ -116,13 +108,14 @@ export function postExecute(
   const transport = url.protocol === "https:" ? https : http;
   const resolve = options.resolve;
 
-  return new Promise<UpstreamResponse>((resolvePromise, rejectPromise) => {
+  return new Promise<ExecuteAnswer>((resolvePromise, rejectPromise) => {
     let settled = false;
     let cancelDeadline = (): void => undefined;
-    const finish = (outcome: UpstreamResponse | UpstreamError): void => {
+    const finish = (outcome: ExecuteAnswer | UpstreamError): void => {
       if (settled) return;
       settled = true;
-      cancelDeadline();
+      // A raw answer's body is still streaming, and the deadline still ends it.
+      if (!("raw" in outcome)) cancelDeadline();
       if (outcome instanceof UpstreamError) rejectPromise(outcome);
       else resolvePromise(outcome);
     };
@@ -148,9 +141,12 @@ export function postExecute(
           }),
     });
 
-    cancelDeadline = schedule(() => {
+    let onDeadline = (): void => {
       finish(new UpstreamError("timeout"));
       request.destroy();
+    };
+    cancelDeadline = schedule(() => {
+      onDeadline();
     }, options.timeoutMs);
 
     request.on("error", (cause: NodeJS.ErrnoException) => {
@@ -165,10 +161,35 @@ export function postExecute(
         finish(new UpstreamError("redirect-refused"));
         return;
       }
+      const job = JOB_STATUSES.has(status);
+      const cap = job
+        ? options.maxResponseBytes
+        : (options.maxRawResponseBytes ?? options.maxResponseBytes);
       const declared = Number(response.headers["content-length"]);
-      if (Number.isFinite(declared) && declared > options.maxResponseBytes) {
+      if (Number.isFinite(declared) && declared > cap) {
         response.destroy();
         finish(new UpstreamError("response-too-large"));
+        return;
+      }
+
+      if (!job) {
+        const streamed = streamBody(response, cap);
+        onDeadline = () => {
+          streamed.breakOff("duration");
+        };
+        void streamed.done.then(() => {
+          cancelDeadline();
+        });
+        finish({
+          raw: {
+            status,
+            headers: returnedHeaders(response),
+            body: NULL_BODY_STATUSES.has(status) ? null : streamed.body,
+            finalUrl: url.toString(),
+            redirectsFollowed: 0,
+            done: streamed.done,
+          },
+        });
         return;
       }
 

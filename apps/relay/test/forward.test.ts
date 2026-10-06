@@ -24,7 +24,7 @@ import {
   type ForwardRequest,
   type Lookup,
 } from "../src/forward.js";
-import { UpstreamError, type Schedule } from "../src/upstream.js";
+import { UpstreamError, type Schedule } from "../src/exchange.js";
 
 type Handler = (request: http.IncomingMessage, response: http.ServerResponse) => void;
 
