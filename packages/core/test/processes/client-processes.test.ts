@@ -120,6 +120,26 @@ describe("client.listProcesses", () => {
     await expect(client.listProcesses()).resolves.toMatchObject({ pageCount: 1 });
   });
 
+  it("puts the slash on the path of a base URL with a query, and keeps the query (C6)", async () => {
+    // Appended to the whole string, the slash used to land on the query:
+    // `?apikey=abc/`, or `?f=json/` for an address copied from a JSON landing
+    // page, which pygeoapi answers with 400.
+    const landingRequests: string[] = [];
+    server.use(
+      http.get("https://gateway.test/ogc/", ({ request }) => {
+        landingRequests.push(request.url);
+        return HttpResponse.json({ title: "t", links: [] });
+      }),
+      http.get("https://gateway.test/ogc/conformance", () => HttpResponse.json({ conformsTo: [] })),
+      http.get("https://gateway.test/ogc/processes", () => HttpResponse.json(pygeoapiList)),
+    );
+    const client = createClient({ baseUrl: "https://gateway.test/ogc?apikey=abc" });
+
+    await expect(client.listProcesses()).resolves.toMatchObject({ pageCount: 1 });
+    expect(client.baseUrl.href).toBe("https://gateway.test/ogc/?apikey=abc");
+    expect(landingRequests).toEqual(["https://gateway.test/ogc/?apikey=abc"]);
+  });
+
   it("asks again after a landing page it could not reach, rather than keeping the guess", async () => {
     // A blip on the first call would otherwise pin this client to `./processes`
     // for its whole life, over the link the server does advertise.

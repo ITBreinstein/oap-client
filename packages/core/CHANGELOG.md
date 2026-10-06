@@ -3,6 +3,18 @@
 Changes to `@breinstein/oap-client` that a consumer has to know about. Started
 at 0.5.0; earlier versions are recorded only in the git history.
 
+## Unreleased
+
+### Fixed
+
+- `createClient` adds the trailing slash a base URL needs to its _path_. It used
+  to append it to the whole string, so a base with a query got the slash on the
+  query: `https://host/ogc?apikey=abc` became `…/ogc?apikey=abc/`, `client.baseUrl`
+  carried that, and every URL resolved from it lost the `ogc` segment. A landing
+  page address copied with `?f=json` became `?f=json/`, which pygeoapi answers
+  with 400. `client.baseUrl` is now `https://host/ogc/?apikey=abc`, and the
+  landing page is requested with the query intact.
+
 ## 0.5.0
 
 ### Breaking
