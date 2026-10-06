@@ -361,6 +361,12 @@ filtered by endpoint and by kind. It writes them to a file:
   endpoint named at the top of the file. This is the file the
   interoperability matrix is built from.
 
+`pnpm capture:observations` does all of this in Chromium against the local
+reference stack: it connects to each configured endpoint, takes the census,
+runs a few processes both ways, loads a reference and cancels a job, then
+saves each endpoint's export. See
+[`e2e/observations.capture.ts`](../../e2e/observations.capture.ts).
+
 **Describe every process** is the process census. It fetches each listed
 process's description once, one at a time, through whichever route the
 connection uses. The session then holds a `process-fetched` record, and any
