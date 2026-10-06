@@ -1,6 +1,12 @@
 /** A caller's signal and a deadline, as one signal that remembers which fired. */
 
 /**
+ * The longest delay a timer holds: a signed 32-bit millisecond count, a little
+ * under 25 days. Node and browsers fire a longer one after about 1 ms instead.
+ */
+const MAX_TIMER_MS = 2_147_483_647;
+
+/**
  * One signal that fires for either reason, and remembers which.
  *
  * `AbortSignal.any` would do most of this, but it is Node 20+ and this package
@@ -11,6 +17,11 @@
  *
  * Used by `execute()` for its one POST, and by `pollJob()` so that its total
  * deadline also ends a status read that never answers.
+ *
+ * `timeoutMs: Infinity` means no deadline: no timer is armed. A finite
+ * deadline longer than a timer holds is held to {@link MAX_TIMER_MS}. Passed
+ * straight to `setTimeout`, either fired at once, so "no deadline" failed
+ * every call immediately (review C3).
  */
 export function withDeadline(
   signal: AbortSignal | undefined,
@@ -19,10 +30,15 @@ export function withDeadline(
   const controller = new AbortController();
   let timedOut = false;
 
-  const timer = setTimeout(() => {
-    timedOut = true;
-    controller.abort();
-  }, timeoutMs);
+  const timer = Number.isFinite(timeoutMs)
+    ? setTimeout(
+        () => {
+          timedOut = true;
+          controller.abort();
+        },
+        Math.min(timeoutMs, MAX_TIMER_MS),
+      )
+    : undefined;
 
   const onAbort = (): void => {
     controller.abort(signal?.reason);

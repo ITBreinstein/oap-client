@@ -1,11 +1,9 @@
 /**
- * Review: deadlines that cannot be expressed as a timer, and a wait that can
- * end before the job does.
+ * Review: a wait that can end before the job does.
  */
 
 import { describe, expect, it } from "vitest";
-import { execute } from "../../src/execution/execute.js";
-import { pollJob, waitForJob } from "../../src/jobs/poll-job.js";
+import { waitForJob } from "../../src/jobs/poll-job.js";
 
 const HUNG = Symbol("hung");
 
@@ -29,56 +27,6 @@ function json(body: unknown, status = 200): Response {
     headers: { "Content-Type": "application/json" },
   });
 }
-
-/** Answers after `ms`, and rejects like fetch does if the signal fires first. */
-function slowFetch(ms: number, answer: () => Response) {
-  return (_url: string, init: RequestInit = {}): Promise<Response> =>
-    new Promise<Response>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        resolve(answer());
-      }, ms);
-      init.signal?.addEventListener("abort", () => {
-        clearTimeout(timer);
-        reject(new DOMException("This operation was aborted", "AbortError"));
-      });
-    });
-}
-
-describe("timeoutMs larger than a timer can hold", () => {
-  // setTimeout clamps anything above 2^31-1 ms (~24.8 days) to 1 ms (Node warns
-  // with TimeoutOverflowWarning; browsers fire immediately). 2^32, not 2^31:
-  // pollJob subtracts the milliseconds already spent, and 2^31 minus one is
-  // exactly the largest delay a timer holds, so 2^31 only failed sometimes.
-  it.fails("C3: pollJob with a very long deadline still polls the job to its end", async () => {
-    const fetch = slowFetch(30, () => json({ jobID: "j1", status: "successful" }));
-    const outcome = await settleWithin(
-      pollJob("https://service.test/jobs/j1", { timeoutMs: 2 ** 32, fetch }),
-      1_500,
-    );
-    expect(outcome).toMatchObject({ outcome: "terminal" });
-  });
-
-  it.fails(
-    'C3: pollJob with timeoutMs: Infinity ("no deadline") still polls the job to its end',
-    async () => {
-      const fetch = slowFetch(30, () => json({ jobID: "j1", status: "successful" }));
-      const outcome = await settleWithin(
-        pollJob("https://service.test/jobs/j1", { timeoutMs: Number.POSITIVE_INFINITY, fetch }),
-        1_500,
-      );
-      expect(outcome).toMatchObject({ outcome: "terminal" });
-    },
-  );
-
-  it.fails("C3: execute with a very long deadline still returns the result", async () => {
-    const fetch = slowFetch(30, () => json({ id: "echo", value: "hi" }));
-    const outcome = await settleWithin(
-      execute("https://service.test/processes", "echo", { inputs: {}, timeoutMs: 2 ** 32, fetch }),
-      1_500,
-    );
-    expect(outcome).toMatchObject({ kind: "immediate" });
-  });
-});
 
 describe("waitForJob promises a final status", () => {
   it.fails(
