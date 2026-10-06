@@ -305,7 +305,15 @@ describe("forward", () => {
   });
 
   it("times out before the status line with an UpstreamError", async () => {
-    handlers.set("/api/silent", () => undefined);
+    // Fired once the request has reached the server, not after a guessed
+    // delay: a busy runner could take longer than any fixed wait.
+    let arrived: () => void = () => undefined;
+    const reached = new Promise<void>((resolve) => {
+      arrived = resolve;
+    });
+    handlers.set("/api/silent", () => {
+      arrived();
+    });
     let fire: () => void = () => undefined;
     const schedule: Schedule = (callback) => {
       fire = callback;
@@ -316,7 +324,7 @@ describe("forward", () => {
       schedule,
       lookup: loopbackLookup([]),
     });
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    await reached;
     fire();
     expect(await failure(pending)).toBe("timeout");
   });
