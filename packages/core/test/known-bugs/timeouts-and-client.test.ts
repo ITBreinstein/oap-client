@@ -1,13 +1,11 @@
 /**
- * Review: deadlines that cannot be expressed as a timer, and client-level
- * discovery that ignores the caller's signal.
+ * Review: deadlines that cannot be expressed as a timer, and a wait that can
+ * end before the job does.
  */
 
 import { describe, expect, it } from "vitest";
-import { createClient } from "../../src/client.js";
 import { execute } from "../../src/execution/execute.js";
 import { pollJob, waitForJob } from "../../src/jobs/poll-job.js";
-import { AbortError } from "../../src/http/errors.js";
 
 const HUNG = Symbol("hung");
 
@@ -104,58 +102,4 @@ describe("waitForJob promises a final status", () => {
       expect(outcome.terminal).toBe(true);
     },
   );
-});
-
-describe("client discovery honours the caller's signal", () => {
-  /** A landing page that never answers unless its own request is aborted. */
-  function hangingLanding() {
-    return (_url: string, init: RequestInit = {}): Promise<Response> =>
-      new Promise<Response>((_resolve, reject) => {
-        init.signal?.addEventListener("abort", () => {
-          reject(new DOMException("This operation was aborted", "AbortError"));
-        });
-      });
-  }
-
-  it("control: listProcesses rejects with AbortError while discovery hangs", async () => {
-    const client = createClient({ baseUrl: "https://service.test/", fetch: hangingLanding() });
-    const controller = new AbortController();
-    setTimeout(() => {
-      controller.abort();
-    }, 50);
-    const outcome = await settleWithin(client.listProcesses({ signal: controller.signal }), 1_000);
-    expect(outcome).toBeInstanceOf(AbortError);
-  });
-
-  it.fails("C4: listJobs rejects with AbortError while discovery hangs", async () => {
-    const client = createClient({ baseUrl: "https://service.test/", fetch: hangingLanding() });
-    const controller = new AbortController();
-    setTimeout(() => {
-      controller.abort();
-    }, 50);
-    const outcome = await settleWithin(client.listJobs({ signal: controller.signal }), 1_000);
-    expect(outcome).toBeInstanceOf(AbortError);
-  });
-
-  it.fails("C4: getJob(bare id) rejects with AbortError while discovery hangs", async () => {
-    const client = createClient({ baseUrl: "https://service.test/", fetch: hangingLanding() });
-    const controller = new AbortController();
-    setTimeout(() => {
-      controller.abort();
-    }, 50);
-    const outcome = await settleWithin(client.getJob("j1", { signal: controller.signal }), 1_000);
-    expect(outcome).toBeInstanceOf(AbortError);
-  });
-
-  it.fails("C4: execute with timeoutMs ends while discovery hangs", async () => {
-    const client = createClient({ baseUrl: "https://service.test/", fetch: hangingLanding() });
-    const outcome = await settleWithin(client.execute("p", { inputs: {}, timeoutMs: 100 }), 1_000);
-    expect(outcome).not.toBe(HUNG);
-  });
-
-  it.fails("C4: pollJob(bare id) with a deadline ends while discovery hangs", async () => {
-    const client = createClient({ baseUrl: "https://service.test/", fetch: hangingLanding() });
-    const outcome = await settleWithin(client.pollJob("j1", { timeoutMs: 100 }), 1_000);
-    expect(outcome).not.toBe(HUNG);
-  });
 });

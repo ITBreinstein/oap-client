@@ -32,6 +32,19 @@ at 0.5.0; earlier versions are recorded only in the git history.
   unknown. Only a body that arrived whole and is not JSON is malformed now.
 - `classify()` lets such an abort through, rather than reading it as "no
   problem document".
+- The client's job methods given a bare job id (`getJob`, `pollJob`,
+  `waitForJob`, `getResults`, `dismissJob`), and `listJobs`, now honour the
+  caller's `signal` while the client discovers the job-list URL. With a landing
+  page that never answered, they waited for ever whatever the caller did.
+  `execute`'s `timeoutMs`, and `pollJob`'s and `waitForJob`'s for a bare id,
+  now count that discovery too. Running out there throws
+  `ExecutionTimeoutError` or `JobPollTimeoutError`, whose `url` is then the
+  landing page, since no job URL is known yet; what is left of the deadline goes
+  to the call.
+- The client's shared discovery gives up on a landing page after 30 seconds,
+  falls back to the constructed path as it does for one it cannot reach, and
+  asks again on the next call. It used to wait for ever, and every later call
+  on that client waited with it.
 
 ### Added
 
