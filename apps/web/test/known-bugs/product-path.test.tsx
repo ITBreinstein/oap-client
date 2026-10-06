@@ -7,6 +7,7 @@
  * - 0059: a background run the server answers synchronously.
  * - 0057: an execute a browser never sends (preflight refused).
  * - 0049/0050: a typed address that is simply down.
+ * - W7: a result over the core's 8 MB that declares no length.
  *
  * The server is a fake `fetch` routed by path; nothing touches the network.
  */
@@ -149,6 +150,21 @@ async function runInBackground(view: HTMLElement): Promise<void> {
   await flush();
 }
 
+async function runInForeground(view: HTMLElement): Promise<void> {
+  const open = button(view, "Slow process, foreground only");
+  if (open === undefined) throw new Error(`process not listed: ${view.textContent}`);
+  await act(async () => {
+    open.click();
+    await Promise.resolve();
+  });
+  await flush();
+  await act(async () => {
+    button(view, "Run")?.click();
+    await Promise.resolve();
+  });
+  await flush(40);
+}
+
 function observations(view: HTMLElement): Record<string, unknown>[] {
   return [...view.querySelectorAll(".observation-list pre")].map(
     (pre) => JSON.parse(pre.textContent) as Record<string, unknown>,
@@ -201,6 +217,35 @@ describe("finding 0059 on the product path: asked for a job, answered with the r
       disagreedWithRequestedMode: true,
       preferenceApplied: "ignored",
     });
+  });
+});
+
+describe("W7 on the product path: a result over 8 MB that declares no length", () => {
+  it("is offered as a download, not an error", async () => {
+    // Chunked, as a streamed or compressed answer arrives: the core counts it
+    // as it is read, and at its default 8 MB it was cut off.
+    const body = new TextEncoder().encode(
+      JSON.stringify({ id: "slept", value: { pad: "x".repeat(9 * 1024 * 1024) } }),
+    );
+    executeAnswer = () =>
+      new Response(
+        new ReadableStream<Uint8Array>({
+          start(controller) {
+            for (let at = 0; at < body.length; at += 1024 * 1024) {
+              controller.enqueue(body.slice(at, at + 1024 * 1024));
+            }
+            controller.close();
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    const view = await connectTyped(BASE);
+    await runInForeground(view);
+
+    expect(view.querySelector("[role='alert']")?.textContent ?? "").toBe("");
+    expect(view.querySelector('[data-output-id="slept"]')?.getAttribute("data-kind")).toBe(
+      "download",
+    );
   });
 });
 

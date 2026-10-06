@@ -14,7 +14,12 @@
  * and how a results document splits into outputs.
  */
 
-import { isJsonMediaType, resolveHref, type ResponseEnvelope } from "@breinstein/oap-client";
+import {
+  DEFAULT_MAX_BUFFER_BYTES,
+  isJsonMediaType,
+  resolveHref,
+  type ResponseEnvelope,
+} from "@breinstein/oap-client";
 import type { LoadedReference } from "./reference.js";
 
 export type RenderableResult =
@@ -69,6 +74,23 @@ export type RenderableResult =
  */
 export const DEFAULT_DISPLAY_LIMIT_BYTES = 512 * 1024;
 
+/**
+ * How much of a run's result this page reads: enough to offer any realistic
+ * output as a download. At the core's 8 MB, a result that declared no length
+ * was cut off as it arrived and the user got an error, the result itself lost
+ * (review W7). The session's clients read with it (`relay/job-session.ts`). An
+ * output given by reference keeps the core's limit: its URL is the server's
+ * choice.
+ */
+export const RESULT_READ_LIMIT_BYTES = 256 * 1024 * 1024;
+
+/**
+ * Above this a result is only offered as a download: not decoded, not parsed,
+ * not put on the map. The core's own read limit, where a result used to stop
+ * being readable at all, so everything below it behaves as it always did.
+ */
+export const DEFAULT_PARSE_LIMIT_BYTES = DEFAULT_MAX_BUFFER_BYTES;
+
 export interface RenderOptions {
   /** The process's declared output ids, in order. */
   readonly outputIds: readonly string[];
@@ -81,6 +103,7 @@ export interface RenderOptions {
    */
   readonly declaredMediaTypes?: Readonly<Record<string, string | undefined>> | undefined;
   readonly displayLimitBytes?: number | undefined;
+  readonly parseLimitBytes?: number | undefined;
 }
 
 const EXTENSIONS: Readonly<Record<string, string>> = {
@@ -307,6 +330,9 @@ export async function toRenderable(
   // The bytes first: they are what a Download saves, and text is only what
   // they decode to cleanly. Bytes that do not decode are not text.
   const bytes = await envelope.arrayBuffer();
+  if (bytes.byteLength > (options.parseLimitBytes ?? DEFAULT_PARSE_LIMIT_BYTES)) {
+    return download("too-large");
+  }
   const text = strictText(bytes, envelope.mediaTypeParams["charset"]);
   if (text === undefined) return download("not-text");
   const tooLarge = bytes.byteLength > limit;

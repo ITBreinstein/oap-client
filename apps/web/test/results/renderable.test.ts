@@ -125,6 +125,32 @@ describe("toRenderable", () => {
     expect(result).toMatchObject({ kind: "download", reason: "too-large", json: collection });
   });
 
+  it("offers a body whose declared length is over the read limit as a download, unread", async () => {
+    const body = JSON.stringify({ pad: "x".repeat(4096) });
+    const [result] = await toRenderable(
+      createEnvelope(
+        new Response(body, {
+          headers: { "Content-Type": "application/json", "Content-Length": String(body.length) },
+        }),
+        { requestedUrl: "http://ogc.test/processes/p/execution", maxBufferBytes: 1024 },
+      ),
+      { outputIds: ["o"], processId: "p" },
+    );
+    expect(result).toMatchObject({ kind: "download", reason: "too-large" });
+  });
+
+  it("offers a result past the parse limit as a download of its bytes, unparsed (W7)", async () => {
+    const body = JSON.stringify({ type: "FeatureCollection", features: [], pad: "x".repeat(4096) });
+    const [result] = await toRenderable(
+      envelope(body, { "Content-Type": "application/geo+json" }),
+      { outputIds: ["big"], processId: "p", parseLimitBytes: 1024 },
+    );
+    expect(result).toMatchObject({ kind: "download", reason: "too-large" });
+    // Not parsed, so not put on the map either.
+    expect(result?.kind === "download" ? result.json : "unset").toBeUndefined();
+    expect(result?.kind === "download" ? result.blob.size : 0).toBe(body.length);
+  });
+
   it("applies the display limit to each output, so a base64 image does not hide its neighbour", async () => {
     const body = JSON.stringify({
       image: { value: btoa("x".repeat(300)), mediaType: "image/jpeg", encoding: "base64" },
