@@ -132,6 +132,27 @@ describe("headers", () => {
   it("ignores an empty Retry-After", () => {
     expect(envelope(null, { headers: { "retry-after": "   " } }).retryAfterMs).toBeUndefined();
   });
+
+  // Review C9. V8's Date.parse reads a word followed by a number as a date:
+  // "wait 10" in 2001, already elapsed, so 0 ms; "later 2027" months away.
+  it.each([["wait 10"], ["later 2027"], ["A 1"], ["2026-08-24T12:00:30Z"], ["Monday"]])(
+    "ignores %j, which is not one of the HTTP-date forms",
+    (raw) => {
+      expect(envelope(null, { headers: { "retry-after": raw } }).retryAfterMs).toBeUndefined();
+    },
+  );
+
+  it.each([
+    ["IMF-fixdate", "Mon, 24 Aug 2026 12:00:30 GMT"],
+    ["obsolete RFC 850 date", "Monday, 24-Aug-26 12:00:30 GMT"],
+    ["asctime date, read as GMT", "Mon Aug 24 12:00:30 2026"],
+  ])("reads an %s", (_label, raw) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-24T12:00:00Z"));
+    expect(envelope(null, { status: 503, headers: { "retry-after": raw } }).retryAfterMs).toBe(
+      30_000,
+    );
+  });
 });
 
 describe("location", () => {

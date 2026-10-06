@@ -8,7 +8,6 @@ import {
   findLink,
   getJob,
   isJobState,
-  pollJob,
   readBodyLinks,
   type Execution,
   type JobState,
@@ -126,22 +125,4 @@ describe("JobStatus.exception", () => {
       expect(status.exception?.detail).toBe("it broke");
     },
   );
-});
-
-describe("Retry-After where RFC 9110 actually defines it", () => {
-  it.fails("C10: pollJob honours Retry-After on a 503 rather than ending the loop", async () => {
-    let calls = 0;
-    const fetch = (): Promise<Response> => {
-      calls += 1;
-      return Promise.resolve(
-        calls === 1
-          ? new Response("busy", { status: 503, headers: { "Retry-After": "1" } })
-          : json({ jobID: "j1", status: "successful" }),
-      );
-    };
-    const report = await pollJob("https://service.test/jobs/j1", { fetch }).catch(
-      (error: unknown) => error,
-    );
-    expect(report).toMatchObject({ outcome: "terminal" });
-  });
 });

@@ -52,6 +52,20 @@ at 0.5.0; earlier versions are recorded only in the git history.
   longer than a timer holds (2 147 483 647 ms, a little under 25 days) is held
   to that, instead of firing at once too.
 
+- `waitForJob` throws `JobNotFoundError` when the job went away while it was
+  being polled (`pollJob`'s `dismissed-remotely`). It used to return the last
+  status it had seen, `running` for example, although it promises a final one.
+- `pollJob` treats a 429 or 503 that carries a usable `Retry-After` as "ask
+  again then": it waits as the header asks, within its usual bounds and its
+  deadline, and polls again. The code goes into `statusSequence` in place of a
+  status. It used to end the loop with a `ProcessesError`. Without such a
+  header, those statuses are still errors.
+- `Retry-After` is read as a date only in the three HTTP-date forms RFC 9110
+  defines (IMF-fixdate, the obsolete RFC 850 form, and asctime, read as GMT).
+  `Date.parse` used to be asked about anything that did not start with a digit,
+  so `"wait 10"` became a date in 2001 (0 ms) and `"later 2027"` one months
+  away. Anything else is now ignored, so `retryAfterMs` is `undefined`.
+
 ### Added
 
 - `EnvelopeOptions.signal`: the signal the request was sent with. A body read

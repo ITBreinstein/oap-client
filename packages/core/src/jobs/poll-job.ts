@@ -46,7 +46,7 @@
  */
 
 import { withDeadline } from "../http/deadline.js";
-import { AbortError } from "../http/errors.js";
+import { AbortError, ProcessesError } from "../http/errors.js";
 import { JobNotFoundError, JobPollTimeoutError } from "../errors.js";
 import { observe, redactUrl } from "../observations.js";
 import { readJobStatus } from "./get-job.js";
@@ -244,6 +244,9 @@ export async function pollJob(
 
       let retryAfterMs: number | undefined;
       let retryAfterRaw: string | undefined;
+      /** This read's status; undefined when the server said "not yet" (`busy`). */
+      let read: JobStatus | undefined;
+      let busy: number | undefined;
       // The total deadline also covers a read in flight. Checked only between
       // polls, a status request that never answers — and a browser `fetch` has
       // no timeout of its own — would hold the loop past it indefinitely.
@@ -253,7 +256,8 @@ export async function pollJob(
         // `Retry-After`, which is a fact about one HTTP response rather than
         // about the job, and so has no place on `JobStatus`.
         const polled = await readJobStatus(statusUrl, { ...options, signal: deadline.signal });
-        status = polled.status;
+        read = polled.status;
+        status = read;
         retryAfterMs = polled.envelope.retryAfterMs;
         // The raw header as well as the parsed value: when the two disagree —
         // the header was present but unparseable — that difference *is* the
@@ -283,17 +287,26 @@ export async function pollJob(
           statusSequence.push("404");
           return finish("dismissed-remotely");
         }
-        finish("error");
-        throw error;
+        if (!isBusy(error)) {
+          finish("error");
+          throw error;
+        }
+        busy = error.status;
+        retryAfterMs = error.envelope.retryAfterMs;
+        retryAfterRaw = error.envelope.headers.get("retry-after") ?? undefined;
       } finally {
         deadline.dispose();
       }
 
       pollCount += 1;
-      statusSequence.push(status.rawStatus);
-      report(options.onStatus, status);
-
-      if (status.terminal) return finish("terminal");
+      if (read === undefined) {
+        // The status code stands in for the status this read did not get.
+        statusSequence.push(String(busy));
+      } else {
+        statusSequence.push(read.rawStatus);
+        report(options.onStatus, read);
+        if (read.terminal) return finish("terminal");
+      }
       if (pollCount >= maxPolls) return finish("timeout");
 
       const elapsed = Date.now() - startedAt;
@@ -358,6 +371,21 @@ export async function pollJob(
 }
 
 /**
+ * A status read answered 429 or 503 with a `Retry-After` it can be held to.
+ * RFC 9110 defines the header for exactly these, as "ask again then": the
+ * server is busy, not broken, and has said nothing about the job. The loop
+ * waits as asked and polls again, within its deadline. It used to end there,
+ * with the error (review C10). Without a usable header it is still an error.
+ */
+function isBusy(error: unknown): error is ProcessesError {
+  return (
+    error instanceof ProcessesError &&
+    (error.status === 429 || error.status === 503) &&
+    error.envelope.retryAfterMs !== undefined
+  );
+}
+
+/**
  * Our own backoff, held between the floor and the ceiling.
  *
  * The floor exists to stop *us* hammering a server that has told us nothing.
@@ -398,7 +426,9 @@ function clampServer(ms: number): number {
  *
  * Throws {@link JobPollTimeoutError} when polling stopped at `maxPolls` with the
  * job still not terminal. `pollJob` reports that as a `timeout` outcome; this
- * function promises a final status, and a `running` one is not.
+ * function promises a final status, and a `running` one is not. For the same
+ * reason it throws {@link JobNotFoundError} when the job went away while it was
+ * being polled (`pollJob`'s `dismissed-remotely`).
  */
 export async function waitForJob(
   statusUrl: string,
@@ -415,7 +445,10 @@ export async function waitForJob(
       { pollCap: Math.max(1, options.maxPolls ?? DEFAULT_MAX_POLLS) },
     );
   }
-  if (result.status !== undefined) return result.status;
-  // Only reachable when the job was dismissed before any poll completed.
-  throw new JobNotFoundError(statusUrl);
+  // Gone, mid-poll or before the first read: the last status seen, if any, is
+  // not final, and returning it broke this function's promise (review C5).
+  if (result.outcome === "dismissed-remotely" || result.status === undefined) {
+    throw new JobNotFoundError(statusUrl);
+  }
+  return result.status;
 }
