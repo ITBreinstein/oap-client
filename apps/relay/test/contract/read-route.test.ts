@@ -178,6 +178,7 @@ describe("the read route against pygeoapi without CORS", () => {
     const gone = await read(`${jobPath}?f=json`, token);
     expect(gone.status).toBe(404);
     expect(gone.headers.get("X-Relay-Error")).toBeNull();
+    await gone.arrayBuffer();
   });
 
   it("forwards nothing for an endpoint configured direct-only", async (context) => {
@@ -189,6 +190,10 @@ describe("the read route against pygeoapi without CORS", () => {
     expect(response.status).toBe(403);
     expect(response.headers.get("X-Relay")).toBe("1");
     expect(response.headers.get("X-Relay-Error")).toBe("read-route-off");
-    expect(audits.length).toBe(before);
+    // Lines for this endpoint only: an earlier test's line is written when its
+    // body is done, which can land during this one.
+    expect(audits.slice(before).filter((line) => line.endpointKey === "pygeoapi-nocors")).toEqual(
+      [],
+    );
   });
 });
