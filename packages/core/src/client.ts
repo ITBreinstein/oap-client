@@ -3,13 +3,16 @@ import type { ResponseEnvelope } from "./http/envelope.js";
 import { type FetchLike, resolveFetch } from "./http/fetch.js";
 import { inspect, type InspectOptions, type ServiceDescription } from "./discovery/inspect.js";
 import { AbortError, ProcessesError, TransportError } from "./http/errors.js";
+import { withDeadline } from "./http/deadline.js";
+import { ExecutionTimeoutError, JobPollTimeoutError } from "./errors.js";
 import { findLink } from "./links/find.js";
 import { observe, redactUrl, type ObservationSink } from "./observations.js";
 import { listProcesses, type ListProcessesOptions } from "./processes/list-processes.js";
 import { getProcess, type GetProcessOptions } from "./processes/get-process.js";
-import { execute, type ExecuteOptions } from "./execution/index.js";
+import { DEFAULT_EXECUTE_TIMEOUT_MS, execute, type ExecuteOptions } from "./execution/index.js";
 import type { Execution } from "./execution/index.js";
 import {
+  DEFAULT_POLL_TIMEOUT_MS,
   dismissJob,
   getJob,
   getResults,
@@ -210,20 +213,31 @@ function processesFallback(landingUrl: string): string {
   return new URL("processes", base).toString();
 }
 
-/**
- * Discovery failed without the server having said anything: no response at
- * all, or a 5xx. Worth asking again next time, unlike an answer that was
- * simply not a usable landing page, which will be the same answer tomorrow.
- */
 /** A discovered URL, and whether it is a guess made because the landing page could not be reached. */
 interface Discovered {
   readonly url: string;
   readonly transient: boolean;
 }
 
+/**
+ * How long the shared discovery may wait for the landing page. It takes no
+ * caller's signal, so without a limit of its own a landing page that never
+ * answered held it, and every later call on the client waiting on it, for
+ * ever (review C4).
+ */
+const DISCOVERY_TIMEOUT_MS = 30_000;
+
+/**
+ * Discovery failed without the server having said anything: no response at
+ * all, none within {@link DISCOVERY_TIMEOUT_MS}, or a 5xx. Worth asking again
+ * next time, unlike an answer that was simply not a usable landing page, which
+ * will be the same answer tomorrow.
+ */
 function isTransient(error: unknown): boolean {
   return (
-    error instanceof TransportError || (error instanceof ProcessesError && error.status >= 500)
+    error instanceof TransportError ||
+    error instanceof AbortError ||
+    (error instanceof ProcessesError && error.status >= 500)
   );
 }
 
@@ -293,16 +307,29 @@ export function createClient(options: ClientOptions): Client {
    */
   let processesUrl: Promise<string> | undefined;
 
+  /** The landing page, read for a shared discovery under its own deadline. */
+  async function inspectForDiscovery(
+    sink: ObservationSink | undefined,
+  ): Promise<ServiceDescription> {
+    const deadline = withDeadline(undefined, DISCOVERY_TIMEOUT_MS);
+    try {
+      return await inspect(baseUrl, {
+        ...transport,
+        signal: deadline.signal,
+        ...(sink === undefined ? {} : { onObservation: sink }),
+      });
+    } finally {
+      deadline.dispose();
+    }
+  }
+
   function discoverProcessesUrl(sink: ObservationSink | undefined): Promise<string> {
     if (processesUrl !== undefined) return processesUrl;
 
     const discovery = (async (): Promise<Discovered> => {
       const landing = baseUrl.toString();
       try {
-        const service = await inspect(baseUrl, {
-          ...transport,
-          ...(sink === undefined ? {} : { onObservation: sink }),
-        });
+        const service = await inspectForDiscovery(sink);
         const advertised = findLink(service.links, "processes");
         if (advertised !== undefined) {
           observe(sink, {
@@ -348,10 +375,7 @@ export function createClient(options: ClientOptions): Client {
     const discovery = (async (): Promise<Discovered> => {
       const landing = baseUrl.toString();
       try {
-        const service = await inspect(baseUrl, {
-          ...transport,
-          ...(sink === undefined ? {} : { onObservation: sink }),
-        });
+        const service = await inspectForDiscovery(sink);
         const advertised = findLink(service.links, "jobList");
         if (advertised !== undefined) {
           observe(sink, {
@@ -396,9 +420,55 @@ export function createClient(options: ClientOptions): Client {
   async function resolveJobUrl(
     jobUrlOrId: string,
     sink: ObservationSink | undefined,
+    signal: AbortSignal | undefined,
   ): Promise<string> {
     if (isAbsoluteUrl(jobUrlOrId)) return jobUrlOrId;
-    return jobUrlFor(await discoverJobsUrl(sink), jobUrlOrId);
+    return jobUrlFor(await untilAborted(() => discoverJobsUrl(sink), signal, baseUrl), jobUrlOrId);
+  }
+
+  /**
+   * A URL from discovery, waited for inside the call's own total deadline:
+   * `timeoutMs` covers the discovery too, and what is left of it is the call's
+   * (review C4). Running out here ends the call with its own timeout error,
+   * built by `timedOut`.
+   */
+  async function discoveredWithin(
+    discover: () => Promise<string>,
+    signal: AbortSignal | undefined,
+    timeoutMs: number,
+    timedOut: (cause: AbortError, elapsedMs: number) => Error,
+  ): Promise<{ readonly url: string; readonly remainingMs: number }> {
+    const startedAt = Date.now();
+    const deadline = withDeadline(signal, timeoutMs);
+    try {
+      const url = await untilAborted(discover, deadline.signal, baseUrl);
+      return { url, remainingMs: Math.max(1, timeoutMs - (Date.now() - startedAt)) };
+    } catch (error) {
+      if (deadline.timedOut() && error instanceof AbortError) {
+        throw timedOut(error, Date.now() - startedAt);
+      }
+      throw error;
+    } finally {
+      deadline.dispose();
+    }
+  }
+
+  /** A job URL for a polling call, its discovery inside the poll's own deadline. */
+  async function pollTarget(
+    jobUrlOrId: string,
+    sink: ObservationSink | undefined,
+    pollOptions: PollJobRequestOptions,
+  ): Promise<{ readonly url: string; readonly timeoutMs: number | undefined }> {
+    if (isAbsoluteUrl(jobUrlOrId)) return { url: jobUrlOrId, timeoutMs: pollOptions.timeoutMs };
+    const timeoutMs = pollOptions.timeoutMs ?? DEFAULT_POLL_TIMEOUT_MS;
+    const { url, remainingMs } = await discoveredWithin(
+      () => resolveJobUrl(jobUrlOrId, sink, undefined),
+      pollOptions.signal,
+      timeoutMs,
+      (cause, elapsedMs) =>
+        new JobPollTimeoutError(baseUrl.toString(), timeoutMs, 0, elapsedMs, undefined, { cause }),
+    );
+    return { url, timeoutMs: remainingMs };
   }
 
   return {
@@ -442,20 +512,23 @@ export function createClient(options: ClientOptions): Client {
       // Only needed for the constructed-path fallback; a description carrying
       // an `execute` link makes this discovery free on the second call and
       // irrelevant on the first.
-      const url = await untilAborted(
+      const timeoutMs = executeOptions.timeoutMs ?? DEFAULT_EXECUTE_TIMEOUT_MS;
+      const { url, remainingMs } = await discoveredWithin(
         () => discoverProcessesUrl(sink),
         executeOptions.signal,
-        baseUrl,
+        timeoutMs,
+        (cause) => new ExecutionTimeoutError(baseUrl.toString(), timeoutMs, { cause }),
       );
       return execute(url, processId, {
         ...transport,
         ...executeOptions,
+        timeoutMs: remainingMs,
         ...(sink === undefined ? {} : { onObservation: sink }),
       });
     },
     async getJob(jobUrlOrId: string, jobOptions: GetJobRequestOptions = {}): Promise<JobStatus> {
       const sink = jobOptions.onObservation ?? options.onObservation;
-      const url = await resolveJobUrl(jobUrlOrId, sink);
+      const url = await resolveJobUrl(jobUrlOrId, sink, jobOptions.signal);
       return getJob(url, {
         ...transport,
         ...jobOptions,
@@ -467,10 +540,11 @@ export function createClient(options: ClientOptions): Client {
       pollOptions: PollJobRequestOptions = {},
     ): Promise<PollReport> {
       const sink = pollOptions.onObservation ?? options.onObservation;
-      const url = await resolveJobUrl(jobUrlOrId, sink);
+      const { url, timeoutMs } = await pollTarget(jobUrlOrId, sink, pollOptions);
       return pollJob(url, {
         ...transport,
         ...pollOptions,
+        ...(timeoutMs === undefined ? {} : { timeoutMs }),
         ...(sink === undefined ? {} : { onObservation: sink }),
       });
     },
@@ -479,10 +553,11 @@ export function createClient(options: ClientOptions): Client {
       pollOptions: PollJobRequestOptions = {},
     ): Promise<JobStatus> {
       const sink = pollOptions.onObservation ?? options.onObservation;
-      const url = await resolveJobUrl(jobUrlOrId, sink);
+      const { url, timeoutMs } = await pollTarget(jobUrlOrId, sink, pollOptions);
       return waitForJob(url, {
         ...transport,
         ...pollOptions,
+        ...(timeoutMs === undefined ? {} : { timeoutMs }),
         ...(sink === undefined ? {} : { onObservation: sink }),
       });
     },
@@ -491,7 +566,7 @@ export function createClient(options: ClientOptions): Client {
       resultsOptions: GetResultsRequestOptions = {},
     ): Promise<JobResults> {
       const sink = resultsOptions.onObservation ?? options.onObservation;
-      const url = await resolveJobUrl(jobUrlOrId, sink);
+      const url = await resolveJobUrl(jobUrlOrId, sink, resultsOptions.signal);
       return getResults(url, {
         ...transport,
         ...resultsOptions,
@@ -503,7 +578,7 @@ export function createClient(options: ClientOptions): Client {
       dismissOptions: DismissJobRequestOptions = {},
     ): Promise<Dismissal> {
       const sink = dismissOptions.onObservation ?? options.onObservation;
-      const url = await resolveJobUrl(jobUrlOrId, sink);
+      const url = await resolveJobUrl(jobUrlOrId, sink, dismissOptions.signal);
       return dismissJob(url, {
         ...transport,
         ...dismissOptions,
@@ -512,7 +587,7 @@ export function createClient(options: ClientOptions): Client {
     },
     async listJobs(listOptions: ListJobsRequestOptions = {}): Promise<JobList> {
       const sink = listOptions.onObservation ?? options.onObservation;
-      const url = await discoverJobsUrl(sink);
+      const url = await untilAborted(() => discoverJobsUrl(sink), listOptions.signal, baseUrl);
       return listJobs(url, {
         ...transport,
         ...listOptions,
