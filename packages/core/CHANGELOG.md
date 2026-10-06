@@ -46,6 +46,12 @@ at 0.5.0; earlier versions are recorded only in the git history.
   asks again on the next call. It used to wait for ever, and every later call
   on that client waited with it.
 
+- `timeoutMs: Infinity` now means no deadline, for `execute()`, `pollJob()`,
+  `waitForJob()` and the client's methods. It used to fail at once, since a
+  timer fires a delay it cannot hold after about 1 ms. A finite `timeoutMs`
+  longer than a timer holds (2 147 483 647 ms, a little under 25 days) is held
+  to that, instead of firing at once too.
+
 ### Added
 
 - `EnvelopeOptions.signal`: the signal the request was sent with. A body read
