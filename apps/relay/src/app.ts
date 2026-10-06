@@ -50,7 +50,13 @@ import {
   type ForwardedResponse,
   type ForwardRequest,
 } from "./forward.js";
-import { RelayState, systemClock, type Clock, type RingOutcome } from "./state.js";
+import {
+  RelayState,
+  stateOptionsFrom,
+  systemClock,
+  type Clock,
+  type RingOutcome,
+} from "./state.js";
 import { isWellFormedSecretToken } from "./tokens.js";
 import {
   executionUrl,
@@ -250,14 +256,7 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 export function createApp(options: AppOptions = {}): Hono {
   const config = options.config ?? parseConfig({ endpoints: [] });
   const clock = options.clock ?? systemClock;
-  const state =
-    options.state ??
-    new RelayState(clock, {
-      registrationTtlMs: config.registrationTtlMs,
-      sessionIdleTtlMs: config.sessionIdleTtlMs,
-      maxSessions: config.limits.maxSessions,
-      maxRegistrationsPerSession: config.limits.maxRegistrationsPerSession,
-    });
+  const state = options.state ?? new RelayState(clock, stateOptionsFrom(config));
   const upstream: UpstreamCall =
     options.upstream ??
     ((endpoint, processId, body) =>
@@ -498,19 +497,30 @@ export function createApp(options: AppOptions = {}): Hono {
     // one event.
     const pending = new Set<string>();
     let wake: (() => void) | undefined;
-    const unsubscribe = state.listen(token, (ref) => {
-      pending.add(ref);
-      wake?.();
-    });
-    if (unsubscribe === undefined)
+    // Mutated from callbacks, so kept on an object: a `let` here is narrowed
+    // to its initial value by the checker, which cannot see the callbacks.
+    const flags = { open: true, heartbeatDue: false };
+    const unsubscribe = state.listen(
+      token,
+      (ref) => {
+        pending.add(ref);
+        wake?.();
+      },
+      // The state closes a stream itself: for a newer one on the same session,
+      // or because the session ended.
+      () => {
+        flags.open = false;
+        wake?.();
+      },
+    );
+    if (unsubscribe === "unknown-session")
       return problem(c, 401, "Unauthorized", "unknown-session", "unknown session");
+    if (unsubscribe === "at-capacity")
+      return problem(c, 503, "Service Unavailable", "stream-capacity", "stream capacity");
 
     c.header("Cache-Control", "no-store");
     return streamSSE(c, async (stream) => {
       emit({ kind: "stream", change: "opened" });
-      // Mutated from callbacks, so kept on an object: a `let` here is narrowed
-      // to its initial value by the checker, which cannot see the callbacks.
-      const flags = { open: true, heartbeatDue: false };
       let cancelHeartbeat = (): void => undefined;
       const armHeartbeat = (): void => {
         cancelHeartbeat = schedule(() => {

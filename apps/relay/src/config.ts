@@ -86,6 +86,14 @@ export interface RelayLimits {
   readonly maxSessions: number;
   readonly maxRegistrationsPerSession: number;
   /**
+   * Event streams one session may hold. One more closes its oldest: a page
+   * holds one, so more is a reconnect racing its predecessor, or a client
+   * hoarding sockets.
+   */
+  readonly maxStreamsPerSession: number;
+  /** Event streams open across all sessions. One more is refused with a 503. */
+  readonly maxOpenStreams: number;
+  /**
    * Largest body the read route passes back — reads and synchronous executes.
    * Streamed, not buffered, so this bounds traffic rather than memory.
    */
@@ -107,6 +115,8 @@ export interface RelayConfig {
   readonly endpoints: readonly EndpointConfig[];
   readonly registrationTtlMs: number;
   readonly sessionIdleTtlMs: number;
+  /** A session ends this long after it was made, however busy, open streams included. */
+  readonly sessionMaxAgeMs: number;
   readonly limits: RelayLimits;
 }
 
@@ -116,12 +126,16 @@ export const DEFAULT_LIMITS: RelayLimits = {
   upstreamTimeoutMs: 30_000,
   maxSessions: 10_000,
   maxRegistrationsPerSession: 100,
+  maxStreamsPerSession: 4,
+  maxOpenStreams: 1_000,
   maxReadResponseBytes: 50 * 1024 * 1024,
   readTimeoutMs: 120_000,
 };
 
 export const DEFAULT_REGISTRATION_TTL_MS = 24 * 60 * 60 * 1000;
 export const DEFAULT_SESSION_IDLE_TTL_MS = 60 * 60 * 1000;
+/** As long as a callback registration lives: no session outlasts the jobs it can be told about. */
+export const DEFAULT_SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 export class ConfigError extends Error {
   constructor(path: string, problem: string) {
@@ -318,6 +332,18 @@ export function parseConfig(input: unknown, options: ParseOptions = {}): RelayCo
       "limits",
       DEFAULT_LIMITS.maxRegistrationsPerSession,
     ),
+    maxStreamsPerSession: readPositiveInteger(
+      rawLimits,
+      "maxStreamsPerSession",
+      "limits",
+      DEFAULT_LIMITS.maxStreamsPerSession,
+    ),
+    maxOpenStreams: readPositiveInteger(
+      rawLimits,
+      "maxOpenStreams",
+      "limits",
+      DEFAULT_LIMITS.maxOpenStreams,
+    ),
     maxReadResponseBytes: readPositiveInteger(
       rawLimits,
       "maxReadResponseBytes",
@@ -347,6 +373,12 @@ export function parseConfig(input: unknown, options: ParseOptions = {}): RelayCo
       "sessionIdleTtlMs",
       "(root)",
       DEFAULT_SESSION_IDLE_TTL_MS,
+    ),
+    sessionMaxAgeMs: readPositiveInteger(
+      input,
+      "sessionMaxAgeMs",
+      "(root)",
+      DEFAULT_SESSION_MAX_AGE_MS,
     ),
     limits,
   };

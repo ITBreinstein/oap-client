@@ -84,8 +84,12 @@ describe("sessions", () => {
     const session = state.createSession();
     if (session === undefined) throw new Error("expected a session");
 
-    const unsubscribe = state.listen(session.token, () => undefined);
-    if (unsubscribe === undefined) throw new Error("expected to listen");
+    const unsubscribe = state.listen(
+      session.token,
+      () => undefined,
+      () => undefined,
+    );
+    if (typeof unsubscribe === "string") throw new Error(unsubscribe);
     clock.advance(60 * MINUTE);
     expect(state.sweep().sessions).toBe(0);
 
@@ -106,6 +110,103 @@ describe("sessions", () => {
   });
 });
 
+describe("stream caps (review R3)", () => {
+  function open(state: RelayState, token: string): { closed: () => boolean; stop: () => void } {
+    let closed = false;
+    const result = state.listen(
+      token,
+      () => undefined,
+      () => {
+        closed = true;
+      },
+    );
+    if (typeof result === "string") throw new Error(result);
+    return { closed: () => closed, stop: result };
+  }
+
+  function sessionToken(state: RelayState): string {
+    const session = state.createSession();
+    if (session === undefined) throw new Error("expected a session");
+    return session.token;
+  }
+
+  it("closes a session's oldest stream when one more opens than it may hold", () => {
+    const state = stateWith(manualClock(), { maxStreamsPerSession: 2 });
+    const token = sessionToken(state);
+    const first = open(state, token);
+    const second = open(state, token);
+    const third = open(state, token);
+    expect([first.closed(), second.closed(), third.closed()]).toEqual([true, false, false]);
+    expect(state.counts().listeners).toBe(2);
+    first.stop(); // the stream's own cleanup, after the state closed it
+    expect(state.counts().listeners).toBe(2);
+  });
+
+  it("refuses a stream when the relay holds as many as it allows, and takes one again after a close", () => {
+    const state = stateWith(manualClock(), { maxOpenStreams: 2 });
+    const a = open(state, sessionToken(state));
+    open(state, sessionToken(state));
+    const third = sessionToken(state);
+    expect(
+      state.listen(
+        third,
+        () => undefined,
+        () => undefined,
+      ),
+    ).toBe("at-capacity");
+    a.stop();
+    expect(
+      typeof state.listen(
+        third,
+        () => undefined,
+        () => undefined,
+      ),
+    ).toBe("function");
+  });
+
+  it("still makes room on a full session when the relay is at its overall cap", () => {
+    const state = stateWith(manualClock(), { maxStreamsPerSession: 1, maxOpenStreams: 1 });
+    const token = sessionToken(state);
+    const first = open(state, token);
+    const second = open(state, token);
+    expect([first.closed(), second.closed()]).toEqual([true, false]);
+    expect(state.counts().listeners).toBe(1);
+  });
+
+  it("ends a session at its maximum age, open stream and all", () => {
+    const clock = manualClock();
+    const state = stateWith(clock, { sessionMaxAgeMs: 24 * 60 * MINUTE });
+    const token = sessionToken(state);
+    const stream = open(state, token);
+    clock.advance(24 * 60 * MINUTE - 1);
+    expect(state.sweep().sessions).toBe(0);
+    expect(stream.closed()).toBe(false);
+    clock.advance(1);
+    expect(state.sweep().sessions).toBe(1);
+    expect(stream.closed()).toBe(true);
+    expect(state.counts()).toMatchObject({ sessions: 0, listeners: 0 });
+    expect(
+      state.listen(
+        token,
+        () => undefined,
+        () => undefined,
+      ),
+    ).toBe("unknown-session");
+  });
+
+  it("ends a busy session at its maximum age too", () => {
+    const clock = manualClock();
+    const state = stateWith(clock, { sessionMaxAgeMs: 60 * MINUTE });
+    const token = sessionToken(state);
+    for (let i = 0; i < 6; i++) {
+      clock.advance(9 * MINUTE);
+      expect(state.touchSession(token)).toBe(true);
+    }
+    clock.advance(6 * MINUTE);
+    expect(state.touchSession(token)).toBe(false);
+  });
+});
+
 describe("registrations and doorbells", () => {
   function setUp() {
     const clock = manualClock();
@@ -113,7 +214,11 @@ describe("registrations and doorbells", () => {
     const session = state.createSession();
     if (session === undefined) throw new Error("expected a session");
     const rung: string[] = [];
-    state.listen(session.token, (ref) => rung.push(ref));
+    state.listen(
+      session.token,
+      (ref) => rung.push(ref),
+      () => undefined,
+    );
     const registration = state.register(session.token, "pygeoapi");
     if (typeof registration === "string") throw new Error(registration);
     return { clock, state, session, registration, rung };
