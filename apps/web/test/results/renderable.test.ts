@@ -71,7 +71,13 @@ describe("toRenderable", () => {
       processId: "p",
     });
     expect(results).toEqual([
-      { kind: "text", outputId: "page", value: "<b>bold</b>", mediaType: "text/html" },
+      {
+        kind: "text",
+        outputId: "page",
+        value: "<b>bold</b>",
+        mediaType: "text/html",
+        blob: expect.any(Blob) as unknown,
+      },
     ]);
   });
 
@@ -158,8 +164,41 @@ describe("toRenderable", () => {
       { outputIds: ["Result"], processId: "Buffer" },
     );
     expect(results).toEqual([
-      { kind: "text", outputId: "Result", value: "<gml:Polygon/>", mediaType: "application/json" },
+      {
+        kind: "text",
+        outputId: "Result",
+        value: "<gml:Polygon/>",
+        mediaType: "application/json",
+        blob: expect.any(Blob) as unknown,
+      },
     ]);
+  });
+
+  it("offers a binary body labelled JSON as a download of the bytes the server sent (W6)", async () => {
+    // ZOO labels every raw result application/json (finding 0026). Decoded as
+    // text, these bytes became replacement characters, and so did the Download.
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0xff, 0xfe]);
+    const [result] = await toRenderable(envelope(png, { "Content-Type": "application/json" }), {
+      outputIds: ["r"],
+      processId: "x",
+    });
+
+    expect(result).toMatchObject({ kind: "download", reason: "not-text" });
+    const saved = result?.kind === "download" ? await result.blob.arrayBuffer() : undefined;
+    expect(new Uint8Array(saved ?? new ArrayBuffer(0))).toEqual(png);
+  });
+
+  it("keeps a text body's own bytes for its Download, not a re-encoding of its text (W6)", async () => {
+    // "café" in Latin-1: the é is one byte, which UTF-8 would write as two.
+    const latin1 = new Uint8Array([0x63, 0x61, 0x66, 0xe9]);
+    const [result] = await toRenderable(
+      envelope(latin1, { "Content-Type": "text/plain; charset=iso-8859-1" }),
+      { outputIds: ["t"], processId: "x" },
+    );
+
+    expect(result).toMatchObject({ kind: "text", value: "café" });
+    const saved = result?.kind === "text" ? await result.blob?.arrayBuffer() : undefined;
+    expect(new Uint8Array(saved ?? new ArrayBuffer(0))).toEqual(latin1);
   });
 
   it("decodes a base64 qualified value into a download", async () => {

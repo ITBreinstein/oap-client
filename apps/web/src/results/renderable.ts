@@ -24,6 +24,11 @@ export type RenderableResult =
       readonly outputId: string;
       readonly value: string;
       readonly mediaType: string;
+      /**
+       * The bytes the server sent, which Download saves. Absent for a text
+       * taken from inside a results document, which has no bytes of its own.
+       */
+      readonly blob?: Blob | undefined;
     }
   | {
       readonly kind: "download";
@@ -232,6 +237,27 @@ function splitResults(
   return keys.map((key) => [key, value[key]]);
 }
 
+/**
+ * The body as text, only if its bytes decode cleanly in the charset it
+ * declares (UTF-8 when it declares none, or one this browser does not know).
+ * Bytes that do not are not text, whatever the label says: ZOO labels every raw
+ * result `application/json` (finding 0026), and decoding a PNG anyway showed
+ * replacement characters and saved them as its Download (review W6).
+ */
+function strictText(bytes: ArrayBuffer, charset: string | undefined): string | undefined {
+  let decoder: TextDecoder;
+  try {
+    decoder = new TextDecoder(charset ?? "utf-8", { fatal: true });
+  } catch {
+    decoder = new TextDecoder("utf-8", { fatal: true });
+  }
+  try {
+    return decoder.decode(bytes);
+  } catch {
+    return undefined;
+  }
+}
+
 function byteLength(text: string): number {
   return new TextEncoder().encode(text).byteLength;
 }
@@ -278,19 +304,30 @@ export async function toRenderable(
   if (envelope.bodyTooLarge) return download("too-large");
   if (!envelope.isJson && !isTextual(mediaType)) return download("not-text");
 
-  const text = await envelope.text();
-  const tooLarge = byteLength(text) > limit;
+  // The bytes first: they are what a Download saves, and text is only what
+  // they decode to cleanly. Bytes that do not decode are not text.
+  const bytes = await envelope.arrayBuffer();
+  const text = strictText(bytes, envelope.mediaTypeParams["charset"]);
+  if (text === undefined) return download("not-text");
+  const tooLarge = bytes.byteLength > limit;
+  const shownAsText = async (): Promise<RenderableResult[]> => [
+    {
+      kind: "text",
+      outputId: single,
+      value: text,
+      mediaType: mediaType ?? "text/plain",
+      blob: await envelope.blob(),
+    },
+  ];
 
   if (envelope.isJson) {
     let value: unknown;
     try {
-      value = await envelope.json();
+      value = JSON.parse(text) as unknown;
     } catch {
       // Labelled JSON and is not (ZOO does this, finding 0026): show the text.
       if (tooLarge) return download("too-large");
-      return [
-        { kind: "text", outputId: single, value: text, mediaType: mediaType ?? "text/plain" },
-      ];
+      return shownAsText();
     }
     const entries = splitResults(value, options.outputIds);
     if (entries !== undefined) {
@@ -304,5 +341,5 @@ export async function toRenderable(
 
   if (tooLarge) return download("too-large");
 
-  return [{ kind: "text", outputId: single, value: text, mediaType: mediaType ?? "text/plain" }];
+  return shownAsText();
 }
