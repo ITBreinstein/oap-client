@@ -54,7 +54,12 @@ export type UpstreamFailure =
   /** Read route: more redirects under `baseUrl` than it follows. */
   | "redirect-limit"
   | "response-too-large"
-  | "connection-failed";
+  | "connection-failed"
+  /**
+   * Read route: a status line outside 200–599. Node's client accepts any
+   * three digits; a browser cannot be handed one of those (review R9).
+   */
+  | "bad-upstream-status";
 
 export class UpstreamError extends Error {
   readonly reason: UpstreamFailure;

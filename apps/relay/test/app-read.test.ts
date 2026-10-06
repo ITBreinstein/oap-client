@@ -307,6 +307,29 @@ describe("GET /read — forwarding", () => {
     expect(response.headers.get("X-Relay-Error")).toBe("timeout");
     await expect(response.json()).resolves.toMatchObject({ reason: "timeout" });
   });
+
+  it("answers 502 for a status no browser can be handed, and drops the upstream body", async () => {
+    // Node's client accepts any three-digit status; `new Response` only
+    // 200–599 (review R9).
+    let cancelled = false;
+    const h = harness(() =>
+      Promise.resolve({
+        ...answer(999, null),
+        body: new ReadableStream<Uint8Array>({
+          cancel() {
+            cancelled = true;
+          },
+        }),
+      }),
+    );
+    const response = await read(h, "/read/zoo/processes");
+    expect(response.status).toBe(502);
+    expect(response.headers.get("X-Relay-Error")).toBe("bad-upstream-status");
+    expect(cancelled).toBe(true);
+    expect(h.audits).toMatchObject([
+      { upstreamStatus: 999, failure: "bad-upstream-status", bytes: 0, capHit: undefined },
+    ]);
+  });
 });
 
 describe("markers", () => {

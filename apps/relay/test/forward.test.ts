@@ -93,6 +93,27 @@ function get(path: string, headers: Record<string, string> = {}): ForwardRequest
 
 const limits = { timeoutMs: 5_000, maxResponseBytes: 1_024 };
 
+/**
+ * A redirect to `location` whose body never ends, and a promise that settles
+ * when the relay drops its socket. Draining it instead would never end.
+ */
+function endlessRedirect(location: string): { handler: Handler; dropped: Promise<void> } {
+  let drop: () => void = () => undefined;
+  const dropped = new Promise<void>((resolve) => {
+    drop = resolve;
+  });
+  const handler: Handler = (_request, response) => {
+    response.writeHead(302, { Location: location, "Content-Type": "application/octet-stream" });
+    const chunk = "x".repeat(16 * 1024);
+    const timer = setInterval(() => response.write(chunk), 2);
+    response.on("close", () => {
+      clearInterval(timer);
+      drop();
+    });
+  };
+  return { handler, dropped };
+}
+
 async function failure(promise: Promise<unknown>): Promise<string> {
   try {
     await promise;
@@ -411,6 +432,30 @@ describe("forward", () => {
     );
     expect(reason).toBe("redirect-limit");
     expect(asked).toHaveLength(MAX_REDIRECTS + 1);
+  });
+
+  it("drops a redirect it follows rather than reading its body, which no cap covers", async () => {
+    const first = endlessRedirect("/api/drop-landed");
+    handlers.set("/api/drop", first.handler);
+    handlers.set("/api/drop-landed", (_request, response) => {
+      response.writeHead(200, { "Content-Type": "text/plain" }).end("ok");
+    });
+    const forwarded = await forward(endpoint(), get("/drop"), {
+      ...limits,
+      lookup: loopbackLookup([]),
+    });
+    expect(await new Response(forwarded.body).text()).toBe("ok");
+    await first.dropped;
+  });
+
+  it("drops the redirects it followed when it stops at the limit", async () => {
+    const loop = endlessRedirect("/api/drop-loop");
+    handlers.set("/api/drop-loop", loop.handler);
+    const reason = await failure(
+      forward(endpoint(), get("/drop-loop"), { ...limits, lookup: loopbackLookup([]) }),
+    );
+    expect(reason).toBe("redirect-limit");
+    await loop.dropped;
   });
 
   it("does not follow a redirect for a DELETE", async () => {
