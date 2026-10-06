@@ -83,3 +83,17 @@ export function fixtureProcess(key: string): ProcessDescription {
   if (document === undefined) throw new Error(`no fixture ${key}`);
   return parseDescription(document, { documentUrl: DOCUMENT_URL }).process;
 }
+
+/**
+ * Runs `run` as a browser that cannot hand over a number's source text would:
+ * Safari before 18.4, Firefox before 135 (W28).
+ */
+export function withoutSourceText<T>(run: () => T): T {
+  const saved = Object.getOwnPropertyDescriptor(JSON, "rawJSON");
+  Reflect.deleteProperty(JSON, "rawJSON");
+  try {
+    return run();
+  } finally {
+    if (saved !== undefined) Object.defineProperty(JSON, "rawJSON", saved);
+  }
+}

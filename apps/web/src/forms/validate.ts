@@ -3,7 +3,8 @@
  * anything else.
  *
  * Required fields, numeric bounds, `enum` membership, `maxLength`, coordinate
- * counts, list lengths, and that raw JSON parses. Nothing more — no `pattern`,
+ * counts, list lengths, and that raw JSON parses and can be sent as written.
+ * Nothing more — no `pattern`,
  * no `format`, no URL shape — because the server is authoritative and a client
  * that refuses what the server would accept is worse than one that lets the
  * server say no.
@@ -20,6 +21,7 @@
 
 import { classifyCrs } from "./crs.js";
 import { isAbsentFor, isGeoJsonText, isRawJson, type FormValues } from "./encode.js";
+import { inexactNumbers } from "./exact-json.js";
 import { shapesOfText } from "./geometry.js";
 import { isJsonArray, isJsonObject } from "./json.js";
 import type { Control, FormPlan, NumberControl } from "./plan.js";
@@ -77,8 +79,24 @@ function jsonError(text: string): string | undefined {
   }
 }
 
+/**
+ * JSON the user typed as the wire value, holding a number this browser would
+ * send as another (W28): it cannot keep a number as written, so the promise
+ * "sent as typed" would not hold. Not asked of a geometry, whose coordinates
+ * past a double's precision mean nothing.
+ */
+function inexactError(text: string): string | undefined {
+  const [first, ...more] = inexactNumbers(text);
+  if (first === undefined) return undefined;
+  const also =
+    more.length === 0
+      ? ""
+      : ` ${String(more.length)} more ${more.length === 1 ? "number" : "numbers"} would change too.`;
+  return `This browser would send ${first.written} as ${first.sent}.${also} Open the page in a current browser, or write the number as a string if the process accepts one.`;
+}
+
 function checkControl(control: Control, value: unknown): string | undefined {
-  if (isRawJson(value)) return jsonError(value.rawJson);
+  if (isRawJson(value)) return jsonError(value.rawJson) ?? inexactError(value.rawJson);
 
   switch (control.kind) {
     case "number":
@@ -124,7 +142,9 @@ function checkControl(control: Control, value: unknown): string | undefined {
       const format = control.formats[typeof value["format"] === "number" ? value["format"] : 0];
       const href = typeof value["href"] === "string" ? value["href"].trim() : "";
       const text = typeof value["value"] === "string" ? value["value"] : "";
-      return href === "" && format?.object === true ? jsonError(text) : undefined;
+      return href === "" && format?.object === true
+        ? (jsonError(text) ?? inexactError(text))
+        : undefined;
     }
     case "list": {
       const items = (isJsonArray(value) ? value : [value]).filter(

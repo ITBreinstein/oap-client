@@ -32,6 +32,19 @@ describe("schemaWarnings", () => {
     expect(result.byField.get("count")).toEqual(["The value should be at most 10."]);
   });
 
+  it("checks a number kept as written for the wire as the number it is (W28)", () => {
+    const process = describeProcess({
+      id: { schema: { type: "integer", minimum: 0, not: { const: 5 } } },
+    });
+    const raw = resolveFormPlan(process);
+    expect(raw.fields[0]?.control.kind).toBe("json");
+    const result = schemaWarnings(process, raw, { id: { rawJson: "1234567890123456789" } });
+    expect(result.byField.size).toBe(0);
+    expect(
+      schemaWarnings(process, raw, { id: { rawJson: "-1234567890123456789" } }).byField,
+    ).toEqual(new Map([["id", ["The value should be at least 0."]]]));
+  });
+
   it("lists an input behind a $ref as not checked, and does not guess", () => {
     const point = { type: "Point", coordinates: [5, 52] };
     const result = schemaWarnings(inputs, plan, { area: { geojson: JSON.stringify(point) } });
