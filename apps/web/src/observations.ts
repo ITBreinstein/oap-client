@@ -156,8 +156,21 @@ export interface ResultObservation {
   readonly axisSwapped: boolean | undefined;
 }
 
+/**
+ * The core's `execution` record, as the session keeps it: told which route the
+ * execute request took (W13). Through the relay, the relay read `Location` and
+ * `Preference-Applied` and handed them back on a rebuilt response, so
+ * `locationPresent`, `preferenceAppliedHeader` and `discoveredVia` say what the
+ * relay could read. Only a `direct` record is evidence of what a page can read
+ * (finding 0039).
+ */
+export type ExecutionObservation = Extract<Observation, { readonly kind: "execution" }> & {
+  readonly executeRoute: "direct" | "relay";
+};
+
 export type WebObservation =
   | Observation
+  | ExecutionObservation
   | ExecuteRouteObservation
   | FormObservation
   | EndpointAccessObservation

@@ -328,7 +328,12 @@ Everything the client observes goes into one stream, redacted at creation — id
 codes, schema keywords, CRS URIs and endpoints' origins and paths; never an
 input value, a schema body, a query string or a response body:
 
-- the core's own observations (discovery, descriptions, executions, jobs);
+- the core's own observations (discovery, descriptions, executions, jobs). An
+  `execution` record also gets `executeRoute`, `direct` or `relay`. Through the
+  relay, the relay read `Location` and `Preference-Applied` and handed them
+  back, so the core's `locationPresent`, `preferenceAppliedHeader` and
+  `discoveredVia` say what the relay could read. Only a `direct` record shows
+  what a page can read (finding 0039);
 - `execute-route`: which route an execute took, from Task 6;
 - `form`: every input the generator could not handle, with the schema keyword
   that caused it, and every change the encoder made on the way (an axis swap);
