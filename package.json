@@ -21,6 +21,7 @@
     "test:e2e": "playwright test --project=blocking",
     "test:e2e:zoo": "playwright test --project=zoo",
     "test:e2e:pdok": "playwright test --project=pdok",
+    "capture:observations": "playwright test --project=capture --workers=1",
     "build": "pnpm -r build",
     "verify": "pnpm typecheck && pnpm lint && pnpm boundaries && pnpm format:check && pnpm test && pnpm build"
   },

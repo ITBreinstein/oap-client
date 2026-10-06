@@ -25,6 +25,10 @@ export default defineConfig({
     // ZOO is a second implementation built from source, and its worker pool
     // runs out as it is used (finding 0044). See .github/workflows/interop.yml.
     { name: "zoo", testMatch: /zoo-browser\.spec\.ts/ },
+    // `pnpm capture:observations`: not a test lane. Drives the client against
+    // the local stack and saves the matrix's evidence, one export per
+    // endpoint. See e2e/observations.capture.ts.
+    { name: "capture", testMatch: /observations\.capture\.ts/, fullyParallel: false },
   ],
   webServer: [
     {
