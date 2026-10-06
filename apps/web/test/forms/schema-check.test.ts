@@ -172,3 +172,95 @@ describe("checkAgainstSchema", () => {
     expect(problems({ items: { type: "number" } }, many)).toHaveLength(5);
   });
 });
+
+// These were ignored as unknown keywords, and a value they rule out was
+// reported as checked with no problems.
+describe("the assertion keywords past the basics (W19)", () => {
+  it("applies then when if holds, and else when it does not", () => {
+    const schema = {
+      type: "object",
+      properties: { unit: { type: "string" }, distance: { type: "number" } },
+      if: { properties: { unit: { const: "km" } } },
+      then: { properties: { distance: { maximum: 100 } } },
+      else: { properties: { distance: { maximum: 100_000 } } },
+    };
+    expect(problems(schema, { unit: "km", distance: 5000 })).toEqual([
+      "distance should be at most 100.",
+    ]);
+    expect(problems(schema, { unit: "m", distance: 5000 })).toEqual([]);
+    expect(problems(schema, { unit: "m", distance: 500_000 })).toEqual([
+      "distance should be at most 100000.",
+    ]);
+  });
+
+  it("asks for a dependent member, in either spelling", () => {
+    const missing = ['The value should have "bbox" when it has "crs".'];
+    expect(
+      problems({ type: "object", dependentRequired: { crs: ["bbox"] } }, { crs: "x" }),
+    ).toEqual(missing);
+    // Draft 4 to 7.
+    expect(problems({ dependencies: { crs: ["bbox"] } }, { crs: "x" })).toEqual(missing);
+    expect(problems({ dependentRequired: { crs: ["bbox"] } }, { bbox: [] })).toEqual([]);
+  });
+
+  it("applies a dependent schema, in either spelling", () => {
+    const schema = { required: ["unit"] };
+    expect(problems({ dependentSchemas: { distance: schema } }, { distance: 1 })).toEqual([
+      'The value should have "unit".',
+    ]);
+    expect(problems({ dependencies: { distance: schema } }, { distance: 1 })).toEqual([
+      'The value should have "unit".',
+    ]);
+    expect(problems({ dependentSchemas: { distance: schema } }, {})).toEqual([]);
+  });
+
+  it("asks for an item contains describes, as many as minContains and maxContains say", () => {
+    expect(problems({ type: "array", contains: { const: "id" } }, ["name", "height"])).toEqual([
+      "The value should have an item of the kind the description asks for.",
+    ]);
+    expect(problems({ contains: { const: "id" } }, ["name", "id"])).toEqual([]);
+    expect(problems({ contains: { type: "number" }, minContains: 2 }, [1, "a"])).toEqual([
+      "The value should have at least 2 items of the kind the description asks for.",
+    ]);
+    expect(problems({ contains: { type: "number" }, maxContains: 1 }, [1, 2])).toEqual([
+      "The value should have at most 1 item of the kind the description asks for.",
+    ]);
+    expect(problems({ contains: { type: "number" }, minContains: 0 }, ["a"])).toEqual([]);
+  });
+
+  it("checks a member a pattern matches, and does not call it additional", () => {
+    const schema = {
+      type: "object",
+      patternProperties: { "^x-": { type: "string" } },
+      additionalProperties: false,
+    };
+    expect(problems(schema, { "x-note": "fine" })).toEqual([]);
+    expect(problems(schema, { "x-note": 7 })).toEqual(["x-note should be string, not number."]);
+    expect(problems(schema, { other: "x" })).toEqual(['The value should not have "other".']);
+  });
+
+  it("checks member names against propertyNames", () => {
+    expect(problems({ propertyNames: { pattern: "^x-" } }, { "x-a": 1, b: 2 })).toEqual([
+      'The name "b" should match the pattern ^x-.',
+    ]);
+    expect(
+      problems({ properties: { meta: { propertyNames: { maxLength: 2 } } } }, { meta: { abc: 1 } }),
+    ).toEqual(['The name "abc" in meta should be at most 2 characters long.']);
+  });
+
+  it("says it did not check unevaluatedProperties or unevaluatedItems where they apply", () => {
+    const closed = { properties: { a: {} }, unevaluatedProperties: false };
+    expect(checkAgainstSchema(closed, { a: 1, b: 2 })).toEqual({
+      kind: "not-checked",
+      keyword: "unevaluatedProperties",
+    });
+    expect(checkAgainstSchema({ unevaluatedItems: false }, [1])).toEqual({
+      kind: "not-checked",
+      keyword: "unevaluatedItems",
+    });
+    // Nothing to evaluate, or nothing ruled out: checked as usual.
+    expect(problems(closed, {})).toEqual([]);
+    expect(problems({ unevaluatedProperties: true }, { b: 2 })).toEqual([]);
+    expect(problems({ unevaluatedItems: false }, "text")).toEqual([]);
+  });
+});
