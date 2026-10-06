@@ -31,6 +31,7 @@ import { createRelayClient, type RelayClient } from "./relay-client.js";
 import { createRelayFetch } from "./relay-fetch.js";
 import { createRoutedFetch, type RoutedFetchOptions } from "./routed-fetch.js";
 import { NO_STORE, type JobStore, type StoredJob } from "../jobs/job-store.js";
+import { RESULT_READ_LIMIT_BYTES } from "../results/renderable.js";
 
 /**
  * How this page reads one endpoint, decided per connection: `direct` always
@@ -378,6 +379,11 @@ export function createJobSession(
     let reported: "direct" | "relay" | undefined;
     return createClient({
       baseUrl: endpoint.baseUrl,
+      // A run's result, sync or async, read whole for its download (review
+      // W7). The core sets the limit per client, so the endpoint's other
+      // answers share it; an output given by reference does not go through
+      // here, and keeps the core's.
+      maxBufferBytes: RESULT_READ_LIMIT_BYTES,
       onObservation: (observation) => {
         if (observation.kind !== "execution") {
           observe(observation);
