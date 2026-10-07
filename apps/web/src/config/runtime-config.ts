@@ -13,9 +13,9 @@
  * ```
  *
  * - `relay`: `null` or absent for none. Otherwise `{ "url": … }`, an absolute
- *   `https:` URL, or a path on this site (`/api`). Plain `http:` only on a
- *   loopback host, the one exemption browsers make too, for local development
- *   and CI.
+ *   `https:` URL, or a path below this site's root (`/api`). Plain `http:`
+ *   only on a loopback host, the one exemption browsers make too, for local
+ *   development and CI.
  * - `presets`: services offered on the start screen, each `https:`. Reached
  *   directly, exactly as if the address had been typed.
  * - `jobs.acceptedNoticeSeconds`: how long a background job may report
@@ -121,7 +121,12 @@ function checkRelayUrl(value: unknown): string | { readonly problem: string } {
     if (value.startsWith("//") || value.includes("\\") || /[?#]/.test(value)) {
       return { problem: "relay.url must be a plain path on this site, such as /api" };
     }
-    return value.replace(/\/+$/, "");
+    const path = value.replace(/\/+$/, "");
+    // "/" is the page's own address, not a relay's. Taken as one it became the
+    // empty string, which the page reads as no relay, with nothing said (W24).
+    if (path === "")
+      return { problem: "relay.url must be a path below the site root, such as /api" };
+    return path;
   }
   const url = plainAbsoluteUrl(value);
   if (url === undefined) return { problem: "relay.url is not a plain absolute URL or path" };
