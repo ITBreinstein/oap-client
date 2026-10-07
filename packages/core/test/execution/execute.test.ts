@@ -243,6 +243,46 @@ describe("what execute() returns", () => {
       execute(LIST, "hello-world", { inputs: {}, mode: "async", fetch: fake.fetch }),
     ).rejects.toThrow(AmbiguousExecutionResponseError);
   });
+
+  describe("a Location that names nothing to go to (C13)", () => {
+    // An empty one resolved to the execute endpoint itself, and one that
+    // cannot be resolved was kept as it was: either way, a job handle whose
+    // statusUrl was not the job's absolute URL.
+    it.each([
+      ["empty", ""],
+      ["unresolvable", "http://bad host/jobs/1"],
+    ])("an %s one is no job handle, and says Location was sent", async (_label, location) => {
+      const fake = fakeFetch(json(null, 201, { Location: location }));
+      const error = await execute(LIST, "p", {
+        inputs: {},
+        mode: "async",
+        fetch: fake.fetch,
+      }).catch((caught: unknown) => caught);
+
+      expect(error).toBeInstanceOf(AmbiguousExecutionResponseError);
+      expect(error).toMatchObject({ locationPresent: true });
+    });
+
+    it("falls back to the body's monitor link, which is absolute", async () => {
+      const fake = fakeFetch(
+        json(
+          {
+            jobID: "8f2c",
+            status: "accepted",
+            links: [{ rel: "monitor", href: "/oapi/jobs/8f2c" }],
+          },
+          201,
+          { Location: "http://bad host/jobs/1" },
+        ),
+      );
+      const execution = await execute(LIST, "p", { inputs: {}, mode: "async", fetch: fake.fetch });
+
+      expect(execution).toMatchObject({
+        kind: "job",
+        job: { statusUrl: "https://service.test/oapi/jobs/8f2c", discoveredVia: "body-link" },
+      });
+    });
+  });
 });
 
 describe("errors are outcomes, not something to paper over", () => {

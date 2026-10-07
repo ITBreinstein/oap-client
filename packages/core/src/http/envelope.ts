@@ -13,7 +13,7 @@
 
 import { AbortError, BodyTooLargeError, isAbortError } from "./errors.js";
 import { isJsonMediaType, parseContentDisposition, parseMediaType } from "./media-type.js";
-import { parseLinkHeader, resolve, type WebLink } from "./link-header.js";
+import { parseLinkHeader, type WebLink } from "./link-header.js";
 
 /**
  * Bodies above this are not buffered. Process results are routinely large; the
@@ -54,7 +54,11 @@ export interface ResponseEnvelope {
   /** Retry-After as milliseconds, from either delta-seconds or an HTTP-date. */
   readonly retryAfterMs: number | undefined;
 
-  /** Location resolved against {@link url} — the *final* URL, not the requested one. */
+  /**
+   * Location resolved against {@link url} — the *final* URL, not the
+   * requested one — so always absolute. Undefined when the header is absent,
+   * empty, or cannot be resolved; {@link locationRaw} still says it was sent.
+   */
   readonly location: string | undefined;
   /** Location exactly as received. */
   readonly locationRaw: string | undefined;
@@ -131,6 +135,21 @@ function parseHttpDate(value: string): number {
   if (IMF_FIXDATE.test(value) || RFC850_DATE.test(value)) return Date.parse(value);
   if (ASCTIME_DATE.test(value)) return Date.parse(`${value} GMT`);
   return Number.NaN;
+}
+
+/**
+ * `Location`, absolute, or undefined when it names nothing to go to (review
+ * C13). An empty one resolves to the request's own URL, the execute endpoint,
+ * which a job handle would then poll; one that cannot be resolved used to be
+ * kept as it was, so a "status URL" was not a URL.
+ */
+function resolveLocation(raw: string, base: string): string | undefined {
+  if (raw.trim() === "") return undefined;
+  try {
+    return new URL(raw, base).toString();
+  } catch {
+    return undefined;
+  }
 }
 
 function parseRetryAfter(header: string | null): number | undefined {
@@ -267,7 +286,7 @@ export function createEnvelope(
     filename: parseContentDisposition(headers.get("content-disposition")),
     retryAfterMs: parseRetryAfter(headers.get("retry-after")),
 
-    location: locationRaw === undefined ? undefined : resolve(locationRaw, url),
+    location: locationRaw === undefined ? undefined : resolveLocation(locationRaw, url),
     locationRaw,
 
     links: parseLinkHeader(headers.get("link"), url),

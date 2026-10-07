@@ -24,6 +24,15 @@ at 0.5.0; earlier versions are recorded only in the git history.
 
 ### Fixed
 
+- `ResponseEnvelope.location` is undefined when the `Location` header is empty
+  or cannot be resolved; `locationRaw` still holds what was sent. An empty one
+  resolved to the response's own URL, so an async `execute()` returned a job
+  whose `statusUrl` was the execute endpoint. One that could not be resolved
+  was kept as it was, so `statusUrl` was not an absolute URL, as `JobHandle`
+  documents it is. `execute()` now treats either as no `Location`: the job is
+  found by its body's `monitor` or `self` link, or `AmbiguousExecutionResponseError`
+  is thrown with `locationPresent: true`.
+
 - `createClient` adds the trailing slash a base URL needs to its _path_. It used
   to append it to the whole string, so a base with a query got the slash on the
   query: `https://host/ogc?apikey=abc` became `…/ogc?apikey=abc/`, `client.baseUrl`
