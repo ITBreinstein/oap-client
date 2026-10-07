@@ -6,9 +6,10 @@
  * which is the case a live server makes hard to arrange on demand.
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 import { createEnvelope } from "../../src/http/envelope.js";
 import type { ResponseEnvelope } from "../../src/http/envelope.js";
+import { findLink } from "../../src/links/find.js";
 import {
   collectLinks,
   readBodyLinks,
@@ -122,7 +123,7 @@ describe("collectLinks — merging the two sources", () => {
 describe("collectLinks — malformed entries", () => {
   it("skips bad entries without throwing and keeps the valid siblings", () => {
     const observations: Observation[] = [];
-    const bad = [
+    const bad: readonly unknown[] = [
       "not-an-object",
       42,
       null,
@@ -130,7 +131,7 @@ describe("collectLinks — malformed entries", () => {
       { href: "processes" }, // no rel
       { rel: "self", href: "http://[" }, // unresolvable
       { rel: "conformance", href: "conformance" }, // the survivor
-    ] as unknown as readonly Link[];
+    ];
 
     const links = collectLinks(envelopeFor("https://demo.example.nl/oapi/"), bad, (observation) =>
       observations.push(observation),
@@ -154,7 +155,7 @@ describe("collectLinks — malformed entries", () => {
   it("does not let a throwing observation sink break link collection", () => {
     const links = collectLinks(
       envelopeFor("https://demo.example.nl/oapi/"),
-      [null, { rel: "self", href: "." }] as unknown as readonly Link[],
+      [null, { rel: "self", href: "." }],
       () => {
         throw new Error("the application's logger is broken");
       },
@@ -171,7 +172,7 @@ describe("collectLinks — malformed entries", () => {
     const observations: Observation[] = [];
     collectLinks(
       envelopeFor("https://demo.example.nl/oapi/?token=hunter2"),
-      [null] as unknown as readonly Link[],
+      [null],
       (observation) => observations.push(observation),
     );
 
@@ -189,6 +190,24 @@ describe("readBodyLinks", () => {
     expect(readBodyLinks({ links: "nope" })).toEqual([]);
     expect(readBodyLinks({ links: [{ rel: "self", href: "." }] })).toHaveLength(1);
     expect(readBodyLinks("not an object")).toBeUndefined();
+  });
+
+  // Review C11: typed as `Link[]`, its raw entries reached `findLink`, which
+  // threw on an entry with no `rel`, or on `null`.
+  it("is typed as unchecked entries, not as Links", () => {
+    expectTypeOf(readBodyLinks).returns.toEqualTypeOf<readonly unknown[] | undefined>();
+    // @ts-expect-error -- unchecked entries are not Links; resolve them first.
+    const unchecked: readonly Link[] = readBodyLinks({ links: [] }) ?? [];
+    expect(unchecked).toEqual([]);
+  });
+
+  it("gives findLink only checked links once resolved, whatever the server sent", () => {
+    const body = { links: [{ href: "relative/only" }, null, { rel: "self", href: "jobs/1" }] };
+    const links = resolveBodyLinks("https://x.test/oapi/", readBodyLinks(body));
+    expect(findLink(links, "self")?.href).toBe("https://x.test/oapi/jobs/1");
+    expect(
+      findLink(resolveBodyLinks("https://x.test/", readBodyLinks({ links: [null] })), "self"),
+    ).toBeUndefined();
   });
 });
 

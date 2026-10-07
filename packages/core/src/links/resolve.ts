@@ -128,13 +128,11 @@ function addBodyLinks(
   add: (link: Link) => void,
   base: string,
   documentUrl: string,
-  bodyLinks: readonly Link[] | undefined,
+  bodyLinks: readonly unknown[] | undefined,
   sink: ObservationSink | undefined,
 ): void {
-  // Widened back to `unknown` on purpose. The declared parameter type says what
-  // a well-behaved caller passes; it is not evidence about what a server sent,
-  // and validating against the declared type would check nothing.
-  for (const entry of (bodyLinks ?? []) as readonly unknown[]) {
+  // Each entry is whatever the server sent, and is checked here.
+  for (const entry of bodyLinks ?? []) {
     if (!isRecord(entry)) {
       observe(sink, { kind: "link-skipped", documentUrl, reason: "not-an-object" });
       continue;
@@ -180,7 +178,7 @@ function addBodyLinks(
  */
 export function resolveBodyLinks(
   baseUrl: string,
-  bodyLinks: readonly Link[] | undefined,
+  bodyLinks: readonly unknown[] | undefined,
   sink?: ObservationSink,
 ): readonly Link[] {
   const collector = createCollector();
@@ -203,7 +201,7 @@ export function resolveBodyLinks(
  */
 export function collectLinks(
   envelope: ResponseEnvelope,
-  bodyLinks: readonly Link[] | undefined,
+  bodyLinks: readonly unknown[] | undefined,
   sink?: ObservationSink,
 ): readonly Link[] {
   const base = envelope.url;
@@ -230,19 +228,21 @@ export function collectLinks(
 }
 
 /**
- * The `links` member of a document, as a shape `collectLinks` can consume.
+ * The `links` member of a document, its entries unchecked: hand it to
+ * {@link collectLinks} or {@link resolveBodyLinks}, which check each entry and
+ * resolve its href. Not `Link`s yet, so not for `findLink` (review C11:
+ * typed as `Link[]`, an entry with no `rel`, or `null`, made `findLink` throw).
  *
  * Returns `undefined` when there is no `links` member at all, and an empty
  * array when it is present but not an array — the difference matters to the
  * caller deciding whether the document is malformed.
  */
-export function readBodyLinks(body: unknown): readonly Link[] | undefined {
+export function readBodyLinks(body: unknown): readonly unknown[] | undefined {
   if (!isRecord(body)) return undefined;
   const links: unknown = body["links"];
   if (links === undefined) return undefined;
   // Not an array: the member exists but carries nothing followable. Treated as
   // "no links" rather than an error, because header links may still save us.
   if (!Array.isArray(links)) return EMPTY_LINKS;
-  // Cast is safe because `collectLinks` validates every entry itself.
-  return links as readonly Link[];
+  return links as readonly unknown[];
 }
