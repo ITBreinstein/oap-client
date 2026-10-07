@@ -759,12 +759,12 @@ test.describe("the workflow in a browser", () => {
     );
   });
 
-  test("says a typed server allows no web page, and records the attempt", async ({ page }) => {
+  test("says a typed server could not be read, and records the attempt", async ({ page }) => {
     await requireService(`${NOCORS}/?f=json`, "pygeoapi :5081");
     await connectTyped(page, NOCORS);
 
     await expect(page.getByRole("alert")).toContainText(
-      "This server doesn't allow access from a web page (no CORS headers). The attempt has been recorded.",
+      "This page could not read this server: it sends no CORS headers, or it could not be reached. The attempt has been recorded.",
     );
     const observations = await exportedObservations(page);
     expect(observations).toContainEqual(

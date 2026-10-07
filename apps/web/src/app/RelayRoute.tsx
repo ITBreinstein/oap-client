@@ -44,8 +44,8 @@ export function RelayOffer({ onConfirm, onDecline }: RelayOfferProps) {
       >
         <h2 id={`${base}-title`}>Use the relay?</h2>
         <p id={`${base}-text`}>
-          This server sent no CORS headers, so a web page cannot read it directly. Reach it through
-          the relay instead? This will be recorded as a finding.
+          This page could not read this server directly: it sends no CORS headers, or it could not
+          be reached. Try it through the relay instead? This will be recorded as a finding.
         </p>
         <p className="actions">
           <button type="button" onClick={onConfirm} data-testid="relay-confirm">

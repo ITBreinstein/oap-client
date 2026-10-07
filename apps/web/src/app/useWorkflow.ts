@@ -159,18 +159,20 @@ const MIXED_CONTENT_ERROR: WorkflowError = {
 
 function transportMessage(cause: unknown, endpoint: EndpointRef): WorkflowError {
   if (directFailure(cause) === "cors-blocked") {
-    // What to do next depends on where the address came from, and on whether
-    // the relay may read this server (findings 0049, 0050).
+    // Said as one of two, never as a diagnosis: a browser gives a page the same
+    // error for a server that sends no CORS headers and for one that is down
+    // (W34). What to do next depends on where the address came from, and on
+    // whether the relay may read this server (findings 0049, 0050).
     const next =
       endpoint.source !== "configured"
-        ? "Choose another service, or ask this server's operator to enable CORS."
+        ? "Check the address and that the server is running. If both are right, choose another service, or ask this server's operator to enable CORS."
         : endpoint.readRoute === "relay"
-          ? "Connect again to be offered the relay, choose another service, or ask this server's operator to enable CORS."
-          : "The relay is not set up to read this service for a web page, so it cannot help here. Choose another service, or ask this server's operator to enable CORS.";
+          ? "Connect again to be offered the relay, which reaches the server without CORS and so tells the two apart, or choose another service."
+          : "The relay is not set up to read this service for a web page, so it cannot help here. Check that the server is running. If it is, choose another service, or ask this server's operator to enable CORS.";
     return {
       title:
-        "This server doesn't allow access from a web page (no CORS headers). The attempt has been recorded.",
-      detail: `A browser may only read another site's answers when that site sends Access-Control-Allow-Origin. ${next}`,
+        "This page could not read this server: it sends no CORS headers, or it could not be reached. The attempt has been recorded.",
+      detail: `A browser gives a web page the same error for both. A page may only read another site's answers when that site sends Access-Control-Allow-Origin. ${next}`,
     };
   }
   return {

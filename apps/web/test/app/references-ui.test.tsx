@@ -105,7 +105,9 @@ describe("a result given by reference", () => {
     );
     const item = view.querySelector('[data-output-id="file"]');
     expect(item?.getAttribute("data-reference-outcome")).toBe("cors-blocked");
-    expect(item?.textContent).toContain("localhost:5081 sends no CORS headers");
+    expect(item?.textContent).toContain(
+      "localhost:5081 sends no CORS headers for it, or could not be reached",
+    );
     const link = item?.querySelector("a");
     expect(link?.getAttribute("href")).toBe(href);
     expect(link?.getAttribute("target")).toBe("_blank");

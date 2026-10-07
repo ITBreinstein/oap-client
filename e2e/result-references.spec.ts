@@ -121,7 +121,9 @@ test.describe("outputs given by reference", () => {
 
     await file.getByRole("button", { name: "Load" }).click();
     await expect(file).toHaveAttribute("data-reference-outcome", "cors-blocked");
-    await expect(file).toContainText("localhost:5081 sends no CORS headers");
+    await expect(file).toContainText(
+      "localhost:5081 sends no CORS headers for it, or could not be reached",
+    );
     const link = file.getByRole("link", { name: "Open the link" });
     await expect(link).toHaveAttribute("href", `${NOCORS}/static/img/logo.png`);
     await expect(link).toHaveAttribute("rel", "noopener noreferrer");

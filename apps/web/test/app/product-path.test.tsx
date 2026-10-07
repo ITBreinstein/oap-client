@@ -1,7 +1,7 @@
 /**
- * Review 2026-09-30 (read-only audit): the product path through the whole App,
- * for server quirks whose handling lives in `useWorkflow` and had no test of
- * its own there.
+ * The product path through the whole App, for server quirks whose handling
+ * lives in `useWorkflow` and had no test of its own there. Written for the
+ * review of 2026-09-30, and kept with its known bugs until the last was fixed.
  *
  * - 0039: a background run whose 201 hides `Location` and has a `null` body.
  * - 0059: a background run the server answers synchronously.
@@ -266,13 +266,18 @@ describe("finding 0057's other side: an execute the browser never sends", () => 
 });
 
 describe("findings 0049/0050: a typed address that is down, not CORS-less", () => {
-  it.fails("W34: is not reported to the user, as a certainty, as 'no CORS headers'", async () => {
+  it("W34: is not reported to the user, as a certainty, as 'no CORS headers'", async () => {
     serverDown = true;
     const view = await connectTyped("http://localhost:5999");
     const alert = view.querySelector("[role='alert']")?.textContent ?? "";
-    // Today the alert says exactly this, and the record says cors-blocked.
-    expect(alert).not.toContain(
-      "This server doesn't allow access from a web page (no CORS headers).",
-    );
+    // Both, because a page cannot tell them apart; and what to check first.
+    expect(alert).toContain("it sends no CORS headers, or it could not be reached");
+    expect(alert).toContain("Check the address and that the server is running.");
+    expect(alert).not.toContain("doesn't allow access from a web page");
+    // The record stays cors-blocked, which the matrix reads as "CORS or down,
+    // unconfirmed" until a relay attempt reaches the server.
+    expect(observations(view).find((o) => o["kind"] === "endpoint-access")).toMatchObject({
+      outcome: "cors-blocked",
+    });
   });
 });

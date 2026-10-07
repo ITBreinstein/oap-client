@@ -104,9 +104,13 @@ Which of the reference servers a page can read at all, measured in Chromium on
 | pygeoapi :5081 | blocked (no CORS headers; finding 0049)                   |
 | ZOO :5090      | blocked (no CORS headers; finding 0050)                   |
 
-Connecting to a blocked server says so — "This server doesn't allow access
-from a web page (no CORS headers). The attempt has been recorded." — and records
-an `endpoint-access` observation.
+Connecting to a blocked server says so — "This page could not read this
+server: it sends no CORS headers, or it could not be reached. The attempt has
+been recorded." — and records an `endpoint-access` observation. A browser
+gives a page the same error for a server that sends no CORS headers and for one
+that is down, so the message names both and claims neither (W34). The record's
+`outcome` is `cors-blocked` either way; a relay attempt that reaches the server
+is what confirms it was CORS.
 
 ### Direct first, then the relay after a click (phase 3)
 
@@ -114,8 +118,9 @@ For a configured endpoint with `readRoute: "relay"`, there is one more step.
 The page still tries the server directly first. Only if that fails the way a
 missing CORS header fails does it ask:
 
-> This server sent no CORS headers, so a web page cannot read it directly.
-> Reach it through the relay instead? This will be recorded as a finding.
+> This page could not read this server directly: it sends no CORS headers, or it
+> could not be reached. Try it through the relay instead? This will be recorded
+> as a finding.
 
 **Use relay** reconnects through the relay's read route. Everything for that
 endpoint then goes through it: the landing page, processes, descriptions, sync
