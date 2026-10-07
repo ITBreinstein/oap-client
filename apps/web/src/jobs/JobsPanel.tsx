@@ -74,6 +74,12 @@ function StatusText({ job }: { readonly job: JobRow }) {
   return (
     <>
       <strong data-job-status={status.status}>{status.rawStatus}</strong>
+      {job.confirmation?.state === "pending" && (
+        <span className="muted" data-not-yet-confirmed="true">
+          {" "}
+          (not yet confirmed)
+        </span>
+      )}
       {status.progress !== undefined && `, ${String(status.progress)}%`}
       {status.message !== undefined && <span className="muted"> — {status.message}</span>}
       {job.lastError !== undefined && (

@@ -518,7 +518,7 @@ describe("POST /callbacks", () => {
     return { ...h, token, events, ref, callbackToken: callbackTokenSent(h) };
   }
 
-  it("rings the session's stream with the ref — a doorbell, not job data", async () => {
+  it("rings the session's stream with the ref and the callback called — a doorbell, not job data", async () => {
     const { app, events, ref, callbackToken } = await registered();
     const response = await app.request(`/callbacks/${callbackToken}/in-progress`, {
       method: "POST",
@@ -528,7 +528,10 @@ describe("POST /callbacks", () => {
     expect(response.status).toBe(200);
     expect(await response.text()).toBe("");
     // The body claimed a status and a job id. Neither reaches the browser.
-    expect(await events.next()).toEqual({ event: "job", data: JSON.stringify({ ref }) });
+    expect(await events.next()).toEqual({
+      event: "job",
+      data: JSON.stringify({ ref, callbacks: ["in-progress"] }),
+    });
     await events.close();
   });
 
@@ -564,7 +567,10 @@ describe("POST /callbacks", () => {
     });
     expect(response.status).toBe(200);
     expect(await response.text()).toBe("");
-    expect(await events.next()).toEqual({ event: "job", data: JSON.stringify({ ref }) });
+    expect(await events.next()).toEqual({
+      event: "job",
+      data: JSON.stringify({ ref, callbacks: [kind] }),
+    });
     // Nothing from the body was kept: one registration, as before.
     expect(state.counts().registrations).toBe(1);
     await events.close();
@@ -575,7 +581,10 @@ describe("POST /callbacks", () => {
     for (let i = 0; i < 2; i += 1) {
       const response = await app.request(`/callbacks/${callbackToken}/success`, { method: "POST" });
       expect(response.status).toBe(200);
-      expect(await events.next()).toEqual({ event: "job", data: JSON.stringify({ ref }) });
+      expect(await events.next()).toEqual({
+        event: "job",
+        data: JSON.stringify({ ref, callbacks: ["success"] }),
+      });
     }
     await events.close();
   });
@@ -635,7 +644,10 @@ describe("POST /callbacks", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(await events.next()).toEqual({ event: "job", data: JSON.stringify({ ref }) });
+    expect(await events.next()).toEqual({
+      event: "job",
+      data: JSON.stringify({ ref, callbacks: ["success"] }),
+    });
     // At most the stream's own read-ahead; nowhere near the 64 MB offered.
     expect(pulled).toBeLessThan(3);
     await events.close();
@@ -698,12 +710,20 @@ describe("GET /sessions/events", () => {
     const tokenB = callbackTokenSent(h);
 
     // ZOO's once-a-second in-progress calls (finding 0048), compressed: five
-    // rings for A in one tick, then one for B as a sentinel.
-    for (let i = 0; i < 5; i += 1) h.state.ring(tokenA);
-    h.state.ring(tokenB);
+    // rings for A in one tick and its success call, then one for B as a
+    // sentinel. A's one event names each callback that rang, once (W14).
+    for (let i = 0; i < 5; i += 1) h.state.ring(tokenA, "in-progress");
+    h.state.ring(tokenA, "success");
+    h.state.ring(tokenB, "success");
 
-    expect(await events.next()).toEqual({ event: "job", data: JSON.stringify({ ref: refA }) });
-    expect(await events.next()).toEqual({ event: "job", data: JSON.stringify({ ref: refB }) });
+    expect(await events.next()).toEqual({
+      event: "job",
+      data: JSON.stringify({ ref: refA, callbacks: ["in-progress", "success"] }),
+    });
+    expect(await events.next()).toEqual({
+      event: "job",
+      data: JSON.stringify({ ref: refB, callbacks: ["success"] }),
+    });
     await events.close();
   });
 

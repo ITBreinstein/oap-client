@@ -150,12 +150,27 @@ export function parseRelayedExecute(value: unknown): RelayedExecute {
   };
 }
 
+/** The three `subscriber` callbacks an OGC server may call. */
+export type CallbackKind = "success" | "in-progress" | "failed";
+
+const CALLBACK_KINDS: readonly CallbackKind[] = ["success", "in-progress", "failed"];
+
 /**
- * The `ref` out of a `job` event's data, or `undefined` for anything else.
- * Never throws: a doorbell that cannot be read is a doorbell not rung, and the
- * baseline poll covers it.
+ * A `job` event: which job rang, and which of its callbacks the server called
+ * since the last event for it (W14). Evidence of delivery, never a state.
  */
-export function parseDoorbell(data: string): string | undefined {
+export interface Doorbell {
+  readonly ref: string;
+  /** Empty when the relay does not say: one from before the relay named them. */
+  readonly callbacks: readonly CallbackKind[];
+}
+
+/**
+ * A `job` event's data, or `undefined` for anything without a `ref`. Never
+ * throws: a doorbell that cannot be read is a doorbell not rung, and the
+ * baseline poll covers it. A callback name it does not know is left out.
+ */
+export function parseDoorbell(data: string): Doorbell | undefined {
   let value: unknown;
   try {
     value = JSON.parse(data);
@@ -164,7 +179,12 @@ export function parseDoorbell(data: string): string | undefined {
   }
   if (!isRecord(value)) return undefined;
   const ref = value["ref"];
-  return typeof ref === "string" && ref !== "" ? ref : undefined;
+  if (typeof ref !== "string" || ref === "") return undefined;
+  const named = value["callbacks"];
+  const callbacks = Array.isArray(named)
+    ? CALLBACK_KINDS.filter((kind) => named.includes(kind))
+    : [];
+  return { ref, callbacks };
 }
 
 /** The relay's refusal reason, when it sent one it names. */

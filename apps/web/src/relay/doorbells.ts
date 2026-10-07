@@ -9,7 +9,8 @@
  *
  * What it promises the caller:
  *
- * - `onDoorbell(ref)` for every `job` event. A ref, never a state.
+ * - `onDoorbell(ref, callbacks)` for every `job` event: a ref, and which of
+ *   the job's callbacks rang. Never a state.
  * - `onOpen` every time the stream is (re)established — including after the
  *   relay restarted and a new session had to be opened. Doorbells rung while
  *   the stream was down are lost, by design; the caller reconciles on open.
@@ -22,7 +23,7 @@
  *   nothing (review W11).
  */
 
-import { parseDoorbell } from "./contract.js";
+import { parseDoorbell, type CallbackKind } from "./contract.js";
 import type { RelayClient } from "./relay-client.js";
 import type { SessionSource } from "./routed-fetch.js";
 
@@ -40,7 +41,7 @@ export type StreamState = "connecting" | "open" | "waiting" | "closed";
 
 export interface DoorbellOptions {
   readonly relay: RelayClient;
-  readonly onDoorbell: (ref: string) => void;
+  readonly onDoorbell: (ref: string, callbacks: readonly CallbackKind[]) => void;
   readonly onOpen: (info: {
     readonly reconnect: boolean;
     readonly sessionRenewed: boolean;
@@ -184,8 +185,8 @@ export function openDoorbells(options: DoorbellOptions): DoorbellStream {
             opens += 1;
             renewed = false;
           } else if (event === "job") {
-            const ref = parseDoorbell(data);
-            if (ref !== undefined) options.onDoorbell(ref);
+            const doorbell = parseDoorbell(data);
+            if (doorbell !== undefined) options.onDoorbell(doorbell.ref, doorbell.callbacks);
           }
         });
       } catch {

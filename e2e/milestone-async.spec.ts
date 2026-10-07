@@ -78,12 +78,15 @@ test.describe("the asynchronous milestone", () => {
     // before a check on it could see the count.
     await expect(result).toHaveAttribute("data-callbacks", "registered");
     await expect(result).toHaveAttribute("data-doorbells", /^[1-9]\d*$/, { timeout: 5_000 });
-    // The confirming read found nothing changed (the relay was up throughout).
-    await page.waitForTimeout(3_000);
+    // The doorbell named the success callback: delivered, so pygeoapi has no
+    // reason to rewrite the job, and the page reads it no further (finding
+    // 0047, review W14). Nothing changed, and nothing is left unconfirmed.
+    await expect(result).toHaveAttribute("data-confirmation", "delivered", { timeout: 5_000 });
     await expect(page.locator("[data-status-changed]")).toHaveCount(0);
+    await expect(page.locator("[data-not-yet-confirmed]")).toHaveCount(0);
 
     // 4. The status came from polling pygeoapi: every read is on record, the
-    // first `successful` and the confirming read after it included.
+    // `successful` one included.
     const recorded = await observations(page);
     expect(recorded).toContainEqual(
       expect.objectContaining({
@@ -98,7 +101,7 @@ test.describe("the asynchronous milestone", () => {
     const reads = recorded.filter(
       (observation) => observation.kind === "job-status" && String(observation.url).includes(jobId),
     );
-    expect(reads.filter((read) => read.status === "successful").length).toBeGreaterThanOrEqual(2);
+    expect(reads.filter((read) => read.status === "successful").length).toBeGreaterThanOrEqual(1);
   });
 
   test("with the relay's event stream not open, the job runs for polling only", async ({

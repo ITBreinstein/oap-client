@@ -7,6 +7,7 @@ import { useId, useMemo, type SyntheticEvent } from "react";
 import { schemaWarnings } from "../forms/schema-warnings.js";
 import type { FieldErrors } from "../forms/validate.js";
 import type { JobRow } from "../relay/job-session.js";
+import { CONFIRM_WINDOW_MS } from "../relay/reconciler.js";
 import { ErrorMessage } from "./ErrorMessage.js";
 import { FieldView } from "./FormFields.js";
 import { ResultsView } from "./ResultsView.js";
@@ -194,9 +195,9 @@ function JobStatusLine({ job }: { readonly job: JobRow | undefined }) {
 }
 
 /**
- * The server said `successful`, and a second read shortly after said
- * something else (finding 0047). Both are shown, and the results read after
- * the first stay on screen: they are what the server handed out.
+ * The server said `successful`, and a later read said something else (finding
+ * 0047). Both are shown, and the results read after the first stay on screen:
+ * they are what the server handed out.
  */
 function StatusChanged({ job }: { readonly job: JobRow | undefined }) {
   if (job?.confirmation?.state !== "changed" || job.status === undefined) return null;
@@ -205,7 +206,7 @@ function StatusChanged({ job }: { readonly job: JobRow | undefined }) {
   return (
     <div className="notice" role="status" data-status-changed={`${first.status}->${now.status}`}>
       <p>
-        The server first reported this job <strong>{first.rawStatus}</strong>, and a moment later{" "}
+        The server first reported this job <strong>{first.rawStatus}</strong>, and later{" "}
         <strong>{now.rawStatus}</strong>
         {now.message !== undefined && <span className="muted"> — {now.message}</span>}.
       </p>
@@ -214,6 +215,23 @@ function StatusChanged({ job }: { readonly job: JobRow | undefined }) {
         says {now.rawStatus}.
       </p>
     </div>
+  );
+}
+
+/**
+ * The server said `successful` and the page is still reading the job, because
+ * a server can rewrite it as `failed` when it cannot deliver the success
+ * callback (finding 0047, review W14). Information, not a warning.
+ */
+function NotYetConfirmed({ job }: { readonly job: JobRow | undefined }) {
+  if (job?.confirmation?.state !== "pending") return null;
+  const minutes = Math.round(CONFIRM_WINDOW_MS / 60_000);
+  return (
+    <p className="hint" data-not-yet-confirmed="true">
+      Not yet confirmed by the server. A server can still change a finished job to failed when it
+      cannot deliver its notification, so this page keeps checking, for up to {String(minutes)}{" "}
+      minutes.
+    </p>
   );
 }
 
@@ -404,8 +422,10 @@ export function ProcessScreen(props: ProcessScreenProps) {
           data-result-of={state.jobRef}
           data-doorbells={resultJob?.doorbells}
           data-callbacks={callbacksOf(resultJob)}
+          data-confirmation={resultJob?.confirmation?.state}
         >
           <StatusChanged job={resultJob} />
+          <NotYetConfirmed job={resultJob} />
           <ResultsView
             results={state.results}
             processId={process.id}

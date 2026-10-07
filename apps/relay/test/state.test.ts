@@ -226,28 +226,49 @@ describe("registrations and doorbells", () => {
 
   it("rings the owning session with the ref, never the token", () => {
     const { state, registration, rung } = setUp();
-    expect(state.ring(registration.callbackToken)).toBe("delivered");
+    expect(state.ring(registration.callbackToken, "success")).toBe("delivered");
     expect(rung).toEqual([registration.ref]);
     expect(registration.ref).not.toBe(registration.callbackToken);
   });
 
+  it("tells the listener which callback the server called, and nothing else", () => {
+    const clock = manualClock();
+    const state = stateWith(clock);
+    const session = state.createSession();
+    if (session === undefined) throw new Error("expected a session");
+    const rung: [string, string][] = [];
+    state.listen(
+      session.token,
+      (ref, callback) => rung.push([ref, callback]),
+      () => undefined,
+    );
+    const registration = state.register(session.token, "pygeoapi");
+    if (typeof registration === "string") throw new Error(registration);
+    state.ring(registration.callbackToken, "in-progress");
+    state.ring(registration.callbackToken, "success");
+    expect(rung).toEqual([
+      [registration.ref, "in-progress"],
+      [registration.ref, "success"],
+    ]);
+  });
+
   it("rings again for a duplicate callback — the browser's poll is idempotent", () => {
     const { state, registration, rung } = setUp();
-    state.ring(registration.callbackToken);
-    state.ring(registration.callbackToken);
+    state.ring(registration.callbackToken, "success");
+    state.ring(registration.callbackToken, "success");
     expect(rung).toEqual([registration.ref, registration.ref]);
   });
 
   it("answers an unknown token as unknown, and rings nobody", () => {
     const { state, rung } = setUp();
-    expect(state.ring(mintSecretToken())).toBe("unknown");
+    expect(state.ring(mintSecretToken(), "success")).toBe("unknown");
     expect(rung).toEqual([]);
   });
 
   it("treats an expired registration as unknown, before any sweep", () => {
     const { clock, state, registration, rung } = setUp();
     clock.advance(30 * MINUTE);
-    expect(state.ring(registration.callbackToken)).toBe("unknown");
+    expect(state.ring(registration.callbackToken, "success")).toBe("unknown");
     expect(rung).toEqual([]);
   });
 
@@ -258,13 +279,13 @@ describe("registrations and doorbells", () => {
     if (session === undefined) throw new Error("expected a session");
     const registration = state.register(session.token, "pygeoapi");
     if (typeof registration === "string") throw new Error(registration);
-    expect(state.ring(registration.callbackToken)).toBe("no-listener");
+    expect(state.ring(registration.callbackToken, "success")).toBe("no-listener");
   });
 
   it("forgets a released registration", () => {
     const { state, registration } = setUp();
     state.release(registration.ref);
-    expect(state.ring(registration.callbackToken)).toBe("unknown");
+    expect(state.ring(registration.callbackToken, "success")).toBe("unknown");
     expect(state.counts().registrations).toBe(0);
   });
 
