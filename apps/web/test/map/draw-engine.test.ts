@@ -114,6 +114,14 @@ describe("the bounding-box engine, on the real Terra Draw", () => {
     expect(draw.enabled).toBe(false);
     expect(fake.sources.size).toBe(0);
   });
+
+  it("does not throw once MapView's ref cleanup has removed the map (W29)", () => {
+    const { created, fake } = engine();
+    fake.remove();
+    expect(() => {
+      created.stop();
+    }).not.toThrow();
+  });
 });
 
 describe("a box shown while the drawn one is selected (W15)", () => {

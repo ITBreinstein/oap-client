@@ -357,4 +357,13 @@ describe("stopping", () => {
     expect(lastDraw().enabled).toBe(false);
     expect(fake.sources.size).toBe(0);
   });
+
+  it("does not throw once MapView's ref cleanup has removed the map (W29)", () => {
+    const fake = fakeMap();
+    const created = createTerraDrawGeometryEngine(fake.map, { tools: ["Polygon"], several: true });
+    fake.remove();
+    expect(() => {
+      created.stop();
+    }).not.toThrow();
+  });
 });
