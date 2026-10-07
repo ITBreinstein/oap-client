@@ -15,6 +15,12 @@ at 0.5.0; earlier versions are recorded only in the git history.
   Their `bodyLinks` parameter is widened to `readonly unknown[] | undefined` to
   match, which breaks no caller. Code that passed `readBodyLinks()` straight to
   `findLink()` or `findLinks()` stops compiling, and was the code that crashed.
+- `isJobState()` is case-sensitive: it accepts only the vocabulary as spelled,
+  `"successful"` and not `"Successful"`. It accepted any case and narrowed the
+  string to the lowercase `JobState` it did not hold. To read a status a server
+  sent, in whatever case, use the new `toJobState()`. The core's own parsing
+  does, so `getJob()`, `pollJob()` and the execution classifier read a
+  capitalised status as before.
 
 ### Fixed
 
@@ -86,6 +92,8 @@ at 0.5.0; earlier versions are recorded only in the git history.
 
 ### Added
 
+- `toJobState(value)`: the OGC job status a string names, in any case, as the
+  vocabulary spells it (`"Successful"` → `"successful"`), or `undefined`.
 - `AmbiguousExecutionResponseError.jobId`: the job id the body named (`jobID`,
   or `id`), when it named one. A spec-minimal `{"jobID", "status"}` with
   `Location` hidden cross-origin is all a browser sees (finding 0039), and the id

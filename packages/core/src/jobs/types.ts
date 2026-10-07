@@ -35,7 +35,7 @@ import type { JobState } from "../vocabulary/job-status.js";
  * module stays the one place the jobs layer imports its types from.
  */
 export type { JobState } from "../vocabulary/job-status.js";
-export { isJobState, isTerminalState } from "../vocabulary/job-status.js";
+export { isJobState, isTerminalState, toJobState } from "../vocabulary/job-status.js";
 
 export interface JobStatus {
   /**
