@@ -526,5 +526,46 @@ describe("the observation", () => {
     expect(record.outcome).toBe("transport-failure");
     expect(record.status).toBeUndefined();
     expect(record.elapsedMs).toBeGreaterThanOrEqual(0);
+    // No page origin in Node.
+    expect(record).toHaveProperty("crossOrigin", undefined);
+  });
+
+  it("records whether a request that got no answer left the page's origin (W33)", async () => {
+    // A refused CORS preflight and a dead network are the same TypeError to a
+    // page; only a cross-origin request can have been the first.
+    vi.stubGlobal("location", { origin: "https://app.example.org" });
+    try {
+      const dead = (): Promise<Response> => Promise.reject(new TypeError("Failed to fetch"));
+      const cross = collect();
+      await expect(
+        execute(LIST, "hello-world", { inputs: {}, fetch: dead, onObservation: cross.sink }),
+      ).rejects.toThrow();
+      expect(executionRecord(cross.seen)).toMatchObject({
+        outcome: "transport-failure",
+        crossOrigin: true,
+      });
+
+      const same = collect();
+      await expect(
+        execute("https://app.example.org/oapi/processes", "hello-world", {
+          inputs: {},
+          fetch: dead,
+          onObservation: same.sink,
+        }),
+      ).rejects.toThrow();
+      expect(executionRecord(same.seen)).toMatchObject({ crossOrigin: false });
+
+      // An answer arrived, so no preflight was refused: nothing to say.
+      const answered = collect();
+      const fake = fakeFetch(json({ value: 1 }));
+      await execute(LIST, "hello-world", {
+        inputs: {},
+        fetch: fake.fetch,
+        onObservation: answered.sink,
+      });
+      expect(executionRecord(answered.seen)).toHaveProperty("crossOrigin", undefined);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

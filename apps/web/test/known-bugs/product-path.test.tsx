@@ -250,22 +250,19 @@ describe("W7 on the product path: a result over 8 MB that declares no length", (
 });
 
 describe("finding 0057's other side: an execute the browser never sends", () => {
-  it.fails(
-    "W33: records whether the execute that never produced a response was cross-origin",
-    async () => {
-      const view = await connectTyped(BASE);
-      executeAnswer = () => Promise.reject(new TypeError("Failed to fetch"));
-      await runInBackground(view);
+  it("W33: records whether the execute that never produced a response was cross-origin", async () => {
+    const view = await connectTyped(BASE);
+    executeAnswer = () => Promise.reject(new TypeError("Failed to fetch"));
+    await runInBackground(view);
 
-      const alert = view.querySelector("[role='alert']")?.textContent ?? "";
-      expect(alert).toContain("The request did not complete.");
-      expect(alert).not.toMatch(/CORS/);
-      const execution = observations(view).find((o) => o["kind"] === "execution");
-      expect(execution).toMatchObject({ outcome: "transport-failure" });
-      // Today nothing on the record tells a refused preflight from a dead network.
-      expect(execution).toHaveProperty("crossOrigin");
-    },
-  );
+    const alert = view.querySelector("[role='alert']")?.textContent ?? "";
+    expect(alert).toContain("The request did not complete.");
+    expect(alert).not.toMatch(/CORS/);
+    const execution = observations(view).find((o) => o["kind"] === "execution");
+    // Cross-origin with no answer: a refused preflight is possible, so the
+    // record says so rather than leaving it indistinguishable from same-origin.
+    expect(execution).toMatchObject({ outcome: "transport-failure", crossOrigin: true });
+  });
 });
 
 describe("findings 0049/0050: a typed address that is down, not CORS-less", () => {

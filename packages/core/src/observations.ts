@@ -266,6 +266,14 @@ export type Observation =
       readonly problemPresent: boolean;
       /** Names only, of job-document members this layer does not model. */
       readonly unrecognisedKeys: readonly string[];
+      /**
+       * For a request that never produced a response: whether it left the
+       * page's origin, from `TransportError.crossOrigin`. A cross-origin
+       * one may have been refused at its CORS preflight, which a browser does
+       * not tell apart from a network failure; a same-origin one cannot have
+       * been. `undefined` off-browser, and whenever a response arrived.
+       */
+      readonly crossOrigin: boolean | undefined;
     }
   | {
       /**
