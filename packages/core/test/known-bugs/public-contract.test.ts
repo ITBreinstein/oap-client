@@ -3,15 +3,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import {
-  execute,
-  findLink,
-  getJob,
-  isJobState,
-  readBodyLinks,
-  type Execution,
-  type JobState,
-} from "../../src/index.js";
+import { execute, getJob, isJobState, type Execution, type JobState } from "../../src/index.js";
 
 /** An execute's outcome, or what it threw, as one value to assert on. */
 function settle(promise: Promise<Execution>): Promise<Execution | Error> {
@@ -26,19 +18,6 @@ function json(body: unknown, status = 200, headers: Record<string, string> = {})
     headers: { "Content-Type": "application/json", ...headers },
   });
 }
-
-describe("readBodyLinks() is typed as validated Link[] but returns raw entries", () => {
-  it.fails("C11: findLink over its result does not throw on a link with no rel", () => {
-    // Exported publicly; its return type promises `Link` (rel: string, absolute href).
-    const links = readBodyLinks({ links: [{ href: "relative/only" }] });
-    expect(() => findLink(links ?? [], "self")).not.toThrow();
-  });
-
-  it.fails("C11: findLink over its result does not throw on a null entry", () => {
-    const links = readBodyLinks({ links: [null] });
-    expect(() => findLink(links ?? [], "self")).not.toThrow();
-  });
-});
 
 describe("isJobState() narrows to a lowercase literal it did not check", () => {
   it.fails("C12: a value it accepts is one of the JobState literals", () => {

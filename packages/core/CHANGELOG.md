@@ -5,6 +5,17 @@ at 0.5.0; earlier versions are recorded only in the git history.
 
 ## Unreleased
 
+### Breaking
+
+- `readBodyLinks()` returns `readonly unknown[] | undefined`, not
+  `readonly Link[] | undefined`. It never checked its entries: an entry with no
+  `rel`, or `null`, reached `findLink()` typed as a `Link`, and `findLink()`
+  threw. Hand its result to `collectLinks()` or `resolveBodyLinks()`, which
+  check each entry and resolve its href, and look links up in what they return.
+  Their `bodyLinks` parameter is widened to `readonly unknown[] | undefined` to
+  match, which breaks no caller. Code that passed `readBodyLinks()` straight to
+  `findLink()` or `findLinks()` stops compiling, and was the code that crashed.
+
 ### Fixed
 
 - `createClient` adds the trailing slash a base URL needs to its _path_. It used
