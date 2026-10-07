@@ -76,7 +76,9 @@ observation.
 status, the raw `Headers`, the parsed media type (`+json` included, so
 `application/geo+json` reads as JSON), `Content-Crs`, the `Content-Disposition`
 filename, `Retry-After` in milliseconds from either wire format, `Location`
-resolved against the _final_ URL, and the `Link` header.
+resolved against the _final_ URL (undefined when it is empty or cannot be
+resolved, with `locationRaw` still holding what was sent), and the `Link`
+header.
 
 Its readers are read-once-safe: an HTTP body streams exactly once, so the first
 reader buffers it and `json()`, `text()`, `blob()` and `arrayBuffer()` all
@@ -487,8 +489,9 @@ the header route works perfectly; in a browser, against the same server, it is
 silently absent.
 
 So a job is located by `Location` first, then by a `monitor` or `self` link in the
-response body, and `discoveredVia` records which route was taken. If neither
-exists, `AmbiguousExecutionResponseError` names the status, whether `Location` was
+response body, and `discoveredVia` records which route was taken. A `Location`
+that is empty or cannot be resolved counts as none, so a job's `statusUrl` is
+always absolute. If neither exists, `AmbiguousExecutionResponseError` names the status, whether `Location` was
 present, the media type and every body relation found — because a guess here
 produces a job handle pointing nowhere, which fails later and somewhere else.
 

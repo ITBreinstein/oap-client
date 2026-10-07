@@ -174,6 +174,18 @@ describe("location", () => {
     expect(envelope("{}").location).toBeUndefined();
     expect(envelope("{}").locationRaw).toBeUndefined();
   });
+
+  it.each([
+    ["empty", ""],
+    ["blank", "   "],
+    ["unresolvable", "http://bad host/jobs/1"],
+  ])("has no location when the header is %s, and keeps what was sent (C13)", (_label, raw) => {
+    // Empty resolved to the response's own URL; unresolvable was kept as it
+    // was. Neither is an absolute URL to go to.
+    const env = envelope(null, { status: 201, headers: { location: raw } });
+    expect(env.location).toBeUndefined();
+    expect(env.locationRaw).toBe(raw.trim());
+  });
 });
 
 describe("links", () => {

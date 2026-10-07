@@ -3,14 +3,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { execute, getJob, type Execution } from "../../src/index.js";
-
-/** An execute's outcome, or what it threw, as one value to assert on. */
-function settle(promise: Promise<Execution>): Promise<Execution | Error> {
-  return promise.catch((error: unknown) =>
-    error instanceof Error ? error : new Error(String(error)),
-  );
-}
+import { getJob } from "../../src/index.js";
 
 function json(body: unknown, status = 200, headers: Record<string, string> = {}): Response {
   return new Response(JSON.stringify(body), {
@@ -18,36 +11,6 @@ function json(body: unknown, status = 200, headers: Record<string, string> = {})
     headers: { "Content-Type": "application/json", ...headers },
   });
 }
-
-describe("JobHandle.statusUrl is documented as absolute", () => {
-  it.fails("C13: is absolute even when Location cannot be resolved", async () => {
-    const fetch = (): Promise<Response> =>
-      Promise.resolve(json(null, 201, { Location: "http://bad host/jobs/1" }));
-    const execution = await execute("https://service.test/processes", "p", {
-      inputs: {},
-      mode: "async",
-      fetch,
-    });
-    expect(execution.kind).toBe("job");
-    if (execution.kind !== "job") return;
-    expect(() => new URL(execution.job.statusUrl)).not.toThrow();
-  });
-
-  it.fails(
-    "C13: an empty Location does not become a handle pointing at the execute endpoint",
-    async () => {
-      const fetch = (): Promise<Response> => Promise.resolve(json(null, 201, { Location: "" }));
-      const outcome = await settle(
-        execute("https://service.test/processes", "p", { inputs: {}, mode: "async", fetch }),
-      );
-      // Either an AmbiguousExecutionResponseError or a real job URL; not the POST target.
-      if (outcome instanceof Error) return;
-      expect(outcome.kind === "job" ? outcome.job.statusUrl : "").not.toBe(
-        "https://service.test/processes/p/execution",
-      );
-    },
-  );
-});
 
 describe("JobStatus.exception", () => {
   it.fails(
