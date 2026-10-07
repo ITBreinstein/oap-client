@@ -34,8 +34,10 @@ export function initialValue(control: Control, required: boolean): unknown {
       return value;
     }
     case "list":
-      // One empty row to start from; the encoder drops empty rows.
-      return [initialValue(control.item, true)];
+      // One row to start from, as required as the list is. An optional list's
+      // row starts empty and the encoder drops it; started as a required item
+      // it held a boolean's `false` or the item's default, and sent it (W18).
+      return [initialValue(control.item, required)];
     case "bbox":
     case "geometry":
     case "json":

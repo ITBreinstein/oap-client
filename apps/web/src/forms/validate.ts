@@ -19,7 +19,7 @@
  */
 
 import { classifyCrs } from "./crs.js";
-import { isAbsent, isGeoJsonText, isRawJson, type FormValues } from "./encode.js";
+import { isAbsentFor, isGeoJsonText, isRawJson, type FormValues } from "./encode.js";
 import { shapesOfText } from "./geometry.js";
 import { isJsonArray, isJsonObject } from "./json.js";
 import type { Control, FormPlan, NumberControl } from "./plan.js";
@@ -44,7 +44,9 @@ function describeRange(control: NumberControl): string {
 }
 
 function checkNumber(control: NumberControl, value: unknown): string | undefined {
-  const parsed = typeof value === "number" ? value : Number(String(value).trim());
+  const text = String(value).trim();
+  // `Number("")` is 0, which would pass (W27).
+  const parsed = typeof value === "number" ? value : text === "" ? Number.NaN : Number(text);
   const kind = control.integer ? "a whole number" : "a number";
   const range = describeRange(control);
   const ask = `Enter ${kind}${range === "" ? "" : ` ${range}`}.`;
@@ -125,7 +127,9 @@ function checkControl(control: Control, value: unknown): string | undefined {
       return href === "" && format?.object === true ? jsonError(text) : undefined;
     }
     case "list": {
-      const items = (isJsonArray(value) ? value : [value]).filter((item) => !isAbsent(item));
+      const items = (isJsonArray(value) ? value : [value]).filter(
+        (item) => !isAbsentFor(control.item, item),
+      );
       if (control.minItems !== undefined && items.length < control.minItems) {
         return `Give at least ${String(control.minItems)} values.`;
       }
@@ -157,9 +161,11 @@ export function validateForm(plan: FormPlan, values: FormValues): FieldErrors {
   const errors = new Map<string, string>();
   for (const field of plan.fields) {
     const value = Object.hasOwn(values, field.id) ? values[field.id] : undefined;
+    const { control } = field;
+    const item = control.kind === "list" ? control.item : control;
     const empty =
-      isAbsent(value) ||
-      (isJsonArray(value) && value.filter((item) => !isAbsent(item)).length === 0);
+      isAbsentFor(control, value) ||
+      (isJsonArray(value) && value.every((entry) => isAbsentFor(item, entry)));
     if (empty) {
       if (field.required) errors.set(field.id, "Required. Fill this in before running.");
       continue;

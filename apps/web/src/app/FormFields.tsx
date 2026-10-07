@@ -12,6 +12,7 @@
  */
 
 import { useId, type ReactNode } from "react";
+import { initialValue } from "../forms/defaults.js";
 import { bareObjectHint, isRawJson, type FormValues } from "../forms/encode.js";
 import type {
   CheckboxControl,
@@ -191,8 +192,14 @@ function JsonInput({ id, value, describedBy, onChange }: ControlProps<JsonContro
   );
 }
 
+/**
+ * A repeatable input. Each row is as required as the list (W18): in an optional
+ * list a yes/no row offers "Not set", which leaves the row out, rather than an
+ * unticked box that reads as "No" and sends nothing. A row added here starts
+ * where the list's first row did.
+ */
 function ListInput(props: ControlProps<ListControl>) {
-  const { id, control, value, onChange, label, describedBy } = props;
+  const { id, control, value, required, onChange, label, describedBy } = props;
   const items: readonly unknown[] = Array.isArray(value)
     ? value
     : value === undefined
@@ -214,7 +221,7 @@ function ListInput(props: ControlProps<ListControl>) {
               id={`${id}-${String(index)}`}
               control={control.item}
               value={item}
-              required
+              required={required}
               describedBy={undefined}
               label={`${label}, value ${String(index + 1)}`}
               onChange={(next) => {
@@ -238,7 +245,7 @@ function ListInput(props: ControlProps<ListControl>) {
         className="secondary"
         disabled={full}
         onClick={() => {
-          onChange([...items, undefined]);
+          onChange([...items, initialValue(control.item, required)]);
         }}
       >
         Add a value

@@ -138,6 +138,16 @@ export function isAbsent(value: unknown): boolean {
   return false;
 }
 
+/**
+ * {@link isAbsent}, for a value held by `control`. A number field holding only
+ * spaces is blank too (W27): read as a number it was 0, so it passed the
+ * checks, and it was sent as the string " ". A text field's spaces are text.
+ */
+export function isAbsentFor(control: Control, value: unknown): boolean {
+  if (control.kind === "number" && typeof value === "string") return value.trim() === "";
+  return isAbsent(value);
+}
+
 function isComplexValue(value: unknown): value is ComplexValue {
   return isJsonObject(value) && typeof value["format"] === "number";
 }
@@ -268,7 +278,7 @@ function encodeControl(
       // A lone value for a repeatable input is a list of one, not an error.
       const items = isJsonArray(value) ? value : [value];
       return items
-        .filter((item) => !isAbsent(item))
+        .filter((item) => !isAbsentFor(control.item, item))
         .map((item) => encodeControl(control.item, item, note));
     }
     case "bbox":
@@ -306,7 +316,7 @@ export function toExecuteBody(plan: FormPlan, values: FormValues): ExecuteBody {
     // N5: a bare `values[id]` reads Object.prototype for an id like
     // "constructor", and would send it.
     const supplied = Object.hasOwn(values, field.id) ? values[field.id] : undefined;
-    if (isAbsent(supplied)) continue;
+    if (isAbsentFor(field.control, supplied)) continue;
 
     const encoded = encodeControl(field.control, supplied, (code, crs) => {
       notes.push({ inputId: field.id, code, crs });
