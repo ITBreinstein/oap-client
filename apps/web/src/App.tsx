@@ -137,36 +137,42 @@ export function App({ config = STATIC_ONLY, configWarning }: AppProps) {
       break;
   }
 
+  // While the relay offer is open, everything else is inert: no keyboard or
+  // pointer can reach Connect or the jobs behind the question (review W22).
+  const offerOpen = state.stage === "choose-endpoint" && state.offer !== undefined;
+
   return (
     <MapLimitsContext value={mapLimits}>
       <DrawContext.Provider value={draw}>
         <div className="app" data-relay-stream={view.snapshot?.relay}>
-          <header className="app-header">
+          <header className="app-header" inert={offerOpen}>
             <h1>OGC API - Processes client</h1>
             <p className="muted" data-testid="core-version">
               core {VERSION}
             </p>
           </header>
           {configWarning !== undefined && (
-            <p className="notice config-warning" role="alert" data-testid="config-warning">
+            <p
+              className="notice config-warning"
+              role="alert"
+              data-testid="config-warning"
+              inert={offerOpen}
+            >
               {configWarning}
             </p>
           )}
           {relayUrl === undefined && (
-            <p className="muted static-only" data-testid="static-only">
+            <p className="muted static-only" data-testid="static-only" inert={offerOpen}>
               This page runs without the relay: every request goes straight from your browser to the
               service. A service must allow web pages to read it (CORS), and a background run is
               found only where the service lets a page read the job&apos;s address. Callbacks, and
               reading services that send no CORS headers, need the relay.
             </p>
           )}
-          <div className="layout">
+          <div className="layout" inert={offerOpen}>
             <main className="panel" ref={panel}>
               {state.stage !== "choose-endpoint" && state.route === "relay" && <RelayBanner />}
               {screen}
-              {state.stage === "choose-endpoint" && state.offer !== undefined && (
-                <RelayOffer onConfirm={commands.confirmRelay} onDecline={commands.declineRelay} />
-              )}
               <JobsPanel
                 jobs={view.snapshot?.jobs ?? []}
                 activeJob={
@@ -197,6 +203,9 @@ export function App({ config = STATIC_ONLY, configWarning }: AppProps) {
               />
             </MapBoundary>
           </div>
+          {offerOpen && (
+            <RelayOffer onConfirm={commands.confirmRelay} onDecline={commands.declineRelay} />
+          )}
         </div>
       </DrawContext.Provider>
     </MapLimitsContext>
