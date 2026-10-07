@@ -24,7 +24,7 @@ import type { ResponseEnvelope } from "../http/envelope.js";
 import { collectLinks, readBodyLinks, resolveBodyLinks } from "../links/resolve.js";
 import { MalformedJobDocumentError } from "../errors.js";
 import type { ObservationSink } from "../observations.js";
-import { isJobState, isTerminalState, type JobState, type JobStatus } from "./types.js";
+import { isTerminalState, toJobState, type JobState, type JobStatus } from "./types.js";
 
 /**
  * Top-level members this layer models. Anything else is recorded by name —
@@ -173,13 +173,14 @@ export function parseJobStatus(body: unknown, options: ParseJobStatusOptions): J
     );
   }
 
-  const recognised = isJobState(rawStatus);
+  const named = toJobState(rawStatus);
+  const recognised = named !== undefined;
   if (!recognised) warnings.push("unrecognised-status");
 
   // An unknown status reads as `running`: non-terminal, so the loop keeps
   // going under its own cap rather than declaring a job finished on a word it
   // does not know.
-  const status: JobState = recognised ? (rawStatus.toLowerCase() as JobState) : "running";
+  const status: JobState = named ?? "running";
 
   const jobId = readJobId(body, documentUrl, options.listEntry === true);
   if (jobId === undefined) warnings.push("no-job-id");

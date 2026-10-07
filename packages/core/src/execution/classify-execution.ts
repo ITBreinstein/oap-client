@@ -54,7 +54,7 @@ import { readBodyLinks, resolveBodyLinks } from "../links/resolve.js";
 import { findLink } from "../links/find.js";
 import type { Link } from "../links/types.js";
 import type { ObservationSink } from "../observations.js";
-import { isJobState } from "../vocabulary/job-status.js";
+import { toJobState } from "../vocabulary/job-status.js";
 import type { Execution, ExecutionMode, JobHandle } from "./types.js";
 
 /**
@@ -159,7 +159,7 @@ export function isJobDocument(body: unknown): boolean {
   // The vocabulary lives in `vocabulary/job-status.ts`, below both this layer
   // and `jobs/`: one list, imported, rather than two copies that must agree
   // and eventually will not.
-  return typeof status === "string" && isJobState(status);
+  return typeof status === "string" && toJobState(status) !== undefined;
 }
 
 /** The id the body itself names: `jobID`, then `id`. */

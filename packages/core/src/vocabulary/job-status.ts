@@ -60,9 +60,23 @@ const TERMINAL_STATES: ReadonlySet<string> = new Set<JobState>([
   "dismissed",
 ]);
 
-/** Is this string in the OGC job status vocabulary? Case-insensitive: servers are inconsistent. */
+/**
+ * Is this string exactly one of the OGC job status values? Case-sensitive, as
+ * the vocabulary is, so that what it narrows to is what the string holds: it
+ * accepted "Successful" and told the compiler it was "successful" (review C12).
+ * To read a status a server sent, in whatever case, use {@link toJobState}.
+ */
 export function isJobState(value: string): value is JobState {
-  return JOB_STATES.has(value.toLowerCase());
+  return JOB_STATES.has(value);
+}
+
+/**
+ * The OGC job status a string names, in any case, as the vocabulary spells it;
+ * `undefined` when it names none. Servers are inconsistent about case.
+ */
+export function toJobState(value: string): JobState | undefined {
+  const lower = value.toLowerCase();
+  return isJobState(lower) ? lower : undefined;
 }
 
 /** Is this a status the job cannot leave? Unknown statuses are **not** terminal. */

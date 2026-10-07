@@ -180,6 +180,7 @@ export {
   readJobStatus,
   resolveResultsUrl,
   resultsUrlFor,
+  toJobState,
   waitForJob,
 } from "./jobs/index.js";
 export type {

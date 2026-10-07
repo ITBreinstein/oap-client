@@ -3,7 +3,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { execute, getJob, isJobState, type Execution, type JobState } from "../../src/index.js";
+import { execute, getJob, type Execution } from "../../src/index.js";
 
 /** An execute's outcome, or what it threw, as one value to assert on. */
 function settle(promise: Promise<Execution>): Promise<Execution | Error> {
@@ -18,23 +18,6 @@ function json(body: unknown, status = 200, headers: Record<string, string> = {})
     headers: { "Content-Type": "application/json", ...headers },
   });
 }
-
-describe("isJobState() narrows to a lowercase literal it did not check", () => {
-  it.fails("C12: a value it accepts is one of the JobState literals", () => {
-    const raw = "Successful";
-    const vocabulary: readonly JobState[] = [
-      "accepted",
-      "running",
-      "successful",
-      "failed",
-      "dismissed",
-    ];
-    if (isJobState(raw)) {
-      // TypeScript now believes `raw` is JobState.
-      expect(vocabulary).toContain(raw);
-    }
-  });
-});
 
 describe("JobHandle.statusUrl is documented as absolute", () => {
   it.fails("C13: is absolute even when Location cannot be resolved", async () => {

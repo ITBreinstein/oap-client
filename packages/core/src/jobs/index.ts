@@ -34,7 +34,7 @@ export { isAbsoluteUrl, jobUrlFor, jobsFallback, resultsUrlFor } from "./job-url
 // The vocabulary is re-exported from its own module rather than from
 // `./types.js`, so that a reader of this file can see where it actually lives.
 // The public surface is identical either way — see `vocabulary/job-status.ts`.
-export { isJobState, isTerminalState } from "../vocabulary/job-status.js";
+export { isJobState, isTerminalState, toJobState } from "../vocabulary/job-status.js";
 export type { JobState } from "../vocabulary/job-status.js";
 export type {
   JobList,
