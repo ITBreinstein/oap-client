@@ -10,9 +10,12 @@ reference OGC API - Processes servers, and nothing else.
    0039). For endpoints configured for it, the relay sends that one execute
    request on the browser's behalf and hands back `Location`.
 2. **Rings a doorbell when a job changes.** It receives the OGC server's
-   `subscriber` callbacks and tells the browser "something happened to job X"
-   over a server-sent event stream. Never _what_ happened: the browser reads
-   the job's status from the server itself.
+   `subscriber` callbacks and tells the browser "the server called job X's
+   success URI" (or in-progress, or failed) over a server-sent event stream.
+   Never anything the server sent with the call: the browser reads the job's
+   status from the server itself. Which URI was called tells the browser only
+   that a success callback was delivered, so the server has no reason to
+   rewrite a `successful` job as `failed` (finding 0047).
 
 3. **Reads a server that sends no CORS headers**, for endpoints configured
    with `readRoute: "relay"` only. ZOO sends none at all, so a web page cannot
@@ -113,23 +116,27 @@ All three are made in the config, before any request exists.
   the thing that makes the relay add a `subscriber` — only while its doorbell
   stream is open, and otherwise starts the job for polling only
   (`sessionWithheld` on the `execute-route` observation). And for a job it
-  started with callbacks, it reads a first `successful` once more, about two
-  seconds later, and shows both statuses if they differ.
+  started with callbacks, it keeps reading a first `successful`, less often
+  each time, until the doorbell says the success callback arrived or three
+  minutes have passed, marks the result "not yet confirmed" meanwhile, and
+  shows both statuses if they differ. A receiver that hangs rather than
+  refuses makes the server wait for its connection attempt to time out,
+  about two minutes, before it rewrites the job (review W14).
 
 ## HTTP API
 
-| Route                                     | Caller     | Answers                                                                                                   |
-| ----------------------------------------- | ---------- | --------------------------------------------------------------------------------------------------------- |
-| `GET /healthz`                            | operator   | `{ "ok": true }`, and `"build"` when the process was started with `RELAY_BUILD_ID`                        |
-| `GET /endpoints`                          | browser    | each endpoint's `key`, `baseUrl`, `executeRoute`, `readRoute`, `callbacks`                                |
-| `POST /sessions`                          | browser    | `201 { token, expiresAt }` — the session token                                                            |
-| `GET /sessions/events`                    | browser    | `text/event-stream`: `ready`, then `job` events `{ "ref" }`                                               |
-| `POST /execute/{endpointKey}/{processId}` | browser    | `{ upstream: { status, location, contentType, preferenceApplied, body }, registration: { ref } \| null }` |
-|                                           |            | when the server created a job (`201`/`202`); otherwise the server's answer, raw, with `X-Relay-Raw: 1`    |
-|                                           |            | — and always raw for a `readRoute: "relay"` endpoint and no `Prefer: respond-async`                       |
-| `GET /read/{endpointKey}/{path*}`         | browser    | the server's answer to `GET {baseUrl}/{path}?{query}`, raw; session token required                        |
-| `DELETE /read/{endpointKey}/jobs/{id}`    | browser    | the server's answer to dismissing that job, raw; session token required                                   |
-| `POST /callbacks/{token}/{kind}`          | OGC server | `200`, or `404` for a token it does not know                                                              |
+| Route                                     | Caller     | Answers                                                                                                                          |
+| ----------------------------------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /healthz`                            | operator   | `{ "ok": true }`, and `"build"` when the process was started with `RELAY_BUILD_ID`                                               |
+| `GET /endpoints`                          | browser    | each endpoint's `key`, `baseUrl`, `executeRoute`, `readRoute`, `callbacks`                                                       |
+| `POST /sessions`                          | browser    | `201 { token, expiresAt }` — the session token                                                                                   |
+| `GET /sessions/events`                    | browser    | `text/event-stream`: `ready`, then `job` events `{ "ref", "callbacks" }`: the callbacks called since the last event for that job |
+| `POST /execute/{endpointKey}/{processId}` | browser    | `{ upstream: { status, location, contentType, preferenceApplied, body }, registration: { ref } \| null }`                        |
+|                                           |            | when the server created a job (`201`/`202`); otherwise the server's answer, raw, with `X-Relay-Raw: 1`                           |
+|                                           |            | — and always raw for a `readRoute: "relay"` endpoint and no `Prefer: respond-async`                                              |
+| `GET /read/{endpointKey}/{path*}`         | browser    | the server's answer to `GET {baseUrl}/{path}?{query}`, raw; session token required                                               |
+| `DELETE /read/{endpointKey}/jobs/{id}`    | browser    | the server's answer to dismissing that job, raw; session token required                                                          |
+| `POST /callbacks/{token}/{kind}`          | OGC server | `200`, or `404` for a token it does not know                                                                                     |
 
 The browser side of this contract lives in
 [`apps/web/src/relay/`](../web/src/relay/), not in `packages/core`: the

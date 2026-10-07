@@ -111,6 +111,32 @@ describe("readEventStream", () => {
 });
 
 describe("openDoorbells", () => {
+  it("passes on which callbacks rang, and only names it knows (W14)", async () => {
+    const relay = fakeRelay();
+    const rung: [string, readonly string[]][] = [];
+    const doorbells = openDoorbells({
+      relay: relay.relay,
+      schedule: manualSchedule().schedule,
+      onDoorbell: (ref, callbacks) => rung.push([ref, callbacks]),
+      onOpen: () => undefined,
+    });
+    await settle();
+
+    relay.latest().send("event: ready\ndata: {}\n\n");
+    relay.latest().send('event: job\ndata: {"ref":"r1","callbacks":["in-progress","success"]}\n\n');
+    relay.latest().send('event: job\ndata: {"ref":"r2","callbacks":["done",7]}\n\n');
+    // A relay from before callbacks were named.
+    relay.latest().send('event: job\ndata: {"ref":"r3"}\n\n');
+    await settle();
+
+    expect(rung).toEqual([
+      ["r1", ["success", "in-progress"]],
+      ["r2", []],
+      ["r3", []],
+    ]);
+    doorbells.close();
+  });
+
   it("delivers a job event as a ref, and nothing else", async () => {
     const relay = fakeRelay();
     const rung: string[] = [];
@@ -258,9 +284,11 @@ describe("a relay restart in the middle of a job", () => {
       },
       onChange: () => undefined,
       schedule: timers.schedule,
+      now: timers.now,
       // Long baseline, so only the reconnect can explain a prompt read.
       baselineMs: 60_000,
       coalesceMs: 250,
+      confirmWindowMs: 10_000,
     });
     const doorbells = openDoorbells({
       relay: relay.relay,
@@ -295,9 +323,13 @@ describe("a relay restart in the middle of a job", () => {
     expect(relay.opened).toEqual(["session-1", "session-1", "session-2"]);
     expect(reads).toHaveLength(2);
     expect(reconciler.jobs()[0]?.status?.status).toBe("successful");
-    // The job had callbacks, so a first successful is read once more (0047).
+    // The job had callbacks, and their success call can no longer ring, so
+    // the page reads on until the window is over (0047, review W14).
     await timers.advance(2_000);
     expect(reads).toHaveLength(3);
+    expect(reconciler.jobs()[0]?.settled).toBe(false);
+    await timers.advance(15_000);
+    expect(reconciler.jobs()[0]?.confirmation).toEqual({ state: "unchanged" });
     expect(reconciler.jobs()[0]?.settled).toBe(true);
     doorbells.close();
     reconciler.dispose();

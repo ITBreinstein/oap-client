@@ -23,8 +23,15 @@ export interface Clock {
 
 export const systemClock: Clock = { now: () => Date.now() };
 
-/** Told that something happened to the job behind `ref`. Never told what. */
-export type DoorbellListener = (ref: string) => void;
+/** The three `subscriber` members, as path segments. */
+export const CALLBACK_KINDS = ["success", "in-progress", "failed"] as const;
+export type CallbackKind = (typeof CALLBACK_KINDS)[number];
+
+/**
+ * Told that the server called one of the callbacks of the job behind `ref`,
+ * and which. Never told anything the server sent with it.
+ */
+export type DoorbellListener = (ref: string, callback: CallbackKind) => void;
 
 export interface Registration {
   readonly ref: string;
@@ -187,10 +194,11 @@ export class RelayState {
 
   /**
    * A callback arrived for `callbackToken`. Rings every open stream of the
-   * owning session with the registration's ref, and nothing else: which of the
-   * three URIs was called, and anything in the request, stay here.
+   * owning session with the registration's ref and which of the three URIs
+   * was called, and nothing else: anything in the request stays here. The
+   * page uses the URI only to know a success callback was delivered (W14).
    */
-  ring(callbackToken: string): RingOutcome {
+  ring(callbackToken: string, callback: CallbackKind): RingOutcome {
     const registration = this.#byCallbackToken.get(callbackToken);
     if (registration === undefined) return "unknown";
     if (registration.expiresAt <= this.#clock.now()) {
@@ -200,7 +208,7 @@ export class RelayState {
     const session = this.#liveSession(registration.sessionToken);
     if (session === undefined) return "unknown";
     if (session.listeners.size === 0) return "no-listener";
-    for (const listener of session.listeners.keys()) listener(registration.ref);
+    for (const listener of session.listeners.keys()) listener(registration.ref, callback);
     return "delivered";
   }
 

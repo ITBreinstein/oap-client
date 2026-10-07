@@ -8,7 +8,9 @@
  *    hands it back.
  * 2. **Hear that a job changed** without polling hard. The relay receives the
  *    OGC server's callbacks and rings a doorbell on the browser's event stream:
- *    "something happened to job X", never what.
+ *    "the server called job X's success (or in-progress, or failed) URI",
+ *    never anything it sent with the call. That a success call arrived is
+ *    what tells the browser it was delivered (finding 0047, review W14).
  *
  * 3. **Read a server that sends no CORS headers** (phase 3, finding 0050) —
  *    only for endpoints configured with `readRoute: "relay"`, only under their
@@ -55,18 +57,16 @@ import {
   type ForwardRequest,
 } from "./forward.js";
 import {
+  CALLBACK_KINDS,
   RelayState,
   stateOptionsFrom,
   systemClock,
+  type CallbackKind,
   type Clock,
   type RingOutcome,
 } from "./state.js";
 import { isWellFormedSecretToken } from "./tokens.js";
 import { executionUrl, postExecute, type ExecuteAnswer } from "./upstream.js";
-
-/** The three `subscriber` members, as path segments. */
-export const CALLBACK_KINDS = ["success", "in-progress", "failed"] as const;
-export type CallbackKind = (typeof CALLBACK_KINDS)[number];
 
 function isCallbackKind(value: string): value is CallbackKind {
   return CALLBACK_KINDS.some((kind) => kind === value);
@@ -526,16 +526,18 @@ export function createApp(options: AppOptions = {}): Hono {
     // first write is held rather than lost. `pending` is also the coalescing:
     // a ref already waiting to be written is not queued twice, so a burst of
     // callbacks for one job — ZOO sends one a second (finding 0048) — becomes
-    // one event.
-    const pending = new Set<string>();
+    // one event, naming each callback that rang once.
+    const pending = new Map<string, CallbackKind[]>();
     let wake: (() => void) | undefined;
     // Mutated from callbacks, so kept on an object: a `let` here is narrowed
     // to its initial value by the checker, which cannot see the callbacks.
     const flags = { open: true, heartbeatDue: false };
     const unsubscribe = state.listen(
       token,
-      (ref) => {
-        pending.add(ref);
+      (ref, callback) => {
+        const callbacks = pending.get(ref) ?? [];
+        if (!callbacks.includes(callback)) callbacks.push(callback);
+        pending.set(ref, callbacks);
         wake?.();
       },
       // The state closes a stream itself: for a newer one on the same session,
@@ -571,10 +573,11 @@ export function createApp(options: AppOptions = {}): Hono {
         await stream.writeSSE({ event: "ready", data: "{}" });
         armHeartbeat();
         while (flags.open) {
-          const ref = pending.values().next();
-          if (!ref.done) {
-            pending.delete(ref.value);
-            await stream.writeSSE({ event: "job", data: JSON.stringify({ ref: ref.value }) });
+          const next = pending.entries().next();
+          if (!next.done) {
+            const [ref, callbacks] = next.value;
+            pending.delete(ref);
+            await stream.writeSSE({ event: "job", data: JSON.stringify({ ref, callbacks }) });
             continue;
           }
           if (flags.heartbeatDue) {
@@ -812,7 +815,7 @@ export function createApp(options: AppOptions = {}): Hono {
     if (!isCallbackKind(kind) || !isWellFormedSecretToken(token)) {
       return c.body(null, 404, { "Cache-Control": "no-store" });
     }
-    const outcome = state.ring(token);
+    const outcome = state.ring(token, kind);
     emit({ kind: "callback", callbackKind: kind, outcome });
     return c.body(null, outcome === "unknown" ? 404 : 200, { "Cache-Control": "no-store" });
   });

@@ -14,6 +14,8 @@ export interface ManualSchedule {
   advance(ms: number): Promise<void>;
   /** Callbacks still waiting, and when. */
   pending(): number[];
+  /** The scheduler's own time, for a component that also reads a clock. */
+  readonly now: () => number;
 }
 
 /**
@@ -52,6 +54,7 @@ export function manualSchedule(): ManualSchedule {
       await settle();
     },
     pending: () => timers.filter((timer) => !timer.cancelled).map((timer) => timer.at - now),
+    now: () => now,
   };
 }
 

@@ -162,7 +162,7 @@ describe("a status the server changed after a first successful (finding 0047)", 
     const note = page.querySelector("[data-status-changed]");
     expect(note?.getAttribute("data-status-changed")).toBe("successful->failed");
     expect(note?.textContent).toContain(
-      "The server first reported this job successful, and a moment later failed — callback could not be sent.",
+      "The server first reported this job successful, and later failed — callback could not be sent.",
     );
     expect(page.querySelector('[data-output-id="echo"]')).not.toBeNull();
   });
@@ -184,6 +184,32 @@ describe("a status the server changed after a first successful (finding 0047)", 
       withResults,
       row({ status: status("successful", JOB), confirmation: { state: "unchanged" } }),
     );
+    expect(page.querySelector("[data-status-changed]")).toBeNull();
+  });
+
+  it("says the result is not yet confirmed while the page reads on (review W14)", () => {
+    const page = screen(
+      withResults,
+      row({ status: status("successful", JOB), confirmation: { state: "pending" } }),
+    );
+    const note = page.querySelector("[data-result-of] [data-not-yet-confirmed]");
+    expect(note?.textContent).toContain("Not yet confirmed by the server.");
+    expect(note?.textContent).toContain("for up to 3 minutes");
+    // Information, not a warning: nothing is known to be wrong.
+    expect(note?.closest(".notice, .error-box, [role='alert']")).toBeNull();
+    expect(page.querySelector('[data-output-id="echo"]')).not.toBeNull();
+  });
+
+  it("says nothing more once the success callback was delivered", () => {
+    const page = screen(
+      withResults,
+      row({
+        status: status("successful", JOB),
+        settled: true,
+        confirmation: { state: "delivered" },
+      }),
+    );
+    expect(page.querySelector("[data-not-yet-confirmed]")).toBeNull();
     expect(page.querySelector("[data-status-changed]")).toBeNull();
   });
 });

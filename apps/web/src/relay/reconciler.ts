@@ -22,24 +22,33 @@
  */
 
 import { JobNotFoundError, type JobStatus } from "@breinstein/oap-client";
+import type { CallbackKind } from "./contract.js";
 import { systemSchedule, type Schedule } from "./doorbells.js";
 
 /**
- * The second read after a job's first `successful`, when callbacks were
- * registered for it (finding 0047).
+ * The reads after a job's first `successful`, when callbacks were registered
+ * for it (finding 0047).
  *
  * A server may write `successful`, then fail to deliver the success callback
- * and rewrite the job as `failed` — pygeoapi does, within a fraction of a
- * second. Only a job with callbacks is exposed to that, so only such a job is
- * read once more; the choice rests on what was asked of the server, never on
- * which server it is.
+ * and rewrite the job as `failed`. pygeoapi does: within a fraction of a
+ * second when the connection is refused, and only once the connection attempt
+ * times out, minutes later, when the receiver does not answer. One read two
+ * seconds later missed the second case (review W14). So the job is read again,
+ * less often each time, until the success callback is known to have arrived —
+ * delivered, the server has no reason to rewrite anything — or until
+ * {@link CONFIRM_WINDOW_MS} has passed. Only a job with callbacks is exposed to
+ * this, so only such a job is read again; the choice rests on what was asked
+ * of the server, never on which server it is.
  *
- * - `pending`: the first `successful` was read; the second read is scheduled.
- * - `unchanged`: the second read said the same.
- * - `changed`: it did not. `first` is what the server said before.
+ * - `pending`: the first `successful` was read; the reads go on.
+ * - `delivered`: the success callback reached the relay, so nothing will
+ *   rewrite the status; settled on the read that says `successful`.
+ * - `unchanged`: the window ended with every read saying the same.
+ * - `changed`: a read did not. `first` is what the server said before.
  */
 export type Confirmation =
   | { readonly state: "pending" }
+  | { readonly state: "delivered" }
   | { readonly state: "unchanged" }
   | { readonly state: "changed"; readonly first: JobStatus };
 
@@ -83,8 +92,10 @@ export interface ReconcilerOptions {
   readonly coalesceMs?: number | undefined;
   /** How long a job may stay `accepted` before `acceptedLong` is set. */
   readonly acceptedNoticeMs?: number | undefined;
-  /** How long after a first `successful` the confirming read is made. */
+  /** How long after a first `successful` the first confirming read is made. */
   readonly confirmAfterMs?: number | undefined;
+  /** How long after a first `successful` the confirming reads go on, at most. */
+  readonly confirmWindowMs?: number | undefined;
   /** This client's clock, for `acceptedSince`. */
   readonly now?: (() => number) | undefined;
 }
@@ -94,6 +105,11 @@ export const MAX_INTERVAL_MS = 15_000;
 export const COALESCE_MS = 250;
 export const ACCEPTED_NOTICE_MS = 60_000;
 export const CONFIRM_AFTER_MS = 2_000;
+/**
+ * Three minutes: a callback to a receiver that does not answer fails when the
+ * connection attempt times out, about two minutes with Linux's defaults.
+ */
+export const CONFIRM_WINDOW_MS = 180_000;
 
 interface Entry {
   job: TrackedJob;
@@ -107,6 +123,17 @@ interface Entry {
   inFlight: boolean;
   /** A doorbell arrived while a poll was in flight: poll once more after it. */
   again: boolean;
+  /**
+   * `refresh()` was called while a poll was in flight: read once more after
+   * it, even when that poll settles the job (review W23).
+   */
+  refreshAgain: boolean;
+  /** The success callback rang this job's doorbell. */
+  successDelivered: boolean;
+  /** When the first `successful` was read, in this client's clock. */
+  confirmingSince: number | undefined;
+  /** The wait before the next confirming read. */
+  confirmDelay: number;
 }
 
 export class JobReconciler {
@@ -117,6 +144,7 @@ export class JobReconciler {
   readonly #coalesceMs: number;
   readonly #acceptedNoticeMs: number;
   readonly #confirmAfterMs: number;
+  readonly #confirmWindowMs: number;
   readonly #now: () => number;
   readonly #entries = new Map<string, Entry>();
   readonly #byRef = new Map<string, string>();
@@ -130,6 +158,7 @@ export class JobReconciler {
     this.#coalesceMs = options.coalesceMs ?? COALESCE_MS;
     this.#acceptedNoticeMs = options.acceptedNoticeMs ?? ACCEPTED_NOTICE_MS;
     this.#confirmAfterMs = options.confirmAfterMs ?? CONFIRM_AFTER_MS;
+    this.#confirmWindowMs = options.confirmWindowMs ?? CONFIRM_WINDOW_MS;
     this.#now = options.now ?? (() => Date.now());
   }
 
@@ -159,20 +188,30 @@ export class JobReconciler {
       timerKind: undefined,
       inFlight: false,
       again: false,
+      refreshAgain: false,
+      successDelivered: false,
+      confirmingSince: undefined,
+      confirmDelay: this.#confirmAfterMs,
     };
     this.#entries.set(statusUrl, entry);
     if (ref !== undefined) this.#attach(entry, ref);
     void this.#poll(entry);
   }
 
-  /** The relay rang for `ref`. Unknown refs are ignored: nothing to reconcile. */
-  doorbell(ref: string): void {
+  /**
+   * The relay rang for `ref`, naming the callbacks that rang, when it does.
+   * Unknown refs are ignored: nothing to reconcile. A `success` callback is
+   * evidence of delivery, never of state: it ends the confirming reads early,
+   * and a read still decides what the job is.
+   */
+  doorbell(ref: string, callbacks: readonly CallbackKind[] = []): void {
     const statusUrl = this.#byRef.get(ref);
     const entry = statusUrl === undefined ? undefined : this.#entries.get(statusUrl);
     if (entry === undefined || entry.job.settled) return;
+    if (callbacks.includes("success")) entry.successDelivered = true;
     this.#update(entry, { doorbells: entry.job.doorbells + 1 });
-    // The success callback itself rings: the confirming read keeps its time.
-    if (entry.job.confirmation?.state === "pending") return;
+    // Any other doorbell leaves the confirming reads to their own time.
+    if (entry.job.confirmation?.state === "pending" && !entry.successDelivered) return;
     this.#pollEarly(entry);
   }
 
@@ -202,6 +241,11 @@ export class JobReconciler {
   refresh(statusUrl: string): void {
     const entry = this.#entries.get(statusUrl);
     if (entry === undefined) return;
+    if (entry.inFlight) {
+      // The read in flight may have left before the change; another follows.
+      entry.refreshAgain = true;
+      return;
+    }
     if (entry.job.settled) this.#update(entry, { settled: false });
     this.#pollEarly(entry);
   }
@@ -277,20 +321,28 @@ export class JobReconciler {
   }
 
   /**
-   * What a read does to the confirmation, and whether the job settles: a
-   * first `successful` for a job with callbacks holds it open for one more
-   * read; that read settles it on whatever it says, if that is terminal.
+   * What a read does to the confirmation, and whether the job settles. A first
+   * `successful` for a job with callbacks holds it open; the reads after it
+   * settle it once the success callback has arrived or the window is over,
+   * and at once on anything else that is terminal.
    */
   #confirmationChange(
-    job: TrackedJob,
+    entry: Entry,
     status: JobStatus,
   ): Pick<TrackedJob, "confirmation"> & { settled?: boolean } {
+    const { job } = entry;
     const confirmation = job.confirmation;
     if (confirmation?.state === "pending") {
       const first = job.status;
-      return first === undefined || first.status === status.status
-        ? { confirmation: { state: "unchanged" } }
-        : { confirmation: { state: "changed", first } };
+      if (first !== undefined && first.status !== status.status) {
+        return { confirmation: { state: "changed", first } };
+      }
+      if (entry.successDelivered) return { confirmation: { state: "delivered" } };
+      const since = entry.confirmingSince ?? this.#now();
+      if (this.#now() - since >= this.#confirmWindowMs) {
+        return { confirmation: { state: "unchanged" } };
+      }
+      return { confirmation, settled: false };
     }
     if (
       confirmation === undefined &&
@@ -298,6 +350,9 @@ export class JobReconciler {
       status.terminal &&
       status.status === "successful"
     ) {
+      if (entry.successDelivered) return { confirmation: { state: "delivered" } };
+      entry.confirmingSince = this.#now();
+      entry.confirmDelay = this.#confirmAfterMs;
       return { confirmation: { state: "pending" }, settled: false };
     }
     return { confirmation };
@@ -320,7 +375,7 @@ export class JobReconciler {
         lastError: undefined,
         settled: status.terminal,
         ...this.#acceptedChange(entry.job, status),
-        ...this.#confirmationChange(entry.job, status),
+        ...this.#confirmationChange(entry, status),
       });
     } catch (error) {
       if (this.#aborted() || !this.#current(entry)) return;
@@ -339,10 +394,28 @@ export class JobReconciler {
     }
     // No timer can be armed while a poll is in flight — an early request
     // then only sets `again` — so a settled job has nothing left to cancel.
-    if (!this.#current(entry) || this.#settled(entry)) return;
-    if (entry.job.confirmation?.state === "pending") {
+    if (!this.#current(entry)) return;
+    if (entry.refreshAgain) {
+      // Dismissal was asked for while this read was out: read again, even if
+      // it settled the job, or a job dismissed as it finished keeps showing
+      // `successful` (review W23).
+      entry.refreshAgain = false;
       entry.again = false;
-      this.#arm(entry, "confirm", this.#confirmAfterMs);
+      if (this.#settled(entry)) this.#update(entry, { settled: false });
+      this.#arm(entry, "early", this.#coalesceMs);
+      return;
+    }
+    if (this.#settled(entry)) return;
+    if (entry.job.confirmation?.state === "pending") {
+      // A success doorbell that rang while this read was out ends the wait.
+      if (entry.again && entry.successDelivered) {
+        entry.again = false;
+        this.#arm(entry, "early", this.#coalesceMs);
+        return;
+      }
+      entry.again = false;
+      this.#arm(entry, "confirm", entry.confirmDelay);
+      entry.confirmDelay = Math.min(Math.round(entry.confirmDelay * 1.5), this.#maxIntervalMs);
       return;
     }
     if (entry.again) {

@@ -294,8 +294,8 @@ export function createJobSession(
       ? undefined
       : openDoorbells({
           relay,
-          onDoorbell: (ref) => {
-            reconciler.doorbell(ref);
+          onDoorbell: (ref, callbacks) => {
+            reconciler.doorbell(ref, callbacks);
           },
           onOpen: ({ reconnect }) => {
             if (reconnect) reconciler.reconnected();
