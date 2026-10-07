@@ -640,6 +640,36 @@ test.describe("the workflow in a browser", () => {
     );
   });
 
+  test("sends a number typed in the raw JSON editor exactly as typed (W28)", async ({ page }) => {
+    // The same injected input as above. A double holds neither number, and
+    // JSON.stringify would send the first rounded and the second as null.
+    await page.route(
+      (url) => url.pathname === "/processes/breinstein-inputs",
+      async (route) => {
+        const response = await route.fetch();
+        const description = (await response.json()) as {
+          inputs: Record<string, { schema: unknown }>;
+        };
+        const comment = description.inputs["comment"];
+        if (comment !== undefined)
+          comment.schema = { oneOf: [{ type: "string" }, { type: "number" }] };
+        await route.fulfill({ response, json: description });
+      },
+    );
+    await connectTyped(page, PYGEOAPI);
+    await openProcess(page, "Every input kind");
+    await fillRequiredInputs(page);
+    const typed = '{"value":{"id":1234567890123456789,"cap":1e400}}';
+    await page.locator('[data-input-id="comment"]').getByRole("textbox").fill(typed);
+
+    const request = page.waitForRequest(
+      (candidate) =>
+        candidate.method() === "POST" && candidate.url().includes("/breinstein-inputs/execution"),
+    );
+    await page.getByRole("button", { name: "Run", exact: true }).click();
+    expect((await request).postData()).toContain(`"comment":${typed}`);
+  });
+
   test("runs in the background through the relay, then cancels a second run", async ({ page }) => {
     await requireService(`${RELAY}/healthz`, "the relay");
     await page.goto("/");

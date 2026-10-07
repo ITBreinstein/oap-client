@@ -8,7 +8,7 @@ import { initialValues } from "../../src/forms/defaults.js";
 import { toExecuteBody } from "../../src/forms/encode.js";
 import { validateForm } from "../../src/forms/validate.js";
 import { resolveFormPlan } from "../../src/forms/resolve.js";
-import { fixtureProcess, planFor } from "./helpers.js";
+import { fixtureProcess, planFor, withoutSourceText } from "./helpers.js";
 
 function errorsFor(inputs: Record<string, unknown>, values: Record<string, unknown>) {
   return Object.fromEntries(validateForm(planFor(inputs), values));
@@ -125,6 +125,43 @@ describe("validateForm", () => {
       JSON.parse('{"__proto__":{"schema":{"type":"string"}}}') as Record<string, unknown>,
     );
     expect(validateForm(plan, {}).get("__proto__")).toBe("Required. Fill this in before running.");
+  });
+});
+
+describe("raw JSON with a number a double cannot hold (W28)", () => {
+  const raw = { filter: { schema: { type: "object", not: { required: ["x"] } } } };
+  const typed = { filter: { rawJson: '{"value":{"id":1234567890123456789,"cap":1e400}}' } };
+
+  it("is let through where the browser sends it as written", () => {
+    expect(errorsFor(raw, typed)).toEqual({});
+  });
+
+  it("is refused, naming the number, where the browser would send another", () => {
+    withoutSourceText(() => {
+      expect(errorsFor(raw, typed)).toEqual({
+        filter:
+          "This browser would send 1234567890123456789 as 1234567890123456800. 1 more number would change too. Open the page in a current browser, or write the number as a string if the process accepts one.",
+      });
+    });
+  });
+
+  it("is refused in a complex input's JSON text too, but not in a geometry", () => {
+    withoutSourceText(() => {
+      const complex = {
+        shape: {
+          schema: {
+            oneOf: [{ type: "string", contentMediaType: "text/plain" }, { type: "object" }],
+          },
+        },
+      };
+      expect(errorsFor(complex, { shape: { format: 1, value: '{"cap":1e400}' } })["shape"]).toMatch(
+        /^This browser would send 1e400 as null\. Open the page/,
+      );
+
+      const area = { area: { schema: { format: "geojson-point" } } };
+      const point = '{"type":"Point","coordinates":[5.12345678901234567890,52.1]}';
+      expect(errorsFor(area, { area: { geojson: point } })).toEqual({});
+    });
   });
 });
 

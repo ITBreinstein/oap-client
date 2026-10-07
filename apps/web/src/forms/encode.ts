@@ -18,6 +18,7 @@
  */
 
 import { classifyCrs, typedBboxCrs } from "./crs.js";
+import { parseExact } from "./exact-json.js";
 import { isJsonArray, isJsonObject } from "./json.js";
 import type { BboxControl, ComplexControl, Control, FormPlan } from "./plan.js";
 
@@ -57,7 +58,8 @@ export interface ComplexValue {
 
 /**
  * What the raw JSON editor holds: the text as typed. The user authors the wire
- * value, so the encoder only parses it; the validator is what refuses bad JSON.
+ * value, so the encoder only parses it, keeping its numbers as written
+ * (`exact-json.ts`); the validator is what refuses bad JSON.
  */
 export interface RawJson {
   readonly rawJson: string;
@@ -116,6 +118,22 @@ export interface EncodeNote {
 export interface ExecuteBody {
   readonly inputs: Readonly<Record<string, unknown>>;
   readonly notes: readonly EncodeNote[];
+}
+
+export interface EncodeOptions {
+  /**
+   * Keep each number in JSON text as written (W28), where a double would
+   * change it: the default, for the request. `false` reads every number as
+   * JavaScript holds it, for a caller that compares values rather than sending
+   * them, as the schema warnings do.
+   */
+  readonly exact?: boolean;
+}
+
+/** How one request is being encoded. */
+interface Encoding {
+  readonly note: (code: EncodeNote["code"], crs: string) => void;
+  readonly parse: (text: string) => unknown;
 }
 
 /**
@@ -183,10 +201,9 @@ function asByReference(value: unknown): ByReference | undefined {
 }
 
 /** Parses, or hands the text back unchanged for the server to refuse. */
-function parseRaw(raw: RawJson): unknown {
+function parseRaw(raw: RawJson, parse: Encoding["parse"]): unknown {
   try {
-    const parsed: unknown = JSON.parse(raw.rawJson);
-    return parsed;
+    return parse(raw.rawJson);
   } catch {
     return raw.rawJson;
   }
@@ -228,7 +245,7 @@ function encodeBbox(
   return { bbox: box.coordinates, crs: box.crs };
 }
 
-function encodeComplex(control: ComplexControl, value: unknown): unknown {
+function encodeComplex(control: ComplexControl, value: unknown, parse: Encoding["parse"]): unknown {
   if (!isComplexValue(value)) return value;
   const format = control.formats[value.format] ?? control.formats[0];
   if (format === undefined) return value.value;
@@ -243,7 +260,7 @@ function encodeComplex(control: ComplexControl, value: unknown): unknown {
     // `inputValueNoObject` admits no bare object, so a JSON object travels as
     // `{ "value": … }` — the standard's own example does exactly this, and ZOO
     // answers a bare one with a 500 (echo-complex-bare-object-500.http).
-    return { value: parseRaw({ rawJson: value.value ?? "" }) };
+    return { value: parseRaw({ rawJson: value.value ?? "" }, parse) };
   }
   // R7: the chosen branch's media type and encoding, which the prototype could
   // not see because it only looked at a top-level `contentMediaType`.
@@ -254,13 +271,9 @@ function encodeComplex(control: ComplexControl, value: unknown): unknown {
   };
 }
 
-function encodeControl(
-  control: Control,
-  value: unknown,
-  note: (code: EncodeNote["code"], crs: string) => void,
-): unknown {
+function encodeControl(control: Control, value: unknown, how: Encoding): unknown {
   // A raw JSON value, wherever it appears, is the user's own wire value.
-  if (isRawJson(value)) return parseRaw(value);
+  if (isRawJson(value)) return parseRaw(value, how.parse);
 
   // A reference is a property of the value, not of the control — any input can
   // be supplied by href. Except a raw JSON one, whose content is the user's.
@@ -279,12 +292,12 @@ function encodeControl(
       const items = isJsonArray(value) ? value : [value];
       return items
         .filter((item) => !isAbsentFor(control.item, item))
-        .map((item) => encodeControl(control.item, item, note));
+        .map((item) => encodeControl(control.item, item, how));
     }
     case "bbox":
-      return encodeBbox(control, value, note);
+      return encodeBbox(control, value, how.note);
     case "complex":
-      return encodeComplex(control, value);
+      return encodeComplex(control, value, how.parse);
     case "geometry": {
       // Requirement 20: `inputValueNoObject` admits no bare object, so GeoJSON
       // travels as `{ "value": … }`, as a complex input's JSON object does.
@@ -298,7 +311,9 @@ function encodeControl(
       // qualified value says so too: stating the format is what a qualified
       // value is for. A complex input's bare `type: "object"` branch says
       // nothing of the kind, and gets no media type.
-      const geojson = isGeoJsonText(value) ? parseRaw({ rawJson: value.geojson }) : value;
+      const geojson = isGeoJsonText(value)
+        ? parseRaw({ rawJson: value.geojson }, how.parse)
+        : value;
       return isJsonObject(geojson) ? { value: geojson, mediaType: GEOJSON_MEDIA_TYPE } : geojson;
     }
     case "text":
@@ -308,9 +323,14 @@ function encodeControl(
   }
 }
 
-export function toExecuteBody(plan: FormPlan, values: FormValues): ExecuteBody {
+export function toExecuteBody(
+  plan: FormPlan,
+  values: FormValues,
+  options: EncodeOptions = {},
+): ExecuteBody {
   const entries: [string, unknown][] = [];
   const notes: EncodeNote[] = [];
+  const parse = options.exact === false ? (text: string): unknown => JSON.parse(text) : parseExact;
 
   for (const field of plan.fields) {
     // N5: a bare `values[id]` reads Object.prototype for an id like
@@ -318,8 +338,11 @@ export function toExecuteBody(plan: FormPlan, values: FormValues): ExecuteBody {
     const supplied = Object.hasOwn(values, field.id) ? values[field.id] : undefined;
     if (isAbsentFor(field.control, supplied)) continue;
 
-    const encoded = encodeControl(field.control, supplied, (code, crs) => {
-      notes.push({ inputId: field.id, code, crs });
+    const encoded = encodeControl(field.control, supplied, {
+      note: (code, crs) => {
+        notes.push({ inputId: field.id, code, crs });
+      },
+      parse,
     });
     // An empty list is the same statement as an absent one.
     if (isJsonArray(encoded) && encoded.length === 0) continue;

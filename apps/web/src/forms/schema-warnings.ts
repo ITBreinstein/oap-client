@@ -3,11 +3,12 @@
  * (package 6, finding 0054). Shown beside the field; never a reason to stop a
  * run. The blocking checks are `validate.ts`, and this is not them.
  *
- * What is checked is what will be sent: the form values encoded exactly as
- * the request will carry them, with a qualified value's `value` taken out of
- * its wrapper and a reference skipped — the server fetches that, and only it
- * can say what is behind it. An input that takes several values is checked
- * value by value, since its schema describes one.
+ * What is checked is what will be sent: the form values encoded as the
+ * request will carry them, though with each number as JavaScript holds it
+ * (W28), with a qualified value's `value` taken out of its wrapper, and a
+ * reference skipped — the server fetches that, and only it can say what is
+ * behind it. An input that takes several values is checked value by value,
+ * since its schema describes one.
  *
  * Where the check cannot run — a `$ref`, a pattern this browser cannot
  * compile, a value too large to walk — nothing is guessed: the input is
@@ -48,7 +49,8 @@ export function schemaWarnings(
   plan: FormPlan,
   values: FormValues,
 ): SchemaWarnings {
-  const { inputs } = toExecuteBody(plan, values);
+  // A number kept as written for the wire is not a number to the check.
+  const { inputs } = toExecuteBody(plan, values, { exact: false });
   const byField = new Map<string, readonly string[]>();
   const notChecked: { inputId: string; keyword: string }[] = [];
 

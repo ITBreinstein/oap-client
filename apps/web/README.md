@@ -153,9 +153,10 @@ Running:
   assuming synchronous".
 - **Before anything is sent**, the checks the plan states cheaply: required
   fields, numeric bounds, `enum` membership, `maxLength`, coordinate counts,
-  list lengths, and that raw JSON parses. Nothing else — the server is
-  authoritative. Neither reference server validates inputs against its own
-  schema (Z5, finding 0054), so these are the only checks a user gets.
+  list lengths, and that raw JSON parses and can be sent as written. Nothing
+  else — the server is authoritative. Neither reference server validates
+  inputs against its own schema (Z5, finding 0054), so these are the only
+  checks a user gets.
 - **Every declared output is named** in the request, with no format or
   transmission mode: "all of them, as the server prefers". The core never adds
   `outputs` itself, and ZOO refuses a body without it (finding 0025).
@@ -241,7 +242,10 @@ Ported from Sam's prototype on `feat/T3-prototype-interface`, reviewed first:
   `const`, `enum`, type. Anything it does not understand becomes a raw JSON
   editor, with the reason shown next to it.
 - `encode.ts` turns form values into the request's `inputs`, and nothing else —
-  the core's `execute()` builds the request.
+  the core's `execute()` builds the request. JSON the user typed is sent as
+  typed, numbers included: a number a JavaScript double would change, such as
+  a 19-digit identifier or `1e400`, is kept as written with `JSON.rawJSON`
+  (`exact-json.ts`). A browser without it (Safari before 18.4, Firefox before 135) refuses the run and names the number, rather than sending another.
 - `validate.ts` and `defaults.ts`: the checks above, and the starting values.
   A required field starts at its schema default; an optional one starts empty
   and is left out, with the server's default shown as a hint. An optional

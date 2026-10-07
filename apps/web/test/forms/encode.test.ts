@@ -379,6 +379,48 @@ describe("toExecuteBody", () => {
         inputsFor({ raw: { schema: { type: "object" } } }, { raw: { rawJson: "  " } }),
       ).toEqual({});
     });
+
+    describe("sends what was typed, numbers included (W28)", () => {
+      const plan = planFor({ filter: { schema: { type: "object", not: { required: ["x"] } } } });
+      const wire = (rawJson: string): string =>
+        JSON.stringify(toExecuteBody(plan, { filter: { rawJson } }).inputs);
+
+      it("is the JSON control for this input", () => {
+        expect(plan.fields[0]?.control.kind).toBe("json");
+      });
+
+      it("sends a 19-digit identifier as typed", () => {
+        const typed = '{"value":{"objectId":1234567890123456789}}';
+        expect(wire(typed)).toBe(`{"filter":${typed}}`);
+      });
+
+      it("does not turn an out-of-range number into null", () => {
+        expect(wire('{"value":{"limit":1e400}}')).toBe('{"filter":{"value":{"limit":1e400}}}');
+      });
+
+      it("sends a complex input's JSON text as typed too", () => {
+        const complex = planFor({
+          shape: {
+            schema: {
+              oneOf: [{ type: "string", contentMediaType: "text/plain" }, { type: "object" }],
+            },
+          },
+        });
+        const body = toExecuteBody(complex, {
+          shape: { format: 1, value: '{"id":1234567890123456789}' },
+        });
+        expect(JSON.stringify(body.inputs)).toBe('{"shape":{"value":{"id":1234567890123456789}}}');
+      });
+
+      it("reads every number as JavaScript holds it when asked not to be exact", () => {
+        const body = toExecuteBody(
+          plan,
+          { filter: { rawJson: '{"value":{"limit":1e400}}' } },
+          { exact: false },
+        );
+        expect(body.inputs).toEqual({ filter: { value: { limit: Number.POSITIVE_INFINITY } } });
+      });
+    });
   });
 
   describe("input ids that collide with Object.prototype (N5)", () => {
