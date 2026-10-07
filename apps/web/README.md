@@ -43,8 +43,9 @@ The relay's address is not built in. The page reads `/config.json`, next to
 ```
 
 - `relay`: `null` or absent for none; otherwise `{ "url": … }`, an absolute
-  `https:` URL or a path on the same site such as `/api`. Plain `http:` only on
-  a loopback host, as browsers allow, for development and CI.
+  `https:` URL or a path on the same site such as `/api`. Not `/`: that is the
+  page itself. Plain `http:` only on a loopback host, as browsers allow, for
+  development and CI.
 - `presets`: `https:` services offered on the start screen, reached directly,
   exactly as a typed address is.
 - `jobs.acceptedNoticeSeconds`: how long a background job may report `accepted`

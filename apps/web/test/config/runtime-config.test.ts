@@ -121,6 +121,8 @@ describe("checkRuntimeConfig — refused whole", () => {
     ["a network-path relay", { relay: { url: "//relay.example.org" } }],
     ["a backslashed relay path", { relay: { url: "/\\relay.example.org" } }],
     ["a relay path with a query", { relay: { url: "/api?x=1" } }],
+    // W24: it became "", which the page read as no relay, and said nothing.
+    ["the site root as the relay path", { relay: { url: "/" } }],
     ["a relative relay path without a slash", { relay: { url: "api" } }],
     ["a relay url with userinfo", { relay: { url: "https://u:p@relay.example.org" } }],
     ["a javascript: relay url", { relay: { url: "javascript:alert(1)" } }],
