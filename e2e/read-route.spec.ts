@@ -65,7 +65,7 @@ test.describe("the relay's read route", () => {
     const offer = page.getByTestId("relay-offer");
     await expect(offer).toBeVisible();
     await expect(offer).toContainText(
-      "This server sent no CORS headers, so a web page cannot read it directly. Reach it through the relay instead? This will be recorded as a finding.",
+      "This page could not read this server directly: it sends no CORS headers, or it could not be reached. Try it through the relay instead? This will be recorded as a finding.",
     );
     // The direct attempt is over, and nothing has gone through the relay yet.
     expect(relayRequests).toEqual([]);
@@ -124,7 +124,7 @@ test.describe("the relay's read route", () => {
 
     await expect(page.getByTestId("relay-offer")).toBeHidden();
     await expect(page.getByRole("alert")).toContainText(
-      "This server doesn't allow access from a web page (no CORS headers).",
+      "This page could not read this server: it sends no CORS headers, or it could not be reached.",
     );
     await expect(page.getByTestId("relay-banner")).toHaveCount(0);
     expect(relayRequests).toEqual([]);
@@ -145,7 +145,7 @@ test.describe("the relay's read route", () => {
   test("offers nothing for the direct-only no-CORS endpoint", async ({ page }) => {
     await connectConfigured(page, "pygeoapi-nocors");
     await expect(page.getByRole("alert")).toContainText(
-      "This server doesn't allow access from a web page (no CORS headers).",
+      "This page could not read this server: it sends no CORS headers, or it could not be reached.",
     );
     await expect(page.getByTestId("relay-offer")).toHaveCount(0);
 

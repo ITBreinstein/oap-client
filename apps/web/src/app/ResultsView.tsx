@@ -219,8 +219,8 @@ function LoadedLine({ loaded, href }: { readonly loaded: LoadedReference; readon
     case "cors-blocked":
       return (
         <p className="notice">
-          This page may not read it: {host} sends no CORS headers for it. Open the link to see it in
-          a new tab. The attempt has been recorded.
+          This page could not read it: {host} sends no CORS headers for it, or could not be reached.
+          Open the link to see it in a new tab. The attempt has been recorded.
         </p>
       );
     case "http-error":
