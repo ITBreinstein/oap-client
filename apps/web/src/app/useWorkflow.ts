@@ -335,8 +335,11 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
     (endpoint: EndpointRef) => {
       const active = session.current;
       if (active === undefined) return;
+      // The relay offer is open: only its answer moves on (review W22). The
+      // reducer ignores a connect here, and clearing the pending offer lost
+      // the open attempt's record, or gave "Use relay" another endpoint's.
+      if (pendingOffer.current !== undefined) return;
       dispatch({ type: "connect", endpoint });
-      pendingOffer.current = undefined;
       const at = new Date();
       // Refused before sending: the browser would block it, and the opaque
       // error it throws cross-origin is indistinguishable from CORS.

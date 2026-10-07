@@ -7,7 +7,7 @@
  * the route, and the banner cannot be dismissed.
  */
 
-import { useEffect, useId, useRef, type KeyboardEvent } from "react";
+import { useEffect, useId, useRef } from "react";
 
 export interface RelayOfferProps {
   readonly onConfirm: () => void;
@@ -15,6 +15,12 @@ export interface RelayOfferProps {
   readonly onDecline: () => void;
 }
 
+/**
+ * A modal question. The page behind it is made inert by `App` while it is
+ * open, so nothing there can be reached by keyboard or pointer (review W22),
+ * and Escape is heard from anywhere on the page, not only from inside the
+ * dialog: it used to be lost when pressed before focus had moved in.
+ */
 export function RelayOffer({ onConfirm, onDecline }: RelayOfferProps) {
   const base = useId();
   const cancel = useRef<HTMLButtonElement>(null);
@@ -24,12 +30,17 @@ export function RelayOffer({ onConfirm, onDecline }: RelayOfferProps) {
     cancel.current?.focus();
   }, []);
 
-  const onKeyDown = (event: KeyboardEvent) => {
-    if (event.key === "Escape") {
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
       event.preventDefault();
       onDecline();
-    }
-  };
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [onDecline]);
 
   return (
     <div className="modal-backdrop">
@@ -40,7 +51,6 @@ export function RelayOffer({ onConfirm, onDecline }: RelayOfferProps) {
         aria-labelledby={`${base}-title`}
         aria-describedby={`${base}-text`}
         data-testid="relay-offer"
-        onKeyDown={onKeyDown}
       >
         <h2 id={`${base}-title`}>Use the relay?</h2>
         <p id={`${base}-text`}>
