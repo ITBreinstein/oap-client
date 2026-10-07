@@ -306,30 +306,68 @@ export function createJobSession(
           },
         });
 
-  /** The read route's wrapper, only when asked for and only where the relay offers it. */
-  const readFetch = (endpoint: RelayEndpoint, reads: Reads): FetchLike | undefined =>
-    reads === "relay" &&
-    endpoint.readRoute === "relay" &&
-    relay !== undefined &&
-    doorbells !== undefined
-      ? createRelayFetch({
-          relay,
-          endpointKey: endpoint.key,
-          baseUrl: endpoint.baseUrl,
-          session: doorbells,
-        })
-      : undefined;
+  /**
+   * The read route this page uses, by endpoint base URL: set once the user
+   * confirmed the relay for an endpoint, so that a job restored from storage
+   * after that is read through it too (review W9).
+   */
+  const relayReads = new Map<string, { readonly endpointKey: string; readonly read: FetchLike }>();
 
-  // The jobs a previous page started. Polled again, each read direct first
-  // as every connection is, and without a doorbell: the relay registration
-  // belonged to a session this page never had, and whose token was never
-  // stored. A job already finished settles on its first read.
+  /**
+   * Restored jobs on an endpoint this page now reads through the relay: they
+   * were polled direct, which on a server without CORS fails on every read,
+   * and Dismiss failed with them (review W9). They take the read route, and
+   * an unsettled one is read again now.
+   */
+  const adoptRestored = (endpoint: RelayEndpoint, read: FetchLike): void => {
+    relayReads.set(endpoint.baseUrl, { endpointKey: endpoint.key, read });
+    let changed = false;
+    for (const [statusUrl, job] of meta) {
+      if (!job.restored || job.read !== undefined || job.baseUrl !== endpoint.baseUrl) continue;
+      meta.set(statusUrl, { ...job, endpointKey: endpoint.key, route: "relay", read });
+      const tracked = reconciler.jobs().find((each) => each.statusUrl === statusUrl);
+      if (tracked !== undefined && !tracked.settled) reconciler.refresh(statusUrl);
+      changed = true;
+    }
+    if (changed) publish();
+  };
+
+  /**
+   * The read route's wrapper, only when asked for and only where the relay
+   * offers it. Asked for means the user confirmed the relay for the endpoint,
+   * so the restored jobs on it are moved to the read route as well.
+   */
+  const readFetch = (endpoint: RelayEndpoint, reads: Reads): FetchLike | undefined => {
+    if (
+      reads !== "relay" ||
+      endpoint.readRoute !== "relay" ||
+      relay === undefined ||
+      doorbells === undefined
+    ) {
+      return undefined;
+    }
+    const read = createRelayFetch({
+      relay,
+      endpointKey: endpoint.key,
+      baseUrl: endpoint.baseUrl,
+      session: doorbells,
+    });
+    adoptRestored(endpoint, read);
+    return read;
+  };
+
+  // The jobs a previous page started. Polled again without a doorbell: the
+  // relay registration belonged to a session this page never had, and whose
+  // token was never stored. Each is read direct first, as every connection
+  // is, unless this page already reads its endpoint through the relay. A job
+  // already finished settles on its first read.
   const restore = (stored: StoredJob): void => {
+    const viaRelay = relayReads.get(stored.endpoint);
     meta.set(stored.statusUrl, {
-      endpointKey: "",
+      endpointKey: viaRelay?.endpointKey ?? "",
       baseUrl: stored.endpoint,
-      route: "direct",
-      read: undefined,
+      route: viaRelay === undefined ? "direct" : "relay",
+      read: viaRelay?.read,
       processId: stored.processId,
       startedAt: stored.startedAt,
       restored: true,

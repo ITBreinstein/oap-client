@@ -160,6 +160,42 @@ test.describe("the relay's read route", () => {
     ]);
   });
 
+  test("reads a job restored after a reload through the relay once it is confirmed again (review W9)", async ({
+    page,
+  }) => {
+    await connectConfigured(page, "pygeoapi-nocors-relay");
+    await page.getByRole("button", { name: "Use relay" }).click();
+    await page.getByRole("button", { name: "Hello World", exact: true }).click();
+    await page.getByRole("textbox", { name: "Name (required)" }).fill("restored");
+    await page.getByRole("checkbox", { name: "Run in the background" }).check();
+    await page.getByRole("button", { name: "Run", exact: true }).click();
+    await expect(page.locator('[data-output-id="echo"]')).toContainText("Hello restored", {
+      timeout: 30_000,
+    });
+    const statusUrl =
+      (await page.getByTestId("my-jobs").locator("[data-job-row]").getAttribute("data-job-row")) ??
+      "";
+    expect(statusUrl).toMatch(/^http:\/\/localhost:5081\/jobs\//);
+
+    // A reload: the job is back from storage and read direct first, which a
+    // server without CORS headers refuses a page on every read.
+    await page.reload();
+    const restored = page.getByTestId("my-jobs").locator(`[data-job-row="${statusUrl}"]`);
+    await expect(restored).toHaveAttribute("data-restored", "true");
+    await expect(restored).toContainText("last read failed", { timeout: 15_000 });
+
+    // Confirming the relay again for the endpoint takes the restored job
+    // with it: it was read direct for ever after a reload, and Dismiss failed.
+    await page.getByRole("radio", { name: /^pygeoapi-nocors-relay / }).check();
+    await page.getByRole("button", { name: "Connect" }).click();
+    await page.getByRole("button", { name: "Use relay" }).click();
+    await expect(restored.locator("[data-job-status]")).toHaveAttribute(
+      "data-job-status",
+      "successful",
+      { timeout: 15_000 },
+    );
+  });
+
   test("goes direct to a server that sends CORS headers, with no offer and no banner", async ({
     page,
   }) => {
