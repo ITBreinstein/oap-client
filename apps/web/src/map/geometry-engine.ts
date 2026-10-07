@@ -357,7 +357,15 @@ export const createTerraDrawGeometryEngine: CreateGeometryEngine = (map, { tools
     stop() {
       changeListeners.clear();
       stateListeners.clear();
-      if (draw.enabled) draw.stop();
+      if (!draw.enabled) return;
+      try {
+        draw.stop();
+      } catch {
+        // MapView's ref cleanup can remove the map, its style with it, before
+        // this runs: React 19 runs ref cleanups ahead of effect cleanups. The
+        // draw mode's layers went with the style; nothing is left to remove
+        // (W29).
+      }
     },
   };
 };
