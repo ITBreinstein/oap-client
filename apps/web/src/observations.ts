@@ -46,7 +46,8 @@ export interface FormObservation {
     | "bbox-projected-crs-only"
     /**
      * The value was not checked against the input's schema before a run
-     * (package 6): `keyword` says why — `$ref`, `pattern` or `size`.
+     * (package 6): `keyword` says why — `$ref`, `pattern`, `size`,
+     * `unevaluatedProperties` or `unevaluatedItems`.
      */
     | "schema-not-checked";
   /** The schema keyword that caused a fallback: `oneOf`, `type`, `enum`, … */

@@ -11,11 +11,16 @@
  * A subset of JSON Schema, interpreted directly — no dependency, and no
  * generated code, so it runs under a content security policy that forbids
  * `eval`. Keywords it does not know are ignored, as JSON Schema says unknown
- * keywords are. Where it cannot check honestly it says so instead of guessing:
+ * keywords are. Every assertion keyword JSON Schema has, from draft 4 to
+ * 2020-12, is either checked or stops the check (W19): ignoring one would
+ * answer "no problems" for a value it rules out. Where it cannot check
+ * honestly it says so instead of guessing:
  *
  * - `$ref`: the target is not fetched, so the schema behind it is unknown;
  * - `pattern`: a regular expression this browser cannot compile;
- * - `size`: a value too large to walk while the user types.
+ * - `size`: a value too large to walk while the user types;
+ * - `unevaluatedProperties`, `unevaluatedItems`: what counts as evaluated
+ *   depends on every subschema that applied, which this does not track.
  *
  * Pure: no React, no DOM, no network. It never throws.
  */
@@ -24,7 +29,10 @@ import { isJsonArray, isJsonObject } from "./json.js";
 
 export type SchemaCheck =
   | { readonly kind: "checked"; readonly problems: readonly string[] }
-  /** The keyword that stopped the check: `$ref`, `pattern` or `size`. */
+  /**
+   * The keyword that stopped the check: `$ref`, `pattern`, `size`,
+   * `unevaluatedProperties` or `unevaluatedItems`.
+   */
   | { readonly kind: "not-checked"; readonly keyword: string };
 
 /** Nodes of a value visited before the check gives up as `size`. */
@@ -120,6 +128,29 @@ function number(schema: Readonly<Record<string, unknown>>, key: string): number 
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
+function entries(value: unknown): [string, unknown][] {
+  return isJsonObject(value) ? Object.entries(value) : [];
+}
+
+/** A schema that allows anything: `true`, or `{}`. */
+function allowsAll(schema: unknown): boolean {
+  return schema === true || (isJsonObject(schema) && Object.keys(schema).length === 0);
+}
+
+/** The `unevaluated*` keyword that applies to this value, if any; see the module comment. */
+function unevaluated(
+  schema: Readonly<Record<string, unknown>>,
+  value: unknown,
+): string | undefined {
+  if (isJsonObject(value) && Object.keys(value).length > 0) {
+    if (!allowsAll(schema["unevaluatedProperties"] ?? true)) return "unevaluatedProperties";
+  }
+  if (isJsonArray(value) && value.length > 0) {
+    if (!allowsAll(schema["unevaluatedItems"] ?? true)) return "unevaluatedItems";
+  }
+  return undefined;
+}
+
 function problemsOf(
   schema: unknown,
   value: unknown,
@@ -149,6 +180,8 @@ function problemsOf(
     // Everything below assumes the right type; saying more would only repeat this.
     return problems;
   }
+  const stopped = unevaluated(schema, value);
+  if (stopped !== undefined) throw new NotChecked(stopped);
 
   const allowed = schema["enum"];
   if (isJsonArray(allowed) && !allowed.some((entry) => equal(entry, value))) {
@@ -232,6 +265,27 @@ function problemsOf(
         problems.push(...problemsOf(itemSchema, entry, child(at, index), depth + 1, walk));
       }
     });
+    const contains = schema["contains"];
+    if (contains !== undefined) {
+      // 2019-09's minContains and maxContains count the matches; without them,
+      // one is enough.
+      const least = number(schema, "minContains") ?? 1;
+      const most = number(schema, "maxContains");
+      const matches = value.filter(
+        (entry) => problemsOf(contains, entry, at, depth + 1, walk).length === 0,
+      ).length;
+      if (matches < least) {
+        say(
+          least === 1
+            ? "should have an item of the kind the description asks for."
+            : `should have at least ${String(least)} items of the kind the description asks for.`,
+        );
+      }
+      if (most !== undefined && matches > most) {
+        const noun = most === 1 ? "item" : "items";
+        say(`should have at most ${String(most)} ${noun} of the kind the description asks for.`);
+      }
+    }
   }
 
   if (isJsonObject(value)) {
@@ -242,15 +296,48 @@ function problemsOf(
       }
     }
     const properties = isJsonObject(schema["properties"]) ? schema["properties"] : {};
+    const patterns = entries(schema["patternProperties"]).map(
+      ([pattern, member]) => [compile(pattern), member] as const,
+    );
     const additional = schema["additionalProperties"];
+    const names = schema["propertyNames"];
     for (const [key, member] of Object.entries(value)) {
       const where = child(at, key);
-      if (Object.hasOwn(properties, key)) {
-        problems.push(...problemsOf(properties[key], member, where, depth + 1, walk));
-      } else if (additional === false) {
+      if (names !== undefined) {
+        const name = at === ROOT ? `The name "${key}"` : `The name "${key}" in ${at}`;
+        problems.push(...problemsOf(names, key, name, depth + 1, walk));
+      }
+      const declared = Object.hasOwn(properties, key);
+      if (declared) problems.push(...problemsOf(properties[key], member, where, depth + 1, walk));
+      const matching = patterns.filter(([pattern]) => pattern.test(key));
+      for (const [, patterned] of matching) {
+        problems.push(...problemsOf(patterned, member, where, depth + 1, walk));
+      }
+      // A member `properties` or a pattern covers is not an additional one.
+      if (declared || matching.length > 0) continue;
+      if (additional === false) {
         say(`should not have "${key}".`);
       } else if (isJsonObject(additional)) {
         problems.push(...problemsOf(additional, member, where, depth + 1, walk));
+      }
+    }
+    // `dependentRequired` and `dependentSchemas` (2019-09), and `dependencies`
+    // (draft 4 to 7), which held either: a list of names, or a schema.
+    const dependencies = [
+      ...entries(schema["dependentRequired"]),
+      ...entries(schema["dependentSchemas"]),
+      ...entries(schema["dependencies"]),
+    ];
+    for (const [key, dependency] of dependencies) {
+      if (!Object.hasOwn(value, key)) continue;
+      if (isJsonArray(dependency)) {
+        for (const name of dependency) {
+          if (typeof name === "string" && !Object.hasOwn(value, name)) {
+            say(`should have "${name}" when it has "${key}".`);
+          }
+        }
+      } else {
+        problems.push(...problemsOf(dependency, value, at, depth + 1, walk));
       }
     }
     const count = Object.keys(value).length;
@@ -288,6 +375,12 @@ function problemsOf(
   const not = schema["not"];
   if (not !== undefined && problemsOf(not, value, at, depth + 1, walk).length === 0) {
     say("is a value the description rules out.");
+  }
+  const condition = schema["if"];
+  if (condition !== undefined) {
+    const holds = problemsOf(condition, value, at, depth + 1, walk).length === 0;
+    const branch = holds ? schema["then"] : schema["else"];
+    if (branch !== undefined) problems.push(...problemsOf(branch, value, at, depth + 1, walk));
   }
 
   return problems;
