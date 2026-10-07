@@ -84,6 +84,13 @@ at 0.5.0; earlier versions are recorded only in the git history.
   it cuts short rejects with `AbortError`, whatever the runtime errored the
   stream with. `send()` passes its own; set it when you call `createEnvelope`
   yourself.
+- The `execution` observation's `crossOrigin`: for a request that never
+  produced a response, whether it left the page's origin, taken from
+  `TransportError.crossOrigin`. A cross-origin one may have been refused at its
+  CORS preflight, which a page cannot tell from a network failure; a same-origin
+  one cannot have been. `undefined` off-browser and whenever a response
+  arrived. A new required member of the observation type: code that builds
+  `execution` observations itself has to set it.
 
 ## 0.5.0
 

@@ -15,7 +15,7 @@
 
 import { requireOk } from "../http/classify.js";
 import type { ResponseEnvelope } from "../http/envelope.js";
-import { AbortError, ProcessesError } from "../http/errors.js";
+import { AbortError, ProcessesError, TransportError } from "../http/errors.js";
 import { withDeadline } from "../http/deadline.js";
 import { send } from "../http/transport.js";
 import { AmbiguousExecutionResponseError, ExecutionTimeoutError } from "../errors.js";
@@ -66,6 +66,7 @@ export async function execute(
     warnings: request.warnings,
     inputIds: request.inputIds,
     inputKinds: request.inputKinds,
+    crossOrigin: undefined,
   };
 
   let envelope: ResponseEnvelope;
@@ -82,6 +83,9 @@ export async function execute(
     observe(sink, {
       ...base,
       outcome: "transport-failure",
+      // A cross-origin request with no answer may be a refused preflight; a
+      // same-origin one cannot be (W33).
+      crossOrigin: cause instanceof TransportError ? cause.crossOrigin : undefined,
       status: undefined,
       mediaType: undefined,
       elapsedMs: Date.now() - startedAt,

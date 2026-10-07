@@ -68,7 +68,9 @@ throws — `AbortError` if your signal fired, otherwise `TransportError`.
 A browser CORS block and a dead host are the same opaque `TypeError`, by design;
 the browser will not tell you which. `TransportError` therefore records
 `crossOrigin` — whether the request left the page's origin at all — and leaves
-the inference to whoever is diagnosing. Off-browser it is `undefined`.
+the inference to whoever is diagnosing. Off-browser it is `undefined`. An
+`execute()` that fails this way carries the same flag on its `execution`
+observation.
 
 **`ResponseEnvelope` — the evidence.** The final URL and the requested one,
 status, the raw `Headers`, the parsed media type (`+json` included, so
