@@ -76,9 +76,11 @@ export interface JobStatus {
    * The server's own explanation of a failure, when it sent a structured one.
    *
    * **Absent on both reference servers.** Neither pygeoapi nor ZOO sends an
-   * `exception` member; both put the failure in {@link message}. Populated when
-   * a server sends an `exception` member that reads as a problem document, or
-   * when the job body itself is problem-shaped. Read `message` first.
+   * `exception` member; both put the failure in {@link message}. Populated only
+   * from an `exception` member that reads as a problem document. Never from
+   * the job body's own members: pygeoapi's job documents carry
+   * `"type": "process"` (finding 0003), and reading a problem out of them would
+   * be a guess (review C14). Read `message` first.
    */
   readonly exception?: ProblemDetails;
   /** Resolved absolute against the URL the document was served from. */

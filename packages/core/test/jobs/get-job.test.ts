@@ -295,6 +295,35 @@ describe("getJob()", () => {
     expect(statusRecord(seen).classifiedAsException).toBe(true);
   });
 
+  describe("JobStatus.exception (C14)", () => {
+    it("is read from an `exception` member that reads as a problem document", async () => {
+      const body = {
+        jobID: "j1",
+        status: "failed",
+        exception: { type: "https://example.test/errors/boom", title: "Boom", detail: "it broke" },
+      };
+      const status = await getJob(JOB_URL, { fetch: fakeFetch(json(body)) });
+      expect(status.exception).toMatchObject({ title: "Boom", detail: "it broke" });
+    });
+
+    it("is never guessed from the job body's own members", async () => {
+      // Its doc comment used to promise this. pygeoapi's job documents carry
+      // `type: "process"` (finding 0003): reading a problem out of a job body
+      // is a guess, so the server's own words stay in `message`.
+      const body = {
+        jobID: "j1",
+        status: "failed",
+        type: "https://example.test/errors/boom",
+        title: "Boom",
+        detail: "it broke",
+        message: "the process raised",
+      };
+      const status = await getJob(JOB_URL, { fetch: fakeFetch(json(body)) });
+      expect(status.exception).toBeUndefined();
+      expect(status.message).toBe("the process raised");
+    });
+  });
+
   it("raises JobNotFoundError on a 404 — the normal state of a dismissed job", async () => {
     // pygeoapi's own 404 body, captured 2026-09-16 from
     // `slow-after-dismiss-404.http`. Note it says `InvalidParameterValue` on a

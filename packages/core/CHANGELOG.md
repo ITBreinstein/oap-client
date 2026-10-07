@@ -32,6 +32,11 @@ at 0.5.0; earlier versions are recorded only in the git history.
   documents it is. `execute()` now treats either as no `Location`: the job is
   found by its body's `monitor` or `self` link, or `AmbiguousExecutionResponseError`
   is thrown with `locationPresent: true`.
+- `JobStatus.exception`'s documentation promised it was also filled in when the
+  job body itself is problem-shaped. It never was, and is not now: it is read
+  only from an `exception` member that reads as a problem document. Reading a
+  problem out of a job body's own members would misread pygeoapi, whose job
+  documents carry `"type": "process"`. The documentation now says so.
 
 - `createClient` adds the trailing slash a base URL needs to its _path_. It used
   to append it to the whole string, so a base with a query got the slash on the
