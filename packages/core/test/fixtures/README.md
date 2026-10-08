@@ -26,7 +26,8 @@ the versions are recorded here rather than left to a commit message.
 
 ## `pygeoapi/`
 
-    server    geopython/pygeoapi:0.21.0   (infra/compose/pygeoapi.yml, port 5080)
+    server    geopython/pygeoapi:0.21.0@sha256:34b409a5c4317e3c222ab85068a7ecccd00f50eb5455a149e83cb4e884e132bc
+              (infra/compose/pygeoapi.yml, port 5080)
     captured  landing-page.json, landing-page-browser-accept.html,
               conformance.json                                        2026-08-26
               processes/hello-world.json                              2026-08-31

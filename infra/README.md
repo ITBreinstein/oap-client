@@ -17,6 +17,11 @@ ZOO has its own README — [zoo/README.md](zoo/README.md) — covering the fork,
 pinning and why it is not in the contract lane. The rest of this file is about
 pygeoapi.
 
+pygeoapi is pinned by digest in `compose/pygeoapi.yml`, as `tag@sha256:…`: the
+tag is for reading, the digest is what Docker pulls. To move the pin, run
+`docker buildx imagetools inspect geopython/pygeoapi:<tag>` and put the
+`Digest:` it prints after the new tag, in both services.
+
 ## The two pygeoapi ports
 
 Identical configuration but for one flag. `:5080` sets `cors: true` and
