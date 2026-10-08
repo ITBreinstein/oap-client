@@ -8,11 +8,11 @@
   "body": {
     "inputs": {
       "InputEntity1": {
-        "href": "http://host.docker.internal:8099/square.gml",
+        "href": "https://raw.githubusercontent.com/ITBreinstein/oap-client/16762ebfb5184fda0189d6f7447a2ce468c9e7fe/apps/web/test/fixtures/forms/zoo-linked-gml/square.gml",
         "type": "text/xml"
       },
       "InputEntity2": {
-        "href": "http://host.docker.internal:8099/point.gml",
+        "href": "https://raw.githubusercontent.com/ITBreinstein/oap-client/16762ebfb5184fda0189d6f7447a2ce468c9e7fe/apps/web/test/fixtures/forms/zoo-linked-gml/point.gml",
         "type": "text/xml"
       }
     },

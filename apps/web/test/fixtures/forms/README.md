@@ -22,7 +22,7 @@ repository that declares no licence.
 | `zoo-inline-csv/`                  | `SAGA.table_tools.3`      | two CSV tables inline, UTF-8, joined on their first column; three booleans              | `200`, the joined table (`execute.response.json`)    |
 | `zoo-inline-las/`                  | `SAGA.pointcloud_tools.4` | a nine-point LAS 1.2 file inline, base64, made by `make-las.py`; two enums and a number | `500`, a kernel segfault (finding 0070)              |
 | `zoo-inline-geojson-polygons/`     | `SAGA.shapes_polygons.5`  | a GeoJSON FeatureCollection of three squares, as the `type: object` branch; four others | `200` with no output: `{}` (finding 0071)            |
-| `zoo-linked-gml/`                  | `Contains`                | a polygon and a point by reference, `square.gml` and `point.gml` beside it              | not yet sent: see below                              |
+| `zoo-linked-gml/`                  | `Contains`                | a polygon and a point by reference: `square.gml` and `point.gml`, fetched from GitHub   | `200`, `{"Result":true}`                             |
 | `hand-written-undocumented-array/` | none                      | an array input with no `items`, entered item by item                                    | not sent: no reference server declares such an input |
 
 `description.json` is the server's answer to `GET /processes/{id}`, and
@@ -30,9 +30,9 @@ repository that declares no licence.
 what was sent, written by hand. The two ZOO failures are not caused by the
 request: the request each one replaced fails the same way on the same server.
 
-`zoo-linked-gml/execute.request.json` names `host.docker.internal:8099`, where
-ZOO would fetch the two GML files from a local file server. That capture has
-not been run yet, so this scenario has no `execute.response.json`.
+The two GML files ZOO fetched for `zoo-linked-gml` are the ones beside its
+request. The request names them on `raw.githubusercontent.com` at commit
+`16762eb`, the one that added them, so the URLs keep naming these bytes.
 
 ## Shape of these files
 
