@@ -1,6 +1,5 @@
-# .gitignore is honoured automatically; these two are tracked but not ours to format.
+# .gitignore is honoured automatically; this one is tracked but not ours to format.
 pnpm-lock.yaml
-docs/architecture.svg
 
 # Payloads captured verbatim from a live pygeoapi. Reformatting them would
 # destroy the evidence: the point is that they are byte-for-byte what the

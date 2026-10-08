@@ -4,7 +4,8 @@
 # notes.
 #
 # Both mount ../pygeoapi/plugins on PYTHONPATH so the repository's own
-# processors (currently `slow`) load as ordinary pygeoapi plugins without
+# processors (`slow` and the `breinstein-*` family, one file each under
+# infra/pygeoapi/plugins/) load as ordinary pygeoapi plugins without
 # rebuilding the image. See infra/README.md.
 #
 # Both can reach the host as `host.docker.internal`, which is where the relay's
@@ -13,7 +14,7 @@
 # below. It is harmless where the name already resolves.
 services:
   pygeoapi-cors:
-    image: geopython/pygeoapi:0.21.0 # pin the digest in CI
+    image: geopython/pygeoapi:0.21.0 # a tag, in CI too; not a digest
     ports: ["5080:80"]
     extra_hosts: ["host.docker.internal:host-gateway"]
     environment:
