@@ -7,7 +7,7 @@
  * the route, and the banner cannot be dismissed.
  */
 
-import { useEffect, useId, useRef } from "react";
+import { useEffect, useId, useLayoutEffect, useRef } from "react";
 
 export interface RelayOfferProps {
   readonly onConfirm: () => void;
@@ -30,7 +30,10 @@ export function RelayOffer({ onConfirm, onDecline }: RelayOfferProps) {
     cancel.current?.focus();
   }, []);
 
-  useEffect(() => {
+  // A layout effect, so the listener is there before the question can be
+  // seen. The offer follows a failed fetch, not a user event, and a passive
+  // effect for it may run after the paint: an Escape in between was lost.
+  useLayoutEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       event.preventDefault();
