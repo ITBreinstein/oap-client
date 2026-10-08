@@ -124,6 +124,24 @@ export function buildHeaders(mode: ExecutionMode): Readonly<Record<string, strin
   });
 }
 
+/**
+ * The JSON type a `JSON.rawJSON()` value stands for, or undefined for any other
+ * value. Such a value is a frozen object holding JSON text, which
+ * `JSON.stringify` writes as written: a caller's way to send a number a double
+ * cannot hold. Looked up on each call, because not every runtime the core
+ * supports has `JSON.isRawJSON`, and where it is missing no value is one.
+ */
+function rawJsonKind(value: object): string | undefined {
+  const isRawJson: unknown = Reflect.get(JSON, "isRawJSON");
+  if (typeof isRawJson !== "function" || Reflect.apply(isRawJson, JSON, [value]) !== true) {
+    return undefined;
+  }
+  const text: unknown = Reflect.get(value, "rawJSON");
+  if (typeof text !== "string") return undefined;
+  const parsed: unknown = JSON.parse(text);
+  return parsed === null ? "null" : typeof parsed;
+}
+
 /** A short, value-free description of what kind of thing an input was. */
 export function describeInputKind(value: ExecuteInputValue): string {
   if (value === null) return "null";
@@ -133,6 +151,8 @@ export function describeInputKind(value: ExecuteInputValue): string {
     return `array of ${String(value.length)} ${String(of)}`;
   }
   if (typeof value === "object") {
+    const raw = rawJsonKind(value);
+    if (raw !== undefined) return raw;
     const record = value as Record<string, unknown>;
     if (typeof record["href"] === "string") return "reference";
     if ("value" in record) return "qualified value";
