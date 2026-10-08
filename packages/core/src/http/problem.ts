@@ -97,6 +97,8 @@ export function toProblemDetails(
 ): ProblemDetails | undefined {
   if (typeof body !== "object" || body === null || Array.isArray(body)) return undefined;
 
+  // Backed by the check above, which is `isRecord`'s. The http layer sits
+  // below every module that exports one, so it does not import it.
   const record = body as Record<string, unknown>;
   if (!looksLikeProblem(record, context)) return undefined;
 

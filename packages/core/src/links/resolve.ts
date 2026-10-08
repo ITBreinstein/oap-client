@@ -53,7 +53,11 @@ export function resolveHref(href: string, base: string): string | undefined {
   }
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+/**
+ * A JSON object, as opposed to an array, `null` or a primitive. A type
+ * predicate rather than a cast: the narrowing is earned by the check.
+ */
+export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
@@ -244,5 +248,6 @@ export function readBodyLinks(body: unknown): readonly unknown[] | undefined {
   // Not an array: the member exists but carries nothing followable. Treated as
   // "no links" rather than an error, because header links may still save us.
   if (!Array.isArray(links)) return EMPTY_LINKS;
+  // `Array.isArray` narrows to `any[]`; this only takes the `any` back out.
   return links as readonly unknown[];
 }

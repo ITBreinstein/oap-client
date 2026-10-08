@@ -12,7 +12,7 @@
 
 import { MalformedDocumentError } from "../errors.js";
 import type { ResponseEnvelope } from "../http/envelope.js";
-import { collectLinks, readBodyLinks } from "../links/resolve.js";
+import { collectLinks, isRecord, readBodyLinks } from "../links/resolve.js";
 import type { Link } from "../links/types.js";
 import type { ObservationSink } from "../observations.js";
 
@@ -41,16 +41,15 @@ export function parseLandingPage(
   body: unknown,
   sink?: ObservationSink,
 ): LandingPage {
-  if (typeof body !== "object" || body === null || Array.isArray(body)) {
+  if (!isRecord(body)) {
     throw new MalformedDocumentError(
       envelope.url,
       `expected a JSON object, received ${Array.isArray(body) ? "an array" : typeof body}`,
     );
   }
 
-  const record = body as Record<string, unknown>;
-  const title = optionalString(record["title"]);
-  const description = optionalString(record["description"]);
+  const title = optionalString(body["title"]);
+  const description = optionalString(body["description"]);
 
   return {
     url: envelope.url,

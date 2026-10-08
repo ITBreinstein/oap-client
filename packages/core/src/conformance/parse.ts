@@ -19,6 +19,7 @@
  */
 
 import { MalformedDocumentError } from "../errors.js";
+import { isRecord } from "../links/resolve.js";
 
 export interface ConformanceClass {
   /** The URI exactly as the server sent it. */
@@ -107,11 +108,11 @@ export function parseConformanceUri(uri: string): ConformanceClass | undefined {
  * list — but the error type stays available to callers that want to be strict.
  */
 export function parseConformance(document: unknown, url: string): ParsedConformance {
-  if (typeof document !== "object" || document === null || Array.isArray(document)) {
+  if (!isRecord(document)) {
     throw new MalformedDocumentError(url, "expected a JSON object with a conformsTo member");
   }
 
-  const conformsTo: unknown = (document as Record<string, unknown>)["conformsTo"];
+  const conformsTo: unknown = document["conformsTo"];
   if (!Array.isArray(conformsTo)) {
     throw new MalformedDocumentError(
       url,
@@ -125,6 +126,7 @@ export function parseConformance(document: unknown, url: string): ParsedConforma
   const unparseable: string[] = [];
   const raw: string[] = [];
 
+  // `Array.isArray` narrows to `any[]`; this only takes the `any` back out.
   for (const entry of conformsTo as readonly unknown[]) {
     // A non-string entry has no verbatim form to preserve, so it is counted as
     // unparseable rather than coerced into something the server never sent.
