@@ -302,6 +302,25 @@ describe("GET /read — forwarding", () => {
     expect(response.headers.get("X-Relay")).toBe("1");
   });
 
+  it("allows Accept in a preflight, which a media type with a profile needs (W35)", async () => {
+    const h = harness();
+    for (const path of ["/read/zoo/jobs/abc", "/execute/zoo/echo"]) {
+      const response = await h.app.request(path, {
+        method: "OPTIONS",
+        headers: {
+          Origin: ORIGIN,
+          "Access-Control-Request-Method": "GET",
+          "Access-Control-Request-Headers": "accept,authorization",
+        },
+      });
+      const allowed = (response.headers.get("Access-Control-Allow-Headers") ?? "")
+        .toLowerCase()
+        .split(",")
+        .map((name) => name.trim());
+      expect(allowed).toContain("accept");
+    }
+  });
+
   it("answers 502, marked as its own, when the exchange produced no response", async () => {
     const h = harness(() => Promise.reject(new UpstreamError("timeout")));
     const response = await read(h, "/read/zoo/processes");

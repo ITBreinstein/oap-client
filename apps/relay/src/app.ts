@@ -332,11 +332,13 @@ export function createApp(options: AppOptions = {}): Hono {
   // The routes that can hand back an OGC server's answer. They expose the
   // evidence headers, so the core sees what it would see from a server that
   // sends perfect CORS headers, and accept the request headers the read route
-  // forwards.
+  // forwards. `Accept` among them: a value with `"` or `:` in it, such as a
+  // media type with a profile, is off the CORS safelist, and its preflight
+  // failed without it (review W35).
   const forwardingCors = cors({
     origin: (origin) => (allowedOrigins.has(origin) ? origin : null),
     allowMethods: ["GET", "POST", "DELETE", "OPTIONS"],
-    allowHeaders: ["Content-Type", "Authorization", "Prefer", "Accept-Language"],
+    allowHeaders: ["Content-Type", "Authorization", "Prefer", "Accept", "Accept-Language"],
     exposeHeaders: EXPOSED_HEADERS,
     credentials: false,
     maxAge: 600,
