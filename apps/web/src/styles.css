@@ -827,3 +827,44 @@ ol.steps li .help {
 .address-field .help code {
   white-space: nowrap;
 }
+
+/*
+ * After a run: the result's two ways on, then the inputs that were sent,
+ * read-only, under their own heading.
+ */
+.next-steps {
+  margin: 1rem 0 0.5rem;
+}
+
+.sent-heading {
+  margin: 1.75rem 0 0.75rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+  font-size: 1rem;
+}
+
+/* The process list: what has been run here, and where the user came back from. */
+.tag {
+  display: inline-block;
+  padding: 0 0.45rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.5;
+  color: #1d5a35;
+  background: #e3f4e8;
+  border: 1px solid #9fd1ae;
+  border-radius: 999px;
+  vertical-align: 0.1rem;
+}
+
+.process-list li[data-last-opened] {
+  margin: 0 -0.6rem;
+  padding-inline: 0.6rem;
+  background: #f3f7fc;
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+/* Coming back to the list scrolls to the process left; keep some list above it. */
+.process-list .process-link {
+  scroll-margin-top: 8rem;
+}

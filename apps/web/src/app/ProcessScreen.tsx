@@ -288,7 +288,7 @@ export function ProcessScreen(props: ProcessScreenProps) {
           onClick={commands.backToList}
           disabled={state.stage === "running"}
         >
-          All processes
+          <span aria-hidden="true">← </span>All processes
         </button>
       </p>
       <h2
@@ -319,7 +319,82 @@ export function ProcessScreen(props: ProcessScreenProps) {
         </div>
       )}
 
-      <form onSubmit={onSubmit} noValidate aria-labelledby={`${base}-heading`}>
+      {state.stage === "running" && (
+        <div
+          className="running"
+          role="status"
+          aria-live="polite"
+          data-job-ref={state.run.mode === "async" ? state.run.jobRef : undefined}
+          data-doorbells={job?.doorbells}
+          data-callbacks={callbacksOf(job)}
+        >
+          {state.run.mode === "sync" ? (
+            <p>Running… waiting for the server's answer.</p>
+          ) : (
+            <>
+              <p>
+                <JobStatusLine job={job} />
+              </p>
+              {state.run.jobRef !== undefined && (
+                <p className="actions">
+                  <button type="button" className="secondary" onClick={commands.cancelJob}>
+                    Cancel job
+                  </button>
+                  {dismissAdvertisedBy === "nothing" && (
+                    <span className="muted">
+                      {" "}
+                      This server does not advertise that jobs can be cancelled; trying is recorded.
+                    </span>
+                  )}
+                </p>
+              )}
+            </>
+          )}
+          {jobNotice !== undefined && <p>{jobNotice}</p>}
+        </div>
+      )}
+
+      {state.stage === "result" && (
+        // The job's markers again, for after it finished: the running view is
+        // gone the moment a read finds the job done, which can be within
+        // milliseconds of the doorbell that prompted the read.
+        <div
+          data-result-of={state.jobRef}
+          data-doorbells={resultJob?.doorbells}
+          data-callbacks={callbacksOf(resultJob)}
+          data-confirmation={resultJob?.confirmation?.state}
+        >
+          <StatusChanged job={resultJob} />
+          <NotYetConfirmed job={resultJob} />
+          <ResultsView
+            results={state.results}
+            processId={process.id}
+            onLoad={commands.loadReference}
+          />
+          <p className="actions next-steps">
+            <button type="button" onClick={commands.edit}>
+              Change the inputs
+            </button>
+            <button type="button" className="secondary" onClick={commands.backToList}>
+              Choose another process
+            </button>
+          </p>
+        </div>
+      )}
+
+      {/* While a run is under way and after it, the status or result comes
+          first, and the form below it is what was sent: read-only, under its
+          own heading. */}
+      {!editable && (
+        <h3 id={`${base}-sent`} className="sent-heading">
+          Inputs you sent
+        </h3>
+      )}
+      <form
+        onSubmit={onSubmit}
+        noValidate
+        aria-labelledby={editable ? `${base}-heading` : `${base}-sent`}
+      >
         <fieldset disabled={!editable} className="form-body">
           <legend className="visually-hidden">Inputs</legend>
           {plan.fields.length === 0 && <p>This process takes no inputs.</p>}
@@ -377,66 +452,6 @@ export function ProcessScreen(props: ProcessScreenProps) {
       )}
       {state.stage === "process" && state.error?.inputId !== undefined && (
         <p className="hint">The server's message names the input “{state.error.inputId}”.</p>
-      )}
-
-      {state.stage === "running" && (
-        <div
-          className="running"
-          role="status"
-          aria-live="polite"
-          data-job-ref={state.run.mode === "async" ? state.run.jobRef : undefined}
-          data-doorbells={job?.doorbells}
-          data-callbacks={callbacksOf(job)}
-        >
-          {state.run.mode === "sync" ? (
-            <p>Running… waiting for the server's answer.</p>
-          ) : (
-            <>
-              <p>
-                <JobStatusLine job={job} />
-              </p>
-              {state.run.jobRef !== undefined && (
-                <p className="actions">
-                  <button type="button" className="secondary" onClick={commands.cancelJob}>
-                    Cancel job
-                  </button>
-                  {dismissAdvertisedBy === "nothing" && (
-                    <span className="muted">
-                      {" "}
-                      This server does not advertise that jobs can be cancelled; trying is recorded.
-                    </span>
-                  )}
-                </p>
-              )}
-            </>
-          )}
-          {jobNotice !== undefined && <p>{jobNotice}</p>}
-        </div>
-      )}
-
-      {state.stage === "result" && (
-        // The job's markers again, for after it finished: the running view is
-        // gone the moment a read finds the job done, which can be within
-        // milliseconds of the doorbell that prompted the read.
-        <div
-          data-result-of={state.jobRef}
-          data-doorbells={resultJob?.doorbells}
-          data-callbacks={callbacksOf(resultJob)}
-          data-confirmation={resultJob?.confirmation?.state}
-        >
-          <StatusChanged job={resultJob} />
-          <NotYetConfirmed job={resultJob} />
-          <ResultsView
-            results={state.results}
-            processId={process.id}
-            onLoad={commands.loadReference}
-          />
-          <p className="actions">
-            <button type="button" onClick={commands.edit}>
-              Change the inputs
-            </button>
-          </p>
-        </div>
       )}
     </section>
   );

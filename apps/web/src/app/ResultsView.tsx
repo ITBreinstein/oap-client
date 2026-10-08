@@ -123,7 +123,9 @@ function ResultItem({
         </p>
       )}
       {result.kind === "json" && (
-        <details open>
+        // Folded when the map shows it: the shape is the answer there, and
+        // pages of coordinates would push the next steps off screen.
+        <details open={plot !== "plotted"}>
           <summary>
             <strong>{result.outputId}</strong> <span className="muted">JSON</span>
           </summary>

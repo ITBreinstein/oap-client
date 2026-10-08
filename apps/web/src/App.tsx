@@ -5,6 +5,7 @@ import { activeDrawField, DrawContext, type DrawRequest, type DrawTarget } from 
 import { EndpointScreen } from "./app/EndpointScreen.js";
 import { MapBoundary } from "./app/MapBoundary.js";
 import { MapLimitsContext, type MapLimits } from "./app/map-limits.js";
+import { mapNeeded } from "./app/map-need.js";
 import { MapPane } from "./app/MapPane.js";
 import { ProcessListScreen } from "./app/ProcessListScreen.js";
 import { ProcessScreen } from "./app/ProcessScreen.js";
@@ -113,6 +114,8 @@ export function App({ config = STATIC_ONLY, configWarning }: AppProps) {
           service={state.service}
           processes={state.processes}
           opening={state.opening}
+          lastOpened={state.lastOpened}
+          ran={state.ran ?? []}
           error={state.error}
           onOpen={commands.openProcess}
           onDisconnect={commands.disconnect}
@@ -144,12 +147,10 @@ export function App({ config = STATIC_ONLY, configWarning }: AppProps) {
       break;
   }
 
-  // The map appears with the first process opened: before that there is
-  // nothing to draw and nothing to show, so the start screen and the process
-  // list have the page to themselves, and no basemap tile is fetched until the
-  // map has a job to do. Leaving a process removes the map again.
-  const showMap =
-    state.stage === "process" || state.stage === "running" || state.stage === "result";
+  // The map is on screen only while it has a job to do: an input it can draw,
+  // or a result it can show (`app/map-need.ts`). Otherwise the panel has the
+  // page to itself, and no basemap tile is fetched.
+  const showMap = mapNeeded(state, mapLimits.maxCoordinates);
 
   // While the relay offer is open, everything else is inert: no keyboard or
   // pointer can reach Connect or the jobs behind the question (review W22).

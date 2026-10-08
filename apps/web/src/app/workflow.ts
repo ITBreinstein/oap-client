@@ -76,6 +76,10 @@ interface Connected {
   readonly route: "direct" | "relay";
   readonly service: ServiceDescription;
   readonly processes: ProcessList;
+  /** The process opened last on this connection: the list returns to it. */
+  readonly lastOpened?: string | undefined;
+  /** The processes run to a result on this connection, each once, in the order first run. */
+  readonly ran?: readonly string[] | undefined;
 }
 
 interface ProcessOpen extends Connected {
@@ -217,6 +221,8 @@ function connectedPart(state: Connected): Connected {
     route: state.route,
     service: state.service,
     processes: state.processes,
+    lastOpened: state.lastOpened,
+    ran: state.ran,
   };
 }
 
@@ -285,7 +291,12 @@ export function workflowReducer(state: Workflow, action: WorkflowAction): Workfl
       // From the list, from a form, or from a result — never mid-run, where
       // leaving would abandon a job the user has not been told the fate of.
       return state.stage === "connected" || state.stage === "process" || state.stage === "result"
-        ? { stage: "connected", ...connectedPart(state), opening: action.processId }
+        ? {
+            stage: "connected",
+            ...connectedPart(state),
+            opening: action.processId,
+            lastOpened: action.processId,
+          }
         : state;
 
     case "process-loaded":
@@ -370,6 +381,9 @@ export function workflowReducer(state: Workflow, action: WorkflowAction): Workfl
         ? {
             stage: "result",
             ...openPart(state),
+            ran: (state.ran ?? []).includes(state.process.id)
+              ? state.ran
+              : [...(state.ran ?? []), state.process.id],
             runId: state.runId,
             results: action.results,
             jobRef: state.run.mode === "async" ? state.run.jobRef : undefined,
