@@ -576,9 +576,10 @@ with the job still not terminal — `pollJob()` reports that as a `timeout`
 outcome, but a status that is still `running` is not the final one — and
 `JobNotFoundError` when the job went away while it was being polled.
 
-What _does_ throw: a 404 (`JobNotFoundError`), a 5xx (`ProcessesError`), a
-transport failure, an abort, and a body with no usable `status`
-(`MalformedJobDocumentError`).
+What _does_ throw: a 404 (`JobNotFoundError`), any other status outside 2xx
+(`ProcessesError`), a problem document with no job status in it, at a 2xx too
+(`ProcessesError`, with the problem attached), a transport failure, an abort,
+and any other body with no usable `status` (`MalformedJobDocumentError`).
 
 ### `running` is not a status you can wait for
 

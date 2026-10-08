@@ -295,6 +295,49 @@ describe("getJob()", () => {
     expect(statusRecord(seen).classifiedAsException).toBe(true);
   });
 
+  describe("a problem document at 200 (C15)", () => {
+    // Hand-built: neither reference server answers a status read this way. A
+    // gateway that rewrites the status, or a framework that serialises an
+    // exception through a success path, would.
+    const problem = {
+      type: "https://example.test/errors/job-store-down",
+      title: "Job store unavailable",
+      status: 503,
+      detail: "the job database did not answer",
+    };
+
+    it("raises ProcessesError carrying the problem, not a malformed job document", async () => {
+      const error = await getJob(JOB_URL, {
+        fetch: fakeFetch(json(problem, 200, { "Content-Type": "application/problem+json" })),
+      }).catch((err: unknown) => err);
+
+      expect(error).toBeInstanceOf(ProcessesError);
+      if (!(error instanceof ProcessesError)) return;
+      expect(error.outcome).toBe("exception");
+      expect(error.status).toBe(200);
+      expect(error.problem?.title).toBe("Job store unavailable");
+      expect(error.problem?.status).toBe(503);
+      expect(error.message).toContain("Job store unavailable");
+    });
+
+    it("does so for a problem with no status member, sent as plain JSON", async () => {
+      const unnumbered = { type: problem.type, title: problem.title, detail: problem.detail };
+      const error = await getJob(JOB_URL, { fetch: fakeFetch(json(unnumbered)) }).catch(
+        (err: unknown) => err,
+      );
+
+      expect(error).toBeInstanceOf(ProcessesError);
+      if (!(error instanceof ProcessesError)) return;
+      expect(error.problem?.detail).toBe("the job database did not answer");
+    });
+
+    it("still calls a body with no status and no problem shape malformed", async () => {
+      await expect(
+        getJob(JOB_URL, { fetch: fakeFetch(json({ jobID: "no-status-here" })) }),
+      ).rejects.toBeInstanceOf(MalformedJobDocumentError);
+    });
+  });
+
   describe("JobStatus.exception (C14)", () => {
     it("is read from an `exception` member that reads as a problem document", async () => {
       const body = {
