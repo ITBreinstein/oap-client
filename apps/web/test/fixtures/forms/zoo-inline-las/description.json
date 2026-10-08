@@ -1,16 +1,15 @@
 {
   "status": 200,
   "headers": {
-    "Date": "Fri, 28 Aug 2026 13:37:08 GMT",
+    "Date": "Thu, 08 Oct 2026 11:39:35 GMT",
     "Server": "Apache/2.4.29 (Ubuntu)",
     "X-Powered-By": "ZOO-Project",
     "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self';",
     "Link": "<https://www.opengis.net/dev/profile/OGC/0/ogc-process-description>; rel=\"profile\"",
-    "Content-Length": "4922",
-    "Connection": "close",
+    "Content-Length": "4932",
     "Content-Type": "application/json;charset=UTF-8"
   },
-  "final_url": "{{baseUrl}}/processes/SAGA.pointcloud_tools.4",
+  "final_url": "http://localhost:5090/ogc-api/processes/SAGA.pointcloud_tools.4",
   "body": {
     "id": "SAGA.pointcloud_tools.4",
     "title": "Point Cloud to Grid",
@@ -31,13 +30,13 @@
         "rel": "http://www.opengis.net/def/rel/ogc/1.0/execute",
         "type": "application/json",
         "title": "Execute End Point",
-        "href": "{{baseUrl}}/processes/SAGA.pointcloud_tools.4/execution"
+        "href": "http://localhost:5090/ogc-api/processes/SAGA.pointcloud_tools.4/execution"
       },
       {
         "rel": "alternate",
         "type": "text/html",
         "title": "Execute End Point",
-        "href": "{{baseUrl}}/processes/SAGA.pointcloud_tools.4/execution.html"
+        "href": "http://localhost:5090/ogc-api/processes/SAGA.pointcloud_tools.4/execution.html"
       }
     ],
     "inputs": {

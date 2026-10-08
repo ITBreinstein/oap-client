@@ -1,0 +1,24 @@
+{
+  "body": {
+    "id": "undocumented-array",
+    "title": "One array input that declares no items",
+    "version": "1.0.0",
+    "jobControlOptions": ["sync-execute"],
+    "outputControlOptions": ["value"],
+    "inputs": {
+      "values": {
+        "title": "Values",
+        "description": "An array whose entries the description does not type.",
+        "schema": { "type": "array" },
+        "minOccurs": 1,
+        "maxOccurs": 1
+      }
+    },
+    "outputs": {
+      "result": {
+        "title": "Result",
+        "schema": { "type": "object" }
+      }
+    }
+  }
+}
