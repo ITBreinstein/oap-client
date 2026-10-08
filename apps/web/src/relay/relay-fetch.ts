@@ -122,8 +122,12 @@ export interface RelayFetchOptions {
   readonly session: SessionSource;
 }
 
-/** Methods the read route carries. An execute goes through `routed-fetch.ts`, never here. */
-const CARRIED: ReadonlySet<string> = new Set(["GET", "HEAD", "DELETE"]);
+/**
+ * Methods the read route carries. An execute goes through `routed-fetch.ts`,
+ * never here. Not `HEAD`: the relay refuses it with a 404 of its own, which
+ * would reach the core as if the server had said it.
+ */
+const CARRIED: ReadonlySet<string> = new Set(["GET", "DELETE"]);
 
 /** The core's request, as the read route will carry it. */
 async function readRequest(
