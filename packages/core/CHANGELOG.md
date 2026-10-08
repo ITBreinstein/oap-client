@@ -24,6 +24,10 @@ at 0.5.0; earlier versions are recorded only in the git history.
 
 ### Fixed
 
+- `describeInputKind()`, and so the `execution` observation's `inputKinds`,
+  names a `JSON.rawJSON()` value by the JSON it holds (`"number"` for a
+  19-digit identifier sent as written) rather than `"object"`. Where the
+  runtime has no `JSON.isRawJSON`, nothing changes.
 - A `fetch` whose `Response` has no `body` stream, such as whatwg-fetch, which
   React Native's `fetch` is built on, can be read. Every body read threw a
   `TypeError` on `undefined.getReader()`, which surfaced as a malformed

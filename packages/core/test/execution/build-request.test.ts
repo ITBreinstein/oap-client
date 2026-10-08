@@ -152,6 +152,22 @@ describe("describeInputKind", () => {
     expect(describeInputKind([1, 2, 3, 4])).toBe("array of 4 number");
     expect(describeInputKind(["a", 1])).toBe("array of 2 mixed");
   });
+
+  // `JSON.rawJSON` is how a caller sends a number a double cannot hold, as the
+  // web app's number fields and raw JSON editor do. Not in every runtime.
+  const rawJson: unknown = Reflect.get(JSON, "rawJSON");
+  const raw = (text: string): unknown =>
+    typeof rawJson === "function" ? Reflect.apply(rawJson, JSON, [text]) : undefined;
+
+  it.runIf(typeof rawJson === "function")(
+    "names a JSON.rawJSON value by the JSON it holds, not as an object",
+    () => {
+      expect(describeInputKind(raw("1234567890123456789"))).toBe("number");
+      expect(describeInputKind(raw('"text"'))).toBe("string");
+      expect(describeInputKind(raw("null"))).toBe("null");
+      expect(describeInputKind([raw("1e400"), 2])).toBe("array of 2 number");
+    },
+  );
 });
 
 describe("checkArity", () => {
