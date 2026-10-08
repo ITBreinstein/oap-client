@@ -62,15 +62,17 @@ body {
   white-space: nowrap;
 }
 
+/* One screen tall: the panel scrolls inside it, the map fills the rest. */
 .app {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
 }
 
 .app-header {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 1rem;
   padding: 0.6rem 1.25rem;
@@ -81,11 +83,23 @@ body {
 .app-header h1 {
   margin: 0;
   font-size: 1.15rem;
+  line-height: 1.3;
 }
 
-/* Site-wide notes under the header: how this deployment is configured. */
-.config-warning,
-.static-only {
+.app-header .tagline {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.app-header .version {
+  margin: 0;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+/* A site-wide note under the header: this deployment's configuration failed. */
+.config-warning {
   margin: 0;
   padding: 0.45rem 1.25rem;
   font-size: 0.9rem;
@@ -99,6 +113,7 @@ body {
 .layout {
   display: grid;
   grid-template-columns: var(--panel-width) 1fr;
+  grid-template-rows: minmax(0, 1fr);
   flex: 1;
   min-height: 0;
 }
@@ -111,7 +126,6 @@ body {
   background: var(--surface);
   border-right: 1px solid var(--line);
   overflow-y: auto;
-  max-height: calc(100vh - 3rem);
 }
 
 .map-pane {
@@ -221,8 +235,13 @@ body {
 }
 
 @media (max-width: 52rem) {
+  .app {
+    height: auto;
+  }
+
   .layout {
     grid-template-columns: 1fr;
+    grid-template-rows: auto;
   }
 
   .panel {
@@ -627,4 +646,166 @@ button:disabled {
 
 .job-row p {
   margin: 0.2rem 0;
+}
+
+/*
+ * The start screen: what the page is for, one way in, and what comes next.
+ * The address and its button sit on one line, like a search box, when there
+ * is nothing else to choose; choices are cards that show which one is picked.
+ */
+.start .lead {
+  margin: 0 0 1.25rem;
+  font-size: 1.05rem;
+}
+
+.service-choices {
+  border: none;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.service-choices legend {
+  padding: 0;
+  margin-bottom: 0.4rem;
+}
+
+label.choice-card {
+  margin: 0;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+label.choice-card:hover {
+  border-color: var(--accent);
+}
+
+label.choice-card:has(input:checked) {
+  border-color: var(--accent);
+  box-shadow: inset 3px 0 0 var(--accent);
+  background: #f3f7fc;
+}
+
+.choice-body {
+  min-width: 0;
+}
+
+.choice-url {
+  display: block;
+  color: var(--muted);
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+.choice-note {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.address-field input {
+  min-width: 0;
+}
+
+.address-field .field-error {
+  margin-top: 0.1rem;
+}
+
+.input-with-button {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.15rem;
+}
+
+.input-with-button input {
+  flex: 1;
+}
+
+.input-with-button button {
+  flex: none;
+}
+
+.connect-target {
+  overflow-wrap: anywhere;
+}
+
+.how-it-works {
+  margin-top: 1.75rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+
+.how-it-works h3 {
+  margin: 0 0 0.6rem;
+  font-size: 1rem;
+}
+
+ol.steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  counter-reset: step;
+}
+
+ol.steps li {
+  position: relative;
+  counter-increment: step;
+  margin: 0 0 0.6rem;
+  padding-left: 2.25rem;
+}
+
+/* The number in a circle; the list is still an <ol> to a screen reader. */
+ol.steps li::before {
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  top: 0.05rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--accent);
+  border: 1.5px solid var(--accent);
+}
+
+ol.steps li strong,
+ol.steps li .help {
+  display: block;
+}
+
+ol.steps li .help {
+  margin: 0;
+}
+
+.about-access {
+  margin-top: 1rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--page);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.about-access summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.about-access p {
+  margin: 0.5rem 0 0;
+  color: var(--muted);
+}
+
+/* The empty map's note: the same corner the drawing tools use later. */
+.map-empty {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.map-empty strong {
+  color: var(--text);
 }

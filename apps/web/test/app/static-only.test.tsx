@@ -98,6 +98,20 @@ describe("static-only", () => {
     expect(view.textContent).toContain("Hosted service");
     expect(view.textContent).toContain("https://ogc.example.org/api");
     expect(fetched).toEqual([]);
+    // The first service listed is picked, so it is one click away, and Connect says so.
+    // (In a test run, as in development, the local reference servers come first.)
+    const checked = view.querySelector<HTMLInputElement>("input[type='radio']:checked");
+    expect(checked?.value).toBe("preset:0");
+    const picked = checked?.closest("label")?.querySelector(".choice-title")?.textContent;
+    expect(picked).toBeDefined();
+    expect(view.querySelector(".connect-target")?.textContent).toBe(picked);
+  });
+
+  it("explains the empty map before a process is open", async () => {
+    const view = await render(STATIC_ONLY);
+    expect(view.querySelector("[data-testid='map-empty']")?.textContent).toMatch(
+      /Nothing on the map yet/,
+    );
   });
 
   it("control: with a relay configured, the same page makes one and asks it for endpoints", async () => {

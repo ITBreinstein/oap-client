@@ -78,9 +78,15 @@ export function App({ config = STATIC_ONLY, configWarning }: AppProps) {
 
   // Each stage moves focus to its heading, so a keyboard user lands where the
   // new content starts rather than on a button that no longer exists.
+  // Not on the first render, though: on arrival the page starts at its top, as
+  // any page does, rather than with a focus ring around the first heading.
   const panel = useRef<HTMLDivElement>(null);
   const stageKey = `${state.stage}:${openProcessId ?? ""}`;
+  const shownStage = useRef(stageKey);
   useEffect(() => {
+    // Compared, not counted, so React's development double run changes nothing.
+    if (shownStage.current === stageKey) return;
+    shownStage.current = stageKey;
     const target = panel.current?.querySelector<HTMLElement>("[data-focus-on-stage]");
     target?.focus();
   }, [stageKey]);
@@ -95,6 +101,7 @@ export function App({ config = STATIC_ONLY, configWarning }: AppProps) {
           presets={presets}
           connecting={state.connecting}
           error={state.error}
+          staticOnly={relayUrl === undefined}
           onConnect={commands.connect}
         />
       );
@@ -146,8 +153,11 @@ export function App({ config = STATIC_ONLY, configWarning }: AppProps) {
       <DrawContext.Provider value={draw}>
         <div className="app" data-relay-stream={view.snapshot?.relay}>
           <header className="app-header" inert={offerOpen}>
-            <h1>OGC API - Processes client</h1>
-            <p className="muted" data-testid="core-version">
+            <div>
+              <h1>OGC API - Processes client</h1>
+              <p className="tagline">Discover, run and view geospatial calculations</p>
+            </div>
+            <p className="muted version" data-testid="core-version">
               core {VERSION}
             </p>
           </header>
@@ -159,14 +169,6 @@ export function App({ config = STATIC_ONLY, configWarning }: AppProps) {
               inert={offerOpen}
             >
               {configWarning}
-            </p>
-          )}
-          {relayUrl === undefined && (
-            <p className="muted static-only" data-testid="static-only" inert={offerOpen}>
-              This page runs without the relay: every request goes straight from your browser to the
-              service. A service must allow web pages to read it (CORS), and a background run is
-              found only where the service lets a page read the job&apos;s address. Callbacks, and
-              reading services that send no CORS headers, need the relay.
             </p>
           )}
           <div className="layout" inert={offerOpen}>
