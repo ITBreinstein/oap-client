@@ -24,6 +24,11 @@ at 0.5.0; earlier versions are recorded only in the git history.
 
 ### Fixed
 
+- `getJob()` and `pollJob()` throw `ProcessesError`, with the problem attached,
+  when a 2xx status read carries a problem document and no job status. They
+  threw `MalformedJobDocumentError` ("`status` is number"), and the server's
+  explanation was lost. A job document that also reads as a problem document,
+  but carries a job status, is still returned as a `JobStatus`.
 - `classify()` calls only a 2xx `ok`. A 3xx and a status 0 were `ok` too, so
   `requireOk()` returned them as answers. `fetch` follows a redirect itself, so
   a 3xx that arrives is one it did not follow (a 304, a 300, a redirect with no

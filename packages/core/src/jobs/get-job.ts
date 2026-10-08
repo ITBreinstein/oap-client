@@ -22,7 +22,9 @@
  * - any other status outside 2xx → `ProcessesError`, with the classification;
  * - a transport failure or an abort, from `send()` unchanged;
  * - a body that is not a JSON object, or that has no usable `status`, from
- *   `parseJobStatus()`.
+ *   `parseJobStatus()` — unless the body is a problem document, which is the
+ *   server saying what went wrong: that is a `ProcessesError` carrying it, at a
+ *   2xx too (review C15).
  *
  * ## The interaction with the problem-document heuristic
  *
@@ -129,11 +131,26 @@ export async function readJobStatus(
     });
   }
 
-  const status = parseJobStatus(body, {
-    documentUrl: envelope.url,
-    envelope,
-    ...(sink === undefined ? {} : { sink }),
-  });
+  let status: JobStatus;
+  try {
+    status = parseJobStatus(body, {
+      documentUrl: envelope.url,
+      envelope,
+      ...(sink === undefined ? {} : { sink }),
+    });
+  } catch (cause) {
+    // A problem document with no job status in it — `status` absent, or the
+    // number RFC 7807 puts there — is the server's refusal at a 2xx, not a
+    // malformed job. Its words travel on the error, as at any failing status.
+    if (!(cause instanceof MalformedJobDocumentError) || classification.kind !== "exception") {
+      throw cause;
+    }
+    const { problem } = classification;
+    throw new ProcessesError(
+      `${String(envelope.status)} reading job status from ${envelope.url}: a problem document, not a job: ${problem.title ?? problem.detail ?? problem.type}`,
+      classification,
+    );
+  }
 
   observe(sink, {
     kind: "job-status",
