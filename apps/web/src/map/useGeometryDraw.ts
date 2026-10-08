@@ -12,6 +12,7 @@
 import type { Map as MapLibreMap } from "maplibre-gl";
 import { useEffect, useRef, useState } from "react";
 import { moveTo } from "./fit.js";
+import { whenStyleLoaded } from "./style-loaded.js";
 import {
   createTerraDrawGeometryEngine,
   type CreateGeometryEngine,
@@ -58,24 +59,31 @@ export function useGeometryDraw(
   const toolsKey = tools.join(",");
   useEffect(() => {
     if (map === undefined || !active || toolsKey === "") return;
-    let created: GeometryEngine;
-    try {
-      created = createEngine(map, { tools: toolsKey.split(",") as Tool[], several });
-    } catch {
-      // A map that cannot host the draw mode leaves typed GeoJSON working.
-      return;
-    }
-    engine.current = created;
-    created.onState(setState);
-    created.onChange((shapes) => {
-      shown.current = keyOf(shapes);
-      latest.current.onChange(shapes);
-    });
-    const initial = latest.current.value;
-    shown.current = keyOf(initial);
-    created.show(initial);
-    moveTo(map, initial);
+    let created: GeometryEngine | undefined;
+    const start = (): void => {
+      let made: GeometryEngine;
+      try {
+        made = createEngine(map, { tools: toolsKey.split(",") as Tool[], several });
+      } catch {
+        // A map that cannot host the draw mode leaves typed GeoJSON working.
+        return;
+      }
+      created = made;
+      engine.current = made;
+      made.onState(setState);
+      made.onChange((shapes) => {
+        shown.current = keyOf(shapes);
+        latest.current.onChange(shapes);
+      });
+      const initial = latest.current.value;
+      shown.current = keyOf(initial);
+      made.show(initial);
+      moveTo(map, initial);
+    };
+    const cancel = whenStyleLoaded(map, start);
     return () => {
+      cancel();
+      if (created === undefined) return;
       created.stop();
       if (engine.current === created) engine.current = undefined;
       setState(IDLE);

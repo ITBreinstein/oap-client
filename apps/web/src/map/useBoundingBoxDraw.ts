@@ -13,6 +13,7 @@ import type { Map as MapLibreMap } from "maplibre-gl";
 import { useEffect, useRef } from "react";
 import { roundBbox, sameBbox, type Bbox } from "./bbox.js";
 import { createTerraDrawEngine, type CreateDrawEngine, type DrawEngine } from "./draw-engine.js";
+import { whenStyleLoaded } from "./style-loaded.js";
 
 export interface BboxDrawProps {
   readonly active: boolean;
@@ -39,23 +40,30 @@ export function useBoundingBoxDraw(
 
   useEffect(() => {
     if (map === undefined || !active) return;
-    let created: DrawEngine;
-    try {
-      created = createEngine(map);
-    } catch {
-      // A map that cannot host the draw mode leaves the typed fields working.
-      return;
-    }
-    engine.current = created;
-    created.onChange((bbox) => {
-      const rounded = roundBbox(bbox);
-      shown.current = rounded;
-      if (!sameBbox(rounded, latest.current.value)) latest.current.onChange(rounded);
-    });
-    shown.current = latest.current.value;
-    created.show(latest.current.value);
-    created.drawRectangle();
+    let created: DrawEngine | undefined;
+    const start = (): void => {
+      let made: DrawEngine;
+      try {
+        made = createEngine(map);
+      } catch {
+        // A map that cannot host the draw mode leaves the typed fields working.
+        return;
+      }
+      created = made;
+      engine.current = made;
+      made.onChange((bbox) => {
+        const rounded = roundBbox(bbox);
+        shown.current = rounded;
+        if (!sameBbox(rounded, latest.current.value)) latest.current.onChange(rounded);
+      });
+      shown.current = latest.current.value;
+      made.show(latest.current.value);
+      made.drawRectangle();
+    };
+    const cancel = whenStyleLoaded(map, start);
     return () => {
+      cancel();
+      if (created === undefined) return;
       created.stop();
       if (engine.current === created) engine.current = undefined;
     };

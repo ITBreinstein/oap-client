@@ -12,6 +12,7 @@ import { bboxOfRing, roundBbox, sameBbox, type Bbox } from "../../src/map/bbox.j
 import type { DrawEngine } from "../../src/map/draw-engine.js";
 import { MapView, type CreateMap } from "../../src/map/MapView.js";
 import { useBoundingBoxDraw, type BboxDrawProps } from "../../src/map/useBoundingBoxDraw.js";
+import { styleMap } from "./style-map.js";
 
 /**
  * A stand-in for the engine, not for Terra Draw: it copies the `DrawEngine`
@@ -40,7 +41,7 @@ function fakeEngine(): FakeEngine {
   };
 }
 
-const fakeMap = {} as never;
+const fakeMap = styleMap().map;
 
 let root: Root | undefined;
 let host: HTMLElement | undefined;
@@ -172,7 +173,8 @@ describe("the draw mode ends when the chosen process changes", () => {
 describe("MapView", () => {
   it("removes the map on unmount", () => {
     const remove = vi.fn();
-    const createMap: CreateMap = () => ({ remove }) as never;
+    const createMap: CreateMap = () =>
+      ({ remove, getStyle: () => ({ version: 8, sources: {}, layers: [] }) }) as never;
     const onAvailable = vi.fn();
     render(
       <MapView

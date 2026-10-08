@@ -143,20 +143,36 @@ export interface FakeMap {
   readonly sources: ReadonlyMap<string, unknown>;
   /** What MapView's ref cleanup does: `map.remove()`. */
   remove(): void;
+  /** The style comes in, and `style.load` fires. */
+  loadStyle(): void;
 }
 
-export function fakeMap(): FakeMap {
+/**
+ * `styleLoaded: false` is a map in its first frame or so: as MapLibre does, it
+ * refuses a source or layer until its style is in (review W30).
+ */
+export function fakeMap({ styleLoaded = true }: { styleLoaded?: boolean } = {}): FakeMap {
   const container = document.createElement("div");
   const canvas = document.createElement("canvas");
   container.append(canvas);
   const sources = new Map<string, unknown>();
   const layers = new Set<string>();
   let removed = false;
+  let loaded = styleLoaded;
+  const styleListeners = new Set<() => void>();
+  const notLoaded = () => new Error("Style is not done loading.");
   const gone = (method: string) =>
     new TypeError(`Cannot read properties of undefined (reading '${method}')`);
   const toggle = { isEnabled: () => true, enable: () => undefined, disable: () => undefined };
   const map = {
     version: "6.11.1",
+    getStyle: () => (loaded ? { version: 8, sources: {}, layers: [] } : undefined),
+    on(event: string, listener: () => void) {
+      if (event === "style.load") styleListeners.add(listener);
+    },
+    off(event: string, listener: () => void) {
+      if (event === "style.load") styleListeners.delete(listener);
+    },
     getContainer: () => container,
     getCanvas: () => canvas,
     dragRotate: toggle,
@@ -165,6 +181,7 @@ export function fakeMap(): FakeMap {
     hasImage: () => false,
     addSource(id: string, spec: { data?: unknown }) {
       if (removed) throw gone("addSource");
+      if (!loaded) throw notLoaded();
       if (sources.has(id)) throw new Error(`Source "${id}" already exists.`);
       sources.set(id, spec.data);
     },
@@ -178,6 +195,7 @@ export function fakeMap(): FakeMap {
     },
     addLayer(layer: { id: string }) {
       if (removed) throw gone("addLayer");
+      if (!loaded) throw notLoaded();
       if (layers.has(layer.id)) throw new Error(`Layer "${layer.id}" already exists.`);
       layers.add(layer.id);
     },
@@ -198,6 +216,10 @@ export function fakeMap(): FakeMap {
     sources,
     remove() {
       removed = true;
+    },
+    loadStyle() {
+      loaded = true;
+      for (const listener of [...styleListeners]) listener();
     },
   };
 }

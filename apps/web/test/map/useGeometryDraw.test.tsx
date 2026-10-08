@@ -13,6 +13,7 @@ import type {
   MapShape,
 } from "../../src/map/geometry-engine.js";
 import { useGeometryDraw, type GeometryDrawProps } from "../../src/map/useGeometryDraw.js";
+import { styleMap } from "./style-map.js";
 
 /**
  * A stand-in for the engine, not for Terra Draw: it copies the
@@ -53,7 +54,7 @@ function fakeEngine(): FakeEngine {
   return engine;
 }
 
-const fakeMap = {} as never;
+const fakeMap = styleMap().map;
 
 const point: MapShape = { type: "Point", coordinates: [5.1, 52.1] };
 const other: MapShape = { type: "Point", coordinates: [5.2, 52.2] };
@@ -134,5 +135,40 @@ describe("useGeometryDraw", () => {
     render(<Harness props={props({})} engine={engine} />);
     render(<Harness props={props({ active: false })} engine={engine} />);
     expect(engine.calls.at(-1)).toBe("stop");
+  });
+});
+
+describe("useGeometryDraw before the map's style is in (review W30)", () => {
+  function Waiting({ map, engine }: { map: never; engine: FakeEngine }) {
+    useGeometryDraw(map, props({ value: [point] }), engine.create);
+    return null;
+  }
+
+  it("starts the draw mode when the style loads, not before", () => {
+    const loading = styleMap({ loaded: false });
+    const engine = fakeEngine();
+    render(<Waiting map={loading.map} engine={engine} />);
+    expect(engine.options).toEqual([]);
+
+    act(() => {
+      loading.load();
+    });
+    expect(engine.options).toHaveLength(1);
+    expect(engine.calls).toEqual(["show:1"]);
+    expect(loading.listening()).toBe(0);
+  });
+
+  it("starts nothing, and stops waiting, when the field stops drawing first", () => {
+    const loading = styleMap({ loaded: false });
+    const engine = fakeEngine();
+    render(<Waiting map={loading.map} engine={engine} />);
+    act(() => {
+      root?.unmount();
+    });
+    root = undefined;
+    expect(loading.listening()).toBe(0);
+    loading.load();
+    expect(engine.options).toEqual([]);
+    expect(engine.calls).toEqual([]);
   });
 });
