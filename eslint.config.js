@@ -97,11 +97,11 @@ export default tseslint.config(
     ],
     extends: [tseslint.configs.disableTypeChecked],
   },
-  // But an un-awaited Playwright call in a spec races the step after it, so
-  // the specs keep that one typed rule. Their types come from
-  // tsconfig.tooling.json, the project they belong to (review T11).
+  // But an un-awaited Playwright call races the step after it, so the E2E
+  // files, specs and helpers alike, keep that one typed rule. Their types come
+  // from tsconfig.tooling.json, the project they belong to (review T11).
   {
-    files: ["e2e/**/*.spec.ts"],
+    files: ["e2e/**/*.ts"],
     languageOptions: {
       parserOptions: {
         projectService: false,
