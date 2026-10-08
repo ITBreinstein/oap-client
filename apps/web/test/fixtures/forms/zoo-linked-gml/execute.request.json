@@ -1,18 +1,18 @@
 {
   "method": "POST",
-  "url": "{{baseUrl}}/processes/Contains/execution",
+  "url": "http://localhost:5090/ogc-api/processes/Contains/execution",
   "headers": {
-    "Accept": "application/json",
-    "Content-Type": "application/json"
+    "Content-Type": "application/json",
+    "Accept": "application/json"
   },
   "body": {
     "inputs": {
       "InputEntity1": {
-        "href": "https://raw.githubusercontent.com/Gouwe-Gozer/ogc-processes-tests/6337cf43f22f780b883b7b0f43650585e4bf0d92/fixtures/gml/simple_polygon.gml",
+        "href": "https://raw.githubusercontent.com/ITBreinstein/oap-client/16762ebfb5184fda0189d6f7447a2ce468c9e7fe/apps/web/test/fixtures/forms/zoo-linked-gml/square.gml",
         "type": "text/xml"
       },
       "InputEntity2": {
-        "href": "https://raw.githubusercontent.com/Gouwe-Gozer/ogc-processes-tests/6337cf43f22f780b883b7b0f43650585e4bf0d92/fixtures/gml/inside_point.gml",
+        "href": "https://raw.githubusercontent.com/ITBreinstein/oap-client/16762ebfb5184fda0189d6f7447a2ce468c9e7fe/apps/web/test/fixtures/forms/zoo-linked-gml/point.gml",
         "type": "text/xml"
       }
     },

@@ -1,16 +1,15 @@
 {
   "status": 200,
   "headers": {
-    "Date": "Fri, 28 Aug 2026 13:37:06 GMT",
+    "Date": "Thu, 08 Oct 2026 11:39:37 GMT",
     "Server": "Apache/2.4.29 (Ubuntu)",
     "X-Powered-By": "ZOO-Project",
     "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self';",
     "Link": "<https://www.opengis.net/dev/profile/OGC/0/ogc-process-description>; rel=\"profile\"",
-    "Content-Length": "2713",
-    "Connection": "close",
+    "Content-Length": "2723",
     "Content-Type": "application/json;charset=UTF-8"
   },
-  "final_url": "{{baseUrl}}/processes/Contains",
+  "final_url": "http://localhost:5090/ogc-api/processes/Contains",
   "body": {
     "id": "Contains",
     "title": "Contains",
@@ -31,13 +30,13 @@
         "rel": "http://www.opengis.net/def/rel/ogc/1.0/execute",
         "type": "application/json",
         "title": "Execute End Point",
-        "href": "{{baseUrl}}/processes/Contains/execution"
+        "href": "http://localhost:5090/ogc-api/processes/Contains/execution"
       },
       {
         "rel": "alternate",
         "type": "text/html",
         "title": "Execute End Point",
-        "href": "{{baseUrl}}/processes/Contains/execution.html"
+        "href": "http://localhost:5090/ogc-api/processes/Contains/execution.html"
       }
     ],
     "inputs": {

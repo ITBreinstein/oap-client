@@ -6,8 +6,8 @@ pnpm-lock.yaml
 # server sent, so a diff after re-capturing means the server changed.
 packages/core/test/fixtures/
 
-# Requests servers accepted, copied verbatim from another repository; see the
-# README beside them. The same reasoning as above.
+# Descriptions and answers captured from the pinned ZOO-Project, and the
+# requests sent to it; see the README beside them. The same reasoning as above.
 apps/web/test/fixtures/forms/*/
 
 # Generated, not written: the interoperability matrix is rendered whole from

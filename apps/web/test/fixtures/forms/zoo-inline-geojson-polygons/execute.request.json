@@ -1,9 +1,9 @@
 {
   "method": "POST",
-  "url": "{{baseUrl}}/processes/SAGA.shapes_polygons.5/execution",
+  "url": "http://localhost:5090/ogc-api/processes/SAGA.shapes_polygons.5/execution",
   "headers": {
-    "Accept": "application/json",
-    "Content-Type": "application/json"
+    "Content-Type": "application/json",
+    "Accept": "application/json"
   },
   "body": {
     "inputs": {
@@ -13,34 +13,34 @@
           "features": [
             {
               "type": "Feature",
-              "id": "group_a_1",
+              "id": "a1",
               "properties": {
-                "group": "A",
-                "value": 2
+                "zone": "a",
+                "count": 1
               },
               "geometry": {
                 "type": "Polygon",
                 "coordinates": [
                   [
                     [
-                      4.744,
-                      52.628
+                      0,
+                      0
                     ],
                     [
-                      4.75,
-                      52.628
+                      1,
+                      0
                     ],
                     [
-                      4.75,
-                      52.636
+                      1,
+                      1
                     ],
                     [
-                      4.744,
-                      52.636
+                      0,
+                      1
                     ],
                     [
-                      4.744,
-                      52.628
+                      0,
+                      0
                     ]
                   ]
                 ]
@@ -48,47 +48,79 @@
             },
             {
               "type": "Feature",
-              "id": "group_a_2",
+              "id": "a2",
               "properties": {
-                "group": "A",
-                "value": 3
+                "zone": "a",
+                "count": 2
               },
               "geometry": {
                 "type": "Polygon",
                 "coordinates": [
                   [
                     [
-                      4.75,
-                      52.628
+                      1,
+                      0
                     ],
                     [
-                      4.756,
-                      52.628
+                      2,
+                      0
                     ],
                     [
-                      4.756,
-                      52.636
+                      2,
+                      1
                     ],
                     [
-                      4.75,
-                      52.636
+                      1,
+                      1
                     ],
                     [
-                      4.75,
-                      52.628
+                      1,
+                      0
+                    ]
+                  ]
+                ]
+              }
+            },
+            {
+              "type": "Feature",
+              "id": "b1",
+              "properties": {
+                "zone": "b",
+                "count": 3
+              },
+              "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                  [
+                    [
+                      0,
+                      1
+                    ],
+                    [
+                      1,
+                      1
+                    ],
+                    [
+                      1,
+                      2
+                    ],
+                    [
+                      0,
+                      2
+                    ],
+                    [
+                      0,
+                      1
                     ]
                   ]
                 ]
               }
             }
           ]
-        },
-        "format": {
-          "mediaType": "application/json"
         }
       },
-      "STAT_AVG": true,
-      "STAT_SUM": false,
+      "STAT_SUM": true,
+      "STAT_AVG": false,
       "BND_KEEP": false,
       "MIN_AREA": 0
     },

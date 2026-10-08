@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gml:Polygon xmlns:gml="http://www.opengis.net/gml" srsName="EPSG:4326">
+  <gml:exterior>
+    <gml:LinearRing>
+      <gml:posList>0 0 4 0 4 4 0 4 0 0</gml:posList>
+    </gml:LinearRing>
+  </gml:exterior>
+</gml:Polygon>
