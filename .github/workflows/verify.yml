@@ -28,6 +28,24 @@ jobs:
         uses: actions/upload-artifact@v4
         with: { name: playwright-report, path: .playwright/report/ }
 
+  # The core claims Node 18 or later (`engines`, its README), and the smoke
+  # lane above runs its node consumer on 24 only. This runs the same consumer,
+  # from the same packed tarball, on 18 (review T11). Only the consumer: pnpm
+  # and the build tools need the 24 the repository asks for, so 18 is set up
+  # first, its binary remembered, and 24 put back in front of it.
+  core-on-node-18:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 18 }
+      - run: echo "SMOKE_NODE=$(command -v node)" >> "$GITHUB_ENV"
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:smoke
+
   # The relay's container image: it builds, starts on a port of its own, and
   # reports healthy there (review R13).
   relay-image:
