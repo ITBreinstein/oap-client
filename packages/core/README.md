@@ -90,16 +90,21 @@ is a judgement that needs the body:
 
 **`classify()` — the judgement.** One of three outcomes:
 
-| Outcome      | Means                                                           |
-| ------------ | --------------------------------------------------------------- |
-| `ok`         | usable                                                          |
-| `exception`  | the body is a problem document (RFC 7807), _at any status_      |
-| `http-error` | status >= 400 with no problem document; carries a `bodyPreview` |
+| Outcome      | Means                                                              |
+| ------------ | ------------------------------------------------------------------ |
+| `ok`         | a 2xx with no problem document: usable                             |
+| `exception`  | the body is a problem document (RFC 7807), _at any status_         |
+| `http-error` | any other status with no problem document; carries a `bodyPreview` |
 
 A **200 carrying a problem document** is an `exception`, not `ok`. Servers do
 this — a gateway rewrites the status, or a framework serialises an exception
 through a success path — and a status check reports it as success, so the
 failure surfaces later as a missing field somewhere unrelated.
+
+Only a 2xx can be `ok`. `fetch` follows a redirect itself, so a 3xx that
+reaches `classify()` is one it did not follow, and a status 0 is an opaque
+response (`redirect: "manual"`, `mode: "no-cors"`) whose body cannot be read.
+Both are `http-error`.
 
 Detecting one is not simply "has a `type` or `title`". Both members collide with
 ordinary payloads: a job document is `{"type": "process", ...}` and every

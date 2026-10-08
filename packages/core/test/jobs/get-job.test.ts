@@ -346,6 +346,17 @@ describe("getJob()", () => {
     ).rejects.toBeInstanceOf(ProcessesError);
   });
 
+  it("raises ProcessesError on a 3xx fetch did not follow, not a malformed document (C18)", async () => {
+    const error = await getJob(JOB_URL, {
+      fetch: fakeFetch(json(PYGEOAPI_RUNNING, 300, { Location: `${JOB_URL}/elsewhere` })),
+    }).catch((err: unknown) => err);
+
+    expect(error).toBeInstanceOf(ProcessesError);
+    if (!(error instanceof ProcessesError)) return;
+    expect(error.outcome).toBe("http-error");
+    expect(error.status).toBe(300);
+  });
+
   it("asks for JSON explicitly, because pygeoapi negotiates this endpoint to HTML", async () => {
     let seenAccept: string | undefined;
     const status = await getJob(JOB_URL, {
