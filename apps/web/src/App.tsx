@@ -144,6 +144,13 @@ export function App({ config = STATIC_ONLY, configWarning }: AppProps) {
       break;
   }
 
+  // The map appears with the first process opened: before that there is
+  // nothing to draw and nothing to show, so the start screen and the process
+  // list have the page to themselves, and no basemap tile is fetched until the
+  // map has a job to do. Leaving a process removes the map again.
+  const showMap =
+    state.stage === "process" || state.stage === "running" || state.stage === "result";
+
   // While the relay offer is open, everything else is inert: no keyboard or
   // pointer can reach Connect or the jobs behind the question (review W22).
   const offerOpen = state.stage === "choose-endpoint" && state.offer !== undefined;
@@ -171,7 +178,7 @@ export function App({ config = STATIC_ONLY, configWarning }: AppProps) {
               {configWarning}
             </p>
           )}
-          <div className="layout" inert={offerOpen}>
+          <div className={showMap ? "layout" : "layout layout-single"} inert={offerOpen}>
             <main className="panel" ref={panel}>
               {state.stage !== "choose-endpoint" && state.route === "relay" && <RelayBanner />}
               {screen}
@@ -196,14 +203,16 @@ export function App({ config = STATIC_ONLY, configWarning }: AppProps) {
                 onDescribeAll={state.stage === "choose-endpoint" ? undefined : commands.describeAll}
               />
             </main>
-            <MapBoundary>
-              <MapPane
-                state={state}
-                draw={draw}
-                setValue={commands.setValue}
-                onAvailable={setMapAvailable}
-              />
-            </MapBoundary>
+            {showMap && (
+              <MapBoundary>
+                <MapPane
+                  state={state}
+                  draw={draw}
+                  setValue={commands.setValue}
+                  onAvailable={setMapAvailable}
+                />
+              </MapBoundary>
+            )}
           </div>
           {offerOpen && (
             <RelayOffer onConfirm={commands.confirmRelay} onDecline={commands.declineRelay} />

@@ -107,11 +107,10 @@ describe("static-only", () => {
     expect(view.querySelector(".connect-target")?.textContent).toBe(picked);
   });
 
-  it("explains the empty map before a process is open", async () => {
+  it("shows no map before a process is open", async () => {
     const view = await render(STATIC_ONLY);
-    expect(view.querySelector("[data-testid='map-empty']")?.textContent).toMatch(
-      /Nothing on the map yet/,
-    );
+    expect(view.querySelector(".map-pane")).toBeNull();
+    expect(view.querySelector(".layout-single")).not.toBeNull();
   });
 
   it("control: with a relay configured, the same page makes one and asks it for endpoints", async () => {

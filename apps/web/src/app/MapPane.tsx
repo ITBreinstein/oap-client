@@ -299,16 +299,6 @@ export function MapPane({
           },
         }}
       />
-      {(state.stage === "choose-endpoint" || state.stage === "connected") && (
-        // Before a process is open the map has nothing to do; say what it is for,
-        // so an empty map does not read as a broken one.
-        <p className="map-overlay map-empty" data-testid="map-empty">
-          <strong>Nothing on the map yet.</strong>{" "}
-          {state.stage === "choose-endpoint"
-            ? "Once you connect and open a process, you draw areas for its inputs here, and results that have a location are shown here."
-            : "Open a process: you draw areas for its inputs here, and results that have a location are shown here."}
-        </p>
-      )}
       {field !== undefined && control !== undefined && (
         <p className="map-hint" role="status">
           Drawing “{field.title}”: drag a rectangle on the map. Drag it or its corners to adjust.
