@@ -20,3 +20,6 @@ observations/
 
 # A developer's own runtime config; deployments bring theirs (deploy/static/).
 apps/web/public/config.json
+
+# The dependency graph `pnpm graph` writes; regenerated, never committed.
+docs/architecture.svg

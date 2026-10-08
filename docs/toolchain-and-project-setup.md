@@ -5,24 +5,24 @@
 
 ## 1. The stack
 
-| Concern             | Choice                                                  | Why this one                                                                               |
-| ------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| Runtime             | Node 24 LTS, pinned                                     | Current active LTS; Node 26 becomes LTS in October, mid-testbed — do not chase it          |
-| Package manager     | **pnpm** workspaces                                     | Strict, non-hoisted `node_modules` turns the boundary table into an install-time guarantee |
-| Task running        | plain `pnpm -r` scripts                                 | Three workspaces. Turborepo/Nx is overhead you will not recover                            |
-| Language            | **TypeScript 6.0.x**, pinned                            | TS 7.0 has no stable compiler API until 7.1, so `typescript-eslint` cannot run on it       |
-| Lint                | ESLint flat config + `typescript-eslint` (type-checked) | Type-aware rules matter for the polling/AbortController code                               |
-| Format              | Prettier                                                | Boring, universal, zero argument surface                                                   |
-| Boundaries          | `dependency-cruiser`                                    | Encodes the boundary rules as a CI gate and renders the architecture graph                 |
-| Unit/contract tests | Vitest + MSW                                            | One runner for core (node) and web (jsdom); MSW gives real request/response assertions     |
-| Browser E2E         | Playwright                                              | The only way to observe real CORS and `Access-Control-Expose-Headers` behaviour            |
-| Reference service   | Docker Compose, pinned pygeoapi image                   | Deterministic CI lane                                                                      |
-| Core build          | `tsdown` (Rolldown)                                     | ESM + CJS + `.d.ts` in one step, with `publint` and `attw` built in                        |
-| Web build           | Vite + React                                            | Static output, no server needed for phase 1                                                |
-| Relay               | Hono on Node                                            | Small, first-class SSE (`streamSSE`), trivially containerised and unit-testable            |
-| CI                  | GitHub Actions                                          | One blocking `verify` lane, one non-blocking `interop` lane                                |
-| Publishing          | npm **trusted publishing** (OIDC)                       | No long-lived `NPM_TOKEN`; free SLSA provenance attestation                                |
-| Git hooks           | lefthook (optional)                                     | Single binary, fast; skip it if CI feedback is enough. Not installed.                      |
+| Concern             | Choice                                                  | Why this one                                                                                                  |
+| ------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Runtime             | Node 24 LTS, pinned                                     | Current active LTS; Node 26 becomes LTS in October, mid-testbed — do not chase it                             |
+| Package manager     | **pnpm** workspaces                                     | Strict, non-hoisted `node_modules` turns the boundary table into an install-time guarantee                    |
+| Task running        | plain `pnpm -r` scripts                                 | Three workspaces. Turborepo/Nx is overhead you will not recover                                               |
+| Language            | **TypeScript 6.0.x**, pinned                            | TS 7.0 has no stable compiler API until 7.1, so `typescript-eslint` cannot run on it                          |
+| Lint                | ESLint flat config + `typescript-eslint` (type-checked) | Type-aware rules matter for the polling/AbortController code                                                  |
+| Format              | Prettier                                                | Boring, universal, zero argument surface                                                                      |
+| Boundaries          | `dependency-cruiser`                                    | Encodes the boundary rules as a CI gate and renders the architecture graph                                    |
+| Unit/contract tests | Vitest + MSW                                            | One runner for core (node) and web (jsdom); MSW gives real request/response assertions                        |
+| Browser E2E         | Playwright                                              | The only way to observe real CORS and `Access-Control-Expose-Headers` behaviour                               |
+| Reference service   | Docker Compose, pinned pygeoapi image                   | Deterministic CI lane                                                                                         |
+| Core build          | `tsdown` (Rolldown)                                     | ESM + `.d.ts` in one step; ESM only (2b). `publint` and `attw` run on the packed tarball in `pnpm test:smoke` |
+| Web build           | Vite + React                                            | Static output, no server needed for phase 1                                                                   |
+| Relay               | Hono on Node                                            | Small, first-class SSE (`streamSSE`), trivially containerised and unit-testable                               |
+| CI                  | GitHub Actions                                          | One blocking `verify` lane, one non-blocking `interop` lane                                                   |
+| Publishing          | npm **trusted publishing** (OIDC)                       | No long-lived `NPM_TOKEN`; free SLSA provenance attestation                                                   |
+| Git hooks           | lefthook (optional)                                     | Single binary, fast; skip it if CI feedback is enough. Not installed.                                         |
 
 ### Two places this amends the architecture document
 
@@ -56,15 +56,15 @@ plugins. Not taken.
 Seven, all forced by what the registry actually ships today. Each is worth
 knowing before someone "corrects" it back.
 
-| #   | Plan said                                  | Repo has                                                                        | Why                                                                                                                                                                                                     |
-| --- | ------------------------------------------ | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | `pnpm@10.15.0`                             | `pnpm@11.1.2`                                                                   | Matches the installed toolchain                                                                                                                                                                         |
-| 2   | `onlyBuiltDependencies:` list              | `allowBuilds:` map                                                              | pnpm 11 renamed the setting; the old key makes pnpm rewrite the file and then fail every command                                                                                                        |
-| 3   | `vitest: ^3.2.0`                           | `vitest: ^4.1.0`                                                                | `@vitejs/plugin-react@6` needs Vite 8; Vitest 3 caps Vite at 7. Vitest 4 spans `^6 \|\| ^7 \|\| ^8`                                                                                                     |
-| 4   | ESLint 9                                   | ESLint 10.8.1                                                                   | The 9.x line is published deprecated; `typescript-eslint@8.67` and `eslint-plugin-react-hooks@7` both declare `^10.0.0`                                                                                 |
-| 5   | `reactHooks.configs["recommended-latest"]` | `reactHooks.configs.flat["recommended-latest"]`                                 | In v7 the top-level key is still eslintrc-shaped (`plugins: ["react-hooks"]`) and ESLint 10 rejects it                                                                                                  |
-| 6   | core `outDir: "dist"`                      | core `outDir: ".tsbuild"`                                                       | `tsdown` owns `dist/` and cleans it. `tsc -b` writes type-check output next door; apps resolve core through `paths` → project references, so `pnpm typecheck` works on a fresh clone with nothing built |
-| 7   | `exports` → `index.js` / `index.d.ts`      | `index.mjs` / `index.d.mts` + `.cjs` / `.d.cts`, split under `import`/`require` | The filenames tsdown actually emits. Verified: `attw` and `publint` both clean                                                                                                                          |
+| #   | Plan said                                  | Repo has                                             | Why                                                                                                                                                                                                                                                                      |
+| --- | ------------------------------------------ | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | `pnpm@10.15.0`                             | `pnpm@11.1.2`                                        | Matches the installed toolchain                                                                                                                                                                                                                                          |
+| 2   | `onlyBuiltDependencies:` list              | `allowBuilds:` map                                   | pnpm 11 renamed the setting; the old key makes pnpm rewrite the file and then fail every command                                                                                                                                                                         |
+| 3   | `vitest: ^3.2.0`                           | `vitest: ^4.1.0`                                     | `@vitejs/plugin-react@6` needs Vite 8; Vitest 3 caps Vite at 7. Vitest 4 spans `^6 \|\| ^7 \|\| ^8`                                                                                                                                                                      |
+| 4   | ESLint 9                                   | ESLint 10.8.1                                        | The 9.x line is published deprecated; `typescript-eslint@8.67` and `eslint-plugin-react-hooks@7` both declare `^10.0.0`                                                                                                                                                  |
+| 5   | `reactHooks.configs["recommended-latest"]` | `reactHooks.configs.flat["recommended-latest"]`      | In v7 the top-level key is still eslintrc-shaped (`plugins: ["react-hooks"]`) and ESLint 10 rejects it                                                                                                                                                                   |
+| 6   | core `outDir: "dist"`                      | core `outDir: ".tsbuild"`                            | `tsdown` owns `dist/` and cleans it. `tsc -b` writes type-check output next door; apps resolve core through `paths` → project references, so `pnpm typecheck` works on a fresh clone with nothing built                                                                  |
+| 7   | `exports` → `index.js` / `index.d.ts`      | `index.js` / `index.d.ts`, under `types` / `default` | First scaffolded as `index.mjs` / `index.d.mts` + `.cjs` / `.d.cts`, split under `import`/`require`, the names tsdown emits by default. Since made ESM only (2b): `fixedExtension: false` emits the plan's names. `attw` (`--profile esm-only`) and `publint` both clean |
 
 Deviation 8 is the one that would have quietly wasted the exercise. With the
 default resolver, `apps/web/src/App.tsx → @breinstein/oap-client` came back
