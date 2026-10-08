@@ -412,6 +412,31 @@ describe("toExecuteBody", () => {
         expect(JSON.stringify(body.inputs)).toBe('{"shape":{"value":{"id":1234567890123456789}}}');
       });
 
+      it("sends a number field's 19-digit identifier as typed", () => {
+        const ids = planFor({ objectId: { schema: { type: "integer" } } });
+        expect(ids.fields[0]?.control.kind).toBe("number");
+        const sent = JSON.stringify(
+          toExecuteBody(ids, { objectId: " 1234567890123456789 " }).inputs,
+        );
+        expect(sent).toBe('{"objectId":1234567890123456789}');
+      });
+
+      it("still sends a number field a double holds as a plain number", () => {
+        const plain = planFor({ n: { schema: { type: "number" } } });
+        expect(toExecuteBody(plain, { n: "2.50" }).inputs).toEqual({ n: 2.5 });
+        // Not JSON's grammar, so read as JavaScript reads it, as before.
+        expect(toExecuteBody(plain, { n: ".5" }).inputs).toEqual({ n: 0.5 });
+        expect(toExecuteBody(plain, { n: "007" }).inputs).toEqual({ n: 7 });
+      });
+
+      it("sends each number in a list of number fields as typed", () => {
+        const list = planFor({ ids: { maxOccurs: 3, schema: { type: "integer" } } });
+        const sent = JSON.stringify(
+          toExecuteBody(list, { ids: ["1234567890123456789", "2"] }).inputs,
+        );
+        expect(sent).toBe('{"ids":[1234567890123456789,2]}');
+      });
+
       it("reads every number as JavaScript holds it when asked not to be exact", () => {
         const body = toExecuteBody(
           plan,

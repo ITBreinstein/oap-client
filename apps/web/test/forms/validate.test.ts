@@ -165,6 +165,31 @@ describe("raw JSON with a number a double cannot hold (W28)", () => {
   });
 });
 
+describe("a number field with more digits than a double holds", () => {
+  const ids = { objectId: { schema: { type: "integer", minimum: 0 } } };
+  const typed = { objectId: "1234567890123456789" };
+
+  it("is let through where the browser sends it as typed", () => {
+    expect(errorsFor(ids, typed)).toEqual({});
+  });
+
+  it("is refused, naming the number, where the browser would send another", () => {
+    withoutSourceText(() => {
+      expect(errorsFor(ids, typed)).toEqual({
+        objectId:
+          "This browser would send 1234567890123456789 as 1234567890123456800. Open the page in a current browser to send it as typed.",
+      });
+    });
+  });
+
+  it("is not refused for digits a double holds, in any browser", () => {
+    withoutSourceText(() => {
+      expect(errorsFor(ids, { objectId: "9007199254740991" })).toEqual({});
+      expect(errorsFor(ids, { objectId: "1e3" })).toEqual({});
+    });
+  });
+});
+
 describe("a number field holding only spaces (W27)", () => {
   const plan = planFor({
     distance: { schema: { type: "number", minimum: 1 } },

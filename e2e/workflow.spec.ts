@@ -670,6 +670,22 @@ test.describe("the workflow in a browser", () => {
     expect((await request).postData()).toContain(`"comment":${typed}`);
   });
 
+  test("sends a number field's digits as typed, past a double's precision", async ({ page }) => {
+    await connectTyped(page, PYGEOAPI);
+    await openProcess(page, "Every input kind");
+    await fillRequiredInputs(page);
+    // A double holds 0.1234567890123456; JSON.stringify would send that.
+    const typed = "0.12345678901234567890";
+    await page.getByRole("textbox", { name: "Ratio" }).fill(typed);
+
+    const request = page.waitForRequest(
+      (candidate) =>
+        candidate.method() === "POST" && candidate.url().includes("/breinstein-inputs/execution"),
+    );
+    await page.getByRole("button", { name: "Run", exact: true }).click();
+    expect((await request).postData()).toContain(`"ratio":${typed}`);
+  });
+
   test("runs in the background through the relay, then cancels a second run", async ({ page }) => {
     await requireService(`${RELAY}/healthz`, "the relay");
     await page.goto("/");

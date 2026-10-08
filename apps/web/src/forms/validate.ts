@@ -21,7 +21,7 @@
 
 import { classifyCrs } from "./crs.js";
 import { isAbsentFor, isGeoJsonText, isRawJson, type FormValues } from "./encode.js";
-import { inexactNumbers } from "./exact-json.js";
+import { inexactNumbers, isJsonNumber } from "./exact-json.js";
 import { shapesOfText } from "./geometry.js";
 import { isJsonArray, isJsonObject } from "./json.js";
 import type { Control, FormPlan, NumberControl } from "./plan.js";
@@ -57,7 +57,12 @@ function checkNumber(control: NumberControl, value: unknown): string | undefined
   const { min, max } = control;
   if (min !== undefined && (control.minExclusive ? parsed <= min : parsed < min)) return ask;
   if (max !== undefined && (control.maxExclusive ? parsed >= max : parsed > max)) return ask;
-  return undefined;
+  // Sent as typed where the browser can, and refused where it would send
+  // another number: past a double's precision, the digits are the point.
+  const [changed] = typeof value === "string" && isJsonNumber(text) ? inexactNumbers(text) : [];
+  return changed === undefined
+    ? undefined
+    : `This browser would send ${changed.written} as ${changed.sent}. Open the page in a current browser to send it as typed.`;
 }
 
 function sameValue(a: unknown, b: unknown): boolean {

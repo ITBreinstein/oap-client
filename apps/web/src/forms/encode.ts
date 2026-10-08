@@ -18,7 +18,7 @@
  */
 
 import { classifyCrs, typedBboxCrs } from "./crs.js";
-import { parseExact } from "./exact-json.js";
+import { isJsonNumber, parseExact } from "./exact-json.js";
 import { isJsonArray, isJsonObject } from "./json.js";
 import type { BboxControl, ComplexControl, Control, FormPlan } from "./plan.js";
 
@@ -179,11 +179,17 @@ function isBboxValue(value: unknown): value is BboxValue {
   );
 }
 
-/** Leaves anything unparseable alone: the server's rejection says more than a guess. */
-function coerceNumber(value: unknown): unknown {
+/**
+ * Leaves anything unparseable alone: the server's rejection says more than a
+ * guess. Text in JSON's number grammar is read like JSON text (W28), so a
+ * number a double would change — a 19-digit identifier — is sent as typed.
+ */
+function coerceNumber(value: unknown, parse: Encoding["parse"]): unknown {
   if (typeof value !== "string") return value;
-  const parsed = Number(value.trim());
-  return value.trim() !== "" && Number.isFinite(parsed) ? parsed : value;
+  const text = value.trim();
+  const parsed = Number(text);
+  if (text === "" || !Number.isFinite(parsed)) return value;
+  return isJsonNumber(text) ? parse(text) : parsed;
 }
 
 function coerceBoolean(value: unknown): unknown {
@@ -284,7 +290,7 @@ function encodeControl(control: Control, value: unknown, how: Encoding): unknown
 
   switch (control.kind) {
     case "number":
-      return coerceNumber(value);
+      return coerceNumber(value, how.parse);
     case "checkbox":
       return coerceBoolean(value);
     case "list": {
