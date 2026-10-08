@@ -133,6 +133,15 @@ describe("createRelayFetch", () => {
     expect(relay.forwarded).toEqual([]);
   });
 
+  it("refuses a HEAD, which the relay does not forward, and sends nothing", async () => {
+    // The relay answers HEAD on the read route with its own 404 (SSRF audit,
+    // #18). Sent, that 404 would be handed to the core as the server's.
+    const relay = fakeRelay([]);
+    const error = await thrown(relayFetch(relay)(`${BASE}/jobs/42`, { method: "HEAD" }));
+    expect([error.outcome, error.code]).toEqual(["relay-refused", "method-not-carried"]);
+    expect(relay.forwarded).toEqual([]);
+  });
+
   it("hands the server's own 404 through as the server's", async () => {
     const relay = fakeRelay([forwarded('{"title":"Not Found"}', 404)]);
     const response = await relayFetch(relay)(`${BASE}/processes/nope`);
