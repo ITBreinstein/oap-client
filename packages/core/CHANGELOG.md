@@ -24,6 +24,13 @@ at 0.5.0; earlier versions are recorded only in the git history.
 
 ### Fixed
 
+- A `fetch` whose `Response` has no `body` stream, such as whatwg-fetch, which
+  React Native's `fetch` is built on, can be read. Every body read threw a
+  `TypeError` on `undefined.getReader()`, which surfaced as a malformed
+  document or not at all. Such a body is now read with `arrayBuffer()` and held
+  to `maxBufferBytes` once it has arrived: a body over the limit still throws
+  `BodyTooLargeError`, but its download is not stopped at the limit, as a
+  stream's is.
 - `getJob()` and `pollJob()` throw `ProcessesError`, with the problem attached,
   when a 2xx status read carries a problem document and no job status. They
   threw `MalformedJobDocumentError` ("`status` is number"), and the server's

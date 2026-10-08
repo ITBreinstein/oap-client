@@ -176,6 +176,15 @@ function declaredLength(headers: Headers): number | undefined {
 }
 
 /**
+ * `Response.body`, which the DOM types call always present. A fetch polyfill
+ * without streams — whatwg-fetch, which React Native's is built on — leaves it
+ * out and offers only the readers (review C17).
+ */
+function bodyStream(response: Response): ReadableStream<Uint8Array> | null | undefined {
+  return response.body;
+}
+
+/**
  * Wraps a `Response`. Header parsing happens eagerly — it is cheap, and it means
  * a caller that never reads the body still gets the full set of observations.
  * The body itself stays untouched until a reader is called.
@@ -207,8 +216,9 @@ export function createEnvelope(
    * body, and handing it over would invite parsing it.
    */
   async function readCapped(): Promise<ArrayBuffer> {
-    const stream = response.body;
+    const stream = bodyStream(response);
     if (stream === null) return new ArrayBuffer(0);
+    if (stream === undefined) return readWhole();
     const reader = stream.getReader();
     const chunks: Uint8Array[] = [];
     let total = 0;
@@ -243,6 +253,27 @@ export function createEnvelope(
       offset += chunk.byteLength;
     }
     return whole.buffer;
+  }
+
+  /**
+   * The body with no stream to count it by: read whole, then held to the
+   * limit. The download is not stopped at the limit, but nothing over it is
+   * handed on.
+   */
+  async function readWhole(): Promise<ArrayBuffer> {
+    let whole: ArrayBuffer;
+    try {
+      whole = await response.arrayBuffer();
+    } catch (cause) {
+      if (options.signal?.aborted === true || isAbortError(cause)) {
+        throw new AbortError(url, { cause });
+      }
+      throw cause;
+    }
+    if (whole.byteLength > limit) {
+      throw new BodyTooLargeError(url, length, limit, whole.byteLength);
+    }
+    return whole;
   }
 
   function buffer(): Promise<ArrayBuffer> {
