@@ -7,7 +7,7 @@
     "node": ">=24.0.0"
   },
   "scripts": {
-    "typecheck": "tsc -b --pretty",
+    "typecheck": "tsc -b --pretty && tsc -p tsconfig.tooling.json --pretty",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

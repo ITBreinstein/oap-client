@@ -2,7 +2,8 @@
 // workspace: the package is packed, installed from the tarball into a throwaway
 // directory outside the repo, and consumed the way a real dependant would.
 //
-//   node  — imports the public entry and constructs a client with a stub fetch
+//   node  — imports the public entry and constructs a client with a stub fetch,
+//           on this Node or on the one SMOKE_NODE names
 //   web   — bundles for the browser; a Node built-in in the published output is
 //           an unresolvable import and fails the bundle
 //
@@ -18,6 +19,10 @@ const smokeDir = fileURLToPath(new URL(".", import.meta.url));
 const repoRoot = resolve(smokeDir, "..");
 const coreDir = join(repoRoot, "packages", "core");
 const PKG = "@breinstein/oap-client";
+// The Node the node consumer runs on: this one, unless SMOKE_NODE names
+// another binary. CI uses that to hold the core to the oldest Node its
+// `engines` claims, while the tools themselves run on 24 (review T11).
+const consumerNode = process.env.SMOKE_NODE ?? process.execPath;
 
 const run = (cmd, args, cwd, quiet = true) =>
   execFileSync(cmd, args, {
@@ -72,13 +77,14 @@ try {
 
   step("node consumer (installed from tarball)");
   const nodeDir = scratch();
+  console.log(`  on Node ${run(consumerNode, ["--version"], nodeDir).trim()}`);
   writeFileSync(
     join(nodeDir, "package.json"),
     JSON.stringify({ name: "smoke-node", private: true, type: "module" }, null, 2),
   );
   run("npm", ["install", "--no-audit", "--no-fund", tarball], nodeDir);
   copyFileSync(join(smokeDir, "node", "consumer.mjs"), join(nodeDir, "consumer.mjs"));
-  process.stdout.write(run("node", ["consumer.mjs"], nodeDir));
+  process.stdout.write(run(consumerNode, ["consumer.mjs"], nodeDir));
 
   step("browser bundle (installed from tarball)");
   const webDir = scratch();

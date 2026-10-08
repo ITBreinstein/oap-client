@@ -1,0 +1,25 @@
+{
+  // The files that belong to no project: the browser lane, and the config of
+  // every tool. Type-checked here so that a wrong Playwright call, or a typo in
+  // a config, fails `pnpm typecheck` rather than a lane at run time (review
+  // T11). Node's types, because all of them run on Node; the DOM's, because
+  // the specs hand callbacks to `page.evaluate`, which runs in the page.
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "noEmit": true,
+    "lib": ["ES2023", "DOM"],
+    "types": ["node"]
+  },
+  "include": [
+    "e2e/**/*.ts",
+    "playwright.config.ts",
+    "vitest.config.ts",
+    "apps/web/vite.config.ts",
+    "apps/relay/*.config.ts",
+    "packages/core/*.config.ts"
+  ]
+}
