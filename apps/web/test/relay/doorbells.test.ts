@@ -108,6 +108,25 @@ describe("readEventStream", () => {
       ["message", "plain"],
     ]);
   });
+
+  it("waits for the next chunk when one ends in \\r, which may be half a CRLF (W26)", async () => {
+    // The relay writes plain `\n`; a proxy in between may not.
+    const stream = controlledStream();
+    const events: [string, string][] = [];
+    const done = readEventStream(stream.response.body ?? new ReadableStream(), (event, data) =>
+      events.push([event, data]),
+    );
+    stream.send("event: job\r");
+    stream.send('\ndata: {"ref":"a"}\r');
+    stream.send("\n\r");
+    stream.send("\nevent: ready\rdata: {}\r\r");
+    stream.end();
+    await done;
+    expect(events).toEqual([
+      ["job", '{"ref":"a"}'],
+      ["ready", "{}"],
+    ]);
+  });
 });
 
 describe("openDoorbells", () => {

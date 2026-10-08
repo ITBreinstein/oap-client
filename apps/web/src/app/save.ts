@@ -1,6 +1,13 @@
 /**
- * Hand the user a file. The object URL lives only as long as the click that
- * uses it, so there is nothing to revoke later and nothing to leak.
+ * How long a download's object URL is kept. The click starts the download,
+ * but WebKit is known to lose a blob download whose URL is revoked straight
+ * after it (review W26), so it is kept for long enough to have been read.
+ */
+export const REVOKE_AFTER_MS = 30_000;
+
+/**
+ * Hand the user a file. The object URL is revoked once the download has had
+ * time to read it, so nothing is left to leak.
  */
 export function saveBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
@@ -11,8 +18,7 @@ export function saveBlob(blob: Blob, filename: string): void {
   document.body.append(link);
   link.click();
   link.remove();
-  // Revoked on the next turn: the click has started the download by then.
   setTimeout(() => {
     URL.revokeObjectURL(url);
-  }, 0);
+  }, REVOKE_AFTER_MS);
 }

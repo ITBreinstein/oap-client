@@ -80,12 +80,15 @@ export async function readEventStream(
     event = "";
     data = [];
   };
-  for (;;) {
-    const chunk = await reader.read();
-    if (chunk.done) return;
-    buffer += decoder.decode(chunk.value, { stream: true });
+  /**
+   * Hand on every complete line in the buffer. A `\r` that ends it may be the
+   * first half of a CRLF split across chunks: read as a line ending on its
+   * own, its `\n` would arrive as a blank line and dispatch the event early
+   * (review W26). So it waits for the next chunk, unless there is none.
+   */
+  const lines = (final: boolean): void => {
     let newline = buffer.search(/\r\n|\r|\n/);
-    while (newline !== -1) {
+    while (newline !== -1 && (final || newline < buffer.length - 1 || buffer[newline] !== "\r")) {
       const line = buffer.slice(0, newline);
       buffer = buffer.slice(newline + (buffer.startsWith("\r\n", newline) ? 2 : 1));
       if (line === "") dispatch();
@@ -98,6 +101,17 @@ export async function readEventStream(
       }
       newline = buffer.search(/\r\n|\r|\n/);
     }
+  };
+  for (;;) {
+    const chunk = await reader.read();
+    if (chunk.done) {
+      // What is left after the last line ending is an unfinished event, which
+      // the format drops.
+      lines(true);
+      return;
+    }
+    buffer += decoder.decode(chunk.value, { stream: true });
+    lines(false);
   }
 }
 
