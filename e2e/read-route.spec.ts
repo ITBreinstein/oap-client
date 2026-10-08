@@ -112,6 +112,29 @@ test.describe("the relay's read route", () => {
     });
   });
 
+  test("takes an Accept the browser has to ask about first (W35)", async ({ page }) => {
+    // A reference Load asks for its link's `type`. One with a profile carries
+    // `"` and `:`, which take `Accept` off the CORS safelist: the browser then
+    // asks the relay in a preflight whether it may send it. No session here,
+    // so the relay's answer is its own refusal; what matters is that one came.
+    await page.goto("/");
+    const outcome = await page.evaluate(async (relay) => {
+      try {
+        const response = await fetch(`${relay}/read/pygeoapi-nocors-relay/processes`, {
+          headers: {
+            Accept: 'application/json; profile="https://example.test/profile"',
+            Authorization: "Bearer no-such-session",
+          },
+          credentials: "omit",
+        });
+        return `status ${String(response.status)}`;
+      } catch (error) {
+        return String(error);
+      }
+    }, RELAY);
+    expect(outcome).toBe("status 401");
+  });
+
   test("sends nothing through the relay when the user cancels", async ({ page }) => {
     const relayRequests: string[] = [];
     page.on("request", (request) => {
