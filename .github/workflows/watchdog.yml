@@ -16,15 +16,18 @@ name: watchdog
 # The job used to be `continue-on-error` at the job level, which made all three
 # look identical from the Actions list. It no longer is:
 #
-# | outcome        | job     | how to recognise it                             |
-# | -------------- | ------- | ----------------------------------------------- |
-# | normal         | green   | pool.json present, verdict in the summary       |
-# | broken run     | **red** | "the watchdog produced no measurement"          |
-# | watchdog alarm | **red** | "ALARM"; the summary says what to do about it   |
+# | outcome        | job     | how to recognise it                                  |
+# | -------------- | ------- | ---------------------------------------------------- |
+# | normal         | green   | pool.json present, verdict in the summary            |
+# | broken run     | **red** | "no measurement", or "the pool test did not run"     |
+# | watchdog alarm | **red** | "ALARM"; the summary says what to do about it        |
 #
-# A broken run is a failed ZOO build, a container that never came up, or a
-# characterisation that produced nothing — none of which say anything about
-# ZOO's behaviour, and all of which once passed silently.
+# A broken run is a failed ZOO build, a container that never came up, a
+# refresh that failed, a characterisation that produced nothing, or a pool
+# test that was skipped because ZOO did not answer — none of which say
+# anything about ZOO's behaviour, and all of which once passed silently or
+# read as the alarm (review T5). The list-versus-document check and the
+# pool-size tripwire are red on their own, and named as such.
 #
 # Both red states fail the job, for opposite reasons, and the run summary is
 # what tells them apart. The alarm fails on purpose: an alarm nobody is
@@ -87,34 +90,66 @@ jobs:
       - uses: actions/upload-artifact@v4
         with: { name: pool-characterisation, path: pool.json, if-no-files-found: error }
 
-      # `test:watchdog` refreshes the pool first: every test here starts from a
-      # full pool and depletes it itself, which is the whole point.
+      # The two watch files run apart, each on a freshly refreshed pool, each
+      # with a JSON report the verdict reads test by test (review T5). Run as
+      # one `pnpm test:watchdog`, any red at all — an ordinary test, the
+      # pool-size tripwire, the refresh itself — read as the 0044 alarm, and a
+      # run where ZOO never answered skipped everything and read as "0044
+      # still holds".
       #
-      # `continue-on-error` here does not mean the outcome is tolerated — the
-      # verdict step below fails the job on it. It means this step does not
-      # short-circuit the run, so the verdict is still written and the
-      # observations are still uploaded. Note what a red step means here:
-      # `it.fails` reports the *expected* failure as a pass, so red is the
-      # alarm, not the norm.
-      - name: watchdog tests
-        id: watchdog
-        run: pnpm test:watchdog
+      # A refresh that fails stops the job: nothing after it would mean
+      # anything. The verdict still runs and says so.
+      - name: refresh the pool for the list check
+        run: ./infra/zoo/zoo.sh refresh
+
+      # Ordinary assertions: ZOO's job list agrees with the job's own document.
+      # Red here is a finding of its own, not the alarm; see that file.
+      - name: job list versus job document
+        run: >-
+          pnpm exec vitest run --config packages/core/vitest.watchdog.config.ts
+          test/watch/zoo-list-vs-document.test.ts
+          --reporter=default --reporter=json --outputFile.json="$GITHUB_WORKSPACE/list.json"
         continue-on-error: true
 
-      # Always runs, including after a failed measurement, so the run summary
-      # says which of the three outcomes this was without anyone opening a log.
+      - name: refresh the pool for the watchdog
+        run: ./infra/zoo/zoo.sh refresh
+
+      # The `it.fails` pool test and its tripwire. `continue-on-error` does not
+      # mean the outcome is tolerated: the verdict below decides the job, and
+      # the observations are still uploaded.
+      - name: watchdog test
+        run: >-
+          pnpm exec vitest run --config packages/core/vitest.watchdog.config.ts
+          test/watch/zoo-worker-pool.test.ts
+          --reporter=default --reporter=json --outputFile.json="$GITHUB_WORKSPACE/watchdog.json"
+        continue-on-error: true
+
+      # Always runs, including after a failed measurement or refresh, so the run
+      # summary says what this run was without anyone opening a log. Read from
+      # the reports, never from a step's outcome: `it.fails` turns the pool
+      # test's expected failure into a pass, so only the test's own status says
+      # which way it went, and a skipped test is a broken run, not a verdict.
       - name: verdict
         if: always()
         shell: bash
         run: |
-          # An `if`, not `[ ... ] && alarm=yes`: GitHub runs `shell: bash` with
-          # `set -e`, so the `&&` form would exit non-zero whenever the test
-          # is false — which is the *normal* case, and would fail every healthy
-          # run for the opposite of the intended reason.
-          alarm=no
-          if [ "${{ steps.watchdog.outcome }}" = "failure" ]; then
-            alarm=yes
-          fi
+          # The status of every test in a report, or nothing when the report is
+          # missing or did not parse.
+          statuses() {
+            jq -r '.testResults[].assertionResults[] | "\(.status)\t\(.title)"' "$1" 2>/dev/null || true
+          }
+          pool=$(statuses watchdog.json | awk -F'\t' 'index($2, "still runs a new job after") == 1 { print $1 }')
+          tripwire=$(statuses watchdog.json | awk -F'\t' 'index($2, "still runs a new job after") != 1 && $1 != "passed"')
+          list_total=$(statuses list.json | wc -l | tr -d ' ')
+          list_bad=$(statuses list.json | awk -F'\t' '$1 != "passed"')
+
+          # One of: expected, alarm, broken. `it.fails` reports its expected
+          # failure as "passed" and a healthy server as "failed".
+          case "$pool" in
+            passed) verdict=expected ;;
+            failed) verdict=alarm ;;
+            *) verdict=broken ;;
+          esac
           {
             echo "## Watchdog verdict"
             echo
@@ -128,27 +163,70 @@ jobs:
               echo '**No measurement.** This run says nothing about ZOO.'
               echo
             fi
-            if [ "$alarm" = yes ]; then
-              echo '> **ALARM — the watchdog went green.**'
-              echo '>'
-              echo '> The pool test is `it.fails`, so a failing step means it'
-              echo '> *passed*: a new job still completed after two dozen others.'
-              echo '> ZOO may have stopped losing workers. Re-measure with'
-              echo '> `infra/zoo/characterise-pool.mjs`, then rewrite finding 0044.'
-              echo '> Do not delete the test, and do not drop the `zoo.sh refresh`'
-              echo '> pretask on `pnpm test:interop`, until that is done.'
-              echo '>'
-              echo '> This job is red *because* of this. It is not a broken run:'
-              echo '> the measurement above was taken successfully.'
+            case "$verdict" in
+              expected)
+                echo 'Watchdog test failed, as expected: finding 0044 still holds.'
+                ;;
+              alarm)
+                echo '> **ALARM — the watchdog went green.**'
+                echo '>'
+                echo '> The pool test is `it.fails`, so it failing means its assertion'
+                echo '> *passed*: a new job still completed after two dozen others.'
+                echo '> ZOO may have stopped losing workers. Re-measure with'
+                echo '> `infra/zoo/characterise-pool.mjs`, then rewrite finding 0044.'
+                echo '> Do not delete the test, and do not drop the `zoo.sh refresh`'
+                echo '> pretask on `pnpm test:interop`, until that is done.'
+                ;;
+              broken)
+                echo "**Broken run: the pool test did not run** (status: \`${pool:-no report}\`)."
+                echo 'ZOO did not answer, a refresh failed, or the test file did not load.'
+                echo 'This run says nothing about finding 0044.'
+                ;;
+            esac
+            echo
+            if [ -n "$tripwire" ]; then
+              echo '**The pool-size tripwire did not pass**, so the pool test above'
+              echo 'may be measuring the wrong thing:'
+              echo '```'
+              echo "$tripwire"
+              echo '```'
+              echo
+            fi
+            if [ "$list_total" = 0 ]; then
+              echo '**The list-versus-document check did not run.**'
+            elif [ -n "$list_bad" ]; then
+              echo '**ZOO'"'"'s job list and job document disagreed**, or the check did'
+              echo 'not run in full. Not the 0044 alarm: see'
+              echo '`packages/core/test/watch/zoo-list-vs-document.test.ts` for what it means.'
+              echo '```'
+              echo "$list_bad"
+              echo '```'
             else
-              echo 'Watchdog red, as expected: finding 0044 still holds.'
+              echo 'Job list and job document agreed.'
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
-          # The alarm fails the job. A monthly run whose only signal is a line
-          # in a summary nobody opens is not a signal.
-          if [ "$alarm" = yes ]; then
+          # Every red state fails the job, and the summary says which it was.
+          # The alarm fails on purpose: a monthly run whose only signal is a
+          # line in a summary nobody opens is not a signal.
+          failed=no
+          if [ "$verdict" = alarm ]; then
             echo "::error::ALARM: the watchdog passed, so finding 0044 may no longer hold. Re-measure before changing anything."
+            failed=yes
+          fi
+          if [ "$verdict" = broken ]; then
+            echo "::error::the pool test did not run (status: ${pool:-no report}); this run says nothing about finding 0044"
+            failed=yes
+          fi
+          if [ -n "$tripwire" ]; then
+            echo "::error::the pool-size tripwire did not pass"
+            failed=yes
+          fi
+          if [ "$list_total" = 0 ] || [ -n "$list_bad" ]; then
+            echo "::error::the job list versus job document check did not pass"
+            failed=yes
+          fi
+          if [ "$failed" = yes ]; then
             exit 1
           fi
 
