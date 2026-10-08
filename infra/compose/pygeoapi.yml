@@ -12,9 +12,11 @@
 # callback receiver listens when it runs outside Docker (infra/relay/). Docker
 # Desktop provides the name on its own; Linux, and so CI, needs the mapping
 # below. It is harmless where the name already resolves.
+#
+# Pinned by digest; the tag is there to be read. infra/README.md says how to move it.
 services:
   pygeoapi-cors:
-    image: geopython/pygeoapi:0.21.0 # a tag, in CI too; not a digest
+    image: geopython/pygeoapi:0.21.0@sha256:34b409a5c4317e3c222ab85068a7ecccd00f50eb5455a149e83cb4e884e132bc
     ports: ["5080:80"]
     extra_hosts: ["host.docker.internal:host-gateway"]
     environment:
@@ -36,7 +38,7 @@ services:
       retries: 30
       start_period: 5s
   pygeoapi-nocors:
-    image: geopython/pygeoapi:0.21.0
+    image: geopython/pygeoapi:0.21.0@sha256:34b409a5c4317e3c222ab85068a7ecccd00f50eb5455a149e83cb4e884e132bc
     ports: ["5081:80"]
     extra_hosts: ["host.docker.internal:host-gateway"]
     environment:

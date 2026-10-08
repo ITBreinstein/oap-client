@@ -66,11 +66,11 @@ behaviour change, and they are excluded from Prettier so they stay byte-exact.
 Reproduce a capture by starting the server below and re-running the `curl`
 commands in the matching contract test.
 
-| Fixture directory | Server                                                                                    | Image                                                     | Licence                                                                           | Captured                 |
-| ----------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------- | --------------------------------------------------------------------------------- | ------------------------ |
-| `pygeoapi/`       | pygeoapi 0.21.0                                                                           | `geopython/pygeoapi:0.21.0` (a tag, not a digest)         | MIT                                                                               | 2026-08-26 to 2026-10-02 |
-| `zoo-project/`    | ZOO-Project, fork `46289f6` (Gouwe-Gozer) on upstream `19f3c4ee`                          | built from that fork: `infra/zoo/pinned.env`              | MIT                                                                               | 2026-08-28 to 2026-10-02 |
-| `pdok/`           | PDOK, BAG OGC API Features (`https://api.pdok.nl/kadaster/bag/ogc/v2`), API-Version 2.0.0 | none: a live third-party service, not a server under test | Public Domain Mark 1.0, per the service's own `license` link (checked 2026-10-08) | 2026-09-26               |
+| Fixture directory | Server                                                                                    | Image                                                                                               | Licence                                                                           | Captured                 |
+| ----------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- | ------------------------ |
+| `pygeoapi/`       | pygeoapi 0.21.0                                                                           | `geopython/pygeoapi:0.21.0@sha256:34b409a5c4317e3c222ab85068a7ecccd00f50eb5455a149e83cb4e884e132bc` | MIT                                                                               | 2026-08-26 to 2026-10-02 |
+| `zoo-project/`    | ZOO-Project, fork `46289f6` (Gouwe-Gozer) on upstream `19f3c4ee`                          | built from that fork: `infra/zoo/pinned.env`                                                        | MIT                                                                               | 2026-08-28 to 2026-10-02 |
+| `pdok/`           | PDOK, BAG OGC API Features (`https://api.pdok.nl/kadaster/bag/ogc/v2`), API-Version 2.0.0 | none: a live third-party service, not a server under test                                           | Public Domain Mark 1.0, per the service's own `license` link (checked 2026-10-08) | 2026-09-26               |
 
 The dates and files per capture are in `packages/core/test/fixtures/README.md`.
 
