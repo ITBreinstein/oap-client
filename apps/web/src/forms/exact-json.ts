@@ -64,6 +64,19 @@ export function parseExact(text: string): unknown {
   );
 }
 
+/** JSON's own number grammar: no leading zeros, `+`, bare point or hex. */
+const JSON_NUMBER = /^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$/;
+
+/**
+ * True when `text` is a JSON number, so {@link parseExact} reads it, and
+ * {@link inexactNumbers} can say whether a double would change it. A number
+ * field's text goes that way too: typed as `1234567890123456789`, it is sent
+ * as typed.
+ */
+export function isJsonNumber(text: string): boolean {
+  return JSON_NUMBER.test(text);
+}
+
 /** A number this browser would send as something else. */
 export interface InexactNumber {
   readonly written: string;
