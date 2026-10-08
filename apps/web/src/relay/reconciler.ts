@@ -96,6 +96,8 @@ export interface ReconcilerOptions {
   readonly confirmAfterMs?: number | undefined;
   /** How long after a first `successful` the confirming reads go on, at most. */
   readonly confirmWindowMs?: number | undefined;
+  /** How long one status read may take before it is given up. */
+  readonly readTimeoutMs?: number | undefined;
   /** This client's clock, for `acceptedSince`. */
   readonly now?: (() => number) | undefined;
 }
@@ -110,6 +112,13 @@ export const CONFIRM_AFTER_MS = 2_000;
  * connection attempt times out, about two minutes with Linux's defaults.
  */
 export const CONFIRM_WINDOW_MS = 180_000;
+/**
+ * A status document is small, and both reference servers answer in
+ * milliseconds. Thirty seconds, as the core gives a landing page: a read that
+ * has not answered by then, such as on a connection a sleeping laptop left
+ * half-open, is given up, and the next poll tries again (review W25).
+ */
+export const READ_TIMEOUT_MS = 30_000;
 
 interface Entry {
   job: TrackedJob;
@@ -145,6 +154,7 @@ export class JobReconciler {
   readonly #acceptedNoticeMs: number;
   readonly #confirmAfterMs: number;
   readonly #confirmWindowMs: number;
+  readonly #readTimeoutMs: number;
   readonly #now: () => number;
   readonly #entries = new Map<string, Entry>();
   readonly #byRef = new Map<string, string>();
@@ -159,6 +169,7 @@ export class JobReconciler {
     this.#acceptedNoticeMs = options.acceptedNoticeMs ?? ACCEPTED_NOTICE_MS;
     this.#confirmAfterMs = options.confirmAfterMs ?? CONFIRM_AFTER_MS;
     this.#confirmWindowMs = options.confirmWindowMs ?? CONFIRM_WINDOW_MS;
+    this.#readTimeoutMs = options.readTimeoutMs ?? READ_TIMEOUT_MS;
     this.#now = options.now ?? (() => Date.now());
   }
 
@@ -290,6 +301,48 @@ export class JobReconciler {
     }, ms);
   }
 
+  /**
+   * One status read with a deadline of its own (review W25). Its signal ends
+   * with the reconciler's or at the deadline, whichever comes first, and at the
+   * deadline the read is given up even if the fetch underneath does not stop:
+   * a read that never settled kept `inFlight` for ever, and a doorbell then
+   * only set `again`, so the job's status froze on screen.
+   */
+  #deadline(): {
+    readonly run: (statusUrl: string) => Promise<JobStatus>;
+    readonly timedOut: () => boolean;
+    readonly end: () => void;
+  } {
+    const controller = new AbortController();
+    const parent = this.#abort.signal;
+    const follow = (): void => {
+      controller.abort(parent.reason);
+    };
+    parent.addEventListener("abort", follow, { once: true });
+    let timedOut = false;
+    let giveUp: ((reason: unknown) => void) | undefined;
+    const cancel = this.#schedule(() => {
+      timedOut = true;
+      const reason = new DOMException("The status read took too long.", "TimeoutError");
+      controller.abort(reason);
+      giveUp?.(reason);
+    }, this.#readTimeoutMs);
+    return {
+      run: (statusUrl) =>
+        Promise.race([
+          this.#options.readJob(statusUrl, controller.signal),
+          new Promise<never>((_resolve, reject) => {
+            giveUp = reject;
+          }),
+        ]),
+      timedOut: () => timedOut,
+      end: () => {
+        cancel();
+        parent.removeEventListener("abort", follow);
+      },
+    };
+  }
+
   // Read through methods, not inline: the checker narrows `aborted` and
   // `settled` from the guard at the top of #poll across the await, and cannot
   // see that a callback changes them in between.
@@ -366,8 +419,9 @@ export class JobReconciler {
     entry.cancelTimer = undefined;
     entry.timerKind = undefined;
     entry.inFlight = true;
+    const read = this.#deadline();
     try {
-      const status = await this.#options.readJob(entry.job.statusUrl, this.#abort.signal);
+      const status = await read.run(entry.job.statusUrl);
       if (this.#aborted() || !this.#current(entry)) return;
       this.#update(entry, {
         status,
@@ -386,10 +440,15 @@ export class JobReconciler {
         // know more than we did. Keep the last status and try again later.
         this.#update(entry, {
           polls: entry.job.polls + 1,
-          lastError: error instanceof Error ? error.message : String(error),
+          lastError: read.timedOut()
+            ? `The server did not answer the status read within ${String(Math.round(this.#readTimeoutMs / 1000))} s.`
+            : error instanceof Error
+              ? error.message
+              : String(error),
         });
       }
     } finally {
+      read.end();
       entry.inFlight = false;
     }
     // No timer can be armed while a poll is in flight — an early request

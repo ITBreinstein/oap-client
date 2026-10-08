@@ -26,7 +26,7 @@ function server(states: readonly JobState[]) {
 }
 
 function reconciler(
-  readJob: (url: string) => Promise<JobStatus>,
+  readJob: (url: string, signal: AbortSignal) => Promise<JobStatus>,
   options: Partial<ConstructorParameters<typeof JobReconciler>[0]> = {},
 ) {
   const timers = manualSchedule();
@@ -529,6 +529,79 @@ describe("a job removed while its read is in flight (review W8)", () => {
     answer("running");
     await settle();
     expect(current()?.status?.status).toBe("running");
+    instance.dispose();
+  });
+});
+
+describe("a status read that never answers (review W25)", () => {
+  /** A server whose first read hangs, and answers `states` after that. */
+  function hangsOnce(states: readonly JobState[]) {
+    const signals: AbortSignal[] = [];
+    let reads = 0;
+    const readJob = (url: string, signal: AbortSignal): Promise<JobStatus> => {
+      signals.push(signal);
+      reads += 1;
+      if (reads === 1) return new Promise<JobStatus>(() => undefined);
+      const state = states[Math.min(reads - 2, states.length - 1)] ?? "accepted";
+      return Promise.resolve(status(state, url));
+    };
+    return { readJob, signals, reads: () => reads };
+  }
+
+  it("is given up at the deadline, said, and the job is polled again", async () => {
+    const server = hangsOnce(["running"]);
+    const { instance, timers, current } = reconciler(server.readJob, { readTimeoutMs: 30_000 });
+    instance.track(JOB, "ref-1");
+    await settle();
+
+    await timers.advance(29_999);
+    expect(server.reads()).toBe(1);
+    expect(current()?.lastError).toBeUndefined();
+
+    await timers.advance(1);
+    expect(server.signals[0]?.aborted).toBe(true);
+    expect(current()?.lastError).toBe("The server did not answer the status read within 30 s.");
+
+    await timers.advance(2_000);
+    expect(server.reads()).toBe(2);
+    expect(current()?.status?.status).toBe("running");
+    expect(current()?.lastError).toBeUndefined();
+    instance.dispose();
+  });
+
+  it("does not let a doorbell rung during the hung read wait for ever", async () => {
+    const server = hangsOnce(["successful"]);
+    const { instance, timers, current } = reconciler(server.readJob, {
+      readTimeoutMs: 30_000,
+      confirmAfterMs: 2_000,
+    });
+    instance.track(JOB, "ref-1");
+    await settle();
+    instance.doorbell("ref-1", ["success"]);
+    await timers.advance(250);
+    expect(server.reads()).toBe(1);
+
+    await timers.advance(30_000);
+    expect(server.reads()).toBe(2);
+    expect(current()?.status?.status).toBe("successful");
+    instance.dispose();
+  });
+
+  it("still ends the read when the reconciler is disposed", async () => {
+    const server = hangsOnce(["running"]);
+    const { instance } = reconciler(server.readJob);
+    instance.track(JOB);
+    await settle();
+    instance.dispose();
+    expect(server.signals[0]?.aborted).toBe(true);
+  });
+
+  it("leaves no deadline behind once a read has answered", async () => {
+    const { readJob } = server(["successful"]);
+    const { instance, timers } = reconciler(readJob, { readTimeoutMs: 30_000, confirmWindowMs: 0 });
+    instance.track(JOB);
+    await settle();
+    expect(timers.pending().filter((ms) => ms >= 29_000)).toEqual([]);
     instance.dispose();
   });
 });
