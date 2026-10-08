@@ -810,7 +810,10 @@ that recovery or the relay.
   ```
 
   Omit it and the ambient `globalThis.fetch` is used, which Node 18+ and
-  browsers both provide.
+  browsers both provide. A `fetch` whose responses have no `body` stream, such
+  as whatwg-fetch, which React Native's is built on, works too: a body is then
+  read whole and held to `maxBufferBytes` afterwards, rather than counted as it
+  arrives.
 
 The package contains no DOM-specific and no Node-specific API. That is enforced,
 not promised — see below.

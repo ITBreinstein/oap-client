@@ -403,3 +403,74 @@ describe("the buffer limit", () => {
     await expect(env.text()).resolves.toBe("");
   });
 });
+
+/**
+ * What a fetch polyfill without streams hands back: the readers, and no `body`.
+ * whatwg-fetch, which React Native's `fetch` is built on, is one (review C17).
+ * `overrides` replaces a reader.
+ */
+function streamless(response: Response, overrides: Record<string, unknown> = {}): Response {
+  return new Proxy(response, {
+    get(target, key) {
+      if (key === "body") return undefined;
+      if (typeof key === "string" && key in overrides) return overrides[key];
+      const value: unknown = Reflect.get(target, key, target);
+      if (typeof value !== "function") return value;
+      return (...args: unknown[]): unknown => {
+        const result: unknown = Reflect.apply(value, target, args);
+        return result;
+      };
+    },
+  });
+}
+
+describe("a response with no body stream (C17)", () => {
+  it("reads the body through the response's own readers", async () => {
+    const env = createEnvelope(
+      streamless(
+        new Response('{"status":"running"}', { headers: { "content-type": "application/json" } }),
+      ),
+      { requestedUrl: BASE },
+    );
+    await expect(env.json()).resolves.toEqual({ status: "running" });
+    await expect(env.text()).resolves.toBe('{"status":"running"}');
+    expect((await env.arrayBuffer()).byteLength).toBe(20);
+    await expect(env.blob()).resolves.toHaveProperty("size", 20);
+  });
+
+  it("still refuses a body over the limit, once it has been read", async () => {
+    const env = createEnvelope(
+      streamless(new Response("x".repeat(200), { headers: { "content-type": "text/plain" } })),
+      {
+        requestedUrl: BASE,
+        maxBufferBytes: 100,
+      },
+    );
+    expect(env.bodyTooLarge).toBe(false);
+    await expect(env.text()).rejects.toMatchObject({
+      contentLength: undefined,
+      limit: 100,
+      bytesRead: 200,
+    });
+  });
+
+  it("still refuses a declared length over the limit up front", async () => {
+    const env = createEnvelope(
+      streamless(new Response("x".repeat(200), { headers: { "content-length": "200" } })),
+      { requestedUrl: BASE, maxBufferBytes: 100 },
+    );
+    expect(env.bodyTooLarge).toBe(true);
+    await expect(env.text()).rejects.toBeInstanceOf(BodyTooLargeError);
+  });
+
+  it("reports an abort as an abort", async () => {
+    const controller = new AbortController();
+    const aborted = streamless(new Response("{}"), {
+      arrayBuffer: () =>
+        Promise.reject(new DOMException("The operation was aborted.", "AbortError")),
+    });
+    const env = createEnvelope(aborted, { requestedUrl: BASE, signal: controller.signal });
+    controller.abort();
+    await expect(env.text()).rejects.toBeInstanceOf(AbortError);
+  });
+});
