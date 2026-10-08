@@ -294,7 +294,10 @@ export function createEnvelope(
     bodyTooLarge,
 
     async json(): Promise<unknown> {
-      return JSON.parse(await text()) as unknown;
+      // `JSON.parse` returns `any`; held as `unknown`, every reader has to
+      // check what the server sent before using it.
+      const parsed: unknown = JSON.parse(await text());
+      return parsed;
     },
     text,
     async blob(): Promise<Blob> {
