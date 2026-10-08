@@ -61,6 +61,15 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+/**
+ * An array whose entries are not known yet. `Array.isArray` narrows to
+ * `any[]`, which lets an entry be used unchecked; this narrows to
+ * `readonly unknown[]`, so each entry has to be checked before it is used.
+ */
+export function isArray(value: unknown): value is readonly unknown[] {
+  return Array.isArray(value);
+}
+
 /** Present, a string, and not blank. Absent optional members stay absent. */
 function optionalString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() !== "" ? value : undefined;
@@ -247,7 +256,6 @@ export function readBodyLinks(body: unknown): readonly unknown[] | undefined {
   if (links === undefined) return undefined;
   // Not an array: the member exists but carries nothing followable. Treated as
   // "no links" rather than an error, because header links may still save us.
-  if (!Array.isArray(links)) return EMPTY_LINKS;
-  // `Array.isArray` narrows to `any[]`; this only takes the `any` back out.
-  return links as readonly unknown[];
+  if (!isArray(links)) return EMPTY_LINKS;
+  return links;
 }

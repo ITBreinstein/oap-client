@@ -19,7 +19,7 @@
  */
 
 import { MalformedDocumentError } from "../errors.js";
-import { isRecord } from "../links/resolve.js";
+import { isArray, isRecord } from "../links/resolve.js";
 
 export interface ConformanceClass {
   /** The URI exactly as the server sent it. */
@@ -113,7 +113,7 @@ export function parseConformance(document: unknown, url: string): ParsedConforma
   }
 
   const conformsTo: unknown = document["conformsTo"];
-  if (!Array.isArray(conformsTo)) {
+  if (!isArray(conformsTo)) {
     throw new MalformedDocumentError(
       url,
       conformsTo === undefined
@@ -126,8 +126,7 @@ export function parseConformance(document: unknown, url: string): ParsedConforma
   const unparseable: string[] = [];
   const raw: string[] = [];
 
-  // `Array.isArray` narrows to `any[]`; this only takes the `any` back out.
-  for (const entry of conformsTo as readonly unknown[]) {
+  for (const entry of conformsTo) {
     // A non-string entry has no verbatim form to preserve, so it is counted as
     // unparseable rather than coerced into something the server never sent.
     if (typeof entry !== "string") {

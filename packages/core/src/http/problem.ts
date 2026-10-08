@@ -44,6 +44,14 @@ function stringOrUndefined(value: unknown): string | undefined {
 }
 
 /**
+ * The same check as `links/resolve.ts`'s `isRecord`. The http layer sits below
+ * every module that exports one, so it keeps its own.
+ */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
  * Is this JSON body a problem document?
  *
  * "Has a `type` or `title`" is the obvious test, and it is wrong. Both members
@@ -95,27 +103,23 @@ export function toProblemDetails(
   body: unknown,
   context: ProblemContext,
 ): ProblemDetails | undefined {
-  if (typeof body !== "object" || body === null || Array.isArray(body)) return undefined;
-
-  // Backed by the check above, which is `isRecord`'s. The http layer sits
-  // below every module that exports one, so it does not import it.
-  const record = body as Record<string, unknown>;
-  if (!looksLikeProblem(record, context)) return undefined;
+  if (!isRecord(body)) return undefined;
+  if (!looksLikeProblem(body, context)) return undefined;
 
   // A declared problem+json with neither `type` nor `title` is still a problem
   // document: RFC 9457 §3.1.1 reads a missing `type` as `about:blank`. Dropped,
   // `{"detail":"backend unavailable","status":503}` served at 200 was taken
   // for a result (review C7). An undeclared body without either never gets
   // here: `looksLikeProblem` refuses it.
-  const type = stringOrUndefined(record["type"]);
-  const title = stringOrUndefined(record["title"]);
+  const type = stringOrUndefined(body["type"]);
+  const title = stringOrUndefined(body["title"]);
 
   const extensions: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(record)) {
+  for (const [key, value] of Object.entries(body)) {
     if (!KNOWN_MEMBERS.has(key)) extensions[key] = value;
   }
 
-  const claimed = record["status"];
+  const claimed = body["status"];
 
   return {
     type: type ?? "about:blank",
@@ -123,8 +127,8 @@ export function toProblemDetails(
     // A string status is out of spec and common; it is dropped rather than
     // coerced into a NaN that would look like a real number downstream.
     status: typeof claimed === "number" ? claimed : undefined,
-    detail: stringOrUndefined(record["detail"]),
-    instance: stringOrUndefined(record["instance"]),
+    detail: stringOrUndefined(body["detail"]),
+    instance: stringOrUndefined(body["instance"]),
     extensions: Object.freeze(extensions),
   };
 }
