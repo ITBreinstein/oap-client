@@ -24,6 +24,15 @@ at 0.5.0; earlier versions are recorded only in the git history.
 
 ### Fixed
 
+- `classify()` calls only a 2xx `ok`. A 3xx and a status 0 were `ok` too, so
+  `requireOk()` returned them as answers. `fetch` follows a redirect itself, so
+  a 3xx that arrives is one it did not follow (a 304, a 300, a redirect with no
+  `Location`), and status 0 is an opaque response from `redirect: "manual"` or
+  `mode: "no-cors"`, whose body cannot be read. Both are now `http-error`, and
+  `requireOk()` throws `ProcessesError` for them. `getJob()` and `pollJob()`
+  throw `ProcessesError` for a 3xx too, where they reported a malformed job
+  document. A 3xx carrying a problem document is an `exception`, as at any
+  other status.
 - `ResponseEnvelope.location` is undefined when the `Location` header is empty
   or cannot be resolved; `locationRaw` still holds what was sent. An empty one
   resolved to the response's own URL, so an async `execute()` returned a job

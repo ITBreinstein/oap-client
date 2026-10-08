@@ -261,6 +261,40 @@ describe("classify", () => {
     const result = await classify(envelope(null, { status: 404 }));
     expect(result.kind).toBe("http-error");
   });
+
+  // C18. `fetch` follows a redirect itself, so a 3xx that reaches the
+  // classifier is one it did not follow, and carries no answer.
+  it.each([300, 304, 307])("calls an unfollowed %i http-error, not ok (C18)", async (status) => {
+    const result = await classify(
+      envelope(status === 304 ? null : "{}", {
+        status,
+        headers: { "content-type": "application/json", location: "https://example.org/other" },
+      }),
+    );
+    expect(result.kind).toBe("http-error");
+  });
+
+  it("calls a status 0 (an opaque response) http-error, with an empty preview (C18)", async () => {
+    // What `redirect: "manual"` and `mode: "no-cors"` hand back: status 0, no
+    // headers, no readable body.
+    const result = await classify(
+      createEnvelope(Response.error(), { requestedUrl: URL_UNDER_TEST }),
+    );
+    expect(result.kind).toBe("http-error");
+    if (result.kind !== "http-error") return;
+    expect(result.bodyPreview).toBe("");
+    expect(result.envelope.url).toBe(URL_UNDER_TEST);
+  });
+
+  it("still reads a problem document sent with a 3xx as an exception", async () => {
+    const result = await classify(json({ title: "Moved, and broken" }, { status: 300 }));
+    expect(result.kind).toBe("exception");
+  });
+
+  it.each([200, 201, 202, 204, 299])("calls a %i with no problem document ok", async (status) => {
+    const result = await classify(envelope(status === 204 ? null : "{}", { status }));
+    expect(result.kind).toBe("ok");
+  });
 });
 
 describe("classify — an abort while the body is arriving", () => {
@@ -307,6 +341,15 @@ describe("requireOk", () => {
     const input = json({ title: "Not found", status: 404 }, { status: 200 });
     const error = await requireOk(input).catch((err: unknown) => err);
     expect((error as Error).message).toContain("body claims status 404");
+  });
+
+  it("throws for a redirect fetch did not follow, rather than returning it (C18)", async () => {
+    const error = await requireOk(envelope(null, { status: 304 })).catch((err: unknown) => err);
+
+    expect(error).toBeInstanceOf(ProcessesError);
+    if (!(error instanceof ProcessesError)) return;
+    expect(error.outcome).toBe("http-error");
+    expect(error.status).toBe(304);
   });
 
   it("throws for an http-error, carrying the preview and no problem", async () => {

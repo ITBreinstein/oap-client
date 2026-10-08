@@ -9,6 +9,11 @@
  *   a success path. A status check calls it ok and the failure surfaces later,
  *   somewhere unrelated, as a missing field.
  * - A **404** may be exactly the answer a capability probe wanted.
+ * - A **3xx or a status 0** is not an answer at all. `fetch` follows a redirect
+ *   itself, so a 3xx that arrives here is one it did not follow — a 304, a 300,
+ *   a redirect with no `Location` — and status 0 is an opaque response, from
+ *   `redirect: "manual"` or `mode: "no-cors"`, whose body cannot be read (review
+ *   C18). Only a 2xx can be ok.
  *
  * So classification reads the body, and it must never throw: a classifier that
  * fails on a malformed body turns a diagnosable server bug into a stack trace
@@ -36,7 +41,10 @@ export interface ExceptionClassification {
   readonly problem: ProblemDetails;
 }
 
-/** A failing status with no problem document: an HTML error page, a proxy, an empty body. */
+/**
+ * A status outside 2xx with no problem document: an HTML error page, a proxy,
+ * an empty body, a redirect `fetch` did not follow, an opaque response.
+ */
 export interface HttpErrorClassification {
   readonly kind: "http-error";
   readonly envelope: ResponseEnvelope;
@@ -76,12 +84,17 @@ async function readPreview(envelope: ResponseEnvelope): Promise<string> {
   }
 }
 
+/** 2xx: the only statuses that can carry the answer asked for. */
+export function isSuccessStatus(status: number): boolean {
+  return status >= 200 && status <= 299;
+}
+
 export async function classify(envelope: ResponseEnvelope): Promise<Classification> {
   // Checked at every status, not just >= 400. That is the whole point.
   const problem = await readProblem(envelope);
   if (problem !== undefined) return { kind: "exception", envelope, problem };
 
-  if (envelope.status >= 400) {
+  if (!isSuccessStatus(envelope.status)) {
     return { kind: "http-error", envelope, bodyPreview: await readPreview(envelope) };
   }
 

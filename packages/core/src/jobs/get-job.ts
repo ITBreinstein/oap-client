@@ -19,6 +19,7 @@
  * - **404** → {@link JobNotFoundError}. Note that this is the *normal* state of
  *   a dismissed job on both reference servers (finding 0035), so `pollJob()`
  *   handles it rather than letting it surface as a crash.
+ * - any other status outside 2xx → `ProcessesError`, with the classification;
  * - a transport failure or an abort, from `send()` unchanged;
  * - a body that is not a JSON object, or that has no usable `status`, from
  *   `parseJobStatus()`.
@@ -39,7 +40,7 @@
  * exactly that case.
  */
 
-import { classify } from "../http/classify.js";
+import { classify, isSuccessStatus } from "../http/classify.js";
 import type { ResponseEnvelope } from "../http/envelope.js";
 import { ProcessesError } from "../http/errors.js";
 import { send } from "../http/transport.js";
@@ -103,9 +104,10 @@ export async function readJobStatus(
     throw new JobNotFoundError(envelope.url, undefined, { cause: asCause(classification) });
   }
 
-  // Any other failing status is a genuine refusal and is worth the usual error
-  // — a 500 on a status read is not a job outcome, it is a broken service.
-  if (envelope.status >= 400) {
+  // Any other status outside 2xx is a genuine refusal and is worth the usual
+  // error — a 500 on a status read is not a job outcome, it is a broken
+  // service, and a 3xx `fetch` did not follow carries no job document (C18).
+  if (!isSuccessStatus(envelope.status)) {
     throw new ProcessesError(
       `${String(envelope.status)} reading job status from ${envelope.url}`,
       classification.kind === "ok"
