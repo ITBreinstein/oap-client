@@ -81,3 +81,25 @@ describe("typing a box while the drawn one is selected (W15)", () => {
     expect(field.value).toBeUndefined();
   });
 });
+
+describe("a draw mode asked for before the map's style is in (W30)", () => {
+  it("starts once the style has loaded, and draws", () => {
+    const map = fakeMap({ styleLoaded: false });
+    root = createRoot(document.createElement("div"));
+    act(() => {
+      root?.render(<Field map={map.map} />);
+    });
+    // Terra Draw would have thrown "Style is not done loading" on its first source.
+    expect(map.sources.size).toBe(0);
+
+    act(() => {
+      map.loadStyle();
+    });
+    expect(map.sources.size).toBeGreaterThan(0);
+    act(() => {
+      user.click(5.0, 52.0);
+      user.click(5.2, 52.2);
+    });
+    expect(field.value).toEqual([5, 52, 5.2, 52.2]);
+  });
+});
