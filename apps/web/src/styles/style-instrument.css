@@ -614,3 +614,14 @@
 [data-style="instrument"] .filter .needs {
   display: inline-flex;
 }
+
+/* My jobs: out of the rail, the status in mono. */
+[data-style="instrument"] .job-status,
+[data-style="instrument"] .job-service {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+}
+
+[data-style="instrument"] .job-row {
+  border-color: var(--line);
+}

@@ -28,6 +28,11 @@ export interface JobsPanelProps {
   readonly messages: ReadonlyMap<string, string>;
   readonly onRemove: (statusUrl: string) => void;
   readonly onDismiss: (statusUrl: string) => void;
+  /**
+   * Its own "My jobs" heading. Off inside the My jobs panel, whose heading
+   * names it already.
+   */
+  readonly heading?: boolean | undefined;
 }
 
 function hostOf(url: string): string {
@@ -117,18 +122,20 @@ function JobItem({
       data-restored={job.restored ? "true" : undefined}
       aria-labelledby={`${base}-title`}
     >
-      <p>
-        <strong id={`${base}-title`}>{title}</strong>{" "}
-        <span className="muted">
-          on {hostOf(job.endpoint)}
-          {job.startedAt !== undefined && (
-            <>
-              , started <time dateTime={job.startedAt}>{startedLabel(job.startedAt)}</time>
-            </>
-          )}
-        </span>
+      {/* One cell each, so a style can lay a row out as a table's. */}
+      <p className="job-head">
+        <strong className="job-title" id={`${base}-title`}>
+          {title}
+        </strong>{" "}
+        <span className="muted job-service">on {hostOf(job.endpoint)}</span>
+        {job.startedAt !== undefined && (
+          <span className="muted job-started">
+            <span className="job-sep">, </span>started{" "}
+            <time dateTime={job.startedAt}>{startedLabel(job.startedAt)}</time>
+          </span>
+        )}
       </p>
-      <p role="status">
+      <p role="status" className="job-status">
         <StatusText job={job} />
       </p>
       {job.restored && (
@@ -205,12 +212,26 @@ export function JobsPanel(props: JobsPanelProps) {
   const { jobs, activeJob, dismissAdvertisedFor, messages, onRemove, onDismiss } = props;
   const base = useId();
   if (jobs.length === 0) return null;
+  const heading = props.heading !== false;
   return (
-    <section className="jobs-panel" aria-labelledby={`${base}-heading`} data-testid="my-jobs">
-      <h2 id={`${base}-heading`}>My jobs</h2>
+    <section
+      className="jobs-panel"
+      aria-labelledby={heading ? `${base}-heading` : undefined}
+      aria-label={heading ? undefined : "My jobs"}
+      data-testid="my-jobs"
+    >
+      {heading && <h2 id={`${base}-heading`}>My jobs</h2>}
       <p className="help">
         Background jobs started from this browser. Removing one from the list does not stop it on
         the server.
+      </p>
+      {/* The column heads, for a style that lays the rows out as a table. */}
+      <p className="jobs-head" aria-hidden="true">
+        <span className="label">Process</span>
+        <span className="label">Service</span>
+        <span className="label">Status</span>
+        <span className="label">Started</span>
+        <span className="label">Actions</span>
       </p>
       <ul>
         {[...jobs].reverse().map((job) => (

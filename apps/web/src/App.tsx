@@ -132,6 +132,17 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
   const busy =
     state.stage === "running" ||
     (state.stage === "choose-endpoint" && state.connecting !== undefined);
+  const jobs = view.snapshot?.jobs ?? [];
+  // Running only: a finished job needs nothing from anyone.
+  const runningJobs = jobs.filter((job) => !job.settled && !job.gone).length;
+  const jobsBadge =
+    runningJobs === 0 ? undefined : (
+      <span className="badge">
+        <span className="visually-hidden">, </span>
+        {String(runningJobs)}
+        <span className="visually-hidden"> running</span>
+      </span>
+    );
   const openExample = (example: Example) => {
     const endpoint = exampleEndpoint(example, view.configured);
     if (endpoint === undefined) return;
@@ -302,6 +313,19 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
             onConnect={onConnect}
             onProcesses={onProcesses}
             onLog={onLog}
+            tools={
+              <button
+                type="button"
+                className="secondary jobs-button"
+                aria-expanded={panelOpen === "jobs"}
+                aria-controls={PANEL_IDS.jobs}
+                onClick={() => {
+                  togglePanel("jobs");
+                }}
+              >
+                My jobs{jobsBadge}
+              </button>
+            }
             railItems={
               examples.length > 0 && (
                 <RailItem
@@ -314,6 +338,18 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
                   }}
                 />
               )
+            }
+            jobsItem={
+              <RailItem
+                icon="jobs"
+                label="Jobs"
+                pressed={panelOpen === "jobs"}
+                controls={PANEL_IDS.jobs}
+                badge={jobsBadge}
+                onClick={() => {
+                  togglePanel("jobs");
+                }}
+              />
             }
           />
           <div className="app-body">
@@ -331,18 +367,6 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
               <main className="panel" ref={panel} data-stage={state.stage}>
                 {state.stage !== "choose-endpoint" && state.route === "relay" && <RelayBanner />}
                 {screen}
-                <JobsPanel
-                  jobs={view.snapshot?.jobs ?? []}
-                  activeJob={
-                    state.stage === "running" && state.run.mode === "async"
-                      ? state.run.jobRef
-                      : undefined
-                  }
-                  dismissAdvertisedFor={view.dismissAdvertisedFor}
-                  messages={view.jobMessages}
-                  onRemove={commands.removeJob}
-                  onDismiss={commands.dismissJob}
-                />
                 <DeveloperPanel
                   observations={view.snapshot?.observations ?? []}
                   dropped={view.snapshot?.droppedObservations ?? 0}
@@ -377,6 +401,41 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
                 <ExamplesBrowser examples={examples} busy={busy} onOpen={openExample} />
               </SidePanel>
             )}
+            <SidePanel
+              id={PANEL_IDS.jobs}
+              title="My jobs"
+              open={panelOpen === "jobs"}
+              inert={offerOpen}
+              onClose={closePanel}
+              className="my-jobs-panel"
+            >
+              {jobs.length === 0 && (
+                <div className="jobs-empty">
+                  <p>No background jobs yet.</p>
+                  <p className="help">
+                    A process you run in the background is listed here, with its status, until you
+                    remove it from the list. It stays listed when you reload the page.
+                  </p>
+                  <p className="help">
+                    Some services do not let a web page find a job it started, so the job runs but
+                    cannot be listed. The relay can find it: choose a service the relay offers.
+                  </p>
+                </div>
+              )}
+              <JobsPanel
+                heading={false}
+                jobs={view.snapshot?.jobs ?? []}
+                activeJob={
+                  state.stage === "running" && state.run.mode === "async"
+                    ? state.run.jobRef
+                    : undefined
+                }
+                dismissAdvertisedFor={view.dismissAdvertisedFor}
+                messages={view.jobMessages}
+                onRemove={commands.removeJob}
+                onDismiss={commands.dismissJob}
+              />
+            </SidePanel>
           </div>
           {offerOpen && (
             <RelayOffer onConfirm={commands.confirmRelay} onDecline={commands.declineRelay} />

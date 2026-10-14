@@ -1488,3 +1488,55 @@ ol.steps li .help {
 .example-row {
   padding: 0.6rem 0.75rem;
 }
+
+/* My jobs: the button that opens it, its count of running jobs, and the panel. */
+.jobs-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.35rem;
+  height: 1.35rem;
+  padding: 0 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--accent-text);
+  background: var(--accent);
+  border-radius: 999px;
+}
+
+.rail-item .badge {
+  position: absolute;
+  top: 0.3rem;
+  right: 0.85rem;
+}
+
+.jobs-empty p:first-child {
+  margin-top: 0;
+  font-weight: 600;
+}
+
+.jobs-head {
+  display: none;
+}
+
+.my-jobs-panel .jobs-panel > .help {
+  margin-top: 0;
+}
+
+.job-head {
+  margin: 0;
+}
+
+.job-title {
+  color: var(--text-strong);
+}
+
+.job-row .actions {
+  margin-top: 0.4rem;
+}

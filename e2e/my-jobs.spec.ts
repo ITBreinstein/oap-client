@@ -37,6 +37,8 @@ test.describe("My jobs", () => {
     await page.getByRole("button", { name: "Run", exact: true }).click();
     await expect(page.locator('[data-output-id="slept"]')).toBeVisible({ timeout: 30_000 });
 
+    // My jobs is a side panel, opened from the header.
+    await page.getByRole("button", { name: /^My jobs/ }).click();
     const panel = page.getByTestId("my-jobs");
     const row = panel.locator("[data-job-row]");
     await expect(row).toHaveCount(1);
@@ -66,6 +68,7 @@ test.describe("My jobs", () => {
     const reread = page.waitForRequest((request) => request.url().startsWith(statusUrl));
     await page.reload();
     await reread;
+    await page.getByRole("button", { name: /^My jobs/ }).click();
     const restored = page.getByTestId("my-jobs").locator("[data-job-row]");
     await expect(restored).toHaveAttribute("data-restored", "true");
     await expect(restored.locator("[data-job-status]")).toHaveAttribute(

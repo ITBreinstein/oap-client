@@ -34,8 +34,10 @@ export interface AppFrameProps {
   readonly onProcesses: (() => void) | undefined;
   /** Open the developer panel; undefined without `?developer`. */
   readonly onLog: (() => void) | undefined;
-  /** Rail items for the side panels: Examples, Jobs. */
+  /** Rail items for the side panels: Examples. */
   readonly railItems?: ReactNode;
+  /** The rail's Jobs item. */
+  readonly jobsItem?: ReactNode;
 }
 
 const TITLE = "OGC API - Processes client";
@@ -124,7 +126,7 @@ export function RailItem({
 
 // STYLE TRIAL (instrument): delete with the instrument style.
 function Rail(props: AppFrameProps) {
-  const { inert, appearance, place, onConnect, onProcesses, onLog, railItems } = props;
+  const { inert, appearance, place, onConnect, onProcesses, onLog, railItems, jobsItem } = props;
   return (
     <header className="app-rail" inert={inert}>
       <h1 className="visually-hidden">{TITLE}</h1>
@@ -147,6 +149,7 @@ function Rail(props: AppFrameProps) {
             onClick={onProcesses}
           />
           {railItems}
+          {jobsItem}
           {onLog !== undefined && <RailItem icon="log" label="Log" onClick={onLog} />}
         </ul>
       </nav>
