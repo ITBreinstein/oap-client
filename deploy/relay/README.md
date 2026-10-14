@@ -165,25 +165,44 @@ answer.
 A plugfest or an expo hall puts many people behind one public address, and
 they then share one visitor's limits (apps/relay/README.md, "Rate limits").
 Before the event, add a `rateLimits` block to `relay.json`, commit, and
-deploy. For example:
+deploy. Give the address what each person would have on their own, times the
+number of people. For 30 people, every per-client limit times 30:
+
+| Per client                        | One person (default) | × 30 people |
+| --------------------------------- | -------------------: | ----------: |
+| `sessionsPerMinute`               |                   10 |         300 |
+| `executesPerMinute`               |                   20 |         600 |
+| `readsPerMinute`                  |                  240 |       7 200 |
+| `endpointsAndPreflightsPerMinute` |                  120 |       3 600 |
+| `openStreams`                     |                    4 |         120 |
+| `inFlight`                        |                    6 |         180 |
 
 ```json
 "rateLimits": {
   "perClient": {
-    "sessionsPerMinute": 200,
-    "executesPerMinute": 400,
-    "readsPerMinute": 5000,
-    "endpointsAndPreflightsPerMinute": 2000,
-    "openStreams": 80,
-    "inFlight": 60
+    "sessionsPerMinute": 300,
+    "executesPerMinute": 600,
+    "readsPerMinute": 7200,
+    "endpointsAndPreflightsPerMinute": 3600,
+    "openStreams": 120,
+    "inFlight": 180
   }
 }
 ```
 
-Members you leave out keep their defaults. The per-endpoint ceiling
-(`perEndpoint`) protects the servers themselves; raise it only with their
-operators' agreement. Afterwards, remove the block and deploy again. There is
-no switch that turns the limits off.
+Leave out none of the six: a member left out keeps its one-person default.
+
+The per-endpoint ceiling (`perEndpoint`) stays as it is: it protects the
+servers themselves, and is raised only with their operators' agreement. It
+then binds first for a room working against one server: 600 executes and
+reads a minute (20 a person for 30 people), and 32 in flight at once, across
+everyone — below the room's 7 200 reads and 180 in flight. That is enough for
+a room connecting, opening processes and running them: a connection is three
+reads, and a job is polled every 2 to 15 seconds. Past it, the page says how
+long to wait.
+
+Afterwards, remove the block and deploy again. There is no switch that turns
+the limits off.
 
 ## Taking the relay offline
 
