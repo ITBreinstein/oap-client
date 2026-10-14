@@ -32,8 +32,8 @@ export class AbortError extends Error {
  * `AbortSignal.timeout()` aborts with. Not exported from the package.
  */
 export function isAbortError(cause: unknown): boolean {
-  if (typeof cause !== "object" || cause === null) return false;
-  const name: unknown = (cause as { name?: unknown }).name;
+  if (typeof cause !== "object" || cause === null || !("name" in cause)) return false;
+  const name: unknown = cause.name;
   return name === "AbortError" || name === "TimeoutError";
 }
 

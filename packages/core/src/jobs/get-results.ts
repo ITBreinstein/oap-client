@@ -136,9 +136,10 @@ export async function getResults(
     mediaType: envelope.mediaType,
     contentCrsPresent: envelope.contentCrs !== undefined,
     filenamePresent: envelope.filename !== undefined,
-    // Declared `Content-Length` over the buffer limit. A chunked result has no
-    // declared length and is buffered regardless — a known gap, tracked for the
-    // October milestone rather than fixed here. See the README.
+    // Declared `Content-Length` over the buffer limit, known before anything
+    // is read. A chunked result declares no length, so this is false for it:
+    // it is counted as it is read, and refused with `BodyTooLargeError` once it
+    // passes the limit (0.5.0). See the README.
     bodyTooLarge: envelope.bodyTooLarge,
     ok: true,
   });
