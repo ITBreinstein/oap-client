@@ -53,7 +53,13 @@ import {
 } from "./route-decision.js";
 import { loadReference as followReference } from "../results/reference.js";
 import { toRenderable, type RenderableResult } from "../results/renderable.js";
-import { declaredMediaTypes, relayEndpointFor, runError, runRequest } from "./run.js";
+import {
+  declaredMediaTypes,
+  rateLimitMessage,
+  relayEndpointFor,
+  runError,
+  runRequest,
+} from "./run.js";
 import {
   INITIAL_WORKFLOW,
   workflowReducer,
@@ -191,10 +197,12 @@ function relayFailureMessage(attempt: RelayAttempt, cause: unknown): WorkflowErr
         detail: `Check that the relay is running, then connect again. (${code ?? "unreachable"})`,
       };
     case "relay-refused":
-      return {
-        title: "The relay refused to read this server.",
-        detail: `The relay said: ${code ?? "refused"}.`,
-      };
+      return (
+        rateLimitMessage(cause) ?? {
+          title: "The relay refused to read this server.",
+          detail: `The relay said: ${code ?? "refused"}.`,
+        }
+      );
     case "upstream-failed":
       return code === "blocked-address"
         ? {
@@ -483,7 +491,7 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
             type: "process-failed",
             connection: connection.id,
             processId: summary.id,
-            error: {
+            error: rateLimitMessage(cause) ?? {
               title:
                 "Could not read this process's description. Choose it again, or another process.",
               detail: cause instanceof Error ? cause.message : String(cause),
@@ -657,7 +665,7 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
         dispatch({
           type: "run-failed",
           runId,
-          error: {
+          error: rateLimitMessage(cause) ?? {
             title: "The job finished, but its results could not be read.",
             detail: cause instanceof Error ? cause.message : String(cause),
           },

@@ -5,7 +5,7 @@
 
 import { createClient, TransportError } from "@breinstein/oap-client";
 import { describe, expect, it } from "vitest";
-import type { RelayClient } from "../../src/relay/relay-client.js";
+import { RelayError, type RelayClient } from "../../src/relay/relay-client.js";
 import {
   createRelayFetch,
   fromRelay,
@@ -209,6 +209,29 @@ describe("createRelayFetch", () => {
     const session = sessions([undefined, "fresh"]);
     await relayFetch(relay, session)(`${BASE}/`);
     expect(relay.forwarded[0]?.headers.get("Authorization")).toBe("Bearer fresh");
+  });
+
+  it("with no session to be had, reports the relay's refusal of it, and sends nothing", async () => {
+    const relay = fakeRelay([]);
+    const session = {
+      ...sessions([undefined, undefined]),
+      refusal: () => new RelayError(429, "rate-limited", true, 30),
+    };
+    const error = await thrown(relayFetch(relay, session)(`${BASE}/processes`));
+    expect(error).toMatchObject({
+      outcome: "relay-refused",
+      code: "rate-limited",
+      status: 429,
+      retryAfterSeconds: 30,
+    });
+    expect(relay.forwarded).toEqual([]);
+  });
+
+  it("with no session and no refusal on record, reads it as the relay not answering", async () => {
+    const error = await thrown(
+      relayFetch(fakeRelay([]), sessions([undefined, undefined]))(`${BASE}/processes`),
+    );
+    expect([error.outcome, error.code]).toEqual(["relay-unreachable", "no-session"]);
   });
 });
 

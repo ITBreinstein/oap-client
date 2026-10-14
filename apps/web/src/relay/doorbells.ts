@@ -24,7 +24,7 @@
  */
 
 import { parseDoorbell, type CallbackKind } from "./contract.js";
-import type { RelayClient } from "./relay-client.js";
+import { RelayError, type RelayClient } from "./relay-client.js";
 import type { SessionSource } from "./routed-fetch.js";
 
 /** Run `callback` after `ms`; the returned function cancels it. */
@@ -55,6 +55,8 @@ export interface DoorbellOptions {
 export interface DoorbellStream extends SessionSource {
   /** True from the relay's `ready` until the stream drops. */
   live(): boolean;
+  /** The relay's refusal of the last session asked for, until one is granted. */
+  refusal(): RelayError | undefined;
   close(): void;
 }
 
@@ -121,6 +123,8 @@ export function openDoorbells(options: DoorbellOptions): DoorbellStream {
   const maxBackoff = options.maxBackoffMs ?? MAX_BACKOFF_MS;
 
   let session: string | undefined;
+  /** The relay's refusal of the last session asked for, until one is granted. */
+  let refused: RelayError | undefined;
   let closed = false;
   let opens = 0;
   let renewed = false;
@@ -153,7 +157,11 @@ export function openDoorbells(options: DoorbellOptions): DoorbellStream {
     });
 
   const newSession = async (signal?: AbortSignal): Promise<string> => {
-    const grant = await options.relay.createSession(signal);
+    const grant = await options.relay.createSession(signal).catch((error: unknown) => {
+      if (error instanceof RelayError) refused = error;
+      throw error;
+    });
+    refused = undefined;
     session = grant.token;
     renewed = opens > 0;
     return grant.token;
@@ -224,6 +232,7 @@ export function openDoorbells(options: DoorbellOptions): DoorbellStream {
   return {
     current: () => session,
     live: () => state === "open",
+    refusal: () => refused,
     async renew() {
       try {
         const token = await newSession();

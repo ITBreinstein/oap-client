@@ -31,7 +31,7 @@
 
 import type { FetchLike } from "@breinstein/oap-client";
 import { readRetryAfter, RELAY_ERROR, RELAY_MARKER } from "./contract.js";
-import type { RelayClient } from "./relay-client.js";
+import { RelayError, type RelayClient } from "./relay-client.js";
 import type { SessionSource } from "./routed-fetch.js";
 
 /**
@@ -72,6 +72,33 @@ export function relayRouteErrorIn(error: unknown): RelayRouteError | undefined {
   let current: unknown = error;
   for (let depth = 0; depth < 5 && current instanceof Error; depth += 1) {
     if (current instanceof RelayRouteError) return current;
+    current = current.cause;
+  }
+  return undefined;
+}
+
+/** The relay's two rate-limit codes: a client's own limits, and an endpoint's ceiling. */
+const RATE_LIMITED: ReadonlySet<string> = new Set(["rate-limited", "rate-limited-endpoint"]);
+
+export interface RelayRateLimit {
+  readonly code: string;
+  /** From `Retry-After`; undefined when the relay sent none the page could read. */
+  readonly retryAfterSeconds: number | undefined;
+}
+
+/**
+ * The relay's rate-limit refusal behind an error, however deep the core or the
+ * execute route wrapped it: on the read route, a session, or an execute.
+ */
+export function relayRateLimitIn(error: unknown): RelayRateLimit | undefined {
+  let current: unknown = error;
+  for (let depth = 0; depth < 5 && current instanceof Error; depth += 1) {
+    if (
+      (current instanceof RelayRouteError || current instanceof RelayError) &&
+      RATE_LIMITED.has(current.code)
+    ) {
+      return { code: current.code, retryAfterSeconds: current.retryAfterSeconds };
+    }
     current = current.cause;
   }
   return undefined;
@@ -154,7 +181,19 @@ async function readRequest(
   if (!CARRIED.has(method)) throw new RelayRouteError("relay-refused", "method-not-carried");
 
   const token = options.session.current() ?? (await options.session.renew());
-  if (token === undefined) throw new RelayRouteError("relay-unreachable", "no-session");
+  if (token === undefined) {
+    // A relay that refused the session — for its rate, say — did answer.
+    const refused = options.session.refusal?.();
+    if (refused !== undefined) {
+      throw new RelayRouteError(
+        "relay-refused",
+        refused.code,
+        refused.status,
+        refused.retryAfterSeconds,
+      );
+    }
+    throw new RelayRouteError("relay-unreachable", "no-session");
+  }
 
   const headers = new Headers(init?.headers);
   headers.delete("Authorization");

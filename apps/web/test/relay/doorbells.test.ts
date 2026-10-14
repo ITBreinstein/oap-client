@@ -9,7 +9,7 @@ import type { JobState, JobStatus } from "@breinstein/oap-client";
 import { describe, expect, it } from "vitest";
 import { openDoorbells, readEventStream } from "../../src/relay/doorbells.js";
 import { JobReconciler } from "../../src/relay/reconciler.js";
-import type { RelayClient } from "../../src/relay/relay-client.js";
+import { RelayError, type RelayClient } from "../../src/relay/relay-client.js";
 import { manualSchedule, settle, status } from "./harness.js";
 
 /** One event stream the test controls. */
@@ -435,5 +435,38 @@ describe("close() sends nothing more (review W11)", () => {
     streams[0]?.answer();
     await settle();
     expect(streams[0]?.cancelled()).toBe(true);
+  });
+});
+
+describe("a session the relay refuses", () => {
+  it("is on record until the relay grants one, so the read route can say why it has none", async () => {
+    const answers: (() => Promise<{ token: string; expiresAt: number }>)[] = [
+      () => Promise.reject(new RelayError(429, "rate-limited", true, 6)),
+      () => Promise.resolve({ token: "granted", expiresAt: 0 }),
+    ];
+    const relay: RelayClient = {
+      baseUrl: "http://relay.test",
+      endpoints: () => Promise.resolve([]),
+      execute: () => Promise.reject(new Error("not used")),
+      forward: () => Promise.reject(new Error("not used")),
+      createSession: () => answers.shift()?.() ?? Promise.reject(new Error("no more")),
+      openEvents: () => Promise.resolve(new Response(new ReadableStream(), { status: 200 })),
+    };
+    const clock = manualSchedule();
+    const doorbells = openDoorbells({
+      relay,
+      schedule: clock.schedule,
+      onDoorbell: () => undefined,
+      onOpen: () => undefined,
+    });
+    await settle();
+    expect(doorbells.current()).toBeUndefined();
+    expect(doorbells.refusal()).toMatchObject({ code: "rate-limited", retryAfterSeconds: 6 });
+
+    await clock.advance(1_000);
+    await settle();
+    expect(doorbells.current()).toBe("granted");
+    expect(doorbells.refusal()).toBeUndefined();
+    doorbells.close();
   });
 });
