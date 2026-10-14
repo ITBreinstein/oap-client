@@ -166,4 +166,46 @@ describe("parseConfig", () => {
       /trustedProxies\[0\] must be a string/,
     );
   });
+
+  it("rate-limits with the production values unless told otherwise", () => {
+    expect(parseConfig({ endpoints: [] }).rateLimits).toEqual({
+      perClient: {
+        sessionsPerMinute: 10,
+        executesPerMinute: 20,
+        readsPerMinute: 240,
+        endpointsAndPreflightsPerMinute: 120,
+        openStreams: 4,
+        inFlight: 6,
+      },
+      perEndpoint: { requestsPerMinute: 600, inFlight: 32 },
+      maxTrackedClients: 50_000,
+    });
+  });
+
+  it("takes each rate limit from the file, keeping the defaults for the rest", () => {
+    const { rateLimits } = parseConfig({
+      endpoints: [],
+      rateLimits: {
+        perClient: { sessionsPerMinute: 100 },
+        perEndpoint: { inFlight: 64 },
+        maxTrackedClients: 1_000,
+      },
+    });
+    expect(rateLimits.perClient.sessionsPerMinute).toBe(100);
+    expect(rateLimits.perClient.readsPerMinute).toBe(240);
+    expect(rateLimits.perEndpoint).toEqual({ requestsPerMinute: 600, inFlight: 64 });
+    expect(rateLimits.maxTrackedClients).toBe(1_000);
+  });
+
+  it.each([
+    ["zero", { perClient: { sessionsPerMinute: 0 } }, /rateLimits\.perClient\.sessionsPerMinute/],
+    ["a fraction", { perEndpoint: { inFlight: 1.5 } }, /rateLimits\.perEndpoint\.inFlight/],
+    ["a string", { maxTrackedClients: "50000" }, /rateLimits\.maxTrackedClients/],
+    ["an unknown member", { perClient: { reads: 1 } }, /rateLimits\.perClient\.reads is not/],
+    ["an unknown section", { perSession: {} }, /rateLimits\.perSession is not/],
+    ["a switch to turn them off", { enabled: false }, /rateLimits\.enabled is not/],
+    ["not an object", [], /rateLimits must be an object/],
+  ])("refuses rate limits with %s", (_, rateLimits, message) => {
+    expect(() => parseConfig({ endpoints: [], rateLimits })).toThrow(message);
+  });
 });

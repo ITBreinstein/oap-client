@@ -32,5 +32,19 @@
       "callbacks": false,
       "allowPrivateNetwork": true
     }
-  ]
+  ],
+  "rateLimits": {
+    "perClient": {
+      "sessionsPerMinute": 10000,
+      "executesPerMinute": 10000,
+      "readsPerMinute": 100000,
+      "endpointsAndPreflightsPerMinute": 100000,
+      "openStreams": 200,
+      "inFlight": 200
+    },
+    "perEndpoint": {
+      "requestsPerMinute": 100000,
+      "inFlight": 200
+    }
+  }
 }

@@ -49,6 +49,12 @@
 
 import { isBlockedHost } from "./address-guard.js";
 import { isTrustable, parseNetwork, type IpNetwork } from "./client-address.js";
+import {
+  DEFAULT_RATE_LIMITS,
+  type PerClientLimits,
+  type PerEndpointLimits,
+  type RateLimits,
+} from "./rate-limit.js";
 
 /** The deployment's key: without it set to `1`, no endpoint may set `allowPrivateNetwork`. */
 export const PRIVATE_ADDRESS_ALLOWANCE = "RELAY_ALLOW_PRIVATE_ADDRESSES";
@@ -142,6 +148,8 @@ export interface RelayConfig {
   /** A session ends this long after it was made, however busy, open streams included. */
   readonly sessionMaxAgeMs: number;
   readonly limits: RelayLimits;
+  /** Per client and per endpoint; see `rate-limit.ts`. There is no switch that turns them off. */
+  readonly rateLimits: RateLimits;
 }
 
 export const DEFAULT_LIMITS: RelayLimits = {
@@ -295,7 +303,22 @@ const ROOT_MEMBERS = [
   "sessionIdleTtlMs",
   "sessionMaxAgeMs",
   "limits",
+  "rateLimits",
 ] as const;
+
+const PER_CLIENT_MEMBERS: readonly (keyof PerClientLimits)[] = [
+  "sessionsPerMinute",
+  "executesPerMinute",
+  "readsPerMinute",
+  "endpointsAndPreflightsPerMinute",
+  "openStreams",
+  "inFlight",
+];
+
+const PER_ENDPOINT_MEMBERS: readonly (keyof PerEndpointLimits)[] = [
+  "requestsPerMinute",
+  "inFlight",
+];
 
 function parseEndpoint(value: unknown, path: string, options: ParseOptions): EndpointConfig {
   if (!isRecord(value)) throw new ConfigError(path, "must be an object");
@@ -371,6 +394,83 @@ function parseTrustedProxy(value: unknown, path: string): IpNetwork {
     throw new ConfigError(path, "must be a loopback or private address or range");
   }
   return network;
+}
+
+/** A nested object, absent meaning `{}`, with only the given members. */
+function readSection(
+  record: Record<string, unknown>,
+  key: string,
+  path: string,
+  members: readonly string[],
+): Record<string, unknown> {
+  const value = record[key] ?? {};
+  const where = path === "" ? key : `${path}.${key}`;
+  if (!isRecord(value)) throw new ConfigError(where, "must be an object");
+  refuseUnknown(value, members, where);
+  return value;
+}
+
+function parseRateLimits(input: Record<string, unknown>): RateLimits {
+  const section = readSection(input, "rateLimits", "", [
+    "perClient",
+    "perEndpoint",
+    "maxTrackedClients",
+  ]);
+  const perClient = readSection(section, "perClient", "rateLimits", PER_CLIENT_MEMBERS);
+  const perEndpoint = readSection(section, "perEndpoint", "rateLimits", PER_ENDPOINT_MEMBERS);
+  const client = DEFAULT_RATE_LIMITS.perClient;
+  const endpoint = DEFAULT_RATE_LIMITS.perEndpoint;
+  const where = "rateLimits.perClient";
+  return {
+    perClient: {
+      sessionsPerMinute: readPositiveInteger(
+        perClient,
+        "sessionsPerMinute",
+        where,
+        client.sessionsPerMinute,
+      ),
+      executesPerMinute: readPositiveInteger(
+        perClient,
+        "executesPerMinute",
+        where,
+        client.executesPerMinute,
+      ),
+      readsPerMinute: readPositiveInteger(
+        perClient,
+        "readsPerMinute",
+        where,
+        client.readsPerMinute,
+      ),
+      endpointsAndPreflightsPerMinute: readPositiveInteger(
+        perClient,
+        "endpointsAndPreflightsPerMinute",
+        where,
+        client.endpointsAndPreflightsPerMinute,
+      ),
+      openStreams: readPositiveInteger(perClient, "openStreams", where, client.openStreams),
+      inFlight: readPositiveInteger(perClient, "inFlight", where, client.inFlight),
+    },
+    perEndpoint: {
+      requestsPerMinute: readPositiveInteger(
+        perEndpoint,
+        "requestsPerMinute",
+        "rateLimits.perEndpoint",
+        endpoint.requestsPerMinute,
+      ),
+      inFlight: readPositiveInteger(
+        perEndpoint,
+        "inFlight",
+        "rateLimits.perEndpoint",
+        endpoint.inFlight,
+      ),
+    },
+    maxTrackedClients: readPositiveInteger(
+      section,
+      "maxTrackedClients",
+      "rateLimits",
+      DEFAULT_RATE_LIMITS.maxTrackedClients,
+    ),
+  };
 }
 
 export function parseConfig(input: unknown, options: ParseOptions = {}): RelayConfig {
@@ -494,5 +594,6 @@ export function parseConfig(input: unknown, options: ParseOptions = {}): RelayCo
       DEFAULT_SESSION_MAX_AGE_MS,
     ),
     limits,
+    rateLimits: parseRateLimits(input),
   };
 }

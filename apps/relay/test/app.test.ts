@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 import { createApp, type AuditLine, type RelayEvent, type UpstreamCall } from "../src/app.js";
-import { parseConfig } from "../src/config.js";
+import { parseConfig, type RelayConfig } from "../src/config.js";
 import { RelayState, type Clock, type StateOptions } from "../src/state.js";
 import { mintSecretToken } from "../src/tokens.js";
 import { UpstreamError } from "../src/exchange.js";
@@ -16,7 +16,7 @@ import type { RawAnswer, UpstreamResponse } from "../src/upstream.js";
 const ORIGIN = "http://localhost:4173";
 const PUBLIC = "http://relay.test:8787";
 
-const config = parseConfig({
+const rawConfig = {
   publicUrl: PUBLIC,
   allowedOrigins: [ORIGIN],
   endpoints: [
@@ -27,7 +27,8 @@ const config = parseConfig({
   limits: { maxExecuteBodyBytes: 4_096 },
   registrationTtlMs: 60_000,
   sessionIdleTtlMs: 60_000,
-});
+};
+const config = parseConfig(rawConfig);
 
 const CREATED: UpstreamResponse = {
   status: 201,
@@ -73,7 +74,11 @@ interface Harness {
   readonly audits: AuditLine[];
 }
 
-function harness(upstream?: UpstreamCall, stateOverrides: Partial<StateOptions> = {}): Harness {
+function harness(
+  upstream?: UpstreamCall,
+  stateOverrides: Partial<StateOptions> = {},
+  appConfig: RelayConfig = config,
+): Harness {
   let now = 1_000_000;
   const clock = {
     now: () => now,
@@ -92,7 +97,7 @@ function harness(upstream?: UpstreamCall, stateOverrides: Partial<StateOptions> 
   const events: RelayEvent[] = [];
   const audits: AuditLine[] = [];
   const app = createApp({
-    config,
+    config: appConfig,
     state,
     clock,
     // The heartbeat never fires here; the scheduler hands back a no-op.
@@ -666,7 +671,14 @@ describe("GET /sessions/events", () => {
   });
 
   it("closes a session's oldest stream when it opens one more than it may hold", async () => {
-    const h = harness();
+    // One client, so the per-client cap on open streams (4 by default, the
+    // same as the per-session cap) would refuse the fifth before the session
+    // could make room. Raised here: this is about the session's own rule.
+    const roomy = parseConfig({
+      ...rawConfig,
+      rateLimits: { perClient: { openStreams: 10 } },
+    });
+    const h = harness(undefined, {}, roomy);
     const token = await newSession(h.app);
     const streams = [];
     for (let i = 0; i < 5; i += 1) streams.push(await openEvents(h.app, token));

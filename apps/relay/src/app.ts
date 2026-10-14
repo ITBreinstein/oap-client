@@ -35,17 +35,22 @@
  * | `DELETE /read/{endpointKey}/jobs/{id}`  | browser     | session token   |
  * | `POST /callbacks/{token}/{kind}`        | OGC server  | callback token  |
  *
+ * Every route but `/healthz` and the callbacks is rate-limited, per client
+ * and per endpoint (`rate-limit.ts`); a refusal is a `429` with `Retry-After`.
+ *
  * Every response carries `X-Relay: 1`; every response the relay generates
  * itself, rather than forwards, also carries `X-Relay-Error: <code>`; and an
  * execute answered with the OGC server's own response rather than the relay's
  * envelope carries `X-Relay-Raw: 1`.
  */
 
-import { Hono, type Context } from "hono";
+import { getConnInfo } from "@hono/node-server/conninfo";
+import { Hono, type Context, type MiddlewareHandler } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
 import { streamSSE } from "hono/streaming";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
+import { clientKey, type ClientKey } from "./client-address.js";
 import { parseConfig, type EndpointConfig, type RelayConfig } from "./config.js";
 import { systemSchedule, UpstreamError, type Schedule, type UpstreamFailure } from "./exchange.js";
 import {
@@ -65,6 +70,7 @@ import {
   type Clock,
   type RingOutcome,
 } from "./state.js";
+import { RateLimiter, type RateRoute, type Refused } from "./rate-limit.js";
 import { isWellFormedSecretToken } from "./tokens.js";
 import { executionUrl, postExecute, type ExecuteAnswer } from "./upstream.js";
 
@@ -158,6 +164,23 @@ export interface AppOptions {
    * one (`RELAY_BUILD_ID`); never a secret.
    */
   readonly buildId?: string | undefined;
+  /** The limits' memory. One built from the config by default; `server.ts` passes its own to sweep it. */
+  readonly rateLimiter?: RateLimiter | undefined;
+  /**
+   * The address of the socket a request arrived on. From the Node listener by
+   * default (`getConnInfo`); a test passes its own, since `app.request()` has
+   * no socket.
+   */
+  readonly peerAddress?: ((c: Context) => string | undefined) | undefined;
+}
+
+/** The socket's remote address, or undefined where there is no socket. */
+function socketAddress(c: Context): string | undefined {
+  try {
+    return getConnInfo(c).remote.address;
+  } catch {
+    return undefined;
+  }
 }
 
 /** `[a-z0-9-]`, as the config allows. Checked again here because it is placed in a path prefix. */
@@ -234,6 +257,7 @@ function problem(
   title: string,
   code: string,
   detail?: string,
+  headers: Readonly<Record<string, string>> = {},
 ): Response {
   return c.json(
     { type: "about:blank", title, status, ...(detail === undefined ? {} : { detail }) },
@@ -242,7 +266,25 @@ function problem(
       "Content-Type": "application/problem+json",
       "Cache-Control": "no-store",
       [RELAY_ERROR]: code,
+      ...headers,
     },
+  );
+}
+
+/**
+ * A rate-limit refusal. The detail is fixed text: never the client's address,
+ * and nothing the client sent.
+ */
+function tooMany(c: Context, refused: Refused): Response {
+  return problem(
+    c,
+    429,
+    "Too Many Requests",
+    refused.code,
+    refused.code === "rate-limited-endpoint"
+      ? "too many requests to this endpoint through the relay; try again later"
+      : "too many requests from this client; try again later",
+    { "Retry-After": String(refused.retryAfterSeconds) },
   );
 }
 
@@ -295,6 +337,31 @@ export function createApp(options: AppOptions = {}): Hono {
   };
   const endpoints = new Map(config.endpoints.map((endpoint) => [endpoint.key, endpoint]));
   const allowedOrigins = new Set(config.allowedOrigins);
+  const limiter = options.rateLimiter ?? new RateLimiter(clock, config.rateLimits);
+  const peerAddress = options.peerAddress ?? socketAddress;
+  // Worked out once per request: the preflight limit, the route's limit and
+  // the upstream slot all ask.
+  const clients = new WeakMap<Request, ClientKey>();
+  const clientOf = (c: Context): ClientKey => {
+    const known = clients.get(c.req.raw);
+    if (known !== undefined) return known;
+    const key = clientKey(peerAddress(c), c.req.header("X-Forwarded-For"), config.trustedProxies);
+    clients.set(c.req.raw, key);
+    return key;
+  };
+  /** A per-minute limit for `route`, on the methods it is given for. */
+  const limit =
+    (route: RateRoute, methods: (method: string) => boolean): MiddlewareHandler =>
+    async (c, next) => {
+      if (methods(c.req.method)) {
+        const admitted = limiter.take(route, clientOf(c));
+        if (!admitted.ok) return tooMany(c, admitted);
+      }
+      await next();
+      return undefined;
+    };
+  const isPreflight = (method: string): boolean => method === "OPTIONS";
+  const notPreflight = (method: string): boolean => method !== "OPTIONS";
 
   const app = new Hono();
 
@@ -316,12 +383,22 @@ export function createApp(options: AppOptions = {}): Hono {
     c.json(options.buildId === undefined ? { ok: true } : { ok: true, build: options.buildId }),
   );
 
+  // CORS preflights, counted before the CORS middleware, which answers them
+  // itself without passing them on. Never `/healthz` or the callbacks.
+  const preflights = limit("endpoints-and-preflights", isPreflight);
+  for (const path of ["/endpoints", "/sessions", "/sessions/*", "/execute/*", "/read/*"]) {
+    app.use(path, preflights);
+  }
+
   // The browser-facing routes. The callback routes are server-to-server and
-  // get no CORS headers at all.
+  // get no CORS headers at all. `Retry-After` and the relay's error code are
+  // exposed, so a page on another origin can read why it was refused, and for
+  // how long.
   const browserCors = cors({
     origin: (origin) => (allowedOrigins.has(origin) ? origin : null),
     allowMethods: ["GET", "POST", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization"],
+    exposeHeaders: ["Retry-After", RELAY_ERROR],
     credentials: false,
     maxAge: 600,
   });
@@ -346,6 +423,17 @@ export function createApp(options: AppOptions = {}): Hono {
   app.use("/execute/*", forwardingCors);
   app.use("/read/*", forwardingCors);
 
+  // Each route's per-minute limit, inside the CORS middleware so a refusal
+  // carries its headers. The event stream is limited by how many a client
+  // holds open, in its handler.
+  app.use("/endpoints", limit("endpoints-and-preflights", notPreflight));
+  app.use(
+    "/sessions",
+    limit("sessions", (method) => method === "POST"),
+  );
+  app.use("/execute/*", limit("execute", notPreflight));
+  app.use("/read/*", limit("read", notPreflight));
+
   /** The relay's own 502, for an exchange that produced no answer it can hand on. */
   const badGateway = (c: Context, reason: UpstreamFailure): Response =>
     c.json({ type: "about:blank", title: "Bad Gateway", status: 502, reason }, 502, {
@@ -365,8 +453,12 @@ export function createApp(options: AppOptions = {}): Hono {
     request: ForwardRequest,
     started: number,
     forwarded: ForwardedResponse,
+    release: () => void,
     marks: Readonly<Record<string, string>> = {},
   ): Response => {
+    // The upstream slot is held until the body is done or broken off, not
+    // until the headers arrive: a read may stream for minutes.
+    forwarded.done.then(release, release);
     // `new Response` throws outside 200–599. Refused before that, with the
     // body cancelled, which drops the upstream socket instead of holding it
     // until the deadline (review R9).
@@ -483,6 +575,9 @@ export function createApp(options: AppOptions = {}): Hono {
       );
     }
 
+    const slot = limiter.beginForward(clientOf(c), endpoint.key);
+    if (!slot.ok) return tooMany(c, slot);
+
     const request: ForwardRequest = { method, url: target, headers: c.req.raw.headers };
     const started = clock.now();
     // Only the exchange is in the try: a fault of ours after the server
@@ -491,9 +586,10 @@ export function createApp(options: AppOptions = {}): Hono {
     try {
       forwarded = await forward(endpoint, request);
     } catch (error) {
+      slot.release();
       return upstreamFailed(c, "read-route", endpoint, request, started, error);
     }
-    return relayForwarded(c, "read-route", endpoint, request, started, forwarded);
+    return relayForwarded(c, "read-route", endpoint, request, started, forwarded, slot.release);
   };
   app.get("/read/:endpointKey", (c) => read(c, "GET"));
   app.get("/read/:endpointKey/*", (c) => read(c, "GET"));
@@ -523,6 +619,8 @@ export function createApp(options: AppOptions = {}): Hono {
     if (token === undefined || !isWellFormedSecretToken(token)) {
       return problem(c, 401, "Unauthorized", "unknown-session", "unknown session");
     }
+    const held = limiter.openStream(clientOf(c));
+    if (!held.ok) return tooMany(c, held);
 
     // Subscribe before streaming, so a doorbell rung between the check and the
     // first write is held rather than lost. `pending` is also the coalescing:
@@ -549,10 +647,14 @@ export function createApp(options: AppOptions = {}): Hono {
         wake?.();
       },
     );
-    if (unsubscribe === "unknown-session")
+    if (unsubscribe === "unknown-session") {
+      held.release();
       return problem(c, 401, "Unauthorized", "unknown-session", "unknown session");
-    if (unsubscribe === "at-capacity")
+    }
+    if (unsubscribe === "at-capacity") {
+      held.release();
       return problem(c, 503, "Service Unavailable", "stream-capacity", "stream capacity");
+    }
 
     c.header("Cache-Control", "no-store");
     return streamSSE(c, async (stream) => {
@@ -599,6 +701,7 @@ export function createApp(options: AppOptions = {}): Hono {
       } finally {
         cancelHeartbeat();
         unsubscribe();
+        held.release();
         emit({ kind: "stream", change: "closed" });
       }
     });
@@ -672,6 +775,10 @@ export function createApp(options: AppOptions = {}): Hono {
         }
       }
 
+      // Before anything is registered or sent: a refusal here leaves no trace.
+      const slot = limiter.beginForward(clientOf(c), endpoint.key);
+      if (!slot.ok) return tooMany(c, slot);
+
       // A synchronous execute for a read-route endpoint: its answer is the
       // result itself, which the browser cannot read from this server, so it
       // is forwarded raw like a read — the browser's own `Prefer`, streamed
@@ -689,6 +796,7 @@ export function createApp(options: AppOptions = {}): Hono {
         try {
           forwarded = await forward(endpoint, request);
         } catch (error) {
+          slot.release();
           emit({
             kind: "execute",
             endpointKey: endpoint.key,
@@ -705,9 +813,16 @@ export function createApp(options: AppOptions = {}): Hono {
           upstreamStatus: forwarded.status,
           registered: false,
         });
-        return relayForwarded(c, "read-route", endpoint, request, started, forwarded, {
-          [RELAY_RAW]: "1",
-        });
+        return relayForwarded(
+          c,
+          "read-route",
+          endpoint,
+          request,
+          started,
+          forwarded,
+          slot.release,
+          { [RELAY_RAW]: "1" },
+        );
       }
 
       let ref: string | undefined;
@@ -715,9 +830,11 @@ export function createApp(options: AppOptions = {}): Hono {
       if (endpoint.callbacks && sessionToken !== undefined && config.publicUrl !== undefined) {
         const registration = state.register(sessionToken, endpoint.key);
         if (registration === "unknown-session") {
+          slot.release();
           return problem(c, 401, "Unauthorized", "unknown-session", "unknown session");
         }
         if (registration === "at-capacity") {
+          slot.release();
           return problem(
             c,
             429,
@@ -750,6 +867,7 @@ export function createApp(options: AppOptions = {}): Hono {
       try {
         answer = await upstream(endpoint, processId, JSON.stringify(body));
       } catch (error) {
+        slot.release();
         if (ref !== undefined) state.release(ref);
         emit({
           kind: "execute",
@@ -775,11 +893,13 @@ export function createApp(options: AppOptions = {}): Hono {
           upstreamStatus: answer.raw.status,
           registered: false,
         });
-        return relayForwarded(c, "execute", endpoint, sent, started, answer.raw, {
+        return relayForwarded(c, "execute", endpoint, sent, started, answer.raw, slot.release, {
           [RELAY_RAW]: "1",
         });
       }
 
+      // A job's answer is read whole before it is returned: nothing left upstream.
+      slot.release();
       const response = answer;
       // No job, no doorbell. The registration would otherwise sit until its TTL.
       const created = response.status >= 200 && response.status < 300;
