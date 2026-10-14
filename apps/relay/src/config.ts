@@ -48,6 +48,7 @@
  */
 
 import { isBlockedHost } from "./address-guard.js";
+import { isTrustable, parseNetwork, type IpNetwork } from "./client-address.js";
 
 /** The deployment's key: without it set to `1`, no endpoint may set `allowPrivateNetwork`. */
 export const PRIVATE_ADDRESS_ALLOWANCE = "RELAY_ALLOW_PRIVATE_ADDRESSES";
@@ -128,6 +129,13 @@ export interface RelayConfig {
   readonly publicUrl: string | undefined;
   /** Exact origins allowed to call the relay from a browser. */
   readonly allowedOrigins: readonly string[];
+  /**
+   * The reverse proxies whose `X-Forwarded-For` is believed: the only peers
+   * for which the relay reads that header at all, and then only its rightmost
+   * entry. Loopback and private addresses or ranges only. Empty by default:
+   * every request is keyed by the address of the socket it came in on.
+   */
+  readonly trustedProxies: readonly IpNetwork[];
   readonly endpoints: readonly EndpointConfig[];
   readonly registrationTtlMs: number;
   readonly sessionIdleTtlMs: number;
@@ -281,6 +289,7 @@ const LIMIT_MEMBERS: readonly (keyof RelayLimits)[] = [
 const ROOT_MEMBERS = [
   "publicUrl",
   "allowedOrigins",
+  "trustedProxies",
   "endpoints",
   "registrationTtlMs",
   "sessionIdleTtlMs",
@@ -349,6 +358,21 @@ function parseOrigin(value: unknown, path: string): string {
   return value;
 }
 
+/**
+ * An address or a CIDR range, inside loopback or private space. Trusting a
+ * public address, or everyone (`0.0.0.0/0`, `::/0`), would let any client name
+ * itself in `X-Forwarded-For` and so pick its own rate-limit key.
+ */
+function parseTrustedProxy(value: unknown, path: string): IpNetwork {
+  if (typeof value !== "string") throw new ConfigError(path, "must be a string");
+  const network = parseNetwork(value);
+  if (network === undefined) throw new ConfigError(path, "is not an IP address or CIDR range");
+  if (!isTrustable(network)) {
+    throw new ConfigError(path, "must be a loopback or private address or range");
+  }
+  return network;
+}
+
 export function parseConfig(input: unknown, options: ParseOptions = {}): RelayConfig {
   if (!isRecord(input)) throw new ConfigError("(root)", "must be an object");
   refuseUnknown(input, ROOT_MEMBERS, "");
@@ -368,6 +392,12 @@ export function parseConfig(input: unknown, options: ParseOptions = {}): RelayCo
   if (!Array.isArray(rawOrigins)) throw new ConfigError("allowedOrigins", "must be an array");
   const allowedOrigins = rawOrigins.map((entry, index) =>
     parseOrigin(entry, `allowedOrigins[${String(index)}]`),
+  );
+
+  const rawProxies = input["trustedProxies"] ?? [];
+  if (!Array.isArray(rawProxies)) throw new ConfigError("trustedProxies", "must be an array");
+  const trustedProxies = rawProxies.map((entry, index) =>
+    parseTrustedProxy(entry, `trustedProxies[${String(index)}]`),
   );
 
   const rawPublicUrl = input["publicUrl"];
@@ -443,6 +473,7 @@ export function parseConfig(input: unknown, options: ParseOptions = {}): RelayCo
   return {
     publicUrl,
     allowedOrigins,
+    trustedProxies,
     endpoints,
     registrationTtlMs: readPositiveInteger(
       input,

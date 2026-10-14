@@ -131,4 +131,39 @@ describe("parseConfig", () => {
       expect(() => parseConfig(input)).toThrow(message);
     },
   );
+
+  it("trusts no proxy unless told, and takes addresses and ranges in private space", () => {
+    expect(parseConfig({ endpoints: [] }).trustedProxies).toEqual([]);
+    const { trustedProxies } = parseConfig({
+      endpoints: [],
+      trustedProxies: ["172.31.87.1", "::ffff:127.0.0.1", "192.168.0.0/16", "fd00::/8"],
+    });
+    expect(trustedProxies.map((proxy) => [proxy.family, proxy.prefix])).toEqual([
+      [4, 32],
+      [4, 32],
+      [4, 16],
+      [6, 8],
+    ]);
+  });
+
+  it.each([
+    ["everyone, IPv4", "0.0.0.0/0", /must be a loopback or private/],
+    ["everyone, IPv6", "::/0", /must be a loopback or private/],
+    ["a public address", "8.8.8.8", /must be a loopback or private/],
+    ["a range wider than private space", "172.0.0.0/8", /must be a loopback or private/],
+    ["link-local", "169.254.169.254", /must be a loopback or private/],
+    ["a name", "caddy", /is not an IP address/],
+    ["a bad prefix", "10.0.0.0/33", /is not an IP address/],
+  ])("refuses to trust %s", (_, entry, message) => {
+    expect(() => parseConfig({ endpoints: [], trustedProxies: [entry] })).toThrow(message);
+  });
+
+  it("refuses trustedProxies that is not an array of strings", () => {
+    expect(() => parseConfig({ endpoints: [], trustedProxies: "172.17.0.1" })).toThrow(
+      /trustedProxies must be an array/,
+    );
+    expect(() => parseConfig({ endpoints: [], trustedProxies: [172] })).toThrow(
+      /trustedProxies\[0\] must be a string/,
+    );
+  });
 });
