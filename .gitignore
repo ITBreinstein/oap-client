@@ -23,3 +23,5 @@ apps/web/public/config.json
 
 # The dependency graph `pnpm graph` writes; regenerated, never committed.
 docs/architecture.svg
+# Screenshots from pnpm capture:styles (e2e/styles.capture.ts).
+test-results/

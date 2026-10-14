@@ -1540,3 +1540,48 @@ ol.steps li .help {
 .job-row .actions {
   margin-top: 0.4rem;
 }
+
+/*
+ * The header on a narrow screen: the title on its own, the tools beside it,
+ * Appearance as an icon (its name stays, for screen readers).
+ */
+@media (max-width: 52rem) {
+  .app-header {
+    flex-wrap: wrap;
+    gap: 0.4rem 0.75rem;
+    padding: 0.5rem 1rem;
+  }
+
+  .app-header h1 {
+    font-size: 1rem;
+  }
+
+  .app-header .tagline {
+    display: none;
+  }
+
+  .header-tools {
+    gap: 0.5rem;
+    margin-left: auto;
+  }
+
+  .app-header .version {
+    font-size: 0.75rem;
+  }
+
+  .app-header .appearance-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .app-header .appearance-button {
+    justify-content: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    padding: 0;
+  }
+}

@@ -625,3 +625,19 @@
 [data-style="instrument"] .job-row {
   border-color: var(--line);
 }
+
+/* On a narrow screen, a listed service's name, address and access stack. */
+@media (max-width: 40rem) {
+  [data-style="instrument"] .choice-body {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  [data-style="instrument"] .choice-url {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  [data-style="instrument"] .choice-note {
+    grid-column: 1 / -1;
+  }
+}
