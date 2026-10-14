@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Appearance } from "./app/appearance.js";
 import { AppearanceControl } from "./app/AppearanceControl.js";
-import { AppFrame } from "./app/AppFrame.js";
+import { AppFrame, type FramePlace } from "./app/AppFrame.js";
 import { DeveloperPanel } from "./app/DeveloperPanel.js";
 import { activeDrawField, DrawContext, type DrawRequest, type DrawTarget } from "./app/draw.js";
 import { EndpointScreen } from "./app/EndpointScreen.js";
@@ -190,6 +190,39 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
   // pointer can reach Connect or the jobs behind the question (review W22).
   const offerOpen = state.stage === "choose-endpoint" && state.offer !== undefined;
 
+  // Where the page is, and the ways back, for the frame's navigation. Never
+  // mid-run: leaving would abandon a job the user has not been told the fate of.
+  const place: FramePlace =
+    state.stage === "choose-endpoint"
+      ? "connect"
+      : state.stage === "connected"
+        ? "processes"
+        : "process";
+  const focusStage = () => {
+    panel.current?.querySelector<HTMLElement>("[data-focus-on-stage]")?.focus();
+  };
+  const onConnect =
+    state.stage === "choose-endpoint"
+      ? focusStage
+      : state.stage === "running"
+        ? undefined
+        : commands.disconnect;
+  const onProcesses =
+    state.stage === "connected"
+      ? focusStage
+      : state.stage === "process" || state.stage === "result"
+        ? commands.backToList
+        : undefined;
+  const onLog = developer
+    ? () => {
+        const details = panel.current?.querySelector<HTMLDetailsElement>("details.developer");
+        if (details === null || details === undefined) return;
+        details.open = true;
+        details.scrollIntoView({ block: "start" });
+        details.querySelector("summary")?.focus();
+      }
+    : undefined;
+
   return (
     <MapLimitsContext value={mapLimits}>
       <DrawContext.Provider value={draw}>
@@ -197,55 +230,63 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
           <AppFrame
             style={appearance.style}
             inert={offerOpen}
-            tools={
+            appearance={
               <AppearanceControl appearance={appearance} onStyle={setStyle} onTheme={setTheme} />
             }
+            place={place}
+            onConnect={onConnect}
+            onProcesses={onProcesses}
+            onLog={onLog}
           />
-          {configWarning !== undefined && (
-            <p
-              className="notice config-warning"
-              role="alert"
-              data-testid="config-warning"
-              inert={offerOpen}
-            >
-              {configWarning}
-            </p>
-          )}
-          <div className={showMap ? "layout" : "layout layout-single"} inert={offerOpen}>
-            <main className="panel" ref={panel} data-stage={state.stage}>
-              {state.stage !== "choose-endpoint" && state.route === "relay" && <RelayBanner />}
-              {screen}
-              <JobsPanel
-                jobs={view.snapshot?.jobs ?? []}
-                activeJob={
-                  state.stage === "running" && state.run.mode === "async"
-                    ? state.run.jobRef
-                    : undefined
-                }
-                dismissAdvertisedFor={view.dismissAdvertisedFor}
-                messages={view.jobMessages}
-                onRemove={commands.removeJob}
-                onDismiss={commands.dismissJob}
-              />
-              <DeveloperPanel
-                observations={view.snapshot?.observations ?? []}
-                dropped={view.snapshot?.droppedObservations ?? 0}
-                relayUrl={relayUrl}
-                open={developer}
-                census={view.census}
-                onDescribeAll={state.stage === "choose-endpoint" ? undefined : commands.describeAll}
-              />
-            </main>
-            {showMap && (
-              <MapBoundary>
-                <MapPane
-                  state={state}
-                  draw={draw}
-                  setValue={commands.setValue}
-                  onAvailable={setMapAvailable}
-                />
-              </MapBoundary>
+          <div className="app-body">
+            {configWarning !== undefined && (
+              <p
+                className="notice config-warning"
+                role="alert"
+                data-testid="config-warning"
+                inert={offerOpen}
+              >
+                {configWarning}
+              </p>
             )}
+            <div className={showMap ? "layout" : "layout layout-single"} inert={offerOpen}>
+              <main className="panel" ref={panel} data-stage={state.stage}>
+                {state.stage !== "choose-endpoint" && state.route === "relay" && <RelayBanner />}
+                {screen}
+                <JobsPanel
+                  jobs={view.snapshot?.jobs ?? []}
+                  activeJob={
+                    state.stage === "running" && state.run.mode === "async"
+                      ? state.run.jobRef
+                      : undefined
+                  }
+                  dismissAdvertisedFor={view.dismissAdvertisedFor}
+                  messages={view.jobMessages}
+                  onRemove={commands.removeJob}
+                  onDismiss={commands.dismissJob}
+                />
+                <DeveloperPanel
+                  observations={view.snapshot?.observations ?? []}
+                  dropped={view.snapshot?.droppedObservations ?? 0}
+                  relayUrl={relayUrl}
+                  open={developer}
+                  census={view.census}
+                  onDescribeAll={
+                    state.stage === "choose-endpoint" ? undefined : commands.describeAll
+                  }
+                />
+              </main>
+              {showMap && (
+                <MapBoundary>
+                  <MapPane
+                    state={state}
+                    draw={draw}
+                    setValue={commands.setValue}
+                    onAvailable={setMapAvailable}
+                  />
+                </MapBoundary>
+              )}
+            </div>
           </div>
           {offerOpen && (
             <RelayOffer onConfirm={commands.confirmRelay} onDecline={commands.declineRelay} />

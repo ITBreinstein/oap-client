@@ -139,6 +139,9 @@ export function EndpointScreen(props: EndpointScreenProps) {
                   <span className="choice-body">
                     <strong className="choice-title">{entry.key}</strong>{" "}
                     <span className="choice-url">{entry.baseUrl}</span>
+                    <span className="choice-access">
+                      {entry.executeRoute === "relay" ? "relay" : "direct"}
+                    </span>
                     {entry.executeRoute === "relay" && (
                       <span className="choice-note"> Background runs go through the relay.</span>
                     )}
@@ -159,6 +162,7 @@ export function EndpointScreen(props: EndpointScreenProps) {
                   <span className="choice-body">
                     <strong className="choice-title">{preset.title}</strong>{" "}
                     <span className="choice-url">{preset.url}</span>
+                    <span className="choice-access">direct</span>
                   </span>
                 </label>
               ))}

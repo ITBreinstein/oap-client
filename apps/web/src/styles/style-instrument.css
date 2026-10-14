@@ -1,0 +1,525 @@
+/*
+ * Instrument: a dark, exact tool for testers. A rail down the left edge
+ * instead of a header; panels that slide out of it; Manrope headings, mono
+ * capitals for labels; one accent-filled control per screen.
+ *
+ * Only what this style does beyond `styles.css`, every rule under
+ * `[data-style="instrument"]`. Deleting this file (and its blocks in
+ * `tokens.css`, and the rail in `AppFrame.tsx`) removes the style (ADR 0002).
+ */
+
+/* ------------------------------------------------------------- the rail */
+
+[data-style="instrument"] .app {
+  flex-direction: row;
+}
+
+[data-style="instrument"] .app-rail {
+  position: relative;
+  z-index: 15;
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  width: 72px;
+  padding: 0.6rem 0 0.5rem;
+  background: var(--rail);
+  border-right: 1px solid var(--line);
+}
+
+[data-style="instrument"] .rail-logo {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin: 0 auto 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--accent-text);
+  background: var(--accent);
+  border-radius: var(--r-control);
+}
+
+[data-style="instrument"] .rail-nav ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+[data-style="instrument"] .rail-item,
+[data-style="instrument"] .app-rail .appearance-button {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  width: 100%;
+  min-height: 56px;
+  padding: 0.45rem 0.2rem;
+  font-family: var(--font-ui);
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--muted);
+  background: none;
+  border: none;
+  border-radius: 0;
+}
+
+[data-style="instrument"] .rail-item:hover:not(:disabled),
+[data-style="instrument"] .app-rail .appearance-button:hover {
+  color: var(--text-strong);
+  background: var(--surface-hover);
+}
+
+[data-style="instrument"] .rail-item[aria-current="page"],
+[data-style="instrument"] .rail-item[aria-expanded="true"] {
+  color: var(--text-strong);
+  background: var(--surface-hover);
+  box-shadow: inset 2px 0 0 var(--accent-ink);
+}
+
+[data-style="instrument"] .rail-item:disabled {
+  opacity: 0.4;
+}
+
+[data-style="instrument"] .rail-item .icon,
+[data-style="instrument"] .app-rail .appearance-button .icon {
+  width: 1.3rem;
+  height: 1.3rem;
+}
+
+[data-style="instrument"] .rail-end {
+  margin-top: auto;
+}
+
+[data-style="instrument"] .rail-version {
+  margin: 0.25rem 0 0;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  text-align: center;
+  color: var(--ident);
+}
+
+/* The Appearance popover opens beside the rail, from its foot. */
+[data-style="instrument"] .app-rail .appearance-popover {
+  top: auto;
+  right: auto;
+  bottom: 0;
+  left: calc(100% + 0.5rem);
+}
+
+@media (max-width: 52rem) {
+  [data-style="instrument"] .app {
+    flex-direction: column;
+    padding-bottom: 64px;
+  }
+
+  [data-style="instrument"] .app-rail {
+    position: fixed;
+    inset: auto 0 0;
+    flex-direction: row;
+    align-items: stretch;
+    width: auto;
+    height: 64px;
+    padding: 0;
+    border-top: 1px solid var(--line);
+    border-right: none;
+  }
+
+  [data-style="instrument"] .rail-logo,
+  [data-style="instrument"] .rail-version {
+    display: none;
+  }
+
+  [data-style="instrument"] .rail-nav {
+    flex: 1;
+  }
+
+  [data-style="instrument"] .rail-nav ul {
+    display: flex;
+    height: 100%;
+  }
+
+  [data-style="instrument"] .rail-nav li {
+    flex: 1;
+  }
+
+  [data-style="instrument"] .rail-item,
+  [data-style="instrument"] .app-rail .appearance-button {
+    height: 100%;
+  }
+
+  [data-style="instrument"] .rail-item[aria-current="page"],
+  [data-style="instrument"] .rail-item[aria-expanded="true"] {
+    box-shadow: inset 0 2px 0 var(--accent-ink);
+  }
+
+  [data-style="instrument"] .rail-end {
+    width: 72px;
+    margin: 0;
+  }
+
+  [data-style="instrument"] .app-rail .appearance-popover {
+    bottom: calc(100% + 0.5rem);
+    left: auto;
+    right: 0.5rem;
+  }
+}
+
+/* ------------------------------------------------------------ type */
+
+[data-style="instrument"] h2 {
+  font-size: 1.6rem;
+  line-height: 1.2;
+}
+
+/* One accent-filled control per screen: everything else is outlined. */
+[data-style="instrument"] button.secondary,
+[data-style="instrument"] a.button.secondary {
+  color: var(--text);
+  border-color: var(--line-strong);
+}
+
+[data-style="instrument"] button.secondary:hover:not(:disabled) {
+  border-color: var(--field-border);
+}
+
+[data-style="instrument"] .card {
+  border-color: var(--line);
+}
+
+/* ---------------------------------------------------- the start screen */
+
+[data-style="instrument"] .layout-single .panel[data-stage="choose-endpoint"] {
+  background: var(--page);
+}
+
+[data-style="instrument"] .start-card {
+  padding: 0;
+  background: none;
+  border: none;
+}
+
+[data-style="instrument"] .eyebrow {
+  color: var(--accent-ink);
+}
+
+[data-style="instrument"] .start-card h2 {
+  margin: 0.1rem 0 0.75rem;
+  font-size: 2.4rem;
+  line-height: 1.05;
+}
+
+/* The listed services: a table of known services, the radio as its status dot. */
+[data-style="instrument"] .service-choices {
+  gap: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  overflow: hidden;
+}
+
+[data-style="instrument"] .service-choices legend {
+  margin-bottom: 0.5rem;
+}
+
+[data-style="instrument"] label.choice-card {
+  align-items: center;
+  padding: 0.55rem 0.8rem;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: var(--surface);
+}
+
+[data-style="instrument"] label.choice-card:last-child {
+  border-bottom: none;
+}
+
+[data-style="instrument"] label.choice-card:has(input:checked) {
+  background: var(--selected-bg);
+  box-shadow: inset 2px 0 0 var(--accent-ink);
+}
+
+[data-style="instrument"] label.choice-card input[type="radio"] {
+  appearance: none;
+  flex: none;
+  width: 0.6rem;
+  height: 0.6rem;
+  margin: 0;
+  border: 1.5px solid var(--field-border);
+  border-radius: 50%;
+}
+
+[data-style="instrument"] label.choice-card input[type="radio"]:checked {
+  background: var(--accent-ink);
+  border-color: var(--accent-ink);
+}
+
+[data-style="instrument"] .choice-body {
+  display: grid;
+  flex: 1;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) 4rem;
+  gap: 0 1rem;
+  align-items: baseline;
+}
+
+[data-style="instrument"] .choice-url {
+  display: block;
+  font-size: 0.8rem;
+}
+
+[data-style="instrument"] .choice-access {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-align: right;
+}
+
+[data-style="instrument"] .choice-note {
+  grid-column: 2 / -1;
+}
+
+[data-style="instrument"] ol.steps li::before {
+  border-radius: var(--r-tag);
+  font-family: var(--font-mono);
+}
+
+[data-style="instrument"] .how-it-works h3 {
+  font-family: var(--label-font);
+  font-size: var(--label-size);
+  font-weight: var(--label-weight);
+  text-transform: var(--label-transform);
+  letter-spacing: var(--label-tracking);
+  color: var(--label-color);
+}
+
+[data-style="instrument"] .about-access {
+  background: var(--surface);
+}
+
+/* ---------------------------------------------------------- the list */
+
+[data-style="instrument"] .service-facts dd {
+  color: var(--text-secondary);
+}
+
+[data-style="instrument"] .process-table {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+}
+
+[data-style="instrument"] .process-head,
+[data-style="instrument"] .process-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 7rem 6.5rem 5.5rem;
+  gap: 0 1rem;
+  align-items: center;
+  padding: 0.5rem 0.85rem;
+}
+
+[data-style="instrument"] .process-head {
+  margin: 0;
+  border-bottom: 1px solid var(--line-strong);
+}
+
+[data-style="instrument"] .process-list li {
+  border-bottom: 1px solid var(--line);
+}
+
+[data-style="instrument"] .process-list li:last-child {
+  border-bottom: none;
+}
+
+[data-style="instrument"] .process-list li:hover {
+  background: var(--surface-hover);
+}
+
+[data-style="instrument"] .process-list li[data-last-opened] {
+  margin: 0;
+  padding-inline: 0.85rem;
+  box-shadow: inset 2px 0 0 var(--accent-ink);
+}
+
+[data-style="instrument"] .process-link {
+  color: var(--text-strong);
+  text-decoration: none;
+  font-weight: 700;
+}
+
+[data-style="instrument"] .process-link:hover {
+  text-decoration: underline;
+}
+
+[data-style="instrument"] .process-id {
+  display: block;
+  font-size: 0.78rem;
+}
+
+[data-style="instrument"] .process-description {
+  display: none;
+}
+
+[data-style="instrument"] .cell-ran:empty {
+  display: block;
+}
+
+[data-style="instrument"] .tag {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  color: var(--accent-ink);
+  background: none;
+  border-color: var(--line-strong);
+}
+
+/* What a process needs: a mark, with its words for screen readers. */
+[data-style="instrument"] .needs {
+  padding: 0;
+  background: none;
+}
+
+[data-style="instrument"] .needs-text {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+[data-style="instrument"] .needs-mark {
+  display: inline-block;
+  flex: none;
+}
+
+[data-style="instrument"] .needs[data-needs="area"] .needs-mark {
+  width: 8px;
+  height: 8px;
+  border: 1.5px dashed currentColor;
+}
+
+[data-style="instrument"] .needs[data-needs="data"] .needs-mark {
+  width: 8px;
+  height: 8px;
+  background: currentColor;
+  border-radius: 50%;
+}
+
+[data-style="instrument"] .needs[data-needs="values"] .needs-mark {
+  width: 8px;
+  height: 2px;
+  background: currentColor;
+}
+
+@media (max-width: 52rem) {
+  [data-style="instrument"] .process-head {
+    display: none;
+  }
+
+  [data-style="instrument"] .process-list li {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 0.2rem 0.75rem;
+  }
+
+  [data-style="instrument"] .cell-process {
+    grid-column: 1 / -1;
+  }
+}
+
+/* -------------------------------------------------------- one process */
+
+[data-style="instrument"] .process-path {
+  margin-bottom: 0.25rem;
+}
+
+[data-style="instrument"] .breadcrumb button.link {
+  color: var(--muted);
+  text-decoration: none;
+}
+
+[data-style="instrument"] .breadcrumb button.link:hover:not(:disabled) {
+  color: var(--text-strong);
+}
+
+[data-style="instrument"] .layout-single .process-screen {
+  padding: 1.25rem 1.5rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+}
+
+/* The run bar stays at the foot of the sheet while the form scrolls. */
+[data-style="instrument"] .run-bar {
+  position: sticky;
+  bottom: -2rem;
+  z-index: 2;
+  margin: 0 -1.25rem;
+  padding: 0.75rem 1.25rem 2rem;
+  background: var(--surface);
+  border-top: 1px solid var(--line-strong);
+}
+
+[data-style="instrument"] .layout-single .run-bar {
+  margin: 0 -1.5rem;
+  padding-inline: 1.5rem;
+}
+
+[data-style="instrument"] .run-hint {
+  display: inline;
+  margin-right: auto;
+  font-size: 0.75rem;
+  color: var(--ident);
+}
+
+[data-style="instrument"] .progress-line {
+  height: 2px;
+}
+
+/* The result, in the result colours. */
+[data-style="instrument"] .result {
+  background: var(--result-surface);
+  border: 1px solid var(--result-line);
+}
+
+[data-style="instrument"] .result > details > summary strong,
+[data-style="instrument"] .result > p > strong {
+  color: var(--result-fg);
+}
+
+[data-style="instrument"] .result pre.code {
+  background: var(--field);
+}
+
+[data-style="instrument"] .result-strip dt {
+  color: var(--label-color);
+}
+
+/* The requests this page made to the service, newest last. */
+[data-style="instrument"] .request-log {
+  display: block;
+  margin-top: 1.5rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--line);
+}
+
+[data-style="instrument"] .request-log h3 {
+  margin: 0 0 0.4rem;
+}
+
+[data-style="instrument"] .request-method {
+  flex: none;
+  width: 3.5rem;
+  color: var(--accent-ink);
+}
+
+[data-style="instrument"] .request-status {
+  flex: none;
+  width: 2rem;
+  color: var(--success);
+}
+
+/* The access column says it already; only "Another service" keeps its note. */
+[data-style="instrument"] label.choice-card:not(:last-child) .choice-note {
+  display: none;
+}
