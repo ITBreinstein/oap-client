@@ -1,0 +1,350 @@
+/*
+ * Precise (cartographic): a printed map's exactness. 2px corners; 1px ink
+ * borders; a hard offset shadow and corner ticks on each screen's main card
+ * only; mono capitals for labels; tables with hairline rules instead of
+ * cards. The map gets a frame, a scale bar and a north arrow.
+ *
+ * Only what this style does beyond `styles.css`, every rule under
+ * `[data-style="precise"]`. Deleting this file (and its blocks in
+ * `tokens.css`) removes the style and nothing else (ADR 0002).
+ */
+
+/* ------------------------------------------------------------ edges */
+
+[data-style="precise"] .app-header,
+[data-style="precise"] .panel {
+  border-color: var(--line-strong);
+}
+
+[data-style="precise"] .card {
+  box-shadow: none;
+}
+
+/* The one card a screen leads with: the hard offset shadow and four ticks. */
+[data-style="precise"] [data-main-card] {
+  box-shadow: var(--shadow-card);
+}
+
+[data-style="precise"] [data-main-card]::before {
+  --tick-long: 14px;
+  --tick-thick: 3px;
+
+  content: "";
+  position: absolute;
+  inset: -6px;
+  pointer-events: none;
+  background:
+    linear-gradient(var(--ticks) 0 0) top left / var(--tick-long) var(--tick-thick),
+    linear-gradient(var(--ticks) 0 0) top left / var(--tick-thick) var(--tick-long),
+    linear-gradient(var(--ticks) 0 0) top right / var(--tick-long) var(--tick-thick),
+    linear-gradient(var(--ticks) 0 0) top right / var(--tick-thick) var(--tick-long),
+    linear-gradient(var(--ticks) 0 0) bottom left / var(--tick-long) var(--tick-thick),
+    linear-gradient(var(--ticks) 0 0) bottom left / var(--tick-thick) var(--tick-long),
+    linear-gradient(var(--ticks) 0 0) bottom right / var(--tick-long) var(--tick-thick),
+    linear-gradient(var(--ticks) 0 0) bottom right / var(--tick-thick) var(--tick-long);
+  background-repeat: no-repeat;
+}
+
+/* ------------------------------------------------------- start screen */
+
+[data-style="precise"] label.choice-card {
+  border-color: var(--line-strong);
+}
+
+/* The address and its button, joined into one instrument. */
+[data-style="precise"] .input-with-button {
+  gap: 0;
+}
+
+[data-style="precise"] .input-with-button input {
+  border-right: none;
+  border-radius: var(--r-control) 0 0 var(--r-control);
+}
+
+[data-style="precise"] .input-with-button button {
+  border-radius: 0 var(--r-control) var(--r-control) 0;
+}
+
+[data-style="precise"] .how-it-works,
+[data-style="precise"] .about-access {
+  padding: 1rem 1.25rem;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-card);
+}
+
+[data-style="precise"] .how-it-works {
+  margin-top: 1.5rem;
+}
+
+[data-style="precise"] .how-it-works h3 {
+  font-family: var(--label-font);
+  font-size: var(--label-size);
+  font-weight: var(--label-weight);
+  text-transform: var(--label-transform);
+  letter-spacing: var(--label-tracking);
+  color: var(--label-color);
+}
+
+[data-style="precise"] ol.steps li::before {
+  border-radius: var(--r-tag);
+  font-family: var(--font-mono);
+}
+
+/* ------------------------------------------------ the list: a cartouche */
+
+[data-style="precise"] .service-card {
+  padding: 1rem 1.25rem 0;
+}
+
+[data-style="precise"] .service-facts {
+  gap: 0;
+  margin: 0.9rem -1.25rem 0;
+  border-top: 1px solid var(--line-strong);
+}
+
+[data-style="precise"] .service-facts div {
+  padding: 0.5rem 1.25rem;
+}
+
+[data-style="precise"] .service-facts div:nth-child(odd) {
+  border-right: 1px solid var(--line);
+}
+
+[data-style="precise"] .service-facts div:nth-child(-n + 2) {
+  border-bottom: 1px solid var(--line);
+}
+
+/* ...then one ruled table. */
+[data-style="precise"] .process-table {
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-card);
+}
+
+[data-style="precise"] .process-head,
+[data-style="precise"] .process-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 9.5rem 6.5rem 6rem;
+  gap: 0 1rem;
+  align-items: baseline;
+  padding: 0.55rem 0.9rem;
+}
+
+[data-style="precise"] .process-head {
+  margin: 0;
+  border-bottom: 1px solid var(--line-strong);
+}
+
+[data-style="precise"] .process-list li {
+  border-bottom: 1px solid var(--line);
+}
+
+[data-style="precise"] .process-list li:last-child {
+  border-bottom: none;
+}
+
+[data-style="precise"] .process-list li[data-last-opened] {
+  margin: 0;
+  padding-inline: 0.9rem;
+}
+
+[data-style="precise"] .process-link {
+  color: var(--text-strong);
+}
+
+[data-style="precise"] .process-id {
+  display: block;
+  font-size: 0.8rem;
+}
+
+[data-style="precise"] .process-description {
+  display: none;
+}
+
+[data-style="precise"] .cell-ran:empty {
+  display: block;
+}
+
+[data-style="precise"] .tag {
+  padding: 0;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  color: var(--success);
+  background: none;
+  border: none;
+}
+
+/* What a process needs: words in mono capitals behind a glyph, no tint. */
+[data-style="precise"] .needs {
+  padding: 0;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: none;
+}
+
+[data-style="precise"] .needs[data-needs="area"]::before {
+  content: "▢" / "";
+}
+
+[data-style="precise"] .needs[data-needs="data"]::before {
+  content: "↑" / "";
+}
+
+[data-style="precise"] .needs[data-needs="values"]::before {
+  content: "=" / "";
+}
+
+@media (max-width: 52rem) {
+  [data-style="precise"] .process-head {
+    display: none;
+  }
+
+  [data-style="precise"] .process-list li {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.2rem 1rem;
+  }
+
+  [data-style="precise"] .cell-process {
+    grid-column: 1 / -1;
+  }
+}
+
+/* ----------------------------------------------------- one process */
+
+[data-style="precise"] fieldset {
+  border-color: var(--line-strong);
+}
+
+[data-style="precise"] .layout-single .process-screen {
+  padding: 1.25rem 1.5rem;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-card);
+}
+
+/* With no map, the form is a ruled table: what to give on the left, the value on the right. */
+@media (min-width: 52rem) {
+  [data-style="precise"] .layout-single .form-body {
+    border-bottom: 1px solid var(--line);
+  }
+
+  [data-style="precise"] .layout-single .form-body > .field {
+    display: grid;
+    grid-template-columns: 12rem minmax(0, 1fr);
+    column-gap: 1.25rem;
+    margin: 0;
+    padding: 0.75rem 0;
+    border-top: 1px solid var(--line);
+  }
+
+  [data-style="precise"] .layout-single .form-body > .field > * {
+    grid-column: 2;
+  }
+
+  [data-style="precise"] .layout-single .form-body > .field > label {
+    grid-column: 1;
+    grid-row: 1 / span 6;
+  }
+
+  [data-style="precise"] .layout-single .form-body > .field > fieldset {
+    grid-column: 1 / -1;
+  }
+
+  /* In the left column, whether it is required goes under its name. */
+  [data-style="precise"] .layout-single .form-body > .field > label > span {
+    display: block;
+  }
+}
+
+[data-style="precise"] .field .required,
+[data-style="precise"] .field .optional {
+  font-size: 0.68rem;
+}
+
+/* The result: ruled and ticked, then one ruled line about the run. */
+[data-style="precise"] .result-block {
+  margin: 0.5rem 0 0;
+  padding: 1rem 1.1rem 0.5rem;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-card);
+}
+
+[data-style="precise"] .result {
+  border-left-width: 1px;
+}
+
+[data-style="precise"] .result-strip {
+  gap: 0;
+  margin: 0 -1.1rem;
+  border-top: 1px solid var(--line-strong);
+  border-bottom: 1px solid var(--line-strong);
+}
+
+[data-style="precise"] .result-strip div {
+  flex-direction: column;
+  gap: 0;
+  padding: 0.35rem 1.1rem;
+  border-right: 1px solid var(--line);
+}
+
+[data-style="precise"] .result-strip dd {
+  font-size: 0.85rem;
+}
+
+/* ---------------------------------------------------- the map's frame */
+
+[data-style="precise"] .map-pane {
+  --frame: 28px;
+
+  background: var(--surface);
+}
+
+[data-style="precise"] .map-view {
+  inset: var(--frame);
+  border: 1px solid var(--line-strong);
+}
+
+[data-style="precise"] .map-pane > .map-hint {
+  left: calc(var(--frame) + 0.75rem);
+  bottom: calc(var(--frame) + 2.25rem);
+}
+
+[data-style="precise"] .map-pane > .map-overlay {
+  top: calc(var(--frame) + 0.75rem);
+  left: calc(var(--frame) + 0.75rem);
+}
+
+[data-style="precise"] .map-hint,
+[data-style="precise"] .map-overlay {
+  border-color: var(--line-strong);
+  box-shadow: none;
+}
+
+/* The legend: a ruled box, in mono. */
+[data-style="precise"] .map-legend {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+}
+
+[data-style="precise"] .map-pane .maplibregl-ctrl-scale {
+  display: block;
+  color: var(--text);
+  font-family: var(--font-mono);
+  background: var(--surface);
+  border-color: var(--line-strong);
+}
+
+[data-style="precise"] .map-pane .maplibregl-ctrl-group .maplibregl-ctrl-compass {
+  display: block;
+}
+
+[data-style="precise"] .map-pane .maplibregl-ctrl-group {
+  border-radius: var(--r-control);
+  box-shadow: none;
+  border: 1px solid var(--line-strong);
+}
