@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Appearance } from "./app/appearance.js";
 import { AppearanceControl } from "./app/AppearanceControl.js";
-import { AppFrame, type FramePlace } from "./app/AppFrame.js";
+import { AppFrame, RailItem, type FramePlace } from "./app/AppFrame.js";
 import { DeveloperPanel } from "./app/DeveloperPanel.js";
 import { activeDrawField, DrawContext, type DrawRequest, type DrawTarget } from "./app/draw.js";
 import { EndpointScreen } from "./app/EndpointScreen.js";
@@ -12,7 +12,12 @@ import { MapPane } from "./app/MapPane.js";
 import { needsOfPlan, type Needs } from "./app/needs.js";
 import { ProcessListScreen } from "./app/ProcessListScreen.js";
 import { ProcessScreen } from "./app/ProcessScreen.js";
-import { DEV_PRESETS } from "./app/dev-presets.js";
+import { DEV_EXAMPLES, DEV_PRESETS } from "./app/dev-presets.js";
+import { exampleNeeds } from "./app/examples.js";
+import { ExamplesBrowser, FeaturedExamples } from "./app/ExamplesView.js";
+import { typedEndpoint } from "./app/run.js";
+import { SidePanel } from "./app/SidePanel.js";
+import type { EndpointRef } from "./app/workflow.js";
 import { JobsPanel } from "./jobs/JobsPanel.js";
 import { RelayBanner, RelayOffer } from "./app/RelayRoute.js";
 import { useAppearance } from "./app/useAppearance.js";
@@ -21,8 +26,30 @@ import {
   DEFAULT_MAX_EDITABLE_COORDINATES,
   DEFAULT_MAX_MAP_COORDINATES,
   STATIC_ONLY,
+  type Example,
   type RuntimeConfig,
 } from "./config/runtime-config.js";
+import type { RelayEndpoint } from "./relay/contract.js";
+
+/** The side panels; one is open at a time. */
+type Panel = "examples" | "jobs";
+const PANEL_IDS: Readonly<Record<Panel, string>> = {
+  examples: "examples-panel",
+  jobs: "jobs-panel",
+};
+
+/**
+ * Where an example is reached: as the relay's endpoint of the same address
+ * when the relay lists one, so its background runs go where that endpoint
+ * says; otherwise directly, exactly as a typed address.
+ */
+function exampleEndpoint(
+  example: Example,
+  configured: readonly RelayEndpoint[],
+): EndpointRef | undefined {
+  const entry = configured.find((candidate) => candidate.baseUrl === example.service);
+  return entry === undefined ? typedEndpoint(example.service) : { source: "configured", ...entry };
+}
 
 function developerRequested(): boolean {
   try {
@@ -50,6 +77,12 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
     () => (import.meta.env.DEV ? [...DEV_PRESETS, ...config.presets] : config.presets),
     [config.presets],
   );
+  // Development adds examples on the local reference server, as it adds presets.
+  const examples = useMemo(
+    () =>
+      import.meta.env.DEV ? [...DEV_EXAMPLES, ...(config.examples ?? [])] : (config.examples ?? []),
+    [config.examples],
+  );
   const view = useWorkflow(relayUrl, config.acceptedNoticeMs);
   const mapLimits = useMemo<MapLimits>(
     () => ({
@@ -76,15 +109,35 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
   if (openedKey !== undefined && openedPlan !== undefined && !described.has(openedKey)) {
     setDescribed(new Map(described).set(openedKey, needsOfPlan(openedPlan)));
   }
+  // What the list can say a process needs: what the examples say, and over
+  // that, what the page made of a description it read.
   const listNeeds = useMemo(() => {
     if (state.stage !== "connected") return undefined;
     const prefix = `${state.endpoint.baseUrl}\n`;
-    return new Map(
-      [...described]
+    return new Map([
+      ...exampleNeeds(examples, state.endpoint.baseUrl),
+      ...[...described]
         .filter(([key]) => key.startsWith(prefix))
-        .map(([key, needs]) => [key.slice(prefix.length), needs]),
-    );
-  }, [described, state]);
+        .map(([key, needs]): [string, Needs] => [key.slice(prefix.length), needs]),
+    ]);
+  }, [described, examples, state]);
+
+  const [panelOpen, setPanelOpen] = useState<Panel | undefined>();
+  const togglePanel = (which: Panel) => {
+    setPanelOpen((current) => (current === which ? undefined : which));
+  };
+  const closePanel = () => {
+    setPanelOpen(undefined);
+  };
+  const busy =
+    state.stage === "running" ||
+    (state.stage === "choose-endpoint" && state.connecting !== undefined);
+  const openExample = (example: Example) => {
+    const endpoint = exampleEndpoint(example, view.configured);
+    if (endpoint === undefined) return;
+    setPanelOpen(undefined);
+    commands.openExample(endpoint, example.process);
+  };
 
   // Drawing belongs to one field of one open process. It is recorded with the
   // process it was started for, so choosing another process — or leaving the
@@ -135,6 +188,18 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
           error={state.error}
           staticOnly={relayUrl === undefined}
           onConnect={commands.connect}
+          examples={
+            <FeaturedExamples
+              examples={examples}
+              busy={busy}
+              onOpen={openExample}
+              onBrowse={() => {
+                togglePanel("examples");
+              }}
+              browsing={panelOpen === "examples"}
+              panelId={PANEL_IDS.examples}
+            />
+          }
         />
       );
       break;
@@ -237,6 +302,19 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
             onConnect={onConnect}
             onProcesses={onProcesses}
             onLog={onLog}
+            railItems={
+              examples.length > 0 && (
+                <RailItem
+                  icon="examples"
+                  label="Examples"
+                  pressed={panelOpen === "examples"}
+                  controls={PANEL_IDS.examples}
+                  onClick={() => {
+                    togglePanel("examples");
+                  }}
+                />
+              )
+            }
           />
           <div className="app-body">
             {configWarning !== undefined && (
@@ -287,6 +365,18 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
                 </MapBoundary>
               )}
             </div>
+            {examples.length > 0 && (
+              <SidePanel
+                id={PANEL_IDS.examples}
+                title="Examples"
+                open={panelOpen === "examples"}
+                inert={offerOpen}
+                onClose={closePanel}
+                className="examples-panel"
+              >
+                <ExamplesBrowser examples={examples} busy={busy} onOpen={openExample} />
+              </SidePanel>
+            )}
           </div>
           {offerOpen && (
             <RelayOffer onConfirm={commands.confirmRelay} onDecline={commands.declineRelay} />

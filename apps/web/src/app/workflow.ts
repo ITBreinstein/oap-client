@@ -113,6 +113,8 @@ export type Workflow =
       readonly offer?:
         { readonly endpoint: EndpointRef; readonly error: WorkflowError } | undefined;
       readonly error?: WorkflowError | undefined;
+      /** An example was chosen: the process to open once connected. */
+      readonly openAfter?: string | undefined;
     }
   | (Connected & {
       readonly stage: "connected";
@@ -142,6 +144,8 @@ export type Workflow =
 
 export type WorkflowAction =
   | { readonly type: "connect"; readonly endpoint: EndpointRef }
+  /** An example: connect to `endpoint`, then open `processId` there. */
+  | { readonly type: "open-example"; readonly endpoint: EndpointRef; readonly processId: string }
   | {
       readonly type: "connected";
       readonly endpoint: EndpointRef;
@@ -210,6 +214,26 @@ export function defaultMode(process: ProcessDescription): ExecutionMode {
   return process.execution.sync || !process.execution.async ? "sync" : "async";
 }
 
+/**
+ * Where an example lands once connected: on its process, or, when the list
+ * does not have it, on the list with a notice. A list cut short might hold it
+ * further on, so there the description is asked for all the same.
+ */
+export function exampleLanding(processes: ProcessList, processId: string): "open" | "missing" {
+  return processes.truncated || processes.processes.some((process) => process.id === processId)
+    ? "open"
+    : "missing";
+}
+
+/** What the list says when an example names a process the service does not list. */
+export function missingProcess(processId: string): WorkflowError {
+  return {
+    title: `This service has no process called ${processId}.`,
+    detail: "The example names a process this service does not list. Choose one from the list.",
+    notice: true,
+  };
+}
+
 function sameEndpoint(a: EndpointRef | undefined, b: EndpointRef): boolean {
   return a !== undefined && a.source === b.source && a.baseUrl === b.baseUrl;
 }
@@ -246,6 +270,17 @@ export function workflowReducer(state: Workflow, action: WorkflowAction): Workfl
         ? { stage: "choose-endpoint", connecting: action.endpoint }
         : state;
 
+    case "open-example":
+      // A connect that remembers which process to open. From the start
+      // screen, or from anywhere connected — never mid-run, nor while the
+      // relay question is open.
+      return (state.stage === "choose-endpoint" && state.offer === undefined) ||
+        state.stage === "connected" ||
+        state.stage === "process" ||
+        state.stage === "result"
+        ? { stage: "choose-endpoint", connecting: action.endpoint, openAfter: action.processId }
+        : state;
+
     case "connected":
       // The relay route only after "Use relay"; a direct answer only to a
       // direct attempt. A late answer from the other route is ignored.
@@ -259,6 +294,12 @@ export function workflowReducer(state: Workflow, action: WorkflowAction): Workfl
             route: action.route,
             service: action.service,
             processes: action.processes,
+            // An example's process: opened at once, or a notice that it is not there.
+            ...(state.openAfter === undefined
+              ? {}
+              : exampleLanding(action.processes, state.openAfter) === "open"
+                ? { opening: state.openAfter, lastOpened: state.openAfter }
+                : { error: missingProcess(state.openAfter) }),
           }
         : state;
 
@@ -271,12 +312,21 @@ export function workflowReducer(state: Workflow, action: WorkflowAction): Workfl
       return state.stage === "choose-endpoint" &&
         state.viaRelay !== true &&
         sameEndpoint(state.connecting, action.endpoint)
-        ? { stage: "choose-endpoint", offer: { endpoint: action.endpoint, error: action.error } }
+        ? {
+            stage: "choose-endpoint",
+            offer: { endpoint: action.endpoint, error: action.error },
+            openAfter: state.openAfter,
+          }
         : state;
 
     case "relay-confirmed":
       return state.stage === "choose-endpoint" && state.offer !== undefined
-        ? { stage: "choose-endpoint", connecting: state.offer.endpoint, viaRelay: true }
+        ? {
+            stage: "choose-endpoint",
+            connecting: state.offer.endpoint,
+            viaRelay: true,
+            openAfter: state.openAfter,
+          }
         : state;
 
     case "relay-declined":

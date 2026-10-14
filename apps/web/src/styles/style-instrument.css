@@ -523,3 +523,94 @@
 [data-style="instrument"] label.choice-card:not(:last-child) .choice-note {
   display: none;
 }
+
+/* ------------------------------------------------- examples and panels */
+
+/* Panels slide out of the rail, over the content, and back into it. */
+[data-style="instrument"] .side-panel {
+  right: auto;
+  left: 0;
+  border-left: none;
+  border-right: 1px solid var(--line-strong);
+}
+
+[data-style="instrument"] .side-panel[data-open="false"] {
+  transform: translateX(-100%);
+}
+
+[data-style="instrument"] .featured-examples h3,
+[data-style="instrument"] .example-group-head {
+  font-family: var(--label-font);
+  font-size: var(--label-size);
+  font-weight: var(--label-weight);
+  text-transform: var(--label-transform);
+  letter-spacing: var(--label-tracking);
+  color: var(--label-color);
+}
+
+/* Featured examples: compact rows, each with its need's mark. */
+[data-style="instrument"] .example-grid,
+[data-style="instrument"] .example-rows {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  overflow: hidden;
+}
+
+[data-style="instrument"] .example-grid li + li,
+[data-style="instrument"] .example-rows li + li {
+  border-top: 1px solid var(--line);
+}
+
+[data-style="instrument"] .example-card,
+[data-style="instrument"] .example-row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.55rem 0.85rem;
+  border: none;
+  border-radius: 0;
+}
+
+[data-style="instrument"] .example-card:hover:not(:disabled),
+[data-style="instrument"] .example-row:hover:not(:disabled) {
+  box-shadow: inset 2px 0 0 var(--accent-ink);
+}
+
+[data-style="instrument"] .example-more {
+  flex-wrap: nowrap;
+  flex-direction: row-reverse;
+}
+
+[data-style="instrument"] .example-summary {
+  display: none;
+}
+
+[data-style="instrument"] .example-rows .example-summary {
+  display: block;
+  flex-basis: auto;
+  font-size: 0.8rem;
+}
+
+[data-style="instrument"] .example-rows .example-more {
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
+[data-style="instrument"] .example-rows .example-row {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+}
+
+/* The filters: keys, each with its mark. */
+[data-style="instrument"] .filter {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+}
+
+[data-style="instrument"] .filter .needs {
+  display: inline-flex;
+}

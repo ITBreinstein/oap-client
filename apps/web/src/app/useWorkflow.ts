@@ -15,6 +15,7 @@ import {
   type Client,
   type ExecutionMode,
   type ProcessDescription,
+  type ProcessList,
   type ProcessSummary,
 } from "@breinstein/oap-client";
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
@@ -61,6 +62,7 @@ import {
   runRequest,
 } from "./run.js";
 import {
+  exampleLanding,
   INITIAL_WORKFLOW,
   workflowReducer,
   type EndpointRef,
@@ -71,6 +73,11 @@ import {
 /** Properties, not methods: each is handed to a component on its own. */
 export interface WorkflowCommands {
   readonly connect: (endpoint: EndpointRef) => void;
+  /**
+   * An example: connect to `endpoint` and open `processId` there, or, when
+   * already connected to it, open the process at once.
+   */
+  readonly openExample: (endpoint: EndpointRef, processId: string) => void;
   /** "Use relay": the only way anything is sent through the relay's read route. */
   readonly confirmRelay: () => void;
   /** "Cancel", Escape, or any other way of closing the question. */
@@ -280,6 +287,8 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
   const connections = useRef(0);
   /** The direct attempt behind an open offer, for the record its answer completes. */
   const pendingOffer = useRef<AttemptFacts | undefined>(undefined);
+  /** The example's process to open once the connection being made is up. */
+  const openAfterConnect = useRef<string | undefined>(undefined);
   const relayAvailable = relayUrl !== undefined && relayUrl !== "";
   /** Endpoints where a dismissal has been seen to work this session (T6). */
   const [dismissWorked, setDismissWorked] = useState<ReadonlySet<string>>(() => new Set());
@@ -336,138 +345,22 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
     }
   }, []);
 
-  // Direct first, always (route-decision.ts). The relay is offered only for a
-  // CORS-shaped failure on an endpoint that allows it, and tried only from
-  // confirmRelay. The attempt's one record is written when it settles.
-  const connect = useCallback(
-    (endpoint: EndpointRef) => {
-      const active = session.current;
-      if (active === undefined) return;
-      // The relay offer is open: only its answer moves on (review W22). The
-      // reducer ignores a connect here, and clearing the pending offer lost
-      // the open attempt's record, or gave "Use relay" another endpoint's.
-      if (pendingOffer.current !== undefined) return;
-      dispatch({ type: "connect", endpoint });
-      const at = new Date();
-      // Refused before sending: the browser would block it, and the opaque
-      // error it throws cross-origin is indistinguishable from CORS.
-      if (isMixedContent(new URL(endpoint.baseUrl), pageProtocol())) {
-        active.record(
-          endpoint.baseUrl,
-          accessRecord({
-            endpoint,
-            at,
-            relayAvailable,
-            direct: "mixed-content",
-            directError: undefined,
-          }),
-        );
-        dispatch({ type: "connect-failed", endpoint, error: MIXED_CONTENT_ERROR });
-        return;
-      }
-      const connection = active.client(relayEndpointFor(endpoint), "direct");
-      void (async () => {
-        try {
-          const service = await connection.inspect();
-          const processes = await connection.listProcesses();
-          connections.current += 1;
-          const id = connections.current;
-          client.current = { endpoint, client: connection, reads: "direct", id };
-          active.record(
-            endpoint.baseUrl,
-            accessRecord({
-              endpoint,
-              at,
-              relayAvailable,
-              direct: "connected",
-              directError: undefined,
-            }),
-          );
-          dispatch({
-            type: "connected",
-            endpoint,
-            connection: id,
-            route: "direct",
-            service,
-            processes,
-          });
-        } catch (cause) {
-          const direct = directFailure(cause);
-          const facts = { endpoint, at, relayAvailable, direct, directError: errorName(cause) };
-          const error = transportMessage(cause, endpoint);
-          if (offersRelay(endpoint, direct, relayAvailable)) {
-            pendingOffer.current = facts;
-            dispatch({ type: "relay-offered", endpoint, error });
-            return;
-          }
-          active.record(endpoint.baseUrl, accessRecord(facts));
-          dispatch({ type: "connect-failed", endpoint, error });
-        }
-      })();
-    },
-    [relayAvailable],
-  );
-
-  const confirmRelay = useCallback(() => {
-    const active = session.current;
-    const facts = pendingOffer.current;
-    pendingOffer.current = undefined;
-    if (active === undefined || facts === undefined) return;
-    const { endpoint } = facts;
-    dispatch({ type: "relay-confirmed" });
-    const connection = active.client(relayEndpointFor(endpoint), "relay");
-    void (async () => {
-      try {
-        const service = await connection.inspect();
-        const processes = await connection.listProcesses();
-        connections.current += 1;
-        const id = connections.current;
-        client.current = { endpoint, client: connection, reads: "relay", id };
-        active.record(
-          endpoint.baseUrl,
-          accessRecord({ ...facts, confirmed: true, relay: relayAttempt(undefined) }),
-        );
-        dispatch({
-          type: "connected",
-          endpoint,
-          connection: id,
-          route: "relay",
-          service,
-          processes,
-        });
-      } catch (cause) {
-        const attempt = relayAttempt(cause);
-        active.record(
-          endpoint.baseUrl,
-          accessRecord({ ...facts, confirmed: true, relay: attempt }),
-        );
-        dispatch({ type: "connect-failed", endpoint, error: relayFailureMessage(attempt, cause) });
-      }
-    })();
-  }, []);
-
-  // Cancel, Escape, or anything else that closes the question: a decline.
-  const declineRelay = useCallback(() => {
-    const active = session.current;
-    const facts = pendingOffer.current;
-    pendingOffer.current = undefined;
-    if (facts !== undefined) {
-      active?.record(facts.endpoint.baseUrl, accessRecord({ ...facts, confirmed: false }));
-    }
-    dispatch({ type: "relay-declined" });
-  }, []);
-
-  const openProcess = useCallback(
-    (summary: ProcessSummary) => {
-      const connection = client.current;
-      const active = session.current;
-      if (connection === undefined || active === undefined) return;
-      dispatch({ type: "open-process", processId: summary.id });
+  /**
+   * Read one process's description on the open connection and show its
+   * form. The reducer has already been told which process is opening.
+   */
+  const load = useCallback(
+    (
+      connection: NonNullable<typeof client.current>,
+      active: JobSession,
+      processId: string,
+      summary: ProcessSummary | undefined,
+    ) => {
       setFieldErrors(NO_ERRORS);
       void (async () => {
         let warnings: readonly string[] = [];
         try {
-          const process = await connection.client.getProcess(summary.id, {
+          const process = await connection.client.getProcess(processId, {
             summary,
             // Per call, so the parse warnings can be read off the observation
             // that carries them; forwarded, so the session still records it.
@@ -490,7 +383,7 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
           dispatch({
             type: "process-failed",
             connection: connection.id,
-            processId: summary.id,
+            processId,
             error: rateLimitMessage(cause) ?? {
               title:
                 "Could not read this process's description. Choose it again, or another process.",
@@ -501,6 +394,174 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
       })();
     },
     [record],
+  );
+
+  /** After a connection is up: open the example's process, if one was chosen and is there. */
+  const openChosen = useCallback(
+    (connection: NonNullable<typeof client.current>, active: JobSession, list: ProcessList) => {
+      const processId = openAfterConnect.current;
+      openAfterConnect.current = undefined;
+      if (processId === undefined || exampleLanding(list, processId) === "missing") return;
+      load(
+        connection,
+        active,
+        processId,
+        list.processes.find((process) => process.id === processId),
+      );
+    },
+    [load],
+  );
+
+  // Direct first, always (route-decision.ts). The relay is offered only for a
+  // CORS-shaped failure on an endpoint that allows it, and tried only from
+  // confirmRelay. The attempt's one record is written when it settles.
+  const start = useCallback(
+    (endpoint: EndpointRef, openAfter: string | undefined) => {
+      const active = session.current;
+      if (active === undefined) return;
+      // The relay offer is open: only its answer moves on (review W22). The
+      // reducer ignores a connect here, and clearing the pending offer lost
+      // the open attempt's record, or gave "Use relay" another endpoint's.
+      if (pendingOffer.current !== undefined) return;
+      openAfterConnect.current = openAfter;
+      dispatch(
+        openAfter === undefined
+          ? { type: "connect", endpoint }
+          : { type: "open-example", endpoint, processId: openAfter },
+      );
+      const at = new Date();
+      // Refused before sending: the browser would block it, and the opaque
+      // error it throws cross-origin is indistinguishable from CORS.
+      if (isMixedContent(new URL(endpoint.baseUrl), pageProtocol())) {
+        active.record(
+          endpoint.baseUrl,
+          accessRecord({
+            endpoint,
+            at,
+            relayAvailable,
+            direct: "mixed-content",
+            directError: undefined,
+          }),
+        );
+        openAfterConnect.current = undefined;
+        dispatch({ type: "connect-failed", endpoint, error: MIXED_CONTENT_ERROR });
+        return;
+      }
+      const connection = active.client(relayEndpointFor(endpoint), "direct");
+      void (async () => {
+        try {
+          const service = await connection.inspect();
+          const processes = await connection.listProcesses();
+          connections.current += 1;
+          const id = connections.current;
+          const opened = { endpoint, client: connection, reads: "direct" as const, id };
+          client.current = opened;
+          active.record(
+            endpoint.baseUrl,
+            accessRecord({
+              endpoint,
+              at,
+              relayAvailable,
+              direct: "connected",
+              directError: undefined,
+            }),
+          );
+          dispatch({
+            type: "connected",
+            endpoint,
+            connection: id,
+            route: "direct",
+            service,
+            processes,
+          });
+          openChosen(opened, active, processes);
+        } catch (cause) {
+          const direct = directFailure(cause);
+          const facts = { endpoint, at, relayAvailable, direct, directError: errorName(cause) };
+          const error = transportMessage(cause, endpoint);
+          if (offersRelay(endpoint, direct, relayAvailable)) {
+            pendingOffer.current = facts;
+            dispatch({ type: "relay-offered", endpoint, error });
+            return;
+          }
+          openAfterConnect.current = undefined;
+          active.record(endpoint.baseUrl, accessRecord(facts));
+          dispatch({ type: "connect-failed", endpoint, error });
+        }
+      })();
+    },
+    [relayAvailable, openChosen],
+  );
+
+  const connect = useCallback(
+    (endpoint: EndpointRef) => {
+      start(endpoint, undefined);
+    },
+    [start],
+  );
+
+  const confirmRelay = useCallback(() => {
+    const active = session.current;
+    const facts = pendingOffer.current;
+    pendingOffer.current = undefined;
+    if (active === undefined || facts === undefined) return;
+    const { endpoint } = facts;
+    dispatch({ type: "relay-confirmed" });
+    const connection = active.client(relayEndpointFor(endpoint), "relay");
+    void (async () => {
+      try {
+        const service = await connection.inspect();
+        const processes = await connection.listProcesses();
+        connections.current += 1;
+        const id = connections.current;
+        const opened = { endpoint, client: connection, reads: "relay" as const, id };
+        client.current = opened;
+        active.record(
+          endpoint.baseUrl,
+          accessRecord({ ...facts, confirmed: true, relay: relayAttempt(undefined) }),
+        );
+        dispatch({
+          type: "connected",
+          endpoint,
+          connection: id,
+          route: "relay",
+          service,
+          processes,
+        });
+        openChosen(opened, active, processes);
+      } catch (cause) {
+        openAfterConnect.current = undefined;
+        const attempt = relayAttempt(cause);
+        active.record(
+          endpoint.baseUrl,
+          accessRecord({ ...facts, confirmed: true, relay: attempt }),
+        );
+        dispatch({ type: "connect-failed", endpoint, error: relayFailureMessage(attempt, cause) });
+      }
+    })();
+  }, [openChosen]);
+
+  // Cancel, Escape, or anything else that closes the question: a decline.
+  const declineRelay = useCallback(() => {
+    const active = session.current;
+    const facts = pendingOffer.current;
+    pendingOffer.current = undefined;
+    openAfterConnect.current = undefined;
+    if (facts !== undefined) {
+      active?.record(facts.endpoint.baseUrl, accessRecord({ ...facts, confirmed: false }));
+    }
+    dispatch({ type: "relay-declined" });
+  }, []);
+
+  const openProcess = useCallback(
+    (summary: ProcessSummary) => {
+      const connection = client.current;
+      const active = session.current;
+      if (connection === undefined || active === undefined) return;
+      dispatch({ type: "open-process", processId: summary.id });
+      load(connection, active, summary.id, summary);
+    },
+    [load],
   );
 
   // Not memoised: a command is only ever called from a handler rendered with
@@ -863,6 +924,27 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
       client.current = undefined;
       setFieldErrors(NO_ERRORS);
       dispatch({ type: "disconnect" });
+    },
+    openExample: (endpoint, processId) => {
+      if (state.stage === "running") return;
+      // Already connected to that service, and it lists the process: open it.
+      const open = client.current;
+      if (
+        open !== undefined &&
+        state.stage !== "choose-endpoint" &&
+        open.endpoint.source === endpoint.source &&
+        open.endpoint.baseUrl === endpoint.baseUrl
+      ) {
+        const summary = state.processes.processes.find((process) => process.id === processId);
+        if (summary !== undefined) {
+          openProcess(summary);
+          return;
+        }
+      }
+      // Otherwise connect afresh, as Connect does, and open it once there.
+      if (state.stage !== "choose-endpoint") client.current = undefined;
+      setFieldErrors(NO_ERRORS);
+      start(endpoint, processId);
     },
     openProcess,
     backToList: () => {

@@ -1267,3 +1267,224 @@ ol.steps li .help {
 .choice-access {
   display: none;
 }
+
+/*
+ * Side panels (Examples, My jobs): not modal, over the content's edge. Closed,
+ * they slide out of sight and are inert. Each style says which edge; on a
+ * narrow screen they are full-width sheets.
+ */
+.side-panel {
+  position: absolute;
+  z-index: 12;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  width: min(27rem, 100%);
+  color: var(--text);
+  background: var(--surface);
+  border-left: 1px solid var(--line-strong);
+  box-shadow: var(--shadow-panel);
+  /* Visible at once on opening, so focus can move in; hidden after the slide. */
+  transition:
+    transform 0.2s ease,
+    visibility 0s;
+}
+
+.side-panel[data-open="false"] {
+  visibility: hidden;
+  transform: translateX(100%);
+  box-shadow: none;
+  transition:
+    transform 0.2s ease,
+    visibility 0s 0.2s;
+}
+
+.side-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem 0.75rem 1.25rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.side-panel-head h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+/* An icon-only button: 44px, as a finger needs. */
+.panel-close {
+  flex: none;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.side-panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem 1.25rem 2rem;
+}
+
+@media (max-width: 52rem) {
+  .side-panel {
+    position: fixed;
+    width: 100%;
+    border-left: none;
+  }
+}
+
+/* Examples: featured on the start screen, and all of them in the panel. */
+.featured-examples {
+  margin-top: 1.5rem;
+}
+
+.featured-examples h3 {
+  margin: 0 0 0.6rem;
+  font-size: 1rem;
+}
+
+.example-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+  margin: 0 0 0.6rem;
+  padding: 0;
+  list-style: none;
+}
+
+@media (max-width: 40rem) {
+  .example-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.example-grid li {
+  display: flex;
+}
+
+/* An example is one button: its title names it, the rest describes it. */
+.example-card,
+.example-row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.3rem;
+  width: 100%;
+  font-weight: normal;
+  text-align: left;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-item);
+}
+
+.example-card {
+  padding: 0.8rem 0.9rem;
+}
+
+.example-card:hover:not(:disabled),
+.example-row:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--surface-hover);
+  border-color: var(--selected-line);
+}
+
+.example-title {
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.example-more {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.6rem;
+  font-size: 0.9rem;
+}
+
+.example-summary {
+  flex-basis: 100%;
+  color: var(--muted);
+}
+
+.example-service {
+  font-size: 0.78rem;
+  color: var(--ident);
+}
+
+/* The filters: one pressed at a time. */
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0 0 0.5rem;
+}
+
+.filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 500;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-control);
+}
+
+.filter:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--surface-hover);
+  border-color: var(--line-strong);
+}
+
+.filter[aria-pressed="true"],
+.filter[aria-pressed="true"]:hover:not(:disabled) {
+  color: var(--selected-text);
+  background: var(--selected-bg);
+  border-color: var(--selected-line);
+}
+
+/* A filter's mark is only for styles that use marks for what a process needs. */
+.filter .needs {
+  display: none;
+  padding: 0;
+  background: none;
+}
+
+.example-group {
+  margin-top: 1rem;
+}
+
+.example-group-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin: 0 0 0.4rem;
+  font-size: 0.9rem;
+}
+
+.example-group-head .count {
+  padding: 0 0.4rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-tag);
+}
+
+.example-rows {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.example-row {
+  padding: 0.6rem 0.75rem;
+}

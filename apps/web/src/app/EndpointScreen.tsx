@@ -11,7 +11,7 @@
  * are cards, and Connect says which one it will open.
  */
 
-import { useId, useState, type SyntheticEvent } from "react";
+import { useId, useState, type ReactNode, type SyntheticEvent } from "react";
 import type { Preset } from "../config/runtime-config.js";
 import type { RelayEndpoint } from "../relay/contract.js";
 import { typedEndpoint } from "./run.js";
@@ -30,6 +30,8 @@ export interface EndpointScreenProps {
   /** True when the site runs without the relay: the screen then says what that rules out. */
   readonly staticOnly: boolean;
   readonly onConnect: (endpoint: EndpointRef) => void;
+  /** The featured examples, shown under the connect card. */
+  readonly examples?: ReactNode;
 }
 
 /** The four stages of the workflow, in the words a first-time visitor needs. */
@@ -225,6 +227,8 @@ export function EndpointScreen(props: EndpointScreenProps) {
         )}
         <ErrorMessage error={error} />
       </div>
+
+      {props.examples}
 
       <section className="how-it-works" aria-labelledby={`${base}-steps`}>
         <h3 id={`${base}-steps`}>How it works</h3>

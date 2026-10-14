@@ -348,3 +348,86 @@
   box-shadow: none;
   border: 1px solid var(--line-strong);
 }
+
+/* ---------------------------------------------------------- examples */
+
+[data-style="precise"] .featured-examples {
+  padding: 1rem 1.25rem;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-card);
+}
+
+[data-style="precise"] .featured-examples h3,
+[data-style="precise"] .example-group-head {
+  font-family: var(--label-font);
+  font-size: var(--label-size);
+  font-weight: var(--label-weight);
+  text-transform: var(--label-transform);
+  letter-spacing: var(--label-tracking);
+  color: var(--label-color);
+}
+
+/* One bordered grid with hairlines inside. */
+[data-style="precise"] .example-grid {
+  gap: 0;
+  border: 1px solid var(--line-strong);
+}
+
+[data-style="precise"] .example-grid li:nth-child(odd):not(:last-child) {
+  border-right: 1px solid var(--line);
+}
+
+[data-style="precise"] .example-grid li:nth-child(-n + 2):nth-last-child(n + 3) {
+  border-bottom: 1px solid var(--line);
+}
+
+[data-style="precise"] .example-card,
+[data-style="precise"] .example-row {
+  border: none;
+  border-radius: 0;
+}
+
+[data-style="precise"] .example-rows {
+  gap: 0;
+  border-top: 1px solid var(--line-strong);
+}
+
+[data-style="precise"] .example-rows li {
+  border-bottom: 1px solid var(--line);
+}
+
+/* The filters: one segmented bar of joined buttons. */
+[data-style="precise"] .filters {
+  flex-wrap: nowrap;
+  gap: 0;
+}
+
+[data-style="precise"] .filter {
+  flex: 1 1 auto;
+  justify-content: center;
+  padding: 0.4rem 0.55rem;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  margin-left: -1px;
+  border-color: var(--line-strong);
+  border-radius: 0;
+}
+
+[data-style="precise"] .filter:first-child {
+  margin-left: 0;
+  border-radius: var(--r-control) 0 0 var(--r-control);
+}
+
+[data-style="precise"] .filter:last-child {
+  border-radius: 0 var(--r-control) var(--r-control) 0;
+}
+
+[data-style="precise"] .filter .needs {
+  display: inline-flex;
+  color: inherit;
+}
+
+[data-style="precise"] .side-panel {
+  border-color: var(--line-strong);
+}

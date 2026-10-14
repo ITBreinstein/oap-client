@@ -18,6 +18,15 @@
  *   development and CI.
  * - `presets`: services offered on the start screen, each `https:`. Reached
  *   directly, exactly as if the address had been typed.
+ * - `examples`: processes offered on the start screen, each opened with one
+ *   click: the page connects to `service` and opens `process`. Each has a
+ *   `title` and a one-line `summary`; `service` follows the rules for a
+ *   preset's `url`. Optional: `needs`, one of `"area"`, `"data"` or
+ *   `"values"` (what the process asks of the person running it; left out,
+ *   the example shows no tag and is found under "All" only), and
+ *   `featured`, `true` to show it on the start screen itself. At most four
+ *   are shown there, the first four flagged in file order; more flagged is
+ *   not an error. The rest are under "Browse all".
  * - `jobs.acceptedNoticeSeconds`: how long a background job may report
  *   `accepted` before the page says no progress has been reported yet. A
  *   whole number of seconds, 1 to 86 400; 60 when absent.
@@ -36,6 +45,7 @@
  * into shape: the file is operator input on a public site.
  */
 
+import { isNeeds, type Needs } from "../app/needs.js";
 import { isLoopback } from "../mixed-content.js";
 
 export interface Preset {
@@ -43,10 +53,25 @@ export interface Preset {
   readonly url: string;
 }
 
+/** One process offered on the start screen, opened with one click. */
+export interface Example {
+  /** The service's base URL, as a preset's. */
+  readonly service: string;
+  /** The process id on that service. */
+  readonly process: string;
+  readonly title: string;
+  readonly summary: string;
+  /** What it asks of the person running it; undefined when the file does not say. */
+  readonly needs?: Needs | undefined;
+  readonly featured: boolean;
+}
+
 export interface RuntimeConfig {
   /** The relay's base URL or same-site path; undefined for no relay. */
   readonly relayUrl: string | undefined;
   readonly presets: readonly Preset[];
+  /** `examples`; empty when absent. */
+  readonly examples?: readonly Example[] | undefined;
   /** `jobs.acceptedNoticeSeconds`, in milliseconds; undefined for the default. */
   readonly acceptedNoticeMs?: number | undefined;
   /** `map.maxCoordinates`; undefined for {@link DEFAULT_MAX_MAP_COORDINATES}. */
@@ -158,6 +183,56 @@ function checkPresets(value: unknown): Preset[] | { readonly problem: string } {
   return presets;
 }
 
+/** A non-empty string, trimmed, or undefined. */
+function text(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() !== "" ? value.trim() : undefined;
+}
+
+function checkExamples(value: unknown): Example[] | { readonly problem: string } {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) return { problem: "examples must be a list" };
+  const examples: Example[] = [];
+  for (const [index, entry] of value.entries()) {
+    const where = `examples[${String(index)}]`;
+    if (!isRecord(entry)) return { problem: `${where} must be an object` };
+    const extra = unknownMember(entry, [
+      "service",
+      "process",
+      "title",
+      "summary",
+      "needs",
+      "featured",
+    ]);
+    if (extra !== undefined) return { problem: `${where} has an unknown member "${extra}"` };
+    const { service, needs, featured } = entry;
+    if (typeof service !== "string") return { problem: `${where}.service must be a string` };
+    if (plainAbsoluteUrl(service)?.protocol !== "https:") {
+      return { problem: `${where}.service must be a plain https: URL` };
+    }
+    const process = text(entry["process"]);
+    if (process === undefined) return { problem: `${where}.process must be a non-empty string` };
+    const title = text(entry["title"]);
+    if (title === undefined) return { problem: `${where}.title must be a non-empty string` };
+    const summary = text(entry["summary"]);
+    if (summary === undefined) return { problem: `${where}.summary must be a non-empty string` };
+    if (needs !== undefined && !isNeeds(needs)) {
+      return { problem: `${where}.needs must be "area", "data" or "values"` };
+    }
+    if (featured !== undefined && typeof featured !== "boolean") {
+      return { problem: `${where}.featured must be true or false` };
+    }
+    examples.push({
+      service: service.replace(/\/+$/, ""),
+      process,
+      title,
+      summary,
+      ...(needs === undefined ? {} : { needs }),
+      featured: featured === true,
+    });
+  }
+  return examples;
+}
+
 /** `jobs`, as the notice threshold in milliseconds, or undefined when absent. */
 function checkJobs(value: unknown): number | undefined | { readonly problem: string } {
   if (value === undefined) return undefined;
@@ -210,7 +285,7 @@ function checkMap(
 /** Check a parsed `config.json`, whole. */
 export function checkRuntimeConfig(value: unknown): ConfigCheck {
   if (!isRecord(value)) return { ok: false, problem: "the file must hold a JSON object" };
-  const extra = unknownMember(value, ["relay", "presets", "jobs", "map"]);
+  const extra = unknownMember(value, ["relay", "presets", "examples", "jobs", "map"]);
   if (extra !== undefined) return { ok: false, problem: `unknown member "${extra}"` };
 
   let relayUrl: string | undefined;
@@ -229,6 +304,9 @@ export function checkRuntimeConfig(value: unknown): ConfigCheck {
   const presets = checkPresets(value["presets"]);
   if (!Array.isArray(presets)) return { ok: false, ...presets };
 
+  const examples = checkExamples(value["examples"]);
+  if (!Array.isArray(examples)) return { ok: false, ...examples };
+
   const jobs = checkJobs(value["jobs"]);
   if (typeof jobs === "object") return { ok: false, ...jobs };
 
@@ -240,6 +318,7 @@ export function checkRuntimeConfig(value: unknown): ConfigCheck {
     config: {
       relayUrl,
       presets,
+      ...(examples.length === 0 ? {} : { examples }),
       ...(jobs === undefined ? {} : { acceptedNoticeMs: jobs }),
       ...(map.maxCoordinates === undefined ? {} : { maxMapCoordinates: map.maxCoordinates }),
       ...(map.maxEditable === undefined ? {} : { maxEditableCoordinates: map.maxEditable }),
@@ -250,7 +329,7 @@ export function checkRuntimeConfig(value: unknown): ConfigCheck {
 function fallback(why: string): ConfigLoad {
   return {
     config: STATIC_ONLY,
-    warning: `This site's configuration (config.json) ${why}, so the page runs without the relay and without preset services.`,
+    warning: `This site's configuration (config.json) ${why}, so the page runs without the relay, preset services or examples.`,
   };
 }
 

@@ -82,3 +82,25 @@
 [data-style="hybrid"] .result-strip {
   color: var(--muted);
 }
+
+/* Examples: on the start screen, a card with a 2×2 grid of example cards. */
+[data-style="hybrid"] .featured-examples {
+  padding: 1rem 1.25rem 0.5rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-card);
+}
+
+[data-style="hybrid"] .example-card {
+  border-color: var(--line);
+}
+
+[data-style="hybrid"] .example-row {
+  border-color: transparent;
+}
+
+[data-style="hybrid"] .example-row:hover:not(:disabled) {
+  border-color: transparent;
+  box-shadow: inset 3px 0 0 var(--accent-ink);
+}
