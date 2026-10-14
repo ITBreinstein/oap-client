@@ -1,5 +1,7 @@
 import { VERSION } from "@breinstein/oap-client";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import type { Appearance } from "./app/appearance.js";
+import { AppearanceControl } from "./app/AppearanceControl.js";
 import { DeveloperPanel } from "./app/DeveloperPanel.js";
 import { activeDrawField, DrawContext, type DrawRequest, type DrawTarget } from "./app/draw.js";
 import { EndpointScreen } from "./app/EndpointScreen.js";
@@ -12,6 +14,7 @@ import { ProcessScreen } from "./app/ProcessScreen.js";
 import { DEV_PRESETS } from "./app/dev-presets.js";
 import { JobsPanel } from "./jobs/JobsPanel.js";
 import { RelayBanner, RelayOffer } from "./app/RelayRoute.js";
+import { useAppearance } from "./app/useAppearance.js";
 import { useWorkflow } from "./app/useWorkflow.js";
 import {
   DEFAULT_MAX_EDITABLE_COORDINATES,
@@ -33,10 +36,13 @@ export interface AppProps {
   readonly config?: RuntimeConfig | undefined;
   /** Why the page fell back to running without the relay, if it did. */
   readonly configWarning?: string | undefined;
+  /** The style and theme `main.tsx` put on `<html>`; read afresh when absent. */
+  readonly appearance?: Appearance | undefined;
 }
 
-export function App({ config = STATIC_ONLY, configWarning }: AppProps) {
+export function App({ config = STATIC_ONLY, configWarning, appearance: initial }: AppProps) {
   const { relayUrl } = config;
+  const { appearance, setStyle, setTheme } = useAppearance(initial);
   // The local reference servers, in development only: `import.meta.env.DEV` is
   // `false` in a production build, and the list is dropped from the bundle.
   const presets = useMemo(
@@ -165,9 +171,12 @@ export function App({ config = STATIC_ONLY, configWarning }: AppProps) {
               <h1>OGC API - Processes client</h1>
               <p className="tagline">Discover, run and view geospatial calculations</p>
             </div>
-            <p className="muted version" data-testid="core-version">
-              core {VERSION}
-            </p>
+            <div className="header-tools">
+              <p className="muted version" data-testid="core-version">
+                core {VERSION}
+              </p>
+              <AppearanceControl appearance={appearance} onStyle={setStyle} onTheme={setTheme} />
+            </div>
           </header>
           {configWarning !== undefined && (
             <p
