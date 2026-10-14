@@ -30,8 +30,8 @@
  */
 
 import type { FetchLike } from "@breinstein/oap-client";
-import { RELAY_ERROR, RELAY_MARKER } from "./contract.js";
-import type { RelayClient } from "./relay-client.js";
+import { readRetryAfter, RELAY_ERROR, RELAY_MARKER } from "./contract.js";
+import { RelayError, type RelayClient } from "./relay-client.js";
 import type { SessionSource } from "./routed-fetch.js";
 
 /**
@@ -49,13 +49,21 @@ export class RelayRouteError extends Error {
   /** The relay's `X-Relay-Error` code verbatim, or one of ours: `no-relay-marker`, `unreachable`, … */
   readonly code: string;
   readonly status: number | undefined;
+  /** `Retry-After`, in seconds, when the relay sent one: with a rate-limit refusal. */
+  readonly retryAfterSeconds: number | undefined;
 
-  constructor(outcome: RelayRouteError["outcome"], code: string, status?: number) {
+  constructor(
+    outcome: RelayRouteError["outcome"],
+    code: string,
+    status?: number,
+    retryAfterSeconds?: number,
+  ) {
     super(`relay route: ${outcome} (${code})`);
     this.name = "RelayRouteError";
     this.outcome = outcome;
     this.code = code;
     this.status = status;
+    this.retryAfterSeconds = retryAfterSeconds;
   }
 }
 
@@ -64,6 +72,33 @@ export function relayRouteErrorIn(error: unknown): RelayRouteError | undefined {
   let current: unknown = error;
   for (let depth = 0; depth < 5 && current instanceof Error; depth += 1) {
     if (current instanceof RelayRouteError) return current;
+    current = current.cause;
+  }
+  return undefined;
+}
+
+/** The relay's two rate-limit codes: a client's own limits, and an endpoint's ceiling. */
+const RATE_LIMITED: ReadonlySet<string> = new Set(["rate-limited", "rate-limited-endpoint"]);
+
+export interface RelayRateLimit {
+  readonly code: string;
+  /** From `Retry-After`; undefined when the relay sent none the page could read. */
+  readonly retryAfterSeconds: number | undefined;
+}
+
+/**
+ * The relay's rate-limit refusal behind an error, however deep the core or the
+ * execute route wrapped it: on the read route, a session, or an execute.
+ */
+export function relayRateLimitIn(error: unknown): RelayRateLimit | undefined {
+  let current: unknown = error;
+  for (let depth = 0; depth < 5 && current instanceof Error; depth += 1) {
+    if (
+      (current instanceof RelayRouteError || current instanceof RelayError) &&
+      RATE_LIMITED.has(current.code)
+    ) {
+      return { code: current.code, retryAfterSeconds: current.retryAfterSeconds };
+    }
     current = current.cause;
   }
   return undefined;
@@ -88,6 +123,7 @@ export function fromRelay(response: Response): Response {
       response.status === 502 ? "upstream-failed" : "relay-refused",
       code,
       response.status,
+      readRetryAfter(response.headers),
     );
   }
   return new Response(NULL_BODY_STATUSES.has(response.status) ? null : response.body, {
@@ -145,7 +181,19 @@ async function readRequest(
   if (!CARRIED.has(method)) throw new RelayRouteError("relay-refused", "method-not-carried");
 
   const token = options.session.current() ?? (await options.session.renew());
-  if (token === undefined) throw new RelayRouteError("relay-unreachable", "no-session");
+  if (token === undefined) {
+    // A relay that refused the session — for its rate, say — did answer.
+    const refused = options.session.refusal?.();
+    if (refused !== undefined) {
+      throw new RelayRouteError(
+        "relay-refused",
+        refused.code,
+        refused.status,
+        refused.retryAfterSeconds,
+      );
+    }
+    throw new RelayRouteError("relay-unreachable", "no-session");
+  }
 
   const headers = new Headers(init?.headers);
   headers.delete("Authorization");

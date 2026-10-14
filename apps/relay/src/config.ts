@@ -39,9 +39,22 @@
  * config copied into a public deployment fails to start instead of running
  * with the guard off. Only a host literal can be judged here; a name is
  * checked at connect time, on every address it resolves to.
+ *
+ * ## No unknown members
+ *
+ * A member the relay does not know is refused, at every level, rather than
+ * ignored: a misspelt `rateLimits` or `readRoute` would otherwise start a relay
+ * that quietly runs on its defaults.
  */
 
 import { isBlockedHost } from "./address-guard.js";
+import { isTrustable, parseNetwork, type IpNetwork } from "./client-address.js";
+import {
+  DEFAULT_RATE_LIMITS,
+  type PerClientLimits,
+  type PerEndpointLimits,
+  type RateLimits,
+} from "./rate-limit.js";
 
 /** The deployment's key: without it set to `1`, no endpoint may set `allowPrivateNetwork`. */
 export const PRIVATE_ADDRESS_ALLOWANCE = "RELAY_ALLOW_PRIVATE_ADDRESSES";
@@ -122,12 +135,21 @@ export interface RelayConfig {
   readonly publicUrl: string | undefined;
   /** Exact origins allowed to call the relay from a browser. */
   readonly allowedOrigins: readonly string[];
+  /**
+   * The reverse proxies whose `X-Forwarded-For` is believed: the only peers
+   * for which the relay reads that header at all, and then only its rightmost
+   * entry. Loopback and private addresses or ranges only. Empty by default:
+   * every request is keyed by the address of the socket it came in on.
+   */
+  readonly trustedProxies: readonly IpNetwork[];
   readonly endpoints: readonly EndpointConfig[];
   readonly registrationTtlMs: number;
   readonly sessionIdleTtlMs: number;
   /** A session ends this long after it was made, however busy, open streams included. */
   readonly sessionMaxAgeMs: number;
   readonly limits: RelayLimits;
+  /** Per client and per endpoint; see `rate-limit.ts`. There is no switch that turns them off. */
+  readonly rateLimits: RateLimits;
 }
 
 export const DEFAULT_LIMITS: RelayLimits = {
@@ -158,6 +180,18 @@ const ENDPOINT_KEY = /^[a-z0-9][a-z0-9-]{0,62}$/;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** Refuses any member of `record` not in `allowed`, naming the first one. */
+function refuseUnknown(
+  record: Record<string, unknown>,
+  allowed: readonly string[],
+  path: string,
+): void {
+  const unknown = Object.keys(record).find((key) => !allowed.includes(key));
+  if (unknown !== undefined) {
+    throw new ConfigError(path === "" ? unknown : `${path}.${unknown}`, "is not a known member");
+  }
 }
 
 function readString(record: Record<string, unknown>, key: string, path: string): string {
@@ -239,8 +273,56 @@ export function normaliseHttpUrl(value: string, path: string): string {
   return `${parsed.origin}${parsed.pathname}`.replace(/\/+$/, "");
 }
 
+const ENDPOINT_MEMBERS = [
+  "key",
+  "baseUrl",
+  "executeRoute",
+  "readRoute",
+  "callbacks",
+  "allowPrivateNetwork",
+] as const;
+
+const LIMIT_MEMBERS: readonly (keyof RelayLimits)[] = [
+  "maxExecuteBodyBytes",
+  "maxUpstreamResponseBytes",
+  "upstreamTimeoutMs",
+  "maxSessions",
+  "maxRegistrationsPerSession",
+  "maxStreamsPerSession",
+  "maxOpenStreams",
+  "maxReadResponseBytes",
+  "readTimeoutMs",
+];
+
+const ROOT_MEMBERS = [
+  "publicUrl",
+  "allowedOrigins",
+  "trustedProxies",
+  "endpoints",
+  "registrationTtlMs",
+  "sessionIdleTtlMs",
+  "sessionMaxAgeMs",
+  "limits",
+  "rateLimits",
+] as const;
+
+const PER_CLIENT_MEMBERS: readonly (keyof PerClientLimits)[] = [
+  "sessionsPerMinute",
+  "executesPerMinute",
+  "readsPerMinute",
+  "endpointsAndPreflightsPerMinute",
+  "openStreams",
+  "inFlight",
+];
+
+const PER_ENDPOINT_MEMBERS: readonly (keyof PerEndpointLimits)[] = [
+  "requestsPerMinute",
+  "inFlight",
+];
+
 function parseEndpoint(value: unknown, path: string, options: ParseOptions): EndpointConfig {
   if (!isRecord(value)) throw new ConfigError(path, "must be an object");
+  refuseUnknown(value, ENDPOINT_MEMBERS, path);
   const key = readString(value, "key", path);
   if (!ENDPOINT_KEY.test(key)) {
     throw new ConfigError(`${path}.key`, "must be lowercase letters, digits and dashes");
@@ -299,8 +381,101 @@ function parseOrigin(value: unknown, path: string): string {
   return value;
 }
 
+/**
+ * An address or a CIDR range, inside loopback or private space. Trusting a
+ * public address, or everyone (`0.0.0.0/0`, `::/0`), would let any client name
+ * itself in `X-Forwarded-For` and so pick its own rate-limit key.
+ */
+function parseTrustedProxy(value: unknown, path: string): IpNetwork {
+  if (typeof value !== "string") throw new ConfigError(path, "must be a string");
+  const network = parseNetwork(value);
+  if (network === undefined) throw new ConfigError(path, "is not an IP address or CIDR range");
+  if (!isTrustable(network)) {
+    throw new ConfigError(path, "must be a loopback or private address or range");
+  }
+  return network;
+}
+
+/** A nested object, absent meaning `{}`, with only the given members. */
+function readSection(
+  record: Record<string, unknown>,
+  key: string,
+  path: string,
+  members: readonly string[],
+): Record<string, unknown> {
+  const value = record[key] ?? {};
+  const where = path === "" ? key : `${path}.${key}`;
+  if (!isRecord(value)) throw new ConfigError(where, "must be an object");
+  refuseUnknown(value, members, where);
+  return value;
+}
+
+function parseRateLimits(input: Record<string, unknown>): RateLimits {
+  const section = readSection(input, "rateLimits", "", [
+    "perClient",
+    "perEndpoint",
+    "maxTrackedClients",
+  ]);
+  const perClient = readSection(section, "perClient", "rateLimits", PER_CLIENT_MEMBERS);
+  const perEndpoint = readSection(section, "perEndpoint", "rateLimits", PER_ENDPOINT_MEMBERS);
+  const client = DEFAULT_RATE_LIMITS.perClient;
+  const endpoint = DEFAULT_RATE_LIMITS.perEndpoint;
+  const where = "rateLimits.perClient";
+  return {
+    perClient: {
+      sessionsPerMinute: readPositiveInteger(
+        perClient,
+        "sessionsPerMinute",
+        where,
+        client.sessionsPerMinute,
+      ),
+      executesPerMinute: readPositiveInteger(
+        perClient,
+        "executesPerMinute",
+        where,
+        client.executesPerMinute,
+      ),
+      readsPerMinute: readPositiveInteger(
+        perClient,
+        "readsPerMinute",
+        where,
+        client.readsPerMinute,
+      ),
+      endpointsAndPreflightsPerMinute: readPositiveInteger(
+        perClient,
+        "endpointsAndPreflightsPerMinute",
+        where,
+        client.endpointsAndPreflightsPerMinute,
+      ),
+      openStreams: readPositiveInteger(perClient, "openStreams", where, client.openStreams),
+      inFlight: readPositiveInteger(perClient, "inFlight", where, client.inFlight),
+    },
+    perEndpoint: {
+      requestsPerMinute: readPositiveInteger(
+        perEndpoint,
+        "requestsPerMinute",
+        "rateLimits.perEndpoint",
+        endpoint.requestsPerMinute,
+      ),
+      inFlight: readPositiveInteger(
+        perEndpoint,
+        "inFlight",
+        "rateLimits.perEndpoint",
+        endpoint.inFlight,
+      ),
+    },
+    maxTrackedClients: readPositiveInteger(
+      section,
+      "maxTrackedClients",
+      "rateLimits",
+      DEFAULT_RATE_LIMITS.maxTrackedClients,
+    ),
+  };
+}
+
 export function parseConfig(input: unknown, options: ParseOptions = {}): RelayConfig {
   if (!isRecord(input)) throw new ConfigError("(root)", "must be an object");
+  refuseUnknown(input, ROOT_MEMBERS, "");
 
   const rawEndpoints = input["endpoints"];
   if (!Array.isArray(rawEndpoints)) throw new ConfigError("endpoints", "must be an array");
@@ -319,6 +494,12 @@ export function parseConfig(input: unknown, options: ParseOptions = {}): RelayCo
     parseOrigin(entry, `allowedOrigins[${String(index)}]`),
   );
 
+  const rawProxies = input["trustedProxies"] ?? [];
+  if (!Array.isArray(rawProxies)) throw new ConfigError("trustedProxies", "must be an array");
+  const trustedProxies = rawProxies.map((entry, index) =>
+    parseTrustedProxy(entry, `trustedProxies[${String(index)}]`),
+  );
+
   const rawPublicUrl = input["publicUrl"];
   let publicUrl: string | undefined;
   if (rawPublicUrl !== undefined) {
@@ -331,6 +512,7 @@ export function parseConfig(input: unknown, options: ParseOptions = {}): RelayCo
 
   const rawLimits = input["limits"] ?? {};
   if (!isRecord(rawLimits)) throw new ConfigError("limits", "must be an object");
+  refuseUnknown(rawLimits, LIMIT_MEMBERS, "limits");
   const limits: RelayLimits = {
     maxExecuteBodyBytes: readPositiveInteger(
       rawLimits,
@@ -391,6 +573,7 @@ export function parseConfig(input: unknown, options: ParseOptions = {}): RelayCo
   return {
     publicUrl,
     allowedOrigins,
+    trustedProxies,
     endpoints,
     registrationTtlMs: readPositiveInteger(
       input,
@@ -411,5 +594,6 @@ export function parseConfig(input: unknown, options: ParseOptions = {}): RelayCo
       DEFAULT_SESSION_MAX_AGE_MS,
     ),
     limits,
+    rateLimits: parseRateLimits(input),
   };
 }

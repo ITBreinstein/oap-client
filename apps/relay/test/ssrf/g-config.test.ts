@@ -210,6 +210,27 @@ describe("G — deployment artefacts never grant the allowance", () => {
     expect(dockerfile).not.toContain("allowPrivateNetwork");
   });
 
+  it("the production relay's scripts never set it", () => {
+    for (const file of ["run-flags.sh", "deploy.sh", "activate.sh"]) {
+      const text = readFileSync(join(ROOT, "deploy/relay", file), "utf8");
+      expect(text, file).not.toMatch(new RegExp(`${ALLOWANCE}=|-e ${ALLOWANCE}`));
+    }
+  });
+
+  it("the production config starts without it, public endpoints only, trusting one address", () => {
+    const raw = readJson("deploy/relay/relay.json");
+    const config = parseConfig(raw);
+    for (const endpoint of config.endpoints) {
+      expect(endpoint.allowPrivateNetwork, endpoint.key).toBe(false);
+      expect(endpoint.baseUrl, endpoint.key).toMatch(/^https:\/\//);
+      expect(endpoint.callbacks, endpoint.key).toBe(false);
+    }
+    expect(config.publicUrl).toBeUndefined();
+    expect(config.allowedOrigins).toEqual([]);
+    expect(config.trustedProxies).toHaveLength(1);
+    expect(config.trustedProxies[0]?.prefix).toBe(32);
+  });
+
   it("no compose file sets it", () => {
     const files = composeFiles();
     expect(files.length).toBeGreaterThan(0);

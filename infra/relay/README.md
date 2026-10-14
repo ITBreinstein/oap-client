@@ -25,6 +25,14 @@ endpoint and has no place in a public deployment. So it counts only when the
 relay also runs with `RELAY_ALLOW_PRIVATE_ADDRESSES=1`, as Playwright starts it;
 without that, this config refuses to start.
 
+Its `rateLimits` are generous on purpose: every test in a lane comes from one
+address, and a whole suite runs in a minute or two, which the production
+limits would refuse. There is no switch that turns the limits off, so the lanes
+raise them instead. `e2e/relay.json` must carry the same values (a section G
+test compares the two). The limits themselves are tested in process, in
+`apps/relay/test/rate-limit.test.ts`, `app-rate-limit.test.ts` and SSRF matrix
+section I.
+
 ## `demo.example.json` — template for the public demo
 
 Callbacks **off**: a long-running demo relay will be redeployed, and

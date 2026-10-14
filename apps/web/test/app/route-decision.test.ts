@@ -148,6 +148,25 @@ describe("accessRecord", () => {
     });
   });
 
+  it.each(["rate-limited", "rate-limited-endpoint"])(
+    "records a %s relay attempt as relay-refused with its code: no route, and no word on CORS",
+    (code) => {
+      // Refused by the relay before anything was sent, so the server was not
+      // reached: unlike `ok` or `other-failure`, this cannot confirm the block,
+      // and unlike `timeout` or `connection-failed`, it says nothing of the
+      // server being down (ADR 0001, "How the matrix reads it").
+      const attempt = relayAttempt(new RelayRouteError("relay-refused", code, 429, 6));
+      expect(attempt).toEqual({ relayOutcome: "relay-refused", relayReasonCode: code });
+      expect(accessRecord(facts(readRoute, { confirmed: true, relay: attempt }))).toMatchObject({
+        outcome: "cors-blocked",
+        userConfirmedRelay: true,
+        relayOutcome: "relay-refused",
+        relayReasonCode: code,
+        routeUsed: "none",
+      });
+    },
+  );
+
   it("records other-failure as no route, though it proves the server was up", () => {
     const attempt = relayAttempt(new Error("unusable"));
     expect(accessRecord(facts(readRoute, { confirmed: true, relay: attempt }))).toMatchObject({

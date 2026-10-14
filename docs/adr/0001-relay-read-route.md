@@ -97,7 +97,8 @@ means our relay's configuration. Anything else leaves the block unconfirmed.
 - **A larger outbound surface.** The relay now makes reads on a page's behalf.
   The conditions above bound them, but the relay's existing gaps weigh more:
   it has no rate limiting yet (apps/relay/README.md, "Not yet done"), and it
-  must not face the internet without it.
+  must not face the internet without it. Since closed by
+  [ADR 0003](0003-relay-rate-limits.md).
 - **CI shows both sides.** `infra/relay/ci.json` lists `:5081` twice.
   `pygeoapi-nocors` is direct-only, so the blocking lane keeps showing the
   unassisted failure. `pygeoapi-nocors-relay` puts the read route in the

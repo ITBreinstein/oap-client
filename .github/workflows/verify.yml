@@ -53,13 +53,47 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: docker build -f apps/relay/Dockerfile -t oap-relay .
-      - run: |
-          docker run -d --name relay -e PORT=9000 oap-relay
+      # As it is deployed: the flags deploy.sh uses, on its own network, with
+      # the port published on loopback only, and the production config (no
+      # private addresses, no allowance).
+      - name: Run the image with the production flags
+        shell: bash
+        run: |
+          source deploy/relay/run-flags.sh
+          docker network create --subnet "$RELAY_SUBNET" --ip-range "$RELAY_IP_RANGE" \
+            --gateway "$RELAY_GATEWAY" "$RELAY_NETWORK"
+          docker run -d --name relay "${RELAY_RUN_FLAGS[@]}" "${RELAY_PUBLISH[@]}" \
+            -v "$PWD/deploy/relay/relay.json:/config.json:ro" oap-relay
           for i in $(seq 1 30); do
             status=$(docker inspect --format '{{.State.Health.Status}}' relay)
+            if [ "$status" = healthy ]; then break; fi
+            sleep 1
+          done
+          if [ "$status" != healthy ]; then
+            docker logs relay
+            echo "the relay image never reported healthy with the production flags (last: $status)"
+            exit 1
+          fi
+          curl --fail --silent --show-error http://127.0.0.1:8787/healthz
+          echo
+          set -x
+          [ "$(docker inspect -f '{{.HostConfig.ReadonlyRootfs}}' relay)" = true ]
+          [ "$(docker inspect -f '{{.HostConfig.CapDrop}}' relay)" = "[ALL]" ]
+          [ "$(docker inspect -f '{{.HostConfig.SecurityOpt}}' relay)" = "[no-new-privileges]" ]
+          [ "$(docker inspect -f '{{.HostConfig.Memory}}' relay)" = 268435456 ]
+          [ "$(docker inspect -f '{{index .HostConfig.LogConfig.Config "max-file"}}' relay)" = 5 ]
+          [ "$(docker inspect -f '{{(index (index .HostConfig.PortBindings "8787/tcp") 0).HostIp}}' relay)" = 127.0.0.1 ]
+          [ -z "$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' relay | grep RELAY_ALLOW_PRIVATE_ADDRESSES)" ]
+      # The health check reads PORT, so a relay moved to another port is still
+      # checked where it listens.
+      - name: Run the image on another port
+        run: |
+          docker run -d --name relay-port -e PORT=9000 oap-relay
+          for i in $(seq 1 30); do
+            status=$(docker inspect --format '{{.State.Health.Status}}' relay-port)
             if [ "$status" = healthy ]; then exit 0; fi
             sleep 1
           done
-          docker logs relay
+          docker logs relay-port
           echo "the relay image never reported healthy (last: $status)"
           exit 1

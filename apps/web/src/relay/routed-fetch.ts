@@ -91,6 +91,12 @@ export interface SessionSource {
   live?(): boolean;
   /** A fresh session after the relay forgot the last one. */
   renew(): Promise<string | undefined>;
+  /**
+   * The relay's refusal of the last attempt at a session, when it refused one
+   * — for its rate, say — and no session has been granted since. Optional:
+   * without it, a missing session reads as the relay not answering.
+   */
+  refusal?(): RelayError | undefined;
 }
 
 export interface RoutedFetchOptions {

@@ -1,6 +1,7 @@
-# The static web client, with no relay. One site block, added to the host's
-# existing Caddyfile; it changes nothing for any other site on the host.
-# Replace oap.example.nl with the real hostname. See README.md.
+# The static web client, and the relay at /api on the same origin. One site
+# block, added to the host's existing Caddyfile; it changes nothing for any
+# other site on the host. Replace oap.example.nl with the real hostname. See
+# README.md here and in deploy/relay/.
 
 oap.example.nl {
 	# `current` is a relative symlink to releases/<id>, swapped atomically by
@@ -8,11 +9,19 @@ oap.example.nl {
 	# /srv/oap-web.
 	root * /srv/oap-web/current
 
-	# No relay yet. Answered here so that nothing else can answer it — the page
-	# must never read a relay path as a relay's response.
-	@api path /api /api/*
+	# The relay (deploy/relay/). Caddy replaces any X-Forwarded-For a client
+	# sends with the client's own address, and the relay trusts that header
+	# from this proxy only. Bare /api is not a relay path: it falls through to
+	# the file server, which answers 404. No `encode` here: compressing the
+	# relay's answers would hold back its event stream and change
+	# Content-Length, which the client reads as evidence.
+	@api path /api/*
 	handle @api {
-		respond 404
+		uri strip_prefix /api
+		# 127.0.0.1, not localhost, which may resolve to ::1, where the relay
+		# is not published. With Caddy in a container on the relay's network:
+		# reverse_proxy oap-relay:8787
+		reverse_proxy 127.0.0.1:8787
 	}
 
 	handle {

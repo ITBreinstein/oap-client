@@ -20,7 +20,9 @@
  *                 one left running from another (e2e/global-setup.ts).
  *
  * Nothing here logs a request. Paths carry callback tokens, and a relay that
- * never writes a path down cannot leak one that way.
+ * never writes a path down cannot leak one that way. Once a minute, and only
+ * when something was refused or a request had no readable client, one line
+ * counts the rate limits' refusals: by limit, never by client.
  */
 
 import { readFileSync } from "node:fs";
@@ -29,6 +31,7 @@ import { relayServeOptions } from "./serve-options.js";
 import { createApp } from "./app.js";
 import { socketTimeoutMs, stopListening } from "./listener.js";
 import { loadStartup } from "./startup.js";
+import { RateLimiter } from "./rate-limit.js";
 import { RelayState, stateOptionsFrom, systemClock } from "./state.js";
 
 const SWEEP_INTERVAL_MS = 60_000;
@@ -37,6 +40,7 @@ const { config, warnings } = loadStartup(process.env, (path) => readFileSync(pat
 for (const warning of warnings) console.warn(warning);
 
 const state = new RelayState(systemClock, stateOptionsFrom(config));
+const rateLimiter = new RateLimiter(systemClock, config.rateLimits);
 
 const port = Number(process.env["PORT"] ?? 8787);
 const hostname = process.env["HOST"];
@@ -45,14 +49,20 @@ const buildId = process.env["RELAY_BUILD_ID"];
 
 const server = serve({
   ...relayServeOptions,
-  fetch: createApp({ config, state, ...(buildId === undefined ? {} : { buildId }) }).fetch,
+  fetch: createApp({ config, state, rateLimiter, ...(buildId === undefined ? {} : { buildId }) })
+    .fetch,
   port,
   ...(hostname === undefined ? {} : { hostname }),
 });
 // A silent socket is closed once it has outlasted every upstream deadline.
 server.setTimeout(socketTimeoutMs(config.limits));
 
-const sweeper = setInterval(() => state.sweep(), SWEEP_INTERVAL_MS);
+const sweeper = setInterval(() => {
+  state.sweep();
+  rateLimiter.sweep();
+  const report = rateLimiter.report();
+  if (report !== undefined) console.log(JSON.stringify(report));
+}, SWEEP_INTERVAL_MS);
 sweeper.unref();
 
 const shutdown = (): void => {

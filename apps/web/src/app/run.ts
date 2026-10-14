@@ -14,6 +14,7 @@ import { toExecuteBody, type EncodeNote, type FormValues } from "../forms/encode
 import type { FormPlan } from "../forms/plan.js";
 import type { EndpointRef, WorkflowError } from "./workflow.js";
 import type { RelayEndpoint } from "../relay/contract.js";
+import { relayRateLimitIn } from "../relay/relay-fetch.js";
 
 /**
  * Every declared output, with no format and no transmission mode: the
@@ -111,10 +112,34 @@ export function typedEndpoint(text: string): EndpointRef | undefined {
 }
 
 /**
+ * The relay's rate limit, wherever a request through it was refused for one:
+ * how long to wait, and whose limit it was. `undefined` for any other failure.
+ */
+export function rateLimitMessage(cause: unknown): WorkflowError | undefined {
+  const limited = relayRateLimitIn(cause);
+  if (limited === undefined) return undefined;
+  const seconds = limited.retryAfterSeconds;
+  const when =
+    seconds === undefined
+      ? "Try again shortly."
+      : `Try again in ${String(seconds)} ${seconds === 1 ? "second" : "seconds"}.`;
+  return {
+    title: `Too many requests through the relay. ${when}`,
+    detail:
+      limited.code === "rate-limited-endpoint"
+        ? "This service has had as many requests through the relay as it may take for now, from everyone using it. (rate-limited-endpoint)"
+        : "This page, or others sharing its network address, sent more requests through the relay than it allows for now. (rate-limited)",
+  };
+}
+
+/**
  * A server's refusal, as the form shows it (T5): its own `detail`, and the
- * input it names when its words name one we know.
+ * input it names when its words name one we know. The relay's rate limit
+ * first: then the server never saw the request.
  */
 export function runError(cause: unknown, plan: FormPlan): WorkflowError {
+  const limited = rateLimitMessage(cause);
+  if (limited !== undefined) return limited;
   if (cause instanceof ProcessesError) {
     const problem = cause.problem;
     const extensions = problem?.extensions ?? {};

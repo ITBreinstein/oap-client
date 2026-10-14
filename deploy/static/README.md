@@ -1,14 +1,16 @@
 # The static web client
 
 `apps/web`, published as plain files behind a Caddy that already serves the
-host. No relay, no proxy, no callbacks: every request goes from the visitor's
-browser straight to the OGC API service they choose. The relay comes later, at
-`/api`, behind the same origin; until then `/api` answers 404.
+host. Requests go from the visitor's browser straight to the OGC API service
+they choose, except for the servers the relay is configured for, which it
+reaches through the relay at `/api` on the same origin, once the visitor
+agreed. The relay is deployed separately, from
+[`deploy/relay/`](../relay/README.md); no callbacks.
 
 | File                | What it is                                                                  |
 | ------------------- | --------------------------------------------------------------------------- |
 | `Caddyfile.snippet` | The site block to add to the host's Caddyfile                               |
-| `config.json`       | The page's runtime config for this site: no relay, no presets yet           |
+| `config.json`       | The page's runtime config for this site: the relay at `/api`, no presets    |
 | `deploy.sh`         | Build the current commit and publish it as a new release, atomically        |
 | `activate.sh`       | The server half of `deploy.sh`, fed to it over ssh; never run by hand       |
 | `smoke.sh`          | Check the live site from outside with `curl`; exits non-zero on any failure |
@@ -29,13 +31,22 @@ Nothing about the host lives here: its name comes from `OAP_DEPLOY_HOST` and
   polls for it.
 - Download the session's observations as a file. Nothing is sent anywhere.
 
-**Cannot, until the relay is added:**
+**With the relay, for the servers listed in `deploy/relay/relay.json` only:**
 
-- Use a service that sends no CORS headers. The page says so and records it.
+- Use a service that sends no CORS headers. The page tries it directly first,
+  records the failure, and offers the relay; only after **Use relay** is
+  anything sent through it (ADR 0001).
 - Find a background job on a service that hides its address from web pages
-  (pygeoapi does, finding 0039): the job starts, the page cannot find it, and
-  that is recorded.
-- Receive callbacks.
+  (pygeoapi does, finding 0039): the relay starts the job and names it.
+- Within the relay's rate limits (ADR 0003). Past them, the page says how
+  long to wait.
+
+**Cannot:**
+
+- Use a service without CORS that the relay is not configured for, including
+  any address typed in: those are always reached directly. The page says so
+  and records it.
+- Receive callbacks: they stay off (finding 0047), and the page polls.
 - Reach a plain `http:` service: the browser blocks it from an HTTPS page, and
   the page refuses it before sending. This includes a server on the visitor's
   own machine (`http://localhost`): the Content-Security-Policy allows `https:`
@@ -82,7 +93,10 @@ with a graceful reload that does not drop connections.
    ```
 
    Until the first deploy, the new site answers 404; the other sites are
-   untouched.
+   untouched. Until the relay is deployed, `/api/…` answers 502. The order
+   for a first deployment with the relay is in
+   [`deploy/relay/README.md`](../relay/README.md#first-deployment): the relay
+   first, then this block, then the site.
 
 5. **File-integrity monitoring**, if the host runs any: exclude `/srv/oap-web`,
    or every deploy shows up as a change.
@@ -111,10 +125,15 @@ OAP_HOSTNAME=oap.example.nl deploy/static/smoke.sh
 - prints the command that rolls back to the release that was live before.
 
 `smoke.sh` checks, from outside: `/` and `/config.json` answer 200 and are
-revalidated (`no-cache`); an `/assets/` file is `immutable`; `/api`, a missing
-asset and a missing page answer 404; `config.json` is JSON; and HSTS,
+revalidated (`no-cache`); an `/assets/` file is `immutable`; bare `/api`, a
+missing asset and a missing page answer 404; `config.json` is JSON; and HSTS,
 `nosniff`, the referrer, frame and permissions policies, and a
-Content-Security-Policy are present.
+Content-Security-Policy are present. For the relay: `/api/healthz` answers 200
+with `X-Relay: 1`; `/api/endpoints` lists `https:` servers only; a read
+without a session is the relay's own `401`; and port 8787 does not answer on
+any of the host's addresses. `SMOKE_RATE_LIMIT=1` also checks that sessions
+are rate-limited whatever `X-Forwarded-For` says. That leaves the machine
+running it rate-limited for about a minute.
 
 ## Rolling back
 

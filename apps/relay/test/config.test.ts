@@ -112,4 +112,100 @@ describe("parseConfig", () => {
       });
     }
   });
+
+  it.each([
+    ["the root", { endpoints: [], rateLimit: {} }, /relay config: rateLimit is not a known member/],
+    [
+      "an endpoint",
+      { endpoints: [{ ...endpoint, readroute: "relay" }] },
+      /endpoints\[0\]\.readroute is not a known member/,
+    ],
+    [
+      "limits",
+      { endpoints: [], limits: { maxSession: 5 } },
+      /limits\.maxSession is not a known member/,
+    ],
+  ])(
+    "refuses an unknown member in %s, rather than running on the defaults",
+    (_, input, message) => {
+      expect(() => parseConfig(input)).toThrow(message);
+    },
+  );
+
+  it("trusts no proxy unless told, and takes addresses and ranges in private space", () => {
+    expect(parseConfig({ endpoints: [] }).trustedProxies).toEqual([]);
+    const { trustedProxies } = parseConfig({
+      endpoints: [],
+      trustedProxies: ["172.31.87.1", "::ffff:127.0.0.1", "192.168.0.0/16", "fd00::/8"],
+    });
+    expect(trustedProxies.map((proxy) => [proxy.family, proxy.prefix])).toEqual([
+      [4, 32],
+      [4, 32],
+      [4, 16],
+      [6, 8],
+    ]);
+  });
+
+  it.each([
+    ["everyone, IPv4", "0.0.0.0/0", /must be a loopback or private/],
+    ["everyone, IPv6", "::/0", /must be a loopback or private/],
+    ["a public address", "8.8.8.8", /must be a loopback or private/],
+    ["a range wider than private space", "172.0.0.0/8", /must be a loopback or private/],
+    ["link-local", "169.254.169.254", /must be a loopback or private/],
+    ["a name", "caddy", /is not an IP address/],
+    ["a bad prefix", "10.0.0.0/33", /is not an IP address/],
+  ])("refuses to trust %s", (_, entry, message) => {
+    expect(() => parseConfig({ endpoints: [], trustedProxies: [entry] })).toThrow(message);
+  });
+
+  it("refuses trustedProxies that is not an array of strings", () => {
+    expect(() => parseConfig({ endpoints: [], trustedProxies: "172.17.0.1" })).toThrow(
+      /trustedProxies must be an array/,
+    );
+    expect(() => parseConfig({ endpoints: [], trustedProxies: [172] })).toThrow(
+      /trustedProxies\[0\] must be a string/,
+    );
+  });
+
+  it("rate-limits with the production values unless told otherwise", () => {
+    expect(parseConfig({ endpoints: [] }).rateLimits).toEqual({
+      perClient: {
+        sessionsPerMinute: 10,
+        executesPerMinute: 20,
+        readsPerMinute: 240,
+        endpointsAndPreflightsPerMinute: 120,
+        openStreams: 4,
+        inFlight: 6,
+      },
+      perEndpoint: { requestsPerMinute: 600, inFlight: 32 },
+      maxTrackedClients: 50_000,
+    });
+  });
+
+  it("takes each rate limit from the file, keeping the defaults for the rest", () => {
+    const { rateLimits } = parseConfig({
+      endpoints: [],
+      rateLimits: {
+        perClient: { sessionsPerMinute: 100 },
+        perEndpoint: { inFlight: 64 },
+        maxTrackedClients: 1_000,
+      },
+    });
+    expect(rateLimits.perClient.sessionsPerMinute).toBe(100);
+    expect(rateLimits.perClient.readsPerMinute).toBe(240);
+    expect(rateLimits.perEndpoint).toEqual({ requestsPerMinute: 600, inFlight: 64 });
+    expect(rateLimits.maxTrackedClients).toBe(1_000);
+  });
+
+  it.each([
+    ["zero", { perClient: { sessionsPerMinute: 0 } }, /rateLimits\.perClient\.sessionsPerMinute/],
+    ["a fraction", { perEndpoint: { inFlight: 1.5 } }, /rateLimits\.perEndpoint\.inFlight/],
+    ["a string", { maxTrackedClients: "50000" }, /rateLimits\.maxTrackedClients/],
+    ["an unknown member", { perClient: { reads: 1 } }, /rateLimits\.perClient\.reads is not/],
+    ["an unknown section", { perSession: {} }, /rateLimits\.perSession is not/],
+    ["a switch to turn them off", { enabled: false }, /rateLimits\.enabled is not/],
+    ["not an object", [], /rateLimits must be an object/],
+  ])("refuses rate limits with %s", (_, rateLimits, message) => {
+    expect(() => parseConfig({ endpoints: [], rateLimits })).toThrow(message);
+  });
 });

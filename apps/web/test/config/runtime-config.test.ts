@@ -203,7 +203,7 @@ describe("loadRuntimeConfig", () => {
 });
 
 describe("the static site's config.json (deploy/static/)", () => {
-  it("is valid, with no relay and no presets", () => {
+  it("is valid: the relay at /api on the same origin, and no presets", () => {
     // Vite's glob import, as the form fixtures are read: the web project has
     // no Node types, and the file stays where the deploy expects it.
     const shipped = Object.values(
@@ -213,6 +213,9 @@ describe("the static site's config.json (deploy/static/)", () => {
       }),
     );
     expect(shipped).toHaveLength(1);
-    expect(checkRuntimeConfig(shipped[0])).toEqual({ ok: true, config: STATIC_ONLY });
+    expect(checkRuntimeConfig(shipped[0])).toEqual({
+      ok: true,
+      config: { ...STATIC_ONLY, relayUrl: "/api" },
+    });
   });
 });

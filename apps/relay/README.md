@@ -53,10 +53,15 @@ docker build -f apps/relay/Dockerfile -t oap-relay .                           #
 ```
 
 Configuration is one JSON file; see [infra/relay/](../../infra/relay/) for the
-CI config and a public-demo template, and `src/config.ts` for every field. The
-two deadlines, `limits.readTimeoutMs` and `limits.upstreamTimeoutMs`, may be at
-most 2 147 483 647 ms (about 24.8 days), the longest timer Node holds; a longer
-one would fire at once, so the relay refuses to start with it.
+CI config and a public-demo template, [deploy/relay/](../../deploy/relay/) for
+the production one, and `src/config.ts` for every field. Besides the endpoints
+and `limits`, it holds `rateLimits` and `trustedProxies` (see "Rate limits"
+below). A member the relay does not know is refused at every level — the root,
+each endpoint, `limits`, `rateLimits` — and the relay does not start: a
+misspelt field would otherwise run on its default without a word. The two deadlines,
+`limits.readTimeoutMs` and `limits.upstreamTimeoutMs`, may be at most
+2 147 483 647 ms (about 24.8 days), the longest timer Node holds; a longer one
+would fire at once, so the relay refuses to start with it.
 
 `RELAY_BUILD_ID`, when set, is reported on `/healthz` as `build`. The browser
 test lane sets it to a hash of what it built the relay from, and refuses to run
@@ -137,6 +142,10 @@ All three are made in the config, before any request exists.
 | `GET /read/{endpointKey}/{path*}`         | browser    | the server's answer to `GET {baseUrl}/{path}?{query}`, raw; session token required                                               |
 | `DELETE /read/{endpointKey}/jobs/{id}`    | browser    | the server's answer to dismissing that job, raw; session token required                                                          |
 | `POST /callbacks/{token}/{kind}`          | OGC server | `200`, or `404` for a token it does not know                                                                                     |
+
+Every browser route can also answer the relay's own `429`, with
+`Retry-After` and `X-Relay-Error: rate-limited` or `rate-limited-endpoint`
+(see "Rate limits"); `/healthz` and the callbacks never do.
 
 The browser side of this contract lives in
 [`apps/web/src/relay/`](../web/src/relay/), not in `packages/core`: the
@@ -270,17 +279,81 @@ The asynchronous execute. Everything about it is fixed:
   (above). The check is adapted from GeoLibre's proxy
   guard (THIRD_PARTY.md).
 
-## Not yet done — before the public demo
+## Rate limits
 
-Known gaps, not hidden:
+Nothing the relay serves can tell a person from a script: a session needs no
+credentials, and `allowedOrigins` restrains browsers only. So every
+browser-facing route is limited, per client and per endpoint
+([ADR 0003](../../docs/adr/0003-relay-rate-limits.md)). The defaults are the
+production values; `rateLimits` in the config changes them.
 
-- **No rate limiting.** Anyone can create sessions and send executes through
-  the relay; CORS only restrains browsers. Sessions (10 000) and streams
-  (1 000) are capped and no session outlives 24 hours, but one client can
-  still take every place until then. Executes are only as limited as the
-  allowlisted servers are. Put the relay behind a reverse proxy with
-  per-client limits on `POST /sessions`, `GET /sessions/events` and
-  `POST /execute`, or add them here, before it faces the internet.
+| Limit                                                     | Config member                               | Default |
+| --------------------------------------------------------- | ------------------------------------------- | ------- |
+| `POST /sessions`, per client per minute                   | `perClient.sessionsPerMinute`               | 10      |
+| `POST /execute/…`, per client per minute                  | `perClient.executesPerMinute`               | 20      |
+| `GET` and `DELETE /read/…`, per client per minute         | `perClient.readsPerMinute`                  | 240     |
+| `GET /endpoints` and CORS preflights, per client a minute | `perClient.endpointsAndPreflightsPerMinute` | 120     |
+| Event streams open at once, per client                    | `perClient.openStreams`                     | 4       |
+| Executes and reads in flight at once, per client          | `perClient.inFlight`                        | 6       |
+| Executes and reads per endpoint per minute, all clients   | `perEndpoint.requestsPerMinute`             | 600     |
+| Executes and reads in flight per endpoint, all clients    | `perEndpoint.inFlight`                      | 32      |
+| Clients tracked at once                                   | `maxTrackedClients`                         | 50 000  |
+
+- **Never limited:** `GET /healthz`, which Docker's health check calls, and
+  `POST /callbacks/…`: an OGC server that cannot deliver a callback can damage
+  the job (finding 0047), so every callback is answered as before.
+- **In flight** counts from the moment a request is sent upstream until its
+  body is done or broken off, not until its headers arrive.
+- **How:** a token bucket per client and route, holding one minute's budget
+  and refilling continuously; no doubled rate at a window boundary. A client
+  whose buckets are full again is forgotten at the minute sweep. At
+  `maxTrackedClients`, newcomers share one overflow entry; a client being
+  limited is never evicted to make room.
+- **The refusal** is the relay's own `429`: problem+json, `no-store`,
+  `X-Relay: 1`, `Retry-After` in whole seconds, and `X-Relay-Error`
+  `rate-limited` (a client's own limits) or `rate-limited-endpoint` (the
+  per-endpoint ceiling). Nothing is sent upstream, and no session or callback
+  registration is made. Its body never holds the client's address or anything
+  the client sent.
+
+### Who the client is
+
+The socket's remote address, unless that socket is a proxy listed in
+`trustedProxies`: then the **rightmost** `X-Forwarded-For` entry, the one the
+proxy wrote. Anything to its left came from the client.
+
+- `trustedProxies` takes loopback or private addresses or CIDR ranges only;
+  `0.0.0.0/0`, `::/0` and every public address refuse to start. Empty by
+  default. The production config lists exactly one address
+  ([deploy/relay/README.md](../../deploy/relay/README.md)).
+- An IPv4-mapped address (`::ffff:a.b.c.d`), as the dual-stack listener
+  reports an IPv4 peer, is taken as IPv4. An IPv6 client is keyed by its /64.
+- A trusted proxy that names no readable client puts the request in one shared
+  bucket, `unknown`: a misconfiguration, counted in the log line below.
+
+### Logging
+
+No address is ever logged or sent: addresses live only as keys in memory. At
+most once a minute, and only when something was refused or a request had no
+readable client, one line:
+
+```json
+{
+  "rateLimit": { "endpoint:zoo": 3, "sessions": 12 },
+  "unknownBucket": 0,
+  "overflowBucket": 0,
+  "trackedKeys": 41
+}
+```
+
+### Raising the limits for an event
+
+A plugfest or an expo hall puts many people behind one public address, and
+they share one client's limits. Add a `rateLimits` block with higher
+`perClient` values to the deployed config and redeploy; members left out keep
+their defaults. The steps are in
+[deploy/relay/README.md](../../deploy/relay/README.md#raising-the-limits-for-an-event).
+There is no switch that turns the limits off.
 
 ## Tests
 

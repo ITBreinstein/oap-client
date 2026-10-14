@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
-# After a deploy: check the static site from outside, with curl. Exits
-# non-zero when any check fails. See README.md.
+# After a deploy: check the static site and the relay behind it from outside,
+# with curl. Exits non-zero when any check fails. See README.md.
 #
 #   OAP_HOSTNAME=oap.example.nl deploy/static/smoke.sh
 #
 # SMOKE_INSECURE=1 skips certificate checks, for a local test against Caddy's
-# internal CA only.
+# internal CA only. SMOKE_RATE_LIMIT=1 also checks that the relay rate-limits
+# new sessions, even from a client that names itself differently each time;
+# that leaves the machine running it rate-limited for about a minute.
 set -euo pipefail
 
 hostname=${OAP_HOSTNAME:-}
@@ -59,8 +61,7 @@ else
   expect_match "$asset is cached as immutable" "$(header_in "$asset_head" cache-control)" immutable
 fi
 
-expect "/api/anything answers 404 (no relay)" "$(status_in "$(head_of /api/anything)")" 404
-expect "/api answers 404" "$(status_in "$(head_of /api)")" 404
+expect "/api answers 404: not a relay path" "$(status_in "$(head_of /api)")" 404
 expect "a missing asset answers 404, not index.html" \
   "$(status_in "$(head_of /assets/smoke-missing.js)")" 404
 expect "a missing page answers 404" "$(status_in "$(head_of /smoke-missing)")" 404
@@ -73,6 +74,79 @@ if node -e 'JSON.parse(process.argv[1])' "$config" 2>/dev/null; then
   ok "/config.json parses as JSON"
 else
   bad "/config.json does not parse as JSON"
+fi
+
+# --- The relay, at /api -----------------------------------------------------
+
+relay_head=$(head_of /api/healthz)
+expect "/api/healthz answers 200" "$(status_in "$relay_head")" 200
+expect "/api/healthz comes from the relay (X-Relay: 1)" "$(header_in "$relay_head" x-relay)" 1
+
+endpoints=$(curl "${curl_opts[@]}" "$base/api/endpoints")
+# One line per endpoint: key, then base URL.
+# shellcheck disable=SC2016 # JavaScript, not shell
+listed=$(node -e '
+  const { endpoints } = JSON.parse(process.argv[1]);
+  for (const e of endpoints) console.log(`${e.key} ${e.baseUrl}`);
+' "$endpoints" 2>/dev/null || echo "unreadable")
+if [[ $listed == unreadable ]]; then
+  bad "/api/endpoints is the relay's endpoint list"
+elif [[ -z $listed ]]; then
+  bad "/api/endpoints lists at least one endpoint"
+else
+  if grep -qv ' https://' <<<"$listed"; then
+    bad "/api/endpoints lists https: endpoints only: $(grep -v ' https://' <<<"$listed" | tr '\n' ' ')"
+  else
+    ok "/api/endpoints lists https: endpoints only ($(wc -l <<<"$listed" | tr -d ' '))"
+  fi
+  first=$(head -n 1 <<<"$listed" | cut -d' ' -f1)
+  unauthorised=$(head_of "/api/read/$first/")
+  expect "/api/read/$first/ without a session answers 401" "$(status_in "$unauthorised")" 401
+  expect "… refused by the relay as unknown-session" \
+    "$(header_in "$unauthorised" x-relay-error)" unknown-session
+fi
+
+# The relay's own port must not answer from outside: published on 127.0.0.1
+# only, or not at all.
+addresses=$(node -e '
+  require("node:dns").lookup(process.argv[1], { all: true }, (error, found) => {
+    if (error) process.exit(1);
+    for (const { address } of found) console.log(address);
+  });
+' "${hostname%%:*}" 2>/dev/null || true)
+if [[ -z $addresses ]]; then
+  bad "$hostname resolves, to check the relay's port from outside"
+fi
+while read -r address; do
+  [[ -n $address ]] || continue
+  url="http://$address:8787/healthz"
+  [[ $address == *:* ]] && url="http://[$address]:8787/healthz"
+  if curl --silent --output /dev/null --connect-timeout 5 --max-time 8 "$url"; then
+    bad "port 8787 on $address answers from outside"
+  else
+    ok "port 8787 on $address does not answer from outside"
+  fi
+done <<<"$addresses"
+
+if [[ ${SMOKE_RATE_LIMIT:-} == 1 ]]; then
+  # More sessions than any sane limit, each naming a different client in
+  # X-Forwarded-For. Caddy replaces the header, so all count as this machine.
+  limited=
+  for i in $(seq 1 60); do
+    answer=$(curl "${curl_opts[@]}" --output /dev/null --dump-header - --request POST \
+      --header "X-Forwarded-For: 198.51.100.$i" "$base/api/sessions" | tr -d '\r')
+    if [[ $(status_in "$answer") == 429 ]]; then
+      limited=$answer
+      break
+    fi
+  done
+  if [[ -z $limited ]]; then
+    bad "POST /api/sessions is rate-limited within 60 tries, whatever X-Forwarded-For says"
+  else
+    ok "POST /api/sessions is rate-limited after $((i - 1)), whatever X-Forwarded-For says"
+    expect "… refused as rate-limited" "$(header_in "$limited" x-relay-error)" rate-limited
+    expect_match "… with Retry-After in seconds" "$(header_in "$limited" retry-after)" '^[0-9]+$'
+  fi
 fi
 
 if ((failures > 0)); then
