@@ -140,6 +140,9 @@ export default defineConfig({
     name: "web",
     environment: "jsdom",
     setupFiles: ["./test/setup.ts"],
+    // The stylesheets, as text, for test/styles/tokens.test.ts: left out,
+    // Vitest hands every CSS import over empty, `?raw` included.
+    css: { include: [/src\/styles(\.css|\/)/] },
     exclude: [...configDefaults.exclude, "**/.tsbuild/**"],
   },
 });

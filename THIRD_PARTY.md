@@ -87,6 +87,10 @@ more), which is why their licences are listed too.
 | `maplibre-gl`                    | 6.11.1  | BSD-3-Clause | `apps/web/src/map` only (boundary rule 3) |
 | `terra-draw`                     | 1.35.0  | MIT          | `apps/web/src/map` only (boundary rule 3) |
 | `terra-draw-maplibre-gl-adapter` | 1.4.1   | MIT          | `apps/web/src/map` only (boundary rule 3) |
+| `@fontsource/ibm-plex-sans`      | 5.3.0   | OFL-1.1      | `apps/web/src/styles/fonts.ts`            |
+| `@fontsource/ibm-plex-mono`      | 5.3.0   | OFL-1.1      | `apps/web/src/styles/fonts.ts`            |
+| `@fontsource/manrope`            | 5.3.0   | OFL-1.1      | `apps/web/src/styles/fonts.ts`            |
+| `@fontsource/jetbrains-mono`     | 5.3.0   | OFL-1.1      | `apps/web/src/styles/fonts.ts`            |
 | _(the rest: generated)_          |         |              |                                           |
 
 ## 4. Data the web app loads at run time

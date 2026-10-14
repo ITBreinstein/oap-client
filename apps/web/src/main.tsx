@@ -8,6 +8,9 @@ import {
   systemPrefersDark,
 } from "./app/appearance.js";
 import { loadRuntimeConfig } from "./config/runtime-config.js";
+// Tokens first: every other sheet reads them. Then structure, then each style.
+import "./styles/fonts.js";
+import "./styles/tokens.css";
 import "./styles.css";
 
 const root = document.getElementById("root");

@@ -1,0 +1,417 @@
+/*
+ * Every colour, font, radius and shadow the page uses, by meaning (ADR 0002).
+ * `styles.css` and the `style-*.css` files read these names and never a
+ * colour of their own; the one exception is the map's own colours
+ * (`map/basemap.ts`) and the legend swatches that mirror them.
+ *
+ * Two kinds of block, kept apart so a theme can never change a shape:
+ *
+ * - a **shape** block per style, `[data-style=…]`: fonts, label treatment,
+ *   radii. Never a colour.
+ * - a **colour** block per style and theme, `[data-style=…][data-theme=…]`:
+ *   colours and shadows. Never a size.
+ *
+ * Deleting a style is deleting its three blocks here (one shape, two colour)
+ * and its `style-*.css` file. Contrast: text at least 4.5:1 and field borders
+ * at least 3:1 against what they sit on; `test/styles/tokens.test.ts` checks
+ * both for every block.
+ *
+ * `:root` carries the hybrid blocks too, so the page has a complete set
+ * before `main.tsx` has written `data-style` and `data-theme`.
+ */
+
+/* ---------------------------------------------------------------- shapes */
+
+:root,
+[data-style="hybrid"] {
+  --font-ui: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --font-heading: var(--font-ui);
+  --heading-weight: 600;
+  --heading-tracking: -0.005em;
+  --label-font: var(--font-ui);
+  --label-size: 0.9375rem;
+  --label-weight: 600;
+  --label-transform: none;
+  --label-tracking: 0;
+  --r-card: 12px;
+  --r-item: 10px;
+  --r-control: 8px;
+  --r-tag: 6px;
+}
+
+[data-style="precise"] {
+  --font-ui: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --font-heading: var(--font-ui);
+  --heading-weight: 700;
+  --heading-tracking: -0.01em;
+  --label-font: var(--font-mono);
+  --label-size: 0.75rem;
+  --label-weight: 500;
+  --label-transform: uppercase;
+  --label-tracking: 0.08em;
+  --r-card: 2px;
+  --r-item: 2px;
+  --r-control: 2px;
+  --r-tag: 2px;
+}
+
+[data-style="instrument"] {
+  --font-ui: "Manrope", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --font-heading: var(--font-ui);
+  --heading-weight: 800;
+  --heading-tracking: -0.03em;
+  --label-font: var(--font-mono);
+  --label-size: 0.6875rem;
+  --label-weight: 500;
+  --label-transform: uppercase;
+  --label-tracking: 0.08em;
+  --r-card: 6px;
+  --r-item: 6px;
+  --r-control: 4px;
+  --r-tag: 4px;
+}
+
+/* --------------------------------------------- Soft-precise hybrid colours */
+
+:root,
+[data-style="hybrid"][data-theme="light"] {
+  --page: #f5f7fa;
+  --surface: #ffffff;
+  --surface-2: #f5f7fa;
+  --surface-hover: #f3f7fc;
+  --field: #ffffff;
+  --rail: var(--surface);
+  --text: #1f2933;
+  --text-strong: #1f2933;
+  --text-secondary: #1f2933;
+  --muted: #52606d;
+  --ident: #52606d;
+  --label-color: #1f2933;
+  --line: #e4e7eb;
+  --line-strong: #cbd2d9;
+  --field-border: #7b8794;
+  --accent: #1f4e8c;
+  --accent-hover: #163a69;
+  --accent-text: #ffffff;
+  --accent-ink: #1f4e8c;
+  --selected-bg: #e8eef7;
+  --selected-text: #163a69;
+  --selected-line: #1f4e8c;
+  --focus: #b45309;
+  --need-area-fg: #8a4b08;
+  --need-area-bg: #fdf0e1;
+  --need-data-fg: #163a69;
+  --need-data-bg: #e8eef7;
+  --need-values-fg: #1d5a35;
+  --need-values-bg: #e3f4e8;
+  --result-fg: #163a69;
+  --result-surface: #e8eef7;
+  --result-line: #1f4e8c;
+  --success: #1d5a35;
+  --warning: #8a4b08;
+  --error: #9b1c1c;
+  --error-surface: #fdecec;
+  --notice-surface: #fff7e6;
+  --notice-line: #f0c36d;
+  --ticks: #1f4e8c;
+  --overlay: rgb(31 41 51 / 45%);
+  --shadow-card: 0 1px 2px rgb(31 41 51 / 6%), 0 8px 24px rgb(31 41 51 / 6%);
+  --shadow-panel: -8px 0 24px rgb(31 41 51 / 6%);
+  --shadow-popover: 0 8px 24px rgb(31 41 51 / 14%);
+  --backdrop-ground: #eef0ea;
+  --backdrop-line-1: #e2e5dc;
+  --backdrop-line-2: #e7eae2;
+  --backdrop-water: #d6e4ee;
+  --backdrop-park: #dfe8d6;
+}
+
+[data-style="hybrid"][data-theme="dark"] {
+  --page: #0f1720;
+  --surface: #16212e;
+  --surface-2: #121b26;
+  --surface-hover: #1b2939;
+  --field: #0f1720;
+  --rail: var(--surface);
+  --text: #e6ebf0;
+  --text-strong: #f5f7fa;
+  --text-secondary: #e6ebf0;
+  --muted: #9fb0c0;
+  --ident: #9fb0c0;
+  --label-color: #cbd5df;
+  --line: #2b3a4b;
+  --line-strong: #2b3a4b;
+  --field-border: #64778c;
+  --accent: #7fb2f0;
+  --accent-hover: #9cc3f5;
+  --accent-text: #0b1520;
+  --accent-ink: #7fb2f0;
+  --selected-bg: #7fb2f0;
+  --selected-text: #0b1520;
+  --selected-line: #7fb2f0;
+  --focus: #f2b766;
+  --need-area-fg: #f2b766;
+  --need-area-bg: #2a2114;
+  --need-data-fg: #9cc3f5;
+  --need-data-bg: #172a40;
+  --need-values-fg: #86d6a2;
+  --need-values-bg: #15291e;
+  --result-fg: #9cc3f5;
+  --result-surface: #172a40;
+  --result-line: #7fb2f0;
+  --success: #86d6a2;
+  --warning: #f2b766;
+  --error: #ff9b9b;
+  --error-surface: #3a1a1d;
+  --notice-surface: #2a2114;
+  --notice-line: #7a5a26;
+  --ticks: #7fb2f0;
+  --overlay: rgb(0 0 0 / 60%);
+  --shadow-card: 0 24px 60px rgb(0 0 0 / 45%);
+  --shadow-panel: none;
+  --shadow-popover: 0 16px 40px rgb(0 0 0 / 50%);
+  --backdrop-ground: #0f1720;
+  --backdrop-line-1: #18222e;
+  --backdrop-line-2: #141d28;
+  --backdrop-water: #122638;
+  --backdrop-park: #13241a;
+}
+
+/* ---------------------------------------------------------- Precise colours */
+
+[data-style="precise"][data-theme="light"] {
+  --page: #f5f7fa;
+  --surface: #ffffff;
+  --surface-2: #f5f7fa;
+  --surface-hover: #f3f7fc;
+  --field: #ffffff;
+  --rail: var(--surface);
+  --text: #1f2933;
+  --text-strong: #1f2933;
+  --text-secondary: #1f2933;
+  --muted: #52606d;
+  --ident: #52606d;
+  --label-color: #3e4c59;
+  --line: #e4e7eb;
+  --line-strong: #1f2933;
+  --field-border: #1f2933;
+  --accent: #1f4e8c;
+  --accent-hover: #163a69;
+  --accent-text: #ffffff;
+  --accent-ink: #1f4e8c;
+  --selected-bg: #1f2933;
+  --selected-text: #ffffff;
+  --selected-line: #1f2933;
+  --focus: #b45309;
+  --need-area-fg: #8a4b08;
+  --need-area-bg: transparent;
+  --need-data-fg: #163a69;
+  --need-data-bg: transparent;
+  --need-values-fg: #1d5a35;
+  --need-values-bg: transparent;
+  --result-fg: #163a69;
+  --result-surface: #e8eef7;
+  --result-line: #1f4e8c;
+  --success: #1d5a35;
+  --warning: #8a4b08;
+  --error: #9b1c1c;
+  --error-surface: #fdecec;
+  --notice-surface: #fff7e6;
+  --notice-line: #f0c36d;
+  --ticks: #1f4e8c;
+  --overlay: rgb(31 41 51 / 45%);
+  --shadow-card: 6px 6px 0 rgb(31 41 51 / 10%);
+  --shadow-panel: none;
+  --shadow-popover: 4px 4px 0 rgb(31 41 51 / 14%);
+  --backdrop-ground: #eef0ea;
+  --backdrop-line-1: #e2e5dc;
+  --backdrop-line-2: #e7eae2;
+  --backdrop-water: #d6e4ee;
+  --backdrop-park: #dfe8d6;
+}
+
+[data-style="precise"][data-theme="dark"] {
+  --page: #0f1720;
+  --surface: #16212e;
+  --surface-2: #121b26;
+  --surface-hover: #1b2939;
+  --field: #0f1720;
+  --rail: var(--surface);
+  --text: #e6ebf0;
+  --text-strong: #f5f7fa;
+  --text-secondary: #e6ebf0;
+  --muted: #9fb0c0;
+  --ident: #9fb0c0;
+  --label-color: #9fb0c0;
+  --line: #2b3a4b;
+  --line-strong: #8193a6;
+  --field-border: #8193a6;
+  --accent: #7fb2f0;
+  --accent-hover: #9cc3f5;
+  --accent-text: #0b1520;
+  --accent-ink: #7fb2f0;
+  --selected-bg: #e6ebf0;
+  --selected-text: #0f1720;
+  --selected-line: #e6ebf0;
+  --focus: #f2b766;
+  --need-area-fg: #f2b766;
+  --need-area-bg: transparent;
+  --need-data-fg: #9cc3f5;
+  --need-data-bg: transparent;
+  --need-values-fg: #86d6a2;
+  --need-values-bg: transparent;
+  --result-fg: #9cc3f5;
+  --result-surface: #172a40;
+  --result-line: #7fb2f0;
+  --success: #86d6a2;
+  --warning: #f2b766;
+  --error: #ff9b9b;
+  --error-surface: #3a1a1d;
+  --notice-surface: #2a2114;
+  --notice-line: #7a5a26;
+  --ticks: #7fb2f0;
+  --overlay: rgb(0 0 0 / 60%);
+  --shadow-card: 6px 6px 0 rgb(0 0 0 / 35%);
+  --shadow-panel: none;
+  --shadow-popover: 4px 4px 0 rgb(0 0 0 / 40%);
+  --backdrop-ground: #0f1720;
+  --backdrop-line-1: #18222e;
+  --backdrop-line-2: #141d28;
+  --backdrop-water: #122638;
+  --backdrop-park: #13241a;
+}
+
+/* ------------------------------------------------------- Instrument colours */
+
+[data-style="instrument"][data-theme="dark"] {
+  --page: #0e1217;
+  --surface: #11161d;
+  --surface-2: #121820;
+  --surface-hover: #18202a;
+  --field: #0b0f14;
+  --rail: #0a0d11;
+  --text: #e6ebf0;
+  --text-strong: #e6ebf0;
+  --text-secondary: #c3ccd6;
+  --muted: #a9b5c2;
+  --ident: #7d8c9c;
+  --label-color: #93a1b0;
+  --line: #1f2733;
+  --line-strong: #2f3a4a;
+  --field-border: #5d6d82;
+  --accent: #c6f432;
+  --accent-hover: #dcff6e;
+  --accent-text: #10140a;
+  --accent-ink: #c6f432;
+  --selected-bg: rgb(198 244 50 / 14%);
+  --selected-text: #e6ebf0;
+  --selected-line: #c6f432;
+  --focus: #c6f432;
+  --need-area-fg: #ffb020;
+  --need-area-bg: transparent;
+  --need-data-fg: #39c5ff;
+  --need-data-bg: transparent;
+  --need-values-fg: #c3ccd6;
+  --need-values-bg: transparent;
+  --result-fg: #7fd8ff;
+  --result-surface: #0d1d26;
+  --result-line: #1d5f7a;
+  --success: #86d6a2;
+  --warning: #ffcf7a;
+  --error: #ff8a8a;
+  --error-surface: #2a1416;
+  --notice-surface: #221c10;
+  --notice-line: #6b5420;
+  --ticks: #c6f432;
+  --overlay: rgb(0 0 0 / 60%);
+  --shadow-card: none;
+  --shadow-panel: 24px 0 48px rgb(0 0 0 / 45%);
+  --shadow-popover: 0 16px 40px rgb(0 0 0 / 55%);
+  --backdrop-ground: #0e1217;
+  --backdrop-line-1: #0e1217;
+  --backdrop-line-2: #0e1217;
+  --backdrop-water: #0e1217;
+  --backdrop-park: #0e1217;
+}
+
+/*
+ * Not on the design canvas: derived for this trial. Lime cannot be text or a
+ * thin line on white (1.3:1), so it is a fill only, under dark text, and
+ * --accent-ink, a dark olive, carries links, the rail's bar, selected edges
+ * and focus.
+ */
+[data-style="instrument"][data-theme="light"] {
+  --page: #f4f6f8;
+  --surface: #ffffff;
+  --surface-2: #ffffff;
+  --surface-hover: #eef2f6;
+  --field: #ffffff;
+  --rail: #e9edf1;
+  --text: #0e1217;
+  --text-strong: #0e1217;
+  --text-secondary: #2d3a46;
+  --muted: #3e4c59;
+  --ident: #616e7c;
+  --label-color: #52606d;
+  --line: #d5dbe2;
+  --line-strong: #9aa5b1;
+  --field-border: #7b8794;
+  --accent: #c6f432;
+  --accent-hover: #dcff6e;
+  --accent-text: #10140a;
+  --accent-ink: #3f6212;
+  --selected-bg: rgb(198 244 50 / 28%);
+  --selected-text: #0e1217;
+  --selected-line: #3f6212;
+  --focus: #3f6212;
+  --need-area-fg: #b45309;
+  --need-area-bg: transparent;
+  --need-data-fg: #0369a1;
+  --need-data-bg: transparent;
+  --need-values-fg: #52606d;
+  --need-values-bg: transparent;
+  --result-fg: #0369a1;
+  --result-surface: #e6f4fb;
+  --result-line: #7cc4e8;
+  --success: #1d5a35;
+  --warning: #b45309;
+  --error: #9b1c1c;
+  --error-surface: #fdecec;
+  --notice-surface: #fff7e6;
+  --notice-line: #f0c36d;
+  --ticks: #3f6212;
+  --overlay: rgb(14 18 23 / 45%);
+  --shadow-card: none;
+  --shadow-panel: 24px 0 48px rgb(14 18 23 / 12%);
+  --shadow-popover: 0 12px 32px rgb(14 18 23 / 16%);
+  --backdrop-ground: #f4f6f8;
+  --backdrop-line-1: #f4f6f8;
+  --backdrop-line-2: #f4f6f8;
+  --backdrop-water: #f4f6f8;
+  --backdrop-park: #f4f6f8;
+}
+
+/* ------------------------------------------------------------ both themes */
+
+/* Native controls follow the theme: scrollbars, date pickers, <select>. */
+[data-theme="light"] {
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+/*
+ * Before main.tsx has run, a dark system gets a dark page rather than a
+ * white flash. Only what shows before the first render: the page itself.
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    --page: #0f1720;
+    --text: #e6ebf0;
+  }
+}
