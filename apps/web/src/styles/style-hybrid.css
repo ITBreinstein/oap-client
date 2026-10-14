@@ -1,0 +1,84 @@
+/*
+ * Soft-precise hybrid: friendly enough for the public, exact enough for
+ * testers. Medium corners; hairline borders with a soft two-layer shadow on
+ * cards; labels in sentence case; mono only for identifiers, addresses and
+ * coordinates.
+ *
+ * Only what this style does beyond `styles.css`, every rule under
+ * `[data-style="hybrid"]`. Deleting this file (and its blocks in
+ * `tokens.css`) removes the style and nothing else (ADR 0002).
+ */
+
+[data-style="hybrid"] .card {
+  border-color: var(--line);
+}
+
+/* On the start screen's backdrop, everything sits on a card. */
+[data-style="hybrid"] .how-it-works,
+[data-style="hybrid"] .about-access {
+  padding: 1rem 1.25rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-card);
+}
+
+[data-style="hybrid"] .how-it-works {
+  margin-top: 1.25rem;
+}
+
+/* The process list: one card, rows with a rounded hover fill. */
+[data-style="hybrid"] .process-table {
+  padding: 0.35rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-card);
+}
+
+[data-style="hybrid"] .process-list li {
+  padding: 0.6rem 0.75rem;
+  border-bottom: none;
+  border-radius: var(--r-item);
+}
+
+[data-style="hybrid"] .process-list li + li {
+  margin-top: 0.15rem;
+}
+
+[data-style="hybrid"] .process-list li:hover {
+  background: var(--surface-hover);
+}
+
+[data-style="hybrid"] .process-list li[data-last-opened] {
+  margin: 0;
+  padding-inline: 0.75rem;
+}
+
+/* A need not known yet says nothing in a list of tags. */
+[data-style="hybrid"] .cell-needs[data-known="false"] {
+  display: none;
+}
+
+/* A process with nothing for the map: the whole of it on one card. */
+[data-style="hybrid"] .layout-single .process-screen {
+  padding: 1.25rem 1.5rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-card);
+}
+
+/* The result: tinted, so it reads as the answer. */
+[data-style="hybrid"] .result {
+  background: var(--result-surface);
+  border: 1px solid var(--result-line);
+}
+
+[data-style="hybrid"] .result pre.code {
+  background: var(--surface);
+}
+
+[data-style="hybrid"] .result-strip {
+  color: var(--muted);
+}

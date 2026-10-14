@@ -111,113 +111,116 @@ export function EndpointScreen(props: EndpointScreenProps) {
 
   return (
     <section className="start" aria-labelledby={`${base}-heading`}>
-      <h2 id={`${base}-heading`} tabIndex={-1} data-focus-on-stage>
-        Connect to a service
-      </h2>
-      <p className="lead">
-        Try the calculations an OGC API - Processes service offers, without writing code: pick one,
-        fill in a form, and see the result on the map.
-      </p>
+      <div className="start-card card" data-main-card="true">
+        <p className="eyebrow label">OGC API - Processes</p>
+        <h2 id={`${base}-heading`} tabIndex={-1} data-focus-on-stage>
+          Connect to a service
+        </h2>
+        <p className="lead">
+          Try the calculations an OGC API - Processes service offers, without writing code: pick
+          one, fill in a form, and see the result on the map.
+        </p>
 
-      <form onSubmit={onSubmit} noValidate>
-        {hasChoices && (
-          <fieldset className="service-choices">
-            <legend>Choose a service</legend>
-            {configured.map((entry) => (
-              <label key={entry.key} className="choice choice-card">
+        <form onSubmit={onSubmit} noValidate>
+          {hasChoices && (
+            <fieldset className="service-choices">
+              <legend>Choose a service</legend>
+              {configured.map((entry) => (
+                <label key={entry.key} className="choice choice-card">
+                  <input
+                    type="radio"
+                    name={`${base}-service`}
+                    value={entry.key}
+                    checked={selected === entry.key}
+                    onChange={() => {
+                      setChoice(entry.key);
+                    }}
+                  />{" "}
+                  <span className="choice-body">
+                    <strong className="choice-title">{entry.key}</strong>{" "}
+                    <span className="choice-url">{entry.baseUrl}</span>
+                    {entry.executeRoute === "relay" && (
+                      <span className="choice-note"> Background runs go through the relay.</span>
+                    )}
+                  </span>
+                </label>
+              ))}
+              {presets.map((preset, index) => (
+                <label key={presetKey(index)} className="choice choice-card">
+                  <input
+                    type="radio"
+                    name={`${base}-service`}
+                    value={presetKey(index)}
+                    checked={selected === presetKey(index)}
+                    onChange={() => {
+                      setChoice(presetKey(index));
+                    }}
+                  />{" "}
+                  <span className="choice-body">
+                    <strong className="choice-title">{preset.title}</strong>{" "}
+                    <span className="choice-url">{preset.url}</span>
+                  </span>
+                </label>
+              ))}
+              <label className="choice choice-card">
                 <input
                   type="radio"
                   name={`${base}-service`}
-                  value={entry.key}
-                  checked={selected === entry.key}
+                  value={TYPED}
+                  checked={selected === TYPED}
                   onChange={() => {
-                    setChoice(entry.key);
+                    setChoice(TYPED);
                   }}
                 />{" "}
                 <span className="choice-body">
-                  <strong className="choice-title">{entry.key}</strong>{" "}
-                  <span className="choice-url">{entry.baseUrl}</span>
-                  {entry.executeRoute === "relay" && (
-                    <span className="choice-note"> Background runs go through the relay.</span>
-                  )}
+                  <strong className="choice-title">Another service</strong>
+                  <span className="choice-note"> Type its address below.</span>
                 </span>
               </label>
-            ))}
-            {presets.map((preset, index) => (
-              <label key={presetKey(index)} className="choice choice-card">
-                <input
-                  type="radio"
-                  name={`${base}-service`}
-                  value={presetKey(index)}
-                  checked={selected === presetKey(index)}
-                  onChange={() => {
-                    setChoice(presetKey(index));
-                  }}
-                />{" "}
-                <span className="choice-body">
-                  <strong className="choice-title">{preset.title}</strong>{" "}
-                  <span className="choice-url">{preset.url}</span>
-                </span>
-              </label>
-            ))}
-            <label className="choice choice-card">
-              <input
-                type="radio"
-                name={`${base}-service`}
-                value={TYPED}
-                checked={selected === TYPED}
-                onChange={() => {
-                  setChoice(TYPED);
-                }}
-              />{" "}
-              <span className="choice-body">
-                <strong className="choice-title">Another service</strong>
-                <span className="choice-note"> Type its address below.</span>
-              </span>
-            </label>
-          </fieldset>
-        )}
-
-        <div className="field address-field">
-          <label htmlFor={`${base}-address`}>Service address</label>
-          {hasChoices ? (
-            addressInput
-          ) : (
-            // With nothing else to choose, the button belongs to the field.
-            <div className="input-with-button">
-              {addressInput}
-              {connectButton}
-            </div>
+            </fieldset>
           )}
-          <p id={`${base}-address-help`} className="help">
-            The service&apos;s landing page: the address that lists its links, often ending in{" "}
-            <code>/ogcapi</code> or <code>/ogc-api</code>. A typed address is always reached
-            directly from this page, never through the relay.
-          </p>
-          {addressError !== undefined && (
-            <p id={`${base}-address-error`} className="field-error">
-              {addressError}
+
+          <div className="field address-field">
+            <label htmlFor={`${base}-address`}>Service address</label>
+            {hasChoices ? (
+              addressInput
+            ) : (
+              // With nothing else to choose, the button belongs to the field.
+              <div className="input-with-button">
+                {addressInput}
+                {connectButton}
+              </div>
+            )}
+            <p id={`${base}-address-help`} className="help">
+              The service&apos;s landing page: the address that lists its links, often ending in{" "}
+              <code>/ogcapi</code> or <code>/ogc-api</code>. A typed address is always reached
+              directly from this page, never through the relay.
+            </p>
+            {addressError !== undefined && (
+              <p id={`${base}-address-error`} className="field-error">
+                {addressError}
+              </p>
+            )}
+          </div>
+
+          {configuredError !== undefined && <p className="notice">{configuredError}</p>}
+          {hasChoices && (
+            <p className="actions">
+              {connectButton}
+              <span className="muted">
+                Opens <strong className="connect-target">{target}</strong>
+              </span>
             </p>
           )}
-        </div>
+        </form>
 
-        {configuredError !== undefined && <p className="notice">{configuredError}</p>}
-        {hasChoices && (
-          <p className="actions">
-            {connectButton}
-            <span className="muted">
-              Opens <strong className="connect-target">{target}</strong>
-            </span>
+        {connecting !== undefined && (
+          <p role="status" className="status">
+            Connecting to {connecting.baseUrl}…
           </p>
         )}
-      </form>
-
-      {connecting !== undefined && (
-        <p role="status" className="status">
-          Connecting to {connecting.baseUrl}…
-        </p>
-      )}
-      <ErrorMessage error={error} />
+        <ErrorMessage error={error} />
+      </div>
 
       <section className="how-it-works" aria-labelledby={`${base}-steps`}>
         <h3 id={`${base}-steps`}>How it works</h3>

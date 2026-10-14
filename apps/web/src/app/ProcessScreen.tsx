@@ -3,12 +3,15 @@
  * (S2–S4).
  */
 
+import { redactUrl } from "@breinstein/oap-client";
 import { useId, useMemo, type SyntheticEvent } from "react";
 import { schemaWarnings } from "../forms/schema-warnings.js";
 import type { FieldErrors } from "../forms/validate.js";
+import type { SessionObservation } from "../observations.js";
 import type { JobRow } from "../relay/job-session.js";
 import { CONFIRM_WINDOW_MS } from "../relay/reconciler.js";
 import { ErrorMessage } from "./ErrorMessage.js";
+import { lastExecution, requestLog } from "./request-log.js";
 import { FieldView } from "./FormFields.js";
 import { ResultsView } from "./ResultsView.js";
 import { offersLink } from "./run.js";
@@ -235,6 +238,104 @@ function NotYetConfirmed({ job }: { readonly job: JobRow | undefined }) {
   );
 }
 
+/** The host of a base URL, for the path line above the title. */
+function hostOf(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url;
+  }
+}
+
+function seconds(ms: number): string {
+  return ms < 1000 ? `${String(Math.round(ms))} ms` : `${(ms / 1000).toFixed(1)} s`;
+}
+
+/**
+ * One line under a result: how it ended, how it ran, how many outputs, and,
+ * for a run in the foreground, how long the server took. Only what the page
+ * has: a cell it does not know is left out, never guessed.
+ */
+function ResultStrip({
+  state,
+  job,
+  execution,
+}: {
+  readonly state: Extract<Workflow, { stage: "result" }>;
+  readonly job: JobRow | undefined;
+  readonly execution: ReturnType<typeof lastExecution>;
+}) {
+  const background = state.jobRef !== undefined;
+  const status = background
+    ? job?.status?.rawStatus
+    : execution?.status === undefined
+      ? undefined
+      : `HTTP ${String(execution.status)}`;
+  const outputs = state.results.length;
+  return (
+    <dl className="result-strip">
+      {status !== undefined && (
+        <div>
+          <dt className="label">Status</dt>
+          <dd className="mono">{status}</dd>
+        </div>
+      )}
+      <div>
+        <dt className="label">Ran</dt>
+        <dd className="mono">{background ? "in the background" : "in the foreground"}</dd>
+      </div>
+      <div>
+        <dt className="label">Outputs</dt>
+        <dd className="mono">{String(outputs)}</dd>
+      </div>
+      {!background && execution !== undefined && (
+        <div>
+          <dt className="label">Time</dt>
+          <dd className="mono">{seconds(execution.elapsedMs)}</dd>
+        </div>
+      )}
+    </dl>
+  );
+}
+
+/**
+ * The requests this page made to the service, newest last, as the session
+ * recorded them. Shown by the Instrument style; the others leave it out.
+ */
+function RequestLog({
+  entries,
+  endpoint,
+}: {
+  readonly entries: readonly SessionObservation[];
+  readonly endpoint: string;
+}) {
+  const base = useId();
+  const requests = requestLog(entries, endpoint, 12);
+  if (requests.length === 0) return null;
+  return (
+    <section className="request-log" aria-labelledby={`${base}-log`}>
+      <h3 id={`${base}-log`} className="label">
+        Requests to this service
+      </h3>
+      <ol>
+        {requests.map((request, index) => (
+          // The same request can repeat (a poll): its place is its identity.
+          <li key={index} className="mono">
+            <span className="request-method">{request.method}</span>{" "}
+            <span
+              className="request-status"
+              data-ok={request.status !== undefined && request.status < 400}
+            >
+              {request.status === undefined ? "—" : String(request.status)}
+            </span>{" "}
+            <span className="request-url">{request.url}</span>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
 /** Whether the relay registered callbacks for a job; `undefined` for no job. */
 function callbacksOf(job: JobRow | undefined): "registered" | "none" | undefined {
   if (job === undefined) return undefined;
@@ -250,6 +351,8 @@ export interface ProcessScreenProps {
   readonly dismissAdvertisedBy: WorkflowView["dismissAdvertisedBy"];
   /** Opened with `?developer`: offers asking for a link the description does not. */
   readonly developer?: boolean | undefined;
+  /** The session's observations: the request log and the result's timing are read off them. */
+  readonly observations?: readonly SessionObservation[] | undefined;
 }
 
 export function ProcessScreen(props: ProcessScreenProps) {
@@ -278,9 +381,11 @@ export function ProcessScreen(props: ProcessScreenProps) {
     state.stage === "result" && state.jobRef !== undefined
       ? jobs.find((row) => row.statusUrl === state.jobRef)
       : undefined;
+  const observations = props.observations ?? [];
+  const endpointKey = redactUrl(state.endpoint.baseUrl);
 
   return (
-    <section aria-labelledby={`${base}-heading`}>
+    <section className="process-screen" aria-labelledby={`${base}-heading`}>
       <p className="breadcrumb">
         <button
           type="button"
@@ -290,6 +395,10 @@ export function ProcessScreen(props: ProcessScreenProps) {
         >
           <span aria-hidden="true">← </span>All processes
         </button>
+      </p>
+      <p className="process-path mono">
+        {hostOf(state.endpoint.baseUrl)} <span aria-hidden="true">/</span>
+        <span className="visually-hidden">, process</span> {process.id}
       </p>
       <h2
         id={`${base}-heading`}
@@ -328,6 +437,8 @@ export function ProcessScreen(props: ProcessScreenProps) {
           data-doorbells={job?.doorbells}
           data-callbacks={callbacksOf(job)}
         >
+          {/* Movement only: the words below say what is happening. */}
+          <div className="progress-line" aria-hidden="true" />
           {state.run.mode === "sync" ? (
             <p>Running… waiting for the server's answer.</p>
           ) : (
@@ -359,6 +470,8 @@ export function ProcessScreen(props: ProcessScreenProps) {
         // gone the moment a read finds the job done, which can be within
         // milliseconds of the doorbell that prompted the read.
         <div
+          className="result-block"
+          data-main-card="true"
           data-result-of={state.jobRef}
           data-doorbells={resultJob?.doorbells}
           data-callbacks={callbacksOf(resultJob)}
@@ -370,6 +483,11 @@ export function ProcessScreen(props: ProcessScreenProps) {
             results={state.results}
             processId={process.id}
             onLoad={commands.loadReference}
+          />
+          <ResultStrip
+            state={state}
+            job={resultJob}
+            execution={lastExecution(observations, endpointKey, process.id)}
           />
           <p className="actions next-steps">
             <button type="button" onClick={commands.edit}>
@@ -439,6 +557,12 @@ export function ProcessScreen(props: ProcessScreenProps) {
                 Run in the background
               </label>
             )}
+            {(both || onlyAsync) && (
+              // What "in the background" asks the server for, in its own words.
+              <code className="run-hint" aria-hidden="true">
+                Prefer: respond-async
+              </code>
+            )}
             <button type="submit">{onlyAsync ? "Run in the background" : "Run"}</button>
           </div>
         )}
@@ -453,6 +577,7 @@ export function ProcessScreen(props: ProcessScreenProps) {
       {state.stage === "process" && state.error?.inputId !== undefined && (
         <p className="hint">The server's message names the input “{state.error.inputId}”.</p>
       )}
+      <RequestLog entries={observations} endpoint={endpointKey} />
     </section>
   );
 }

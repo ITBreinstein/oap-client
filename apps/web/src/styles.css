@@ -972,3 +972,283 @@ ol.steps li .help {
 .appearance-popover fieldset:last-child {
   margin-bottom: 0;
 }
+
+/*
+ * Cards: the surface a screen's main content sits on. Each style decides
+ * their edge and elevation; `data-main-card` marks the one a screen leads
+ * with (precise puts its corner ticks there).
+ */
+.card {
+  position: relative;
+  padding: 1.25rem;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-card);
+}
+
+[data-main-card] {
+  position: relative;
+}
+
+.eyebrow {
+  margin: 0 0 0.25rem;
+}
+
+/* Before a process is open the panel shows the page behind its cards. */
+.layout-single .panel {
+  background: var(--page);
+}
+
+/*
+ * The start screen's backdrop: streets, a stretch of water and a park, in
+ * CSS gradients, for decoration only. It says nothing a reader needs.
+ */
+.layout-single .panel[data-stage="choose-endpoint"] {
+  background:
+    radial-gradient(ellipse 30rem 18rem at 88% 12%, var(--backdrop-water) 60%, transparent 61%),
+    radial-gradient(ellipse 22rem 14rem at 6% 88%, var(--backdrop-park) 60%, transparent 61%),
+    repeating-linear-gradient(
+      90deg,
+      transparent 0 9rem,
+      var(--backdrop-line-1) 9rem 9.6rem,
+      transparent 9.6rem 13rem
+    ),
+    repeating-linear-gradient(
+      0deg,
+      transparent 0 7rem,
+      var(--backdrop-line-2) 7rem 7.5rem,
+      transparent 7.5rem 11rem
+    ),
+    var(--backdrop-ground);
+  background-attachment: local;
+}
+
+.start-card h2 {
+  margin-top: 0;
+}
+
+.how-it-works,
+.about-access {
+  position: relative;
+}
+
+/* The service the list belongs to: what the page knows of it. */
+.service-card {
+  margin: 0 0 1rem;
+  padding: 1rem 1.25rem;
+}
+
+.service-card p {
+  margin: 0;
+}
+
+.service-title {
+  font-family: var(--font-heading);
+  font-weight: var(--heading-weight);
+  font-size: 1.1rem;
+  color: var(--text-strong);
+}
+
+.service-url {
+  color: var(--ident);
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+.service-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem 1rem;
+  margin: 0.75rem 0 0;
+}
+
+.service-facts div {
+  min-width: 0;
+}
+
+.service-facts dt {
+  display: block;
+}
+
+.service-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.list-count {
+  margin: 0 0 0.5rem;
+}
+
+/*
+ * The process list: one row per process. The column heads are for styles
+ * that draw a table; each row names its own cells for a screen reader.
+ */
+.process-head {
+  display: none;
+}
+
+.process-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem 0.6rem;
+}
+
+.cell-process {
+  flex: 1 1 100%;
+  min-width: 0;
+}
+
+.process-id {
+  color: var(--ident);
+  overflow-wrap: anywhere;
+}
+
+.process-description {
+  display: block;
+}
+
+.cell-runs {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.cell-ran:empty {
+  display: none;
+}
+
+/* What a process needs: a tag with words; each style dresses it. */
+.needs {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.05rem 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.5;
+  border-radius: var(--r-tag);
+}
+
+.needs-mark {
+  display: none;
+}
+
+.needs-unknown {
+  padding-inline: 0;
+  color: var(--muted);
+  font-weight: normal;
+}
+
+.needs[data-needs="area"] {
+  color: var(--need-area-fg);
+  background: var(--need-area-bg);
+}
+
+.needs[data-needs="data"] {
+  color: var(--need-data-fg);
+  background: var(--need-data-bg);
+}
+
+.needs[data-needs="values"] {
+  color: var(--need-values-fg);
+  background: var(--need-values-bg);
+}
+
+/* One process: where it lives, then its title. */
+.process-path {
+  margin: 0 0 0.15rem;
+  color: var(--ident);
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+
+/* A run under way: a line that moves. Still for reduced motion (above). */
+.progress-line {
+  height: 2px;
+  margin: 0 0 0.5rem;
+  overflow: hidden;
+  background: var(--line);
+  border-radius: 1px;
+}
+
+.progress-line::after {
+  content: "";
+  display: block;
+  width: 30%;
+  height: 100%;
+  background: var(--accent-ink);
+  animation: progress-slide 1.4s ease-in-out infinite;
+}
+
+@keyframes progress-slide {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(340%);
+  }
+}
+
+/* The result: its outputs in the result colours, then one line about the run. */
+.result {
+  color: var(--text);
+  background: var(--surface);
+  border-color: var(--result-line);
+  border-left-width: 3px;
+}
+
+.result-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.25rem;
+  margin: 0.25rem 0 0;
+  font-size: 0.9rem;
+}
+
+.result-strip div {
+  display: flex;
+  gap: 0.4rem;
+  align-items: baseline;
+}
+
+.result-strip dd {
+  margin: 0;
+}
+
+/* What only one style shows: the request log and the run bar's header. */
+.request-log,
+.run-hint {
+  display: none;
+}
+
+.request-log ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.8rem;
+}
+
+.request-log li {
+  display: flex;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.request-url {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ident);
+}
+
+.request-status[data-ok="false"] {
+  color: var(--error);
+}
+
+/* The map's scale bar and compass belong to the precise style's map frame. */
+.map-pane .maplibregl-ctrl-scale,
+.map-pane .maplibregl-ctrl-group .maplibregl-ctrl-compass {
+  display: none;
+}

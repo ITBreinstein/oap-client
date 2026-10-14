@@ -1,7 +1,7 @@
-import { VERSION } from "@breinstein/oap-client";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Appearance } from "./app/appearance.js";
 import { AppearanceControl } from "./app/AppearanceControl.js";
+import { AppFrame } from "./app/AppFrame.js";
 import { DeveloperPanel } from "./app/DeveloperPanel.js";
 import { activeDrawField, DrawContext, type DrawRequest, type DrawTarget } from "./app/draw.js";
 import { EndpointScreen } from "./app/EndpointScreen.js";
@@ -9,6 +9,7 @@ import { MapBoundary } from "./app/MapBoundary.js";
 import { MapLimitsContext, type MapLimits } from "./app/map-limits.js";
 import { mapNeeded } from "./app/map-need.js";
 import { MapPane } from "./app/MapPane.js";
+import { needsOfPlan, type Needs } from "./app/needs.js";
 import { ProcessListScreen } from "./app/ProcessListScreen.js";
 import { ProcessScreen } from "./app/ProcessScreen.js";
 import { DEV_PRESETS } from "./app/dev-presets.js";
@@ -60,6 +61,30 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
   const { state, commands } = view;
   const [developer] = useState(developerRequested);
   const [mapAvailable, setMapAvailable] = useState(false);
+
+  // What each process opened this visit needs, by endpoint and id: the
+  // process list shows it once known, and never fetches a description for it.
+  const [described, setDescribed] = useState<ReadonlyMap<string, Needs>>(() => new Map());
+  const openedPlan =
+    state.stage === "choose-endpoint" || state.stage === "connected" ? undefined : state.plan;
+  const openedKey =
+    state.stage === "choose-endpoint" || state.stage === "connected"
+      ? undefined
+      : `${state.endpoint.baseUrl}\n${state.process.id}`;
+  // Recorded while rendering, the way React documents for state that follows
+  // other state: no effect, and no render with the old value on screen.
+  if (openedKey !== undefined && openedPlan !== undefined && !described.has(openedKey)) {
+    setDescribed(new Map(described).set(openedKey, needsOfPlan(openedPlan)));
+  }
+  const listNeeds = useMemo(() => {
+    if (state.stage !== "connected") return undefined;
+    const prefix = `${state.endpoint.baseUrl}\n`;
+    return new Map(
+      [...described]
+        .filter(([key]) => key.startsWith(prefix))
+        .map(([key, needs]) => [key.slice(prefix.length), needs]),
+    );
+  }, [described, state]);
 
   // Drawing belongs to one field of one open process. It is recorded with the
   // process it was started for, so choosing another process — or leaving the
@@ -120,6 +145,8 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
           service={state.service}
           processes={state.processes}
           opening={state.opening}
+          route={state.route}
+          needs={listNeeds}
           lastOpened={state.lastOpened}
           ran={state.ran ?? []}
           error={state.error}
@@ -148,6 +175,7 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
           jobNotice={view.jobNotice}
           dismissAdvertisedBy={view.dismissAdvertisedBy}
           developer={developer}
+          observations={view.snapshot?.observations}
         />
       );
       break;
@@ -166,18 +194,13 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
     <MapLimitsContext value={mapLimits}>
       <DrawContext.Provider value={draw}>
         <div className="app" data-relay-stream={view.snapshot?.relay}>
-          <header className="app-header" inert={offerOpen}>
-            <div>
-              <h1>OGC API - Processes client</h1>
-              <p className="tagline">Discover, run and view geospatial calculations</p>
-            </div>
-            <div className="header-tools">
-              <p className="muted version" data-testid="core-version">
-                core {VERSION}
-              </p>
+          <AppFrame
+            style={appearance.style}
+            inert={offerOpen}
+            tools={
               <AppearanceControl appearance={appearance} onStyle={setStyle} onTheme={setTheme} />
-            </div>
-          </header>
+            }
+          />
           {configWarning !== undefined && (
             <p
               className="notice config-warning"
@@ -189,7 +212,7 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
             </p>
           )}
           <div className={showMap ? "layout" : "layout layout-single"} inert={offerOpen}>
-            <main className="panel" ref={panel}>
+            <main className="panel" ref={panel} data-stage={state.stage}>
               {state.stage !== "choose-endpoint" && state.route === "relay" && <RelayBanner />}
               {screen}
               <JobsPanel
