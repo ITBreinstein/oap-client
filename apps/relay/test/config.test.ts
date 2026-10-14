@@ -112,4 +112,23 @@ describe("parseConfig", () => {
       });
     }
   });
+
+  it.each([
+    ["the root", { endpoints: [], rateLimit: {} }, /relay config: rateLimit is not a known member/],
+    [
+      "an endpoint",
+      { endpoints: [{ ...endpoint, readroute: "relay" }] },
+      /endpoints\[0\]\.readroute is not a known member/,
+    ],
+    [
+      "limits",
+      { endpoints: [], limits: { maxSession: 5 } },
+      /limits\.maxSession is not a known member/,
+    ],
+  ])(
+    "refuses an unknown member in %s, rather than running on the defaults",
+    (_, input, message) => {
+      expect(() => parseConfig(input)).toThrow(message);
+    },
+  );
 });

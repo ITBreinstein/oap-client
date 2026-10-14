@@ -53,10 +53,13 @@ docker build -f apps/relay/Dockerfile -t oap-relay .                           #
 ```
 
 Configuration is one JSON file; see [infra/relay/](../../infra/relay/) for the
-CI config and a public-demo template, and `src/config.ts` for every field. The
-two deadlines, `limits.readTimeoutMs` and `limits.upstreamTimeoutMs`, may be at
-most 2 147 483 647 ms (about 24.8 days), the longest timer Node holds; a longer
-one would fire at once, so the relay refuses to start with it.
+CI config and a public-demo template, and `src/config.ts` for every field. A
+member the relay does not know is refused at every level — the root, each
+endpoint, `limits` — and the relay does not start: a misspelt field would
+otherwise run on its default without a word. The two deadlines,
+`limits.readTimeoutMs` and `limits.upstreamTimeoutMs`, may be at most
+2 147 483 647 ms (about 24.8 days), the longest timer Node holds; a longer one
+would fire at once, so the relay refuses to start with it.
 
 `RELAY_BUILD_ID`, when set, is reported on `/healthz` as `build`. The browser
 test lane sets it to a hash of what it built the relay from, and refuses to run

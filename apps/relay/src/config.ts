@@ -39,6 +39,12 @@
  * config copied into a public deployment fails to start instead of running
  * with the guard off. Only a host literal can be judged here; a name is
  * checked at connect time, on every address it resolves to.
+ *
+ * ## No unknown members
+ *
+ * A member the relay does not know is refused, at every level, rather than
+ * ignored: a misspelt `rateLimits` or `readRoute` would otherwise start a relay
+ * that quietly runs on its defaults.
  */
 
 import { isBlockedHost } from "./address-guard.js";
@@ -160,6 +166,18 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+/** Refuses any member of `record` not in `allowed`, naming the first one. */
+function refuseUnknown(
+  record: Record<string, unknown>,
+  allowed: readonly string[],
+  path: string,
+): void {
+  const unknown = Object.keys(record).find((key) => !allowed.includes(key));
+  if (unknown !== undefined) {
+    throw new ConfigError(path === "" ? unknown : `${path}.${unknown}`, "is not a known member");
+  }
+}
+
 function readString(record: Record<string, unknown>, key: string, path: string): string {
   const value = record[key];
   if (typeof value !== "string" || value === "") {
@@ -239,8 +257,40 @@ export function normaliseHttpUrl(value: string, path: string): string {
   return `${parsed.origin}${parsed.pathname}`.replace(/\/+$/, "");
 }
 
+const ENDPOINT_MEMBERS = [
+  "key",
+  "baseUrl",
+  "executeRoute",
+  "readRoute",
+  "callbacks",
+  "allowPrivateNetwork",
+] as const;
+
+const LIMIT_MEMBERS: readonly (keyof RelayLimits)[] = [
+  "maxExecuteBodyBytes",
+  "maxUpstreamResponseBytes",
+  "upstreamTimeoutMs",
+  "maxSessions",
+  "maxRegistrationsPerSession",
+  "maxStreamsPerSession",
+  "maxOpenStreams",
+  "maxReadResponseBytes",
+  "readTimeoutMs",
+];
+
+const ROOT_MEMBERS = [
+  "publicUrl",
+  "allowedOrigins",
+  "endpoints",
+  "registrationTtlMs",
+  "sessionIdleTtlMs",
+  "sessionMaxAgeMs",
+  "limits",
+] as const;
+
 function parseEndpoint(value: unknown, path: string, options: ParseOptions): EndpointConfig {
   if (!isRecord(value)) throw new ConfigError(path, "must be an object");
+  refuseUnknown(value, ENDPOINT_MEMBERS, path);
   const key = readString(value, "key", path);
   if (!ENDPOINT_KEY.test(key)) {
     throw new ConfigError(`${path}.key`, "must be lowercase letters, digits and dashes");
@@ -301,6 +351,7 @@ function parseOrigin(value: unknown, path: string): string {
 
 export function parseConfig(input: unknown, options: ParseOptions = {}): RelayConfig {
   if (!isRecord(input)) throw new ConfigError("(root)", "must be an object");
+  refuseUnknown(input, ROOT_MEMBERS, "");
 
   const rawEndpoints = input["endpoints"];
   if (!Array.isArray(rawEndpoints)) throw new ConfigError("endpoints", "must be an array");
@@ -331,6 +382,7 @@ export function parseConfig(input: unknown, options: ParseOptions = {}): RelayCo
 
   const rawLimits = input["limits"] ?? {};
   if (!isRecord(rawLimits)) throw new ConfigError("limits", "must be an object");
+  refuseUnknown(rawLimits, LIMIT_MEMBERS, "limits");
   const limits: RelayLimits = {
     maxExecuteBodyBytes: readPositiveInteger(
       rawLimits,
