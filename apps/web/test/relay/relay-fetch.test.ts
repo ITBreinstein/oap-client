@@ -217,6 +217,26 @@ describe("fromRelay", () => {
     const response = fromRelay(new Response(null, { status: 204, headers: { "X-Relay": "1" } }));
     expect(response.status).toBe(204);
   });
+
+  it("throws a rate-limit refusal with its code and Retry-After", () => {
+    const refused = new Response(null, {
+      status: 429,
+      headers: { "X-Relay": "1", "X-Relay-Error": "rate-limited", "Retry-After": "6" },
+    });
+    let thrown: unknown;
+    try {
+      fromRelay(refused);
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(RelayRouteError);
+    expect(thrown).toMatchObject({
+      outcome: "relay-refused",
+      code: "rate-limited",
+      status: 429,
+      retryAfterSeconds: 6,
+    });
+  });
 });
 
 describe("through the core", () => {

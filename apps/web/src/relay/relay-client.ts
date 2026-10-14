@@ -11,6 +11,8 @@ import {
   parseRelayedExecute,
   parseSessionGrant,
   readRefusalReason,
+  readRetryAfter,
+  RELAY_ERROR,
   RELAY_RAW,
   type RawAnswer,
   type RelayEndpoint,
@@ -20,7 +22,8 @@ import {
 
 /**
  * The relay said no, or could not reach the OGC server. `code` is the relay's
- * own reason when it gave one, otherwise the HTTP status.
+ * own reason — its `X-Relay-Error` header, else the body's `reason` — when it
+ * gave one, otherwise what was asked for or the HTTP status.
  *
  * `beforeUpstream` is the load-bearing field: true only when the relay refused
  * before sending anything to the OGC server, so no job can exist. That is the
@@ -30,14 +33,27 @@ export class RelayError extends Error {
   readonly status: number;
   readonly code: string;
   readonly beforeUpstream: boolean;
+  /** `Retry-After`, in seconds, when the relay sent one: with a rate-limit refusal. */
+  readonly retryAfterSeconds: number | undefined;
 
-  constructor(status: number, code: string, beforeUpstream: boolean) {
+  constructor(status: number, code: string, beforeUpstream: boolean, retryAfterSeconds?: number) {
     super(`relay refused (${String(status)}): ${code}`);
     this.name = "RelayError";
     this.status = status;
     this.code = code;
     this.beforeUpstream = beforeUpstream;
+    this.retryAfterSeconds = retryAfterSeconds;
   }
+}
+
+/** The relay's refusal of `response`, its code from the header first, then `fallback`. */
+function refusal(response: Response, fallback: string, beforeUpstream: boolean): RelayError {
+  return new RelayError(
+    response.status,
+    response.headers.get(RELAY_ERROR) ?? fallback,
+    beforeUpstream,
+    readRetryAfter(response.headers),
+  );
 }
 
 export interface RelayClient {
@@ -93,7 +109,7 @@ export function createRelayClient(baseUrl: string, fetchImpl: FetchLike = fetch)
 
     async endpoints(signal) {
       const response = await call("/endpoints", signal === undefined ? {} : { signal });
-      if (!response.ok) throw new RelayError(response.status, "endpoints", true);
+      if (!response.ok) throw refusal(response, "endpoints", true);
       return parseEndpoints(await readJson(response));
     },
 
@@ -102,7 +118,7 @@ export function createRelayClient(baseUrl: string, fetchImpl: FetchLike = fetch)
         method: "POST",
         ...(signal === undefined ? {} : { signal }),
       });
-      if (response.status !== 201) throw new RelayError(response.status, "session", true);
+      if (response.status !== 201) throw refusal(response, "session", true);
       return parseSessionGrant(await readJson(response));
     },
 
@@ -136,8 +152,12 @@ export function createRelayClient(baseUrl: string, fetchImpl: FetchLike = fetch)
       // status, which is the server's here, and may well be 200.
       if (response.headers.has(RELAY_RAW)) return { raw: response };
       if (response.status === 200) return parseRelayedExecute(await readJson(response));
-      const code = readRefusalReason(await readJson(response)) ?? String(response.status);
-      throw new RelayError(response.status, code, REFUSED_BEFORE_UPSTREAM.has(response.status));
+      // The body is read only for a refusal without the header.
+      const code =
+        response.headers.get(RELAY_ERROR) ??
+        readRefusalReason(await readJson(response)) ??
+        String(response.status);
+      throw refusal(response, code, REFUSED_BEFORE_UPSTREAM.has(response.status));
     },
 
     forward(path, init) {

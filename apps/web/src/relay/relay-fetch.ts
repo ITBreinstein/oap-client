@@ -30,7 +30,7 @@
  */
 
 import type { FetchLike } from "@breinstein/oap-client";
-import { RELAY_ERROR, RELAY_MARKER } from "./contract.js";
+import { readRetryAfter, RELAY_ERROR, RELAY_MARKER } from "./contract.js";
 import type { RelayClient } from "./relay-client.js";
 import type { SessionSource } from "./routed-fetch.js";
 
@@ -49,13 +49,21 @@ export class RelayRouteError extends Error {
   /** The relay's `X-Relay-Error` code verbatim, or one of ours: `no-relay-marker`, `unreachable`, … */
   readonly code: string;
   readonly status: number | undefined;
+  /** `Retry-After`, in seconds, when the relay sent one: with a rate-limit refusal. */
+  readonly retryAfterSeconds: number | undefined;
 
-  constructor(outcome: RelayRouteError["outcome"], code: string, status?: number) {
+  constructor(
+    outcome: RelayRouteError["outcome"],
+    code: string,
+    status?: number,
+    retryAfterSeconds?: number,
+  ) {
     super(`relay route: ${outcome} (${code})`);
     this.name = "RelayRouteError";
     this.outcome = outcome;
     this.code = code;
     this.status = status;
+    this.retryAfterSeconds = retryAfterSeconds;
   }
 }
 
@@ -88,6 +96,7 @@ export function fromRelay(response: Response): Response {
       response.status === 502 ? "upstream-failed" : "relay-refused",
       code,
       response.status,
+      readRetryAfter(response.headers),
     );
   }
   return new Response(NULL_BODY_STATUSES.has(response.status) ? null : response.body, {

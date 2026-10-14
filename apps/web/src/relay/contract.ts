@@ -187,7 +187,19 @@ export function parseDoorbell(data: string): Doorbell | undefined {
   return { ref, callbacks };
 }
 
-/** The relay's refusal reason, when it sent one it names. */
+/**
+ * `Retry-After` in whole seconds, as the relay sends it with a rate-limit
+ * refusal; `undefined` when absent or in any other form.
+ */
+export function readRetryAfter(headers: Headers): number | undefined {
+  const value = headers.get("Retry-After")?.trim();
+  return value !== undefined && /^\d{1,9}$/.test(value) ? Number(value) : undefined;
+}
+
+/**
+ * The relay's refusal reason from its body, for a refusal without
+ * `X-Relay-Error`. The header is read first, wherever there is one.
+ */
 export function readRefusalReason(value: unknown): string | undefined {
   if (!isRecord(value)) return undefined;
   const reason = value["reason"] ?? value["detail"];
