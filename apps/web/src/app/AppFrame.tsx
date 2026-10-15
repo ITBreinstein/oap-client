@@ -8,7 +8,9 @@
  *   screen), with one item per place in the workflow and the page's tools.
  *
  * Both carry the same title, the core's version and the same tools, so
- * nothing a test or a screen reader relies on depends on the style.
+ * nothing a test or a screen reader relies on depends on the style. The
+ * header also has the way back and the page's place, which only precise shows
+ * (in place of the panel's breadcrumb, which it hides).
  */
 
 import { VERSION } from "@breinstein/oap-client";
@@ -38,20 +40,44 @@ export interface AppFrameProps {
   readonly railItems?: ReactNode;
   /** The rail's Jobs item. */
   readonly jobsItem?: ReactNode;
+  /**
+   * STYLE TRIAL (precise): the way back and where the page is, for the ruled
+   * header. Shown by precise only, which hides the panel's own breadcrumb.
+   */
+  readonly back?: FrameBack | undefined;
+  readonly context?: string | undefined;
+}
+
+/** The header's way back: its words, and what it does (undefined: not now). */
+export interface FrameBack {
+  readonly label: string;
+  readonly onClick: (() => void) | undefined;
 }
 
 const TITLE = "OGC API - Processes client";
 
 export function AppFrame(props: AppFrameProps) {
-  const { style, inert, appearance, tools } = props;
+  const { style, inert, appearance, tools, back, context } = props;
   // STYLE TRIAL: once a style is chosen, keep one branch and delete the other.
   if (style === "instrument") return <Rail {...props} />;
   return (
-    <header className="app-header" inert={inert}>
+    <header className="app-header" inert={inert} data-back={back !== undefined}>
+      {back !== undefined && (
+        <button
+          type="button"
+          className="link frame-back"
+          disabled={back.onClick === undefined}
+          onClick={back.onClick}
+        >
+          <span aria-hidden="true">← </span>
+          {back.label}
+        </button>
+      )}
       <div className="app-title">
         <h1>{TITLE}</h1>
         <p className="tagline">Discover, run and view geospatial calculations</p>
       </div>
+      {context !== undefined && <p className="frame-context label">{context}</p>}
       <div className="header-tools">
         <p className="muted version" data-testid="core-version">
           core {VERSION}
@@ -63,15 +89,15 @@ export function AppFrame(props: AppFrameProps) {
   );
 }
 
-/** A small line icon, drawn in the current text colour. */
+/** A small line icon, drawn in the current text colour, on the design's 24-unit grid. */
 function Icon({ d }: { readonly d: string }) {
   return (
-    <svg className="icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+    <svg className="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
       <path
         d={d}
         fill="none"
         stroke="currentColor"
-        strokeWidth="1.6"
+        strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
@@ -80,11 +106,12 @@ function Icon({ d }: { readonly d: string }) {
 }
 
 export const ICONS = {
-  connect: "M8 12l4-4M6.5 9.5l-2 2a3 3 0 0 0 4 4l2-2M13.5 10.5l2-2a3 3 0 0 0-4-4l-2 2",
-  processes: "M4 5h12M4 10h12M4 15h12",
-  examples: "M10 3l2 4.5 4.5.5-3.5 3 1 4.5-4-2.5-4 2.5 1-4.5-3.5-3 4.5-.5z",
-  jobs: "M10 4v6l4 2M10 17a7 7 0 1 0 0-14 7 7 0 0 0 0 14z",
-  log: "M4 4h12v12H4zM7 8h6M7 11h6M7 14h3",
+  connect:
+    "M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7",
+  processes: "M4 6h16M4 12h16M4 18h10",
+  examples: "M12 3.5l2.5 5.3 5.8.7-4.3 3.9 1.2 5.7-5.2-2.9-5.2 2.9 1.2-5.7-4.3-3.9 5.8-.7z",
+  jobs: "M12 4a8 8 0 1 0 0 16 8 8 0 1 0 0-16zM12 8v4l3 2",
+  log: "M5 5h14v14H5zM8 9h8M8 13h8M8 17h5",
 } as const;
 
 export function RailItem({
@@ -142,10 +169,11 @@ function Rail(props: AppFrameProps) {
             current={place === "connect"}
             onClick={onConnect}
           />
+          {/* A process is a place within the processes, as the design marks it. */}
           <RailItem
             icon="processes"
             label="Processes"
-            current={place === "processes"}
+            current={place !== "connect"}
             onClick={onProcesses}
           />
           {railItems}

@@ -6,9 +6,11 @@
  *
  * It is the first thing a visitor sees, so it also says what the page is for,
  * what happens after Connect, and which services can work from a web page.
- * With nothing to choose from (the hosted static site), the address field and
- * its Connect button sit on one line, like a search box. With choices, they
- * are cards, and Connect says which one it will open.
+ * The address field and its Connect button sit on one line, like a search
+ * box. The known services, when there are any, are listed under it, and
+ * Connect then says which one it will open. The examples follow the card, and
+ * how it works and which services work are disclosures after them, so a first
+ * screen shows the card and the examples.
  */
 
 import { useId, useState, type ReactNode, type SyntheticEvent } from "react";
@@ -124,9 +126,30 @@ export function EndpointScreen(props: EndpointScreenProps) {
         </p>
 
         <form onSubmit={onSubmit} noValidate>
+          <div className="field address-field">
+            <label htmlFor={`${base}-address`}>Service address</label>
+            {/* The button belongs to the field, like a search box's. */}
+            <div className="input-with-button">
+              {addressInput}
+              {connectButton}
+            </div>
+            <p id={`${base}-address-help`} className="help">
+              Its landing page, often ending in <code>/ogcapi</code>. Always reached directly.
+            </p>
+            {addressError !== undefined && (
+              <p id={`${base}-address-error`} className="field-error">
+                {addressError}
+              </p>
+            )}
+          </div>
+
           {hasChoices && (
             <fieldset className="service-choices">
-              <legend>Choose a service</legend>
+              <legend>Known services</legend>
+              {/* Which one Connect opens, said where the choice is made. */}
+              <p className="muted connect-line">
+                Connect opens <strong className="connect-target">{target}</strong>
+              </p>
               {configured.map((entry) => (
                 <label key={entry.key} className="choice choice-card">
                   <input
@@ -141,7 +164,7 @@ export function EndpointScreen(props: EndpointScreenProps) {
                   <span className="choice-body">
                     <strong className="choice-title">{entry.key}</strong>{" "}
                     <span className="choice-url">{entry.baseUrl}</span>
-                    <span className="choice-access">
+                    <span className="choice-access" data-route={entry.executeRoute}>
                       {entry.executeRoute === "relay" ? "relay" : "direct"}
                     </span>
                     {entry.executeRoute === "relay" && (
@@ -164,7 +187,9 @@ export function EndpointScreen(props: EndpointScreenProps) {
                   <span className="choice-body">
                     <strong className="choice-title">{preset.title}</strong>{" "}
                     <span className="choice-url">{preset.url}</span>
-                    <span className="choice-access">direct</span>
+                    <span className="choice-access" data-route="direct">
+                      direct
+                    </span>
                   </span>
                 </label>
               ))}
@@ -180,44 +205,13 @@ export function EndpointScreen(props: EndpointScreenProps) {
                 />{" "}
                 <span className="choice-body">
                   <strong className="choice-title">Another service</strong>
-                  <span className="choice-note"> Type its address below.</span>
+                  <span className="choice-note"> Type its address above.</span>
                 </span>
               </label>
             </fieldset>
           )}
 
-          <div className="field address-field">
-            <label htmlFor={`${base}-address`}>Service address</label>
-            {hasChoices ? (
-              addressInput
-            ) : (
-              // With nothing else to choose, the button belongs to the field.
-              <div className="input-with-button">
-                {addressInput}
-                {connectButton}
-              </div>
-            )}
-            <p id={`${base}-address-help`} className="help">
-              The service&apos;s landing page: the address that lists its links, often ending in{" "}
-              <code>/ogcapi</code> or <code>/ogc-api</code>. A typed address is always reached
-              directly from this page, never through the relay.
-            </p>
-            {addressError !== undefined && (
-              <p id={`${base}-address-error`} className="field-error">
-                {addressError}
-              </p>
-            )}
-          </div>
-
           {configuredError !== undefined && <p className="notice">{configuredError}</p>}
-          {hasChoices && (
-            <p className="actions">
-              {connectButton}
-              <span className="muted">
-                Opens <strong className="connect-target">{target}</strong>
-              </span>
-            </p>
-          )}
         </form>
 
         {connecting !== undefined && (
@@ -230,8 +224,8 @@ export function EndpointScreen(props: EndpointScreenProps) {
 
       {props.examples}
 
-      <section className="how-it-works" aria-labelledby={`${base}-steps`}>
-        <h3 id={`${base}-steps`}>How it works</h3>
+      <details className="how-it-works">
+        <summary>How it works</summary>
         <ol className="steps">
           {STEPS.map((step) => (
             <li key={step.title}>
@@ -240,7 +234,7 @@ export function EndpointScreen(props: EndpointScreenProps) {
             </li>
           ))}
         </ol>
-      </section>
+      </details>
 
       {staticOnly && (
         <details className="about-access" data-testid="static-only">

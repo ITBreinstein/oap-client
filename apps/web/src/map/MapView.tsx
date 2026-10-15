@@ -100,7 +100,8 @@ export const createPdokMap: CreateMap = (container, reducedMotion) => {
   // scale (ADR 0002); the other styles hide both. The compass turns with the
   // map, so it is right after a rotation, and pressing it turns north up.
   map.addControl(new NavigationControl({ showCompass: true, visualizePitch: false }));
-  map.addControl(new ScaleControl({ unit: "metric" }), "bottom-right");
+  // Bottom left, as on a printed sheet; the attribution keeps the bottom right.
+  map.addControl(new ScaleControl({ unit: "metric", maxWidth: 160 }), "bottom-left");
   return map;
 };
 

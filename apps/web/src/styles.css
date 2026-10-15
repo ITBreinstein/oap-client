@@ -9,6 +9,8 @@
 
 :root {
   --panel-width: 30rem;
+  /* The Examples panel's width, and how far it moves the start screen over. */
+  --examples-width: 380px;
   font-family: var(--font-ui);
   font-size: 16px;
   line-height: 1.5;
@@ -116,7 +118,11 @@ legend,
   border-radius: 0;
 }
 
-/* Everything beside the frame: the configuration note, the layout, the side panels. */
+/*
+ * Everything beside the frame: the configuration note, the layout, the side
+ * panels. Clipped, not scrolled: a closed panel waits just past the edge, and
+ * the page must not scroll sideways to show it.
+ */
 .app-body {
   position: relative;
   display: flex;
@@ -124,6 +130,7 @@ legend,
   flex: 1;
   min-width: 0;
   min-height: 0;
+  overflow-x: clip;
 }
 
 .layout {
@@ -705,44 +712,145 @@ button:disabled {
 }
 
 /*
- * The start screen: what the page is for, one way in, and what comes next.
- * The address and its button sit on one line, like a search box, when there
- * is nothing else to choose; choices are cards that show which one is picked.
+ * The start screen: the connect card, the examples right under it, then how
+ * it works and which services work, folded. One centred column: 620px, with
+ * the card's padding outside it, as the designs draw it. The address and its
+ * button sit on one line, like a search box; the known services, when there
+ * are any, are a compact table under them.
  */
-.start .lead {
-  margin: 0 0 1.25rem;
-  font-size: 1.05rem;
+.layout-single .panel[data-stage="choose-endpoint"] {
+  padding: 64px calc(40px + var(--dock, 0px)) 40px 40px;
+  transition: padding-right 0.2s ease;
 }
 
+.start {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
+}
+
+.start > * {
+  width: 100%;
+  max-width: 620px;
+}
+
+/* The card's padding and edge sit outside the column: 620 + 2 × 36 + 2. */
+.start > .start-card {
+  max-width: 694px;
+}
+
+.start-card,
+.start > .start-card.card {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 32px 36px;
+}
+
+.start-card > *,
+.start-card form > * {
+  margin: 0;
+}
+
+.start-card form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.start-card h2 {
+  font-size: 2rem;
+  line-height: 1.15;
+  font-weight: 700;
+}
+
+.start .lead {
+  font-size: 1.0625rem;
+  line-height: 1.55;
+}
+
+.address-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.address-field > * {
+  margin: 0;
+}
+
+.connect-line {
+  font-size: 0.875rem;
+}
+
+/* The known services: one compact table, the radio first in each row. */
 .service-choices {
-  border: none;
-  padding: 0;
   display: grid;
-  gap: 0.5rem;
+  grid-template-columns: auto minmax(0, 1fr);
+  margin: 0;
+  padding: 0;
+  border: none;
 }
 
 .service-choices legend {
+  float: left;
   padding: 0;
-  margin-bottom: 0.4rem;
+  margin: 0 0 8px;
+}
+
+/* Which one Connect opens, at the end of the heading's line. */
+.service-choices .connect-line {
+  grid-column: 2;
+  justify-self: end;
+  align-self: start;
+  margin: 0 0 8px;
+  text-align: right;
+}
+
+.service-choices label.choice-card {
+  grid-column: 1 / -1;
 }
 
 label.choice-card {
+  align-items: center;
+  min-height: 40px;
   margin: 0;
-  padding: 0.6rem 0.75rem;
+  padding: 0.25rem 0.75rem;
   background: var(--surface);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--r-item);
+  border: 1px solid var(--line-mid);
+  border-radius: 0;
   cursor: pointer;
 }
 
+label.choice-card + label.choice-card {
+  margin-top: -1px;
+}
+
+label.choice-card:first-of-type {
+  border-radius: var(--r-item) var(--r-item) 0 0;
+}
+
+label.choice-card:last-of-type {
+  border-radius: 0 0 var(--r-item) var(--r-item);
+}
+
 label.choice-card:hover {
-  border-color: var(--selected-line);
+  background: var(--surface-hover);
 }
 
 label.choice-card:has(input:checked) {
-  border-color: var(--selected-line);
+  position: relative;
   box-shadow: inset 3px 0 0 var(--accent-ink);
   background: var(--surface-hover);
+}
+
+.choice-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 0.75rem;
+  flex: 1;
 }
 
 .choice-title {
@@ -754,16 +862,32 @@ label.choice-card:has(input:checked) {
 }
 
 .choice-url {
-  display: block;
   color: var(--ident);
   font-family: var(--font-mono);
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   overflow-wrap: anywhere;
+}
+
+/* How a listed service is reached, at the row's end; it says what the note did. */
+.choice-access {
+  margin-left: auto;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
 }
 
 .choice-note {
   color: var(--muted);
   font-size: 0.85rem;
+}
+
+label.choice-card:not(:last-of-type) .choice-note {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .address-field input {
@@ -776,31 +900,45 @@ label.choice-card:has(input:checked) {
 
 .input-with-button {
   display: flex;
-  gap: 0.5rem;
-  margin-top: 0.15rem;
+  gap: 10px;
 }
 
 .input-with-button input {
   flex: 1;
+  min-height: 52px;
+  padding: 0 16px;
+  font-size: 1.0625rem;
 }
 
 .input-with-button button {
   flex: none;
+  min-height: 52px;
+  padding: 0 26px;
+  font-size: 1.0625rem;
 }
 
 .connect-target {
   overflow-wrap: anywhere;
 }
 
-.how-it-works {
-  margin-top: 1.75rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--line);
+/* How it works and which services work: folded, after the examples. */
+.how-it-works,
+.about-access {
+  padding: 0.6rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-item);
+  font-size: 0.9375rem;
 }
 
-.how-it-works h3 {
-  margin: 0 0 0.6rem;
-  font-size: 1rem;
+.how-it-works summary,
+.about-access summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.how-it-works ol.steps {
+  margin-top: 0.75rem;
 }
 
 ol.steps {
@@ -843,20 +981,6 @@ ol.steps li .help {
   margin: 0;
 }
 
-.about-access {
-  margin-top: 1rem;
-  padding: 0.5rem 0.75rem;
-  background: var(--surface-2);
-  border: 1px solid var(--line);
-  border-radius: var(--r-item);
-  font-size: 0.9rem;
-}
-
-.about-access summary {
-  cursor: pointer;
-  font-weight: 600;
-}
-
 .about-access p {
   margin: 0.5rem 0 0;
   color: var(--muted);
@@ -874,7 +998,7 @@ ol.steps li .help {
 .layout-single .panel {
   border-right: none;
   padding-top: 2.5rem;
-  padding-inline: max(1.25rem, calc((100% - 40rem) / 2));
+  padding-inline: max(1.25rem, calc((100% - var(--column, 40rem)) / 2));
 }
 
 @media (min-width: 52rem) {
@@ -1011,36 +1135,62 @@ ol.steps li .help {
 }
 
 /*
- * The start screen's backdrop: streets, a stretch of water and a park, in
- * CSS gradients, for decoration only. It says nothing a reader needs.
+ * The start screen's backdrop: streets, a stretch of water and a park, as the
+ * designs draw them, for decoration only; it says nothing a reader needs. The
+ * streets are the layout's background, the water and the park lie on them,
+ * and the panel over both is a veil (`--backdrop-veil`) with the cards on it.
+ * Sized against the window, so the shapes sit where the designs put them
+ * whatever the header's height.
  */
-.layout-single .panel[data-stage="choose-endpoint"] {
-  background:
-    radial-gradient(ellipse 30rem 18rem at 88% 12%, var(--backdrop-water) 60%, transparent 61%),
-    radial-gradient(ellipse 22rem 14rem at 6% 88%, var(--backdrop-park) 60%, transparent 61%),
-    repeating-linear-gradient(
-      90deg,
-      transparent 0 9rem,
-      var(--backdrop-line-1) 9rem 9.6rem,
-      transparent 9.6rem 13rem
-    ),
-    repeating-linear-gradient(
-      0deg,
-      transparent 0 7rem,
-      var(--backdrop-line-2) 7rem 7.5rem,
-      transparent 7.5rem 11rem
-    ),
-    var(--backdrop-ground);
-  background-attachment: local;
-}
-
-.start-card h2 {
-  margin-top: 0;
-}
-
-.how-it-works,
-.about-access {
+.layout-single:has(> .panel[data-stage="choose-endpoint"]) {
   position: relative;
+  overflow: clip;
+  background:
+    linear-gradient(var(--backdrop-line-1) 2px, transparent 2px) 0 0 / 160px 160px,
+    linear-gradient(90deg, var(--backdrop-line-1) 2px, transparent 2px) 0 0 / 160px 160px,
+    linear-gradient(var(--backdrop-line-2) 1px, transparent 1px) 0 0 / 32px 32px,
+    linear-gradient(90deg, var(--backdrop-line-2) 1px, transparent 1px) 0 0 / 32px 32px,
+    var(--backdrop-ground);
+}
+
+.layout-single:has(> .panel[data-stage="choose-endpoint"])::before,
+.layout-single:has(> .panel[data-stage="choose-endpoint"])::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+}
+
+.layout-single:has(> .panel[data-stage="choose-endpoint"])::before {
+  left: -6vw;
+  top: calc(8vh - 100vh + 100%);
+  width: 30vw;
+  height: 46vh;
+  border-radius: 42% 58% 61% 39% / 47% 38% 62% 53%;
+  background: var(--backdrop-water);
+}
+
+.layout-single:has(> .panel[data-stage="choose-endpoint"])::after {
+  left: 22vw;
+  bottom: -8vh;
+  width: 22vw;
+  height: 26vh;
+  border-radius: 34%;
+  background: var(--backdrop-park);
+}
+
+.layout-single .panel[data-stage="choose-endpoint"] {
+  z-index: 1;
+  background: var(--backdrop-veil);
+}
+
+/*
+ * The Examples panel docks beside the start screen rather than over it: the
+ * column moves over to stay whole. On a narrow screen the panel is a sheet.
+ */
+@media (min-width: 64rem) {
+  .app-body:has(> .examples-panel[data-open="true"]) {
+    --dock: var(--examples-width);
+  }
 }
 
 /* The service the list belongs to: what the page knows of it. */
@@ -1227,9 +1377,19 @@ ol.steps li .help {
   margin: 0;
 }
 
-/* What only one style shows: the request log and the run bar's header. */
+/*
+ * What only some styles show, there for all and hidden here: the request log
+ * and the run bar's header; the header's way back and place, the service's
+ * status, a process's needs, runs and the glyphs' key (precise).
+ */
 .request-log,
-.run-hint {
+.run-hint,
+.frame-back,
+.frame-context,
+.service-status,
+.process-needs,
+.process-runs,
+.process-key {
   display: none;
 }
 
@@ -1260,11 +1420,6 @@ ol.steps li .help {
 /* The map's scale bar and compass belong to the precise style's map frame. */
 .map-pane .maplibregl-ctrl-scale,
 .map-pane .maplibregl-ctrl-group .maplibregl-ctrl-compass {
-  display: none;
-}
-
-/* How a listed service is reached; the instrument style shows it as a column. */
-.choice-access {
   display: none;
 }
 
@@ -1316,19 +1471,31 @@ ol.steps li .help {
 }
 
 /* An icon-only button: 44px, as a finger needs. */
-.panel-close {
+.panel-close,
+button.secondary.panel-close {
+  display: grid;
+  place-items: center;
   flex: none;
   width: 2.75rem;
   height: 2.75rem;
   padding: 0;
-  font-size: 1.4rem;
-  line-height: 1;
+  color: var(--text);
+  border-color: var(--line-strong);
 }
 
 .side-panel-body {
   flex: 1;
   overflow-y: auto;
   padding: 1rem 1.25rem 2rem;
+}
+
+.examples-panel {
+  width: min(var(--examples-width), 100%);
+}
+
+.panel-close .icon {
+  width: 18px;
+  height: 18px;
 }
 
 @media (max-width: 52rem) {
@@ -1341,19 +1508,41 @@ ol.steps li .help {
 
 /* Examples: featured on the start screen, and all of them in the panel. */
 .featured-examples {
-  margin-top: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.featured-examples h3 {
-  margin: 0 0 0.6rem;
-  font-size: 1rem;
+.featured-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.featured-head h3 {
+  margin: 0;
+  font-size: 1.0625rem;
+  font-weight: 600;
+}
+
+.browse-all {
+  min-height: 44px;
+  padding: 0 16px;
+  font-size: 0.9375rem;
+  color: var(--text);
+  border-color: var(--line-strong);
+}
+
+.browse-arrow {
+  display: none;
 }
 
 .example-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.6rem;
-  margin: 0 0 0.6rem;
+  gap: 12px;
+  margin: 0;
   padding: 0;
   list-style: none;
 }
@@ -1384,8 +1573,43 @@ ol.steps li .help {
   border-radius: var(--r-item);
 }
 
+/* A card: title, one line, then what it needs and where, along its foot. */
 .example-card {
-  padding: 0.8rem 0.9rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto auto 1fr;
+  align-items: start;
+  gap: 6px 8px;
+  min-height: 116px;
+  padding: 16px 18px;
+}
+
+.example-card .example-title {
+  grid-column: 1 / -1;
+  font-size: 1rem;
+}
+
+.example-card .example-more {
+  display: contents;
+}
+
+.example-card .example-summary {
+  grid-column: 1 / -1;
+}
+
+.example-card .needs {
+  grid-column: 1;
+  align-self: end;
+  justify-self: start;
+}
+
+.example-card .example-service {
+  grid-column: 2;
+  align-self: end;
+}
+
+.example-id {
+  display: none;
 }
 
 .example-card:hover:not(:disabled),
@@ -1410,11 +1634,13 @@ ol.steps li .help {
 
 .example-summary {
   flex-basis: 100%;
+  font-size: 0.875rem;
   color: var(--muted);
 }
 
-.example-service {
-  font-size: 0.78rem;
+.example-service,
+.example-id {
+  font-size: 0.75rem;
   color: var(--ident);
 }
 
@@ -1422,15 +1648,17 @@ ol.steps li .help {
 .filters {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.4rem;
-  margin: 0 0 0.5rem;
+  gap: 6px;
+  margin: 0;
 }
 
 .filter {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  font-weight: 500;
+  padding: 0 14px;
+  font-size: 0.875rem;
+  font-weight: 400;
   color: var(--text);
   background: var(--surface);
   border: 1px solid var(--line-strong);
@@ -1445,6 +1673,7 @@ ol.steps li .help {
 
 .filter[aria-pressed="true"],
 .filter[aria-pressed="true"]:hover:not(:disabled) {
+  font-weight: 600;
   color: var(--selected-text);
   background: var(--selected-bg);
   border-color: var(--selected-line);
@@ -1457,36 +1686,120 @@ ol.steps li .help {
   background: none;
 }
 
+/*
+ * The panel's list. Its search and filters are a block at the top, under the
+ * heading; the rows run edge to edge below it.
+ */
+.examples-panel .side-panel-head {
+  padding: 24px 24px 0;
+  border-bottom: none;
+}
+
+.examples-panel .side-panel-head h2 {
+  font-size: 1.375rem;
+  font-weight: 700;
+}
+
+.examples-panel .side-panel-body {
+  padding: 0 0 16px;
+}
+
+.examples-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px 24px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.examples-tools .search-field {
+  margin: 0;
+}
+
+.examples-tools input[type="search"] {
+  min-height: 46px;
+  padding: 0 14px;
+  font-size: 1rem;
+}
+
+/* Said for screen readers as the list changes; the group heads count for sight. */
+.examples-count {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 .example-group {
-  margin-top: 1rem;
+  padding: 6px 12px 0;
+}
+
+.example-group + .example-group {
+  margin: 10px 12px 0;
+  padding: 2px 0 0;
+  border-top: 1px solid var(--line);
 }
 
 .example-group-head {
   display: flex;
   align-items: baseline;
-  gap: 0.5rem;
-  margin: 0 0 0.4rem;
-  font-size: 0.9rem;
+  gap: 0.3rem;
+  margin: 10px 12px 4px;
+  font-family: var(--font-ui);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--muted);
 }
 
-.example-group-head .count {
-  padding: 0 0.4rem;
-  font-size: 0.75rem;
-  color: var(--muted);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--r-tag);
+.example-group-head .mono {
+  font-family: inherit;
+  font-size: inherit;
 }
 
 .example-rows {
   display: grid;
-  gap: 0.4rem;
+  gap: 2px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
+/* A row: title and one line, the process id at its end. */
 .example-row {
-  padding: 0.6rem 0.75rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 12px;
+  padding: 12px;
+  border-color: transparent;
+  border-radius: var(--r-control);
+}
+
+.example-row .example-more {
+  display: contents;
+}
+
+.example-row .example-title {
+  grid-column: 1;
+}
+
+.example-row .example-summary {
+  grid-column: 1;
+}
+
+.example-row .needs,
+.example-row .example-service {
+  display: none;
+}
+
+.example-row .example-id {
+  display: block;
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  max-width: 8.5rem;
+  text-align: right;
+  overflow-wrap: anywhere;
 }
 
 /* My jobs: the button that opens it, its count of running jobs, and the panel. */
@@ -1583,5 +1896,20 @@ ol.steps li .help {
     width: 2.75rem;
     height: 2.75rem;
     padding: 0;
+  }
+}
+
+/* The start screen on a narrow screen: the page's gutter, and less padding in the card. */
+@media (max-width: 40rem) {
+  .layout-single .panel[data-stage="choose-endpoint"] {
+    padding: 24px 16px 32px;
+  }
+
+  .start > .start-card.card {
+    padding: 20px;
+  }
+
+  .input-with-button button {
+    padding: 0 18px;
   }
 }

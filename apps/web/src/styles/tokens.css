@@ -18,6 +18,12 @@
  *
  * `:root` carries the hybrid blocks too, so the page has a complete set
  * before `main.tsx` has written `data-style` and `data-theme`.
+ *
+ * Lines come in four weights: `--line` (hairlines inside a container),
+ * `--line-mid` (precise's middle rule), `--line-strong` (container edges) and
+ * `--line-label` (the thin box around a label). The backdrop's veils are the
+ * designs' wash over the streets: 40% on the start screen, 72% under the
+ * process list and 80% under a process without a map.
  */
 
 /* ---------------------------------------------------------------- shapes */
@@ -84,6 +90,7 @@
   --surface-hover: #f3f7fc;
   --field: #ffffff;
   --rail: var(--surface);
+  --rail-hover: var(--surface-hover);
   --text: #1f2933;
   --text-strong: #1f2933;
   --text-secondary: #1f2933;
@@ -92,6 +99,8 @@
   --label-color: #1f2933;
   --line: #e4e7eb;
   --line-strong: #cbd2d9;
+  --line-mid: #cbd2d9;
+  --line-label: #9aa5b1;
   --field-border: #7b8794;
   --accent: #1f4e8c;
   --accent-hover: #163a69;
@@ -126,6 +135,9 @@
   --backdrop-line-2: #e7eae2;
   --backdrop-water: #d6e4ee;
   --backdrop-park: #dfe8d6;
+  --backdrop-veil: rgb(245 247 250 / 40%);
+  --backdrop-veil-list: rgb(245 247 250 / 72%);
+  --backdrop-veil-sheet: rgb(245 247 250 / 80%);
 }
 
 [data-style="hybrid"][data-theme="dark"] {
@@ -135,6 +147,7 @@
   --surface-hover: #1b2939;
   --field: #0f1720;
   --rail: var(--surface);
+  --rail-hover: var(--surface-hover);
   --text: #e6ebf0;
   --text-strong: #f5f7fa;
   --text-secondary: #e6ebf0;
@@ -143,6 +156,8 @@
   --label-color: #cbd5df;
   --line: #2b3a4b;
   --line-strong: #2b3a4b;
+  --line-mid: #2b3a4b;
+  --line-label: #3a4b5e;
   --field-border: #64778c;
   --accent: #7fb2f0;
   --accent-hover: #9cc3f5;
@@ -177,6 +192,9 @@
   --backdrop-line-2: #141d28;
   --backdrop-water: #122638;
   --backdrop-park: #13241a;
+  --backdrop-veil: transparent;
+  --backdrop-veil-list: rgb(15 23 32 / 72%);
+  --backdrop-veil-sheet: rgb(15 23 32 / 80%);
 }
 
 /* ---------------------------------------------------------- Precise colours */
@@ -188,6 +206,7 @@
   --surface-hover: #f3f7fc;
   --field: #ffffff;
   --rail: var(--surface);
+  --rail-hover: var(--surface-hover);
   --text: #1f2933;
   --text-strong: #1f2933;
   --text-secondary: #1f2933;
@@ -196,6 +215,8 @@
   --label-color: #3e4c59;
   --line: #e4e7eb;
   --line-strong: #1f2933;
+  --line-mid: #cbd2d9;
+  --line-label: #9aa5b1;
   --field-border: #1f2933;
   --accent: #1f4e8c;
   --accent-hover: #163a69;
@@ -230,6 +251,9 @@
   --backdrop-line-2: #e7eae2;
   --backdrop-water: #d6e4ee;
   --backdrop-park: #dfe8d6;
+  --backdrop-veil: rgb(245 247 250 / 40%);
+  --backdrop-veil-list: rgb(245 247 250 / 72%);
+  --backdrop-veil-sheet: rgb(245 247 250 / 80%);
 }
 
 [data-style="precise"][data-theme="dark"] {
@@ -239,6 +263,7 @@
   --surface-hover: #1b2939;
   --field: #0f1720;
   --rail: var(--surface);
+  --rail-hover: var(--surface-hover);
   --text: #e6ebf0;
   --text-strong: #f5f7fa;
   --text-secondary: #e6ebf0;
@@ -247,6 +272,8 @@
   --label-color: #9fb0c0;
   --line: #2b3a4b;
   --line-strong: #8193a6;
+  --line-mid: #3a4b5e;
+  --line-label: #64778c;
   --field-border: #8193a6;
   --accent: #7fb2f0;
   --accent-hover: #9cc3f5;
@@ -281,6 +308,9 @@
   --backdrop-line-2: #141d28;
   --backdrop-water: #122638;
   --backdrop-park: #13241a;
+  --backdrop-veil: transparent;
+  --backdrop-veil-list: rgb(15 23 32 / 72%);
+  --backdrop-veil-sheet: rgb(15 23 32 / 80%);
 }
 
 /* ------------------------------------------------------- Instrument colours */
@@ -292,6 +322,7 @@
   --surface-hover: #18202a;
   --field: #0b0f14;
   --rail: #0a0d11;
+  --rail-hover: #151b22;
   --text: #e6ebf0;
   --text-strong: #e6ebf0;
   --text-secondary: #c3ccd6;
@@ -300,6 +331,8 @@
   --label-color: #93a1b0;
   --line: #1f2733;
   --line-strong: #2f3a4a;
+  --line-mid: #2f3a4a;
+  --line-label: #2f3a4a;
   --field-border: #5d6d82;
   --accent: #c6f432;
   --accent-hover: #dcff6e;
@@ -334,6 +367,9 @@
   --backdrop-line-2: #0e1217;
   --backdrop-water: #0e1217;
   --backdrop-park: #0e1217;
+  --backdrop-veil: transparent;
+  --backdrop-veil-list: transparent;
+  --backdrop-veil-sheet: transparent;
 }
 
 /*
@@ -349,6 +385,7 @@
   --surface-hover: #eef2f6;
   --field: #ffffff;
   --rail: #e9edf1;
+  --rail-hover: #dde3e9;
   --text: #0e1217;
   --text-strong: #0e1217;
   --text-secondary: #2d3a46;
@@ -357,6 +394,8 @@
   --label-color: #52606d;
   --line: #d5dbe2;
   --line-strong: #9aa5b1;
+  --line-mid: #c2cad3;
+  --line-label: #9aa5b1;
   --field-border: #7b8794;
   --accent: #c6f432;
   --accent-hover: #dcff6e;
@@ -391,6 +430,9 @@
   --backdrop-line-2: #f4f6f8;
   --backdrop-water: #f4f6f8;
   --backdrop-park: #f4f6f8;
+  --backdrop-veil: transparent;
+  --backdrop-veil-list: transparent;
+  --backdrop-veil-sheet: transparent;
 }
 
 /* ------------------------------------------------------------ both themes */

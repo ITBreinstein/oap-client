@@ -36,7 +36,8 @@ export function SidePanel(props: SidePanelProps) {
     if (!open) return;
     const active = document.activeElement;
     opener.current = active instanceof HTMLElement && active !== document.body ? active : undefined;
-    heading.current?.focus();
+    // Without scrolling: the panel is still sliding in from past the page's edge.
+    heading.current?.focus({ preventScroll: true });
   }, [open]);
 
   // Focus goes back before the panel turns inert, which would drop it on the
@@ -74,7 +75,9 @@ export function SidePanel(props: SidePanelProps) {
           aria-label={`Close ${title}`}
           onClick={close}
         >
-          <span aria-hidden="true">×</span>
+          <svg className="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" strokeWidth="2" />
+          </svg>
         </button>
       </div>
       <div className="side-panel-body">{children}</div>

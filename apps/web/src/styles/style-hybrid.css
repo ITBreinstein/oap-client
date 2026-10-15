@@ -9,23 +9,72 @@
  * `tokens.css`) removes the style and nothing else (ADR 0002).
  */
 
-[data-style="hybrid"] .card {
-  border-color: var(--line);
+/* ------------------------------------------------------- start screen */
+
+/* The card says it all in its heading: no eyebrow, no lead. */
+[data-style="hybrid"] .start-card .eyebrow,
+[data-style="hybrid"] .start-card .lead {
+  display: none;
 }
 
-/* On the start screen's backdrop, everything sits on a card. */
-[data-style="hybrid"] .how-it-works,
-[data-style="hybrid"] .about-access {
-  padding: 1rem 1.25rem;
+/* An address is typed in the UI face here; mono is for what the page shows. */
+[data-style="hybrid"] .input-with-button input {
+  font-family: var(--font-ui);
+}
+
+/* On the backdrop, the examples' heading sits on a small card of its own. */
+[data-style="hybrid"] .featured-head h3 {
+  padding: 6px 12px;
   background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--r-card);
-  box-shadow: var(--shadow-card);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-control);
 }
 
-[data-style="hybrid"] .how-it-works {
-  margin-top: 1.25rem;
+/* The known services, two to a row where there is room. */
+@media (min-width: 40rem) {
+  [data-style="hybrid"] .service-choices {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  [data-style="hybrid"] label.choice-card,
+  [data-style="hybrid"] label.choice-card:first-of-type,
+  [data-style="hybrid"] label.choice-card:last-of-type {
+    grid-column: auto;
+    margin: 0;
+    border-radius: var(--r-control);
+  }
+
+  /* The name on its line; the address and how it is reached under it. */
+  [data-style="hybrid"] .choice-title {
+    flex-basis: 100%;
+  }
+
+  [data-style="hybrid"] .choice-access {
+    margin-left: 0;
+  }
+
+  [data-style="hybrid"] .choice-access::before {
+    content: "· " / "";
+  }
 }
+
+/* The panel's search is named by its placeholder's words; the label is for screen readers. */
+[data-style="hybrid"] .examples-tools .search-field label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Rows in the panel: a rounded fill on hover. */
+[data-style="hybrid"] .example-row:hover:not(:disabled) {
+  border-color: transparent;
+}
+
+/* ---------------------------------------------------------- the list */
 
 /* The process list: one card, rows with a rounded hover fill. */
 [data-style="hybrid"] .process-table {
@@ -60,6 +109,8 @@
   display: none;
 }
 
+/* ----------------------------------------------------- one process */
+
 /* A process with nothing for the map: the whole of it on one card. */
 [data-style="hybrid"] .layout-single .process-screen {
   padding: 1.25rem 1.5rem;
@@ -81,26 +132,4 @@
 
 [data-style="hybrid"] .result-strip {
   color: var(--muted);
-}
-
-/* Examples: on the start screen, a card with a 2×2 grid of example cards. */
-[data-style="hybrid"] .featured-examples {
-  padding: 1rem 1.25rem 0.5rem;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--r-card);
-  box-shadow: var(--shadow-card);
-}
-
-[data-style="hybrid"] .example-card {
-  border-color: var(--line);
-}
-
-[data-style="hybrid"] .example-row {
-  border-color: transparent;
-}
-
-[data-style="hybrid"] .example-row:hover:not(:disabled) {
-  border-color: transparent;
-  box-shadow: inset 3px 0 0 var(--accent-ink);
 }

@@ -50,6 +50,10 @@ function ExampleButton({
         <span className="example-service mono">
           <span className="visually-hidden">on </span>
           {serviceLabel(example.service)}
+        </span>{" "}
+        <span className="example-id mono">
+          <span className="visually-hidden">, process </span>
+          {example.process}
         </span>
       </span>
     </button>
@@ -75,7 +79,22 @@ export function FeaturedExamples(props: FeaturedExamplesProps) {
   const featured = featuredExamples(examples);
   return (
     <section className="featured-examples" aria-labelledby={`${base}-heading`}>
-      <h3 id={`${base}-heading`}>Start from an example</h3>
+      <div className="featured-head">
+        <h3 id={`${base}-heading`}>Start from an example</h3>
+        <button
+          type="button"
+          className="secondary browse-all"
+          aria-expanded={browsing}
+          aria-controls={panelId}
+          onClick={onBrowse}
+        >
+          Browse all<span className="visually-hidden"> {String(examples.length)} examples</span>
+          <span className="browse-arrow" aria-hidden="true">
+            {" "}
+            →
+          </span>
+        </button>
+      </div>
       {featured.length > 0 && (
         <ul className="example-grid">
           {featured.map((example) => (
@@ -90,17 +109,6 @@ export function FeaturedExamples(props: FeaturedExamplesProps) {
           ))}
         </ul>
       )}
-      <p className="actions">
-        <button
-          type="button"
-          className="secondary"
-          aria-expanded={browsing}
-          aria-controls={panelId}
-          onClick={onBrowse}
-        >
-          Browse all {String(examples.length)} examples
-        </button>
-      </p>
     </section>
   );
 }
@@ -125,43 +133,45 @@ export function ExamplesBrowser({
 
   return (
     <div className="examples-browser">
-      <p className="search-field">
-        <label htmlFor={`${base}-search`}>Search examples</label>
-        <input
-          id={`${base}-search`}
-          type="search"
-          placeholder="Title, summary or process id"
-          value={query}
-          onChange={(event) => {
-            setQuery(event.target.value);
-          }}
-        />
-      </p>
-      <div className="filters" role="group" aria-label="What it needs">
-        {FILTERS.map((filter) => (
-          <button
-            key={filter}
-            type="button"
-            className="filter"
-            aria-pressed={needs === filter}
-            onClick={() => {
-              setNeeds(filter);
+      <div className="examples-tools">
+        <p className="search-field">
+          <label htmlFor={`${base}-search`}>Search examples</label>
+          <input
+            id={`${base}-search`}
+            type="search"
+            placeholder="Title, summary or process id"
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value);
             }}
-          >
-            {filter === "all" ? (
-              "All"
-            ) : (
-              <>
-                <span className="needs" data-needs={filter} aria-hidden="true">
-                  <span className="needs-mark" />
-                </span>
-                {NEEDS_LABELS[filter]}
-              </>
-            )}
-          </button>
-        ))}
+          />
+        </p>
+        <div className="filters" role="group" aria-label="What it needs">
+          {FILTERS.map((filter) => (
+            <button
+              key={filter}
+              type="button"
+              className="filter"
+              aria-pressed={needs === filter}
+              onClick={() => {
+                setNeeds(filter);
+              }}
+            >
+              {filter === "all" ? (
+                "All"
+              ) : (
+                <>
+                  <span className="needs" data-needs={filter} aria-hidden="true">
+                    <span className="needs-mark" />
+                  </span>
+                  {NEEDS_LABELS[filter]}
+                </>
+              )}
+            </button>
+          ))}
+        </div>
       </div>
-      <p className="muted" role="status">
+      <p className="muted examples-count" role="status">
         {found.length === 1 ? "1 example" : `${String(found.length)} examples`}
       </p>
       {groups.map((group) => (
@@ -172,7 +182,10 @@ export function ExamplesBrowser({
         >
           <h3 className="example-group-head">
             <span className="mono">{serviceLabel(group.service)}</span>{" "}
-            <span className="count">{String(group.examples.length)}</span>
+            <span className="count">
+              <span aria-hidden="true">· </span>
+              {String(group.examples.length)}
+            </span>
           </h3>
           <ul className="example-rows">
             {group.examples.map((example) => (

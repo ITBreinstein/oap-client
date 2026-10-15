@@ -43,6 +43,7 @@ const COLOUR_TOKENS = [
   "--surface-hover",
   "--field",
   "--rail",
+  "--rail-hover",
   "--text",
   "--text-strong",
   "--text-secondary",
@@ -51,6 +52,8 @@ const COLOUR_TOKENS = [
   "--label-color",
   "--line",
   "--line-strong",
+  "--line-mid",
+  "--line-label",
   "--field-border",
   "--accent",
   "--accent-hover",
@@ -85,6 +88,9 @@ const COLOUR_TOKENS = [
   "--backdrop-line-2",
   "--backdrop-water",
   "--backdrop-park",
+  "--backdrop-veil",
+  "--backdrop-veil-list",
+  "--backdrop-veil-sheet",
 ];
 
 /** Top-level rules of a stylesheet, `@media` blocks and comments left out. */

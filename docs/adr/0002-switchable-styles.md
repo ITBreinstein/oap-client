@@ -89,11 +89,11 @@ else differs in CSS. Where one style shows something the others do not, the
 markup is there for all and the structure hides it, and only that style's
 file shows it:
 
-| Shown by               | What                                                                                                         |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------ |
-| precise                | the map's scale bar and compass, the jobs table's column heads                                               |
-| instrument             | the request log, "Prefer: respond-async" in the run bar, the listed services' access column, the needs marks |
-| precise and instrument | the process table's column heads                                                                             |
+| Shown by               | What                                                                                                                                                                                                                       |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| precise                | the header's way back and place (`back`, `context` on `AppFrame`, hiding the breadcrumb), the list's "Connected" and glyph key, a process's needs and runs, the map's scale bar and compass, the jobs table's column heads |
+| instrument             | "Prefer: respond-async" in the run bar, the needs marks                                                                                                                                                                    |
+| precise and instrument | the process table's column heads, the request log                                                                                                                                                                          |
 
 ### What every style has
 
@@ -150,7 +150,11 @@ Do this twice, once per losing style. Then, optionally, flatten (below).
    block and from `COLOUR_TOKENS` in the token test. `data-main-card` (on the
    start card, the service card and the result) then marks nothing; remove
    the attribute and its rule in `styles.css`.
-3. `src/map/MapView.tsx`: the `ScaleControl` and the compass
+3. `src/app/AppFrame.tsx`: the `back` and `context` props and what they
+   render, and their computation in `App.tsx`; in `ProcessListScreen.tsx` and
+   `ProcessScreen.tsx`, `.service-status`, `.process-key`, `.process-needs`
+   and `.process-runs`, and their rule in `styles.css`. Then
+   `src/map/MapView.tsx`: the `ScaleControl` and the compass
    (`showCompass: true`) are precise's; set `showCompass: false`, remove the
    scale control, and the rule hiding both in `styles.css`.
 4. `src/jobs/JobsPanel.tsx`: the `jobs-head` row of column heads is shown by
@@ -172,10 +176,10 @@ Do this twice, once per losing style. Then, optionally, flatten (below).
    `src/styles/fonts.ts`, the two packages from `apps/web/package.json`, and
    their rows in `THIRD_PARTY.md`.
 5. Shown by instrument only, so delete them or decide to show them in the
-   winner: the request log (`RequestLog` in `ProcessScreen.tsx`,
-   `src/app/request-log.ts` and its rules), `.run-hint`, `.choice-access` in
-   `EndpointScreen.tsx`, and the needs marks (`.needs-mark` in `NeedsTag.tsx`
-   and the filters' marks in `ExamplesView.tsx`).
+   winner: `.run-hint` and the needs marks (`.needs-mark` in `NeedsTag.tsx`
+   and the filters' marks in `ExamplesView.tsx`). If precise goes too, the
+   request log (`RequestLog` in `ProcessScreen.tsx`, `src/app/request-log.ts`
+   and its rules) goes with them.
 6. `src/app/appearance.ts`, `AppearanceControl.tsx` and the tests as for
    hybrid.
 

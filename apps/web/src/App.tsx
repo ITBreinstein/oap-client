@@ -289,6 +289,19 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
       : state.stage === "process" || state.stage === "result"
         ? commands.backToList
         : undefined;
+  // STYLE TRIAL (precise): the header's way back and the page's place in it.
+  const back =
+    state.stage === "connected"
+      ? { label: "Change service", onClick: commands.disconnect }
+      : state.stage === "choose-endpoint"
+        ? undefined
+        : { label: "All processes", onClick: onProcesses };
+  const context =
+    state.stage === "choose-endpoint"
+      ? undefined
+      : state.stage === "connected"
+        ? "OGC API - Processes"
+        : (state.service.title ?? state.endpoint.baseUrl);
   const onLog = developer
     ? () => {
         const details = panel.current?.querySelector<HTMLDetailsElement>("details.developer");
@@ -310,6 +323,8 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
               <AppearanceControl appearance={appearance} onStyle={setStyle} onTheme={setTheme} />
             }
             place={place}
+            back={back}
+            context={context}
             onConnect={onConnect}
             onProcesses={onProcesses}
             onLog={onLog}

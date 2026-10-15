@@ -8,6 +8,25 @@
  * `tokens.css`, and the rail in `AppFrame.tsx`) removes the style (ADR 0002).
  */
 
+/* ------------------------------------------------------------- labels */
+
+[data-style="instrument"] .featured-head h3,
+[data-style="instrument"] .example-group-head,
+[data-style="instrument"] .how-it-works summary,
+[data-style="instrument"] .about-access summary,
+[data-style="instrument"] .results > h3,
+[data-style="instrument"] .sent-heading,
+[data-style="instrument"] .process-path,
+[data-style="instrument"] .service-choices .connect-line,
+[data-style="instrument"] .examples-panel .examples-count {
+  font-family: var(--label-font);
+  font-size: var(--label-size);
+  font-weight: var(--label-weight);
+  text-transform: var(--label-transform);
+  letter-spacing: var(--label-tracking);
+  color: var(--label-color);
+}
+
 /* ------------------------------------------------------------- the rail */
 
 [data-style="instrument"] .app {
@@ -20,8 +39,9 @@
   display: flex;
   flex: none;
   flex-direction: column;
+  align-items: center;
   width: 72px;
-  padding: 0.6rem 0 0.5rem;
+  padding: 14px 0 8px;
   background: var(--rail);
   border-right: 1px solid var(--line);
 }
@@ -29,18 +49,21 @@
 [data-style="instrument"] .rail-logo {
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
-  margin: 0 auto 0.75rem;
-  font-size: 0.8rem;
+  width: 36px;
+  height: 36px;
+  margin: 0 0 14px;
+  font-size: 0.8125rem;
   font-weight: 800;
-  letter-spacing: 0.02em;
   color: var(--accent-text);
   background: var(--accent);
-  border-radius: var(--r-control);
+  border-radius: var(--r-item);
 }
 
 [data-style="instrument"] .rail-nav ul {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -52,29 +75,29 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.2rem;
-  width: 100%;
-  min-height: 56px;
-  padding: 0.45rem 0.2rem;
+  gap: 4px;
+  width: 56px;
+  min-height: 0;
+  padding: 10px 0 8px;
   font-family: var(--font-ui);
-  font-size: 0.68rem;
+  font-size: 0.625rem;
   font-weight: 600;
-  color: var(--muted);
+  color: var(--label-color);
   background: none;
   border: none;
-  border-radius: 0;
+  border-radius: var(--r-item);
 }
 
 [data-style="instrument"] .rail-item:hover:not(:disabled),
 [data-style="instrument"] .app-rail .appearance-button:hover {
   color: var(--text-strong);
-  background: var(--surface-hover);
+  background: var(--rail-hover);
 }
 
 [data-style="instrument"] .rail-item[aria-current="page"],
 [data-style="instrument"] .rail-item[aria-expanded="true"] {
   color: var(--text-strong);
-  background: var(--surface-hover);
+  background: var(--rail-hover);
   box-shadow: inset 2px 0 0 var(--accent-ink);
 }
 
@@ -84,11 +107,14 @@
 
 [data-style="instrument"] .rail-item .icon,
 [data-style="instrument"] .app-rail .appearance-button .icon {
-  width: 1.3rem;
-  height: 1.3rem;
+  width: 20px;
+  height: 20px;
 }
 
 [data-style="instrument"] .rail-end {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   margin-top: auto;
 }
 
@@ -136,7 +162,9 @@
   }
 
   [data-style="instrument"] .rail-nav ul {
-    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    gap: 0;
     height: 100%;
   }
 
@@ -146,7 +174,9 @@
 
   [data-style="instrument"] .rail-item,
   [data-style="instrument"] .app-rail .appearance-button {
+    width: 100%;
     height: 100%;
+    border-radius: 0;
   }
 
   [data-style="instrument"] .rail-item[aria-current="page"],
@@ -190,63 +220,117 @@
 
 /* ---------------------------------------------------- the start screen */
 
+/* No card and no backdrop: the page, left-aligned, as wide as an instrument's face. */
 [data-style="instrument"] .layout-single .panel[data-stage="choose-endpoint"] {
-  background: var(--page);
+  padding: 64px calc(72px + var(--dock, 0px)) 64px 72px;
 }
 
-[data-style="instrument"] .start-card {
+[data-style="instrument"] .start {
+  align-items: flex-start;
+  gap: 36px;
+  max-width: 836px;
+}
+
+[data-style="instrument"] .start > *,
+[data-style="instrument"] .start > .start-card {
+  max-width: none;
+}
+
+[data-style="instrument"] .start > .start-card.card {
   padding: 0;
   background: none;
   border: none;
+  box-shadow: none;
 }
 
-[data-style="instrument"] .eyebrow {
-  color: var(--accent-ink);
+[data-style="instrument"] .start-card .eyebrow {
+  color: var(--label-color);
 }
 
 [data-style="instrument"] .start-card h2 {
-  margin: 0.1rem 0 0.75rem;
-  font-size: 2.4rem;
-  line-height: 1.05;
+  font-size: 3rem;
+  line-height: 1.04;
+  letter-spacing: -0.032em;
+  font-weight: 800;
 }
 
-/* The listed services: a table of known services, the radio as its status dot. */
-[data-style="instrument"] .service-choices {
-  gap: 0;
-  border: 1px solid var(--line);
-  border-radius: var(--r-card);
-  overflow: hidden;
+[data-style="instrument"] .start .lead {
+  max-width: 620px;
+  color: var(--muted);
 }
 
+[data-style="instrument"] .start-card form {
+  gap: 36px;
+}
+
+[data-style="instrument"] .address-field {
+  max-width: 720px;
+}
+
+[data-style="instrument"] .address-field > label,
 [data-style="instrument"] .service-choices legend {
-  margin-bottom: 0.5rem;
+  color: var(--text-secondary);
+}
+
+[data-style="instrument"] .input-with-button {
+  gap: 8px;
+}
+
+[data-style="instrument"] .input-with-button input {
+  min-height: 48px;
+  padding: 0 14px;
+  font-size: 0.9375rem;
+}
+
+[data-style="instrument"] .input-with-button button {
+  min-height: 48px;
+  padding: 0 22px;
+  font-size: 0.9375rem;
+  font-weight: 800;
+}
+
+/* The known services: a table, the radio as its status dot. */
+[data-style="instrument"] .service-choices {
+  max-width: 760px;
+}
+
+[data-style="instrument"] .service-choices .connect-line strong {
+  font-weight: inherit;
+  color: var(--text-secondary);
 }
 
 [data-style="instrument"] label.choice-card {
-  align-items: center;
-  padding: 0.55rem 0.8rem;
-  border: none;
-  border-bottom: 1px solid var(--line);
-  border-radius: 0;
+  gap: 16px;
+  min-height: 52px;
+  padding: 0 16px;
   background: var(--surface);
+  border-color: var(--line);
 }
 
-[data-style="instrument"] label.choice-card:last-child {
-  border-bottom: none;
+[data-style="instrument"] label.choice-card:first-of-type {
+  border-radius: var(--r-card) var(--r-card) 0 0;
+}
+
+[data-style="instrument"] label.choice-card:last-of-type {
+  border-radius: 0 0 var(--r-card) var(--r-card);
+}
+
+[data-style="instrument"] label.choice-card:hover {
+  background: var(--surface-hover);
 }
 
 [data-style="instrument"] label.choice-card:has(input:checked) {
-  background: var(--selected-bg);
+  background: var(--surface-hover);
   box-shadow: inset 2px 0 0 var(--accent-ink);
 }
 
 [data-style="instrument"] label.choice-card input[type="radio"] {
   appearance: none;
   flex: none;
-  width: 0.6rem;
-  height: 0.6rem;
+  width: 8px;
+  height: 8px;
   margin: 0;
-  border: 1.5px solid var(--field-border);
+  border: 1.5px solid var(--ident);
   border-radius: 50%;
 }
 
@@ -256,28 +340,38 @@
 }
 
 [data-style="instrument"] .choice-body {
-  display: grid;
-  flex: 1;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) 4rem;
-  gap: 0 1rem;
-  align-items: baseline;
+  flex-wrap: nowrap;
+  gap: 0 0.4rem;
+}
+
+[data-style="instrument"] .choice-title {
+  font-size: 0.9375rem;
 }
 
 [data-style="instrument"] .choice-url {
-  display: block;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
+  color: var(--label-color);
 }
 
 [data-style="instrument"] .choice-access {
-  display: block;
-  font-family: var(--font-mono);
+  padding-left: 1rem;
   font-size: 0.75rem;
-  color: var(--muted);
-  text-align: right;
+  color: var(--text-secondary);
 }
 
-[data-style="instrument"] .choice-note {
-  grid-column: 2 / -1;
+[data-style="instrument"] .choice-access[data-route="relay"] {
+  color: var(--warning);
+}
+
+[data-style="instrument"] .featured-head .browse-all {
+  min-height: 40px;
+  font-size: 0.8125rem;
+}
+
+[data-style="instrument"] .how-it-works,
+[data-style="instrument"] .about-access {
+  background: var(--surface);
+  border-color: var(--line);
 }
 
 [data-style="instrument"] ol.steps li::before {
@@ -285,17 +379,188 @@
   font-family: var(--font-mono);
 }
 
-[data-style="instrument"] .how-it-works h3 {
-  font-family: var(--label-font);
-  font-size: var(--label-size);
-  font-weight: var(--label-weight);
-  text-transform: var(--label-transform);
-  letter-spacing: var(--label-tracking);
+/* Featured examples: compact rows in one table, as the panel lists them. */
+[data-style="instrument"] .featured-examples {
+  max-width: 760px;
+}
+
+[data-style="instrument"] .example-grid {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  overflow: hidden;
+}
+
+[data-style="instrument"] .example-grid li + li {
+  border-top: 1px solid var(--line);
+}
+
+/* --------------------------------------------- the examples panel, out of the rail */
+
+/* Over the content, never beside it: the start screen stays where it is. */
+[data-style="instrument"] {
+  --examples-width: 420px;
+}
+
+[data-style="instrument"] .app-body:has(> .examples-panel[data-open="true"]) {
+  --dock: 0px;
+}
+
+[data-style="instrument"] .side-panel {
+  right: auto;
+  left: 0;
+  background: var(--surface-2);
+  border-left: none;
+  border-right: 1px solid var(--line-strong);
+}
+
+[data-style="instrument"] .side-panel[data-open="false"] {
+  transform: translateX(-100%);
+}
+
+[data-style="instrument"] .examples-panel .side-panel-head {
+  padding: 20px 20px 0;
+}
+
+[data-style="instrument"] .examples-panel .side-panel-head h2 {
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: -0.015em;
+}
+
+[data-style="instrument"] .examples-tools {
+  gap: 12px;
+  padding: 12px 20px 14px;
+}
+
+[data-style="instrument"] .examples-tools .search-field label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+[data-style="instrument"] .examples-tools input[type="search"] {
+  min-height: 40px;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  border-color: var(--line-strong);
+}
+
+/* How many are shown, at the heading's end. */
+[data-style="instrument"] .examples-panel .examples-count {
+  top: 34px;
+  right: 76px;
+  width: auto;
+  height: auto;
+  clip-path: none;
+  margin: 0;
+}
+
+/* The filters: keys. */
+[data-style="instrument"] .filter {
+  padding: 0 12px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  border-color: var(--line-strong);
+}
+
+[data-style="instrument"] .filter[aria-pressed="true"],
+[data-style="instrument"] .filter[aria-pressed="true"]:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--selected-bg);
+  border-color: var(--selected-line);
+}
+
+[data-style="instrument"] .example-group,
+[data-style="instrument"] .example-group + .example-group {
+  margin: 0;
+  padding: 0;
+  border-top: none;
+}
+
+[data-style="instrument"] .example-group-head {
+  margin: 0;
+  padding: 12px 14px 6px;
+  border-bottom: 1px solid var(--line);
+}
+
+[data-style="instrument"] .example-group-head .mono {
+  font-family: inherit;
+}
+
+[data-style="instrument"] .example-rows {
+  gap: 0;
+}
+
+[data-style="instrument"] .example-rows li {
+  border-bottom: 1px solid var(--line);
+}
+
+/* A row: its need's mark, its title over its service, the process id at its end. */
+[data-style="instrument"] .example-row,
+[data-style="instrument"] .example-card {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  gap: 2px 12px;
+  min-height: 52px;
+  padding: 6px 14px;
+  background: none;
+  border: none;
+  border-radius: 0;
+}
+
+[data-style="instrument"] .example-row:hover:not(:disabled),
+[data-style="instrument"] .example-card:hover:not(:disabled) {
+  background: var(--surface-hover);
+  box-shadow: none;
+}
+
+[data-style="instrument"] :is(.example-row, .example-card) .example-more {
+  display: contents;
+}
+
+[data-style="instrument"] :is(.example-row, .example-card) .needs {
+  display: inline-flex;
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  align-self: center;
+}
+
+[data-style="instrument"] :is(.example-row, .example-card) .example-title {
+  grid-column: 2;
+  grid-row: 1;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+[data-style="instrument"] :is(.example-row, .example-card) .example-summary {
+  display: none;
+}
+
+[data-style="instrument"] :is(.example-row, .example-card) .example-service {
+  display: block;
+  grid-column: 2;
+  grid-row: 2;
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
   color: var(--label-color);
 }
 
-[data-style="instrument"] .about-access {
-  background: var(--surface);
+[data-style="instrument"] :is(.example-row, .example-card) .example-id {
+  display: block;
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  max-width: none;
+  font-size: 0.6875rem;
+  color: var(--ident);
 }
 
 /* ---------------------------------------------------------- the list */
@@ -429,8 +694,8 @@
 
 /* -------------------------------------------------------- one process */
 
-[data-style="instrument"] .process-path {
-  margin-bottom: 0.25rem;
+[data-style="instrument"] .process-runs {
+  display: none;
 }
 
 [data-style="instrument"] .breadcrumb button.link {
@@ -495,6 +760,21 @@
   color: var(--label-color);
 }
 
+/* After a result, both ways on are outlined: Run was the screen's one primary. */
+[data-style="instrument"] .next-steps button {
+  min-height: 38px;
+  padding: 0 12px;
+  font-size: 0.8125rem;
+  color: var(--text);
+  background: var(--surface);
+  border-color: var(--line-strong);
+}
+
+[data-style="instrument"] .next-steps button:hover:not(:disabled) {
+  background: var(--surface-hover);
+  border-color: var(--field-border);
+}
+
 /* The requests this page made to the service, newest last. */
 [data-style="instrument"] .request-log {
   display: block;
@@ -504,118 +784,249 @@
 }
 
 [data-style="instrument"] .request-log h3 {
-  margin: 0 0 0.4rem;
+  margin: 0 0 8px;
 }
 
-[data-style="instrument"] .request-method {
-  flex: none;
-  width: 3.5rem;
+[data-style="instrument"] .request-log ol {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+[data-style="instrument"] .request-log li {
+  gap: 0.6em;
+}
+
+[data-style="instrument"] .request-url {
+  color: var(--text-secondary);
+}
+
+[data-style="instrument"] .request-status[data-ok="true"] {
   color: var(--accent-ink);
 }
 
-[data-style="instrument"] .request-status {
-  flex: none;
-  width: 2rem;
-  color: var(--success);
+/* -------------------------- one process, beside the map: the left sheet */
+
+@media (min-width: 52rem) {
+  [data-style="instrument"] .layout:not(.layout-single) {
+    --panel-width: 400px;
+  }
+
+  [data-style="instrument"] .layout:not(.layout-single) .panel {
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    background: var(--surface-2);
+    border-right-color: var(--line-strong);
+  }
+
+  [data-style="instrument"] .layout:not(.layout-single) .process-screen {
+    display: flex;
+    flex: 1 0 auto;
+    flex-direction: column;
+  }
+
+  [data-style="instrument"] .layout:not(.layout-single) .process-screen > * {
+    margin-inline: 22px;
+  }
+
+  /* The rail's Processes item is the way back. */
+  [data-style="instrument"] .layout:not(.layout-single) .breadcrumb {
+    display: none;
+  }
+
+  /* The title block: where it lives, its title, what it does, ruled off. */
+  [data-style="instrument"] .layout:not(.layout-single) .process-path {
+    margin-top: 20px;
+    margin-bottom: 0;
+  }
+
+  [data-style="instrument"] .layout:not(.layout-single) .process-screen > h2 {
+    margin-block: 8px 0;
+    font-size: 1.625rem;
+    line-height: 1.1;
+    letter-spacing: -0.024em;
+    font-weight: 800;
+  }
+
+  [data-style="instrument"] .layout:not(.layout-single) .process-summary {
+    margin-block: 8px 0;
+    font-size: 0.875rem;
+    color: var(--muted);
+  }
+
+  [data-style="instrument"] .layout:not(.layout-single) .about {
+    margin: 8px 0 0;
+    padding: 0 22px 16px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  [data-style="instrument"] .layout:not(.layout-single) .running {
+    margin-inline: 0;
+    padding: 0 22px 0.5rem;
+  }
+
+  /* The result: a block in the result colours, above the inputs. */
+  [data-style="instrument"] .layout:not(.layout-single) .result-block {
+    margin-top: 20px;
+    padding: 14px;
+    background: var(--result-surface);
+    border: 1px solid var(--result-line);
+    border-radius: var(--r-control);
+  }
+
+  [data-style="instrument"] .layout:not(.layout-single) .results {
+    margin: 0;
+  }
+
+  [data-style="instrument"] .layout:not(.layout-single) .results > h3 {
+    margin: 0 0 6px;
+    color: var(--result-fg);
+  }
+
+  [data-style="instrument"] .layout:not(.layout-single) .result {
+    margin: 0;
+    padding: 0;
+    background: none;
+    border: none;
+  }
+
+  [data-style="instrument"] .layout:not(.layout-single) .result-strip {
+    margin-top: 6px;
+    font-size: 0.75rem;
+    color: var(--muted);
+  }
+
+  [data-style="instrument"] .layout:not(.layout-single) .next-steps {
+    margin-top: 12px;
+  }
+
+  [data-style="instrument"] .layout:not(.layout-single) .sent-heading {
+    margin-top: 20px;
+    padding: 0;
+    border: none;
+  }
+
+  /* The inputs, then the run bar pinned to the sheet's foot. */
+  [data-style="instrument"] .layout:not(.layout-single) form {
+    display: flex;
+    flex: 1 0 auto;
+    flex-direction: column;
+    gap: 20px;
+    padding-top: 20px;
+  }
+
+  [data-style="instrument"] .layout:not(.layout-single) .form-body fieldset {
+    margin: 0;
+    padding: 0;
+    border: none;
+  }
+
+  [data-style="instrument"] .layout:not(.layout-single) .form-body legend {
+    padding: 0 0 10px;
+    color: var(--text-secondary);
+  }
+
+  [data-style="instrument"] .geometry .actions button {
+    min-height: 36px;
+    padding: 0 12px;
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
+    background: var(--surface);
+    border-color: var(--line-strong);
+  }
+
+  /* Drawing is on: the key is pressed, not a second primary. */
+  [data-style="instrument"] .geometry .actions button:not(.secondary) {
+    color: var(--text);
+    background: var(--selected-bg);
+    border-color: var(--selected-line);
+  }
+
+  /* The choice and what it asks the server for, stacked; Run beside them. */
+  [data-style="instrument"] .layout:not(.layout-single) .run-bar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    bottom: 0;
+    gap: 2px 10px;
+    margin: auto -22px 0;
+    padding: 14px 22px 18px;
+    background: var(--surface-2);
+    border-top: 1px solid var(--line);
+  }
+
+  [data-style="instrument"] .layout:not(.layout-single) .run-bar label.choice {
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
+  }
+
+  [data-style="instrument"] .layout:not(.layout-single) .run-bar input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent);
+  }
+
+  [data-style="instrument"] .layout:not(.layout-single) .run-hint {
+    grid-column: 1;
+    padding-left: calc(16px + 0.4rem);
+  }
+
+  [data-style="instrument"] .layout:not(.layout-single) .run-bar button[type="submit"] {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    min-height: 46px;
+    padding: 0 22px;
+    font-size: 0.9375rem;
+    font-weight: 800;
+  }
+
+  [data-style="instrument"] .layout:not(.layout-single) .developer {
+    margin: 0;
+    padding: 0.5rem 22px;
+  }
+
+  /* The request log lies over the map's foot, out of the sheet. */
+  [data-style="instrument"] .layout:not(.layout-single) .request-log {
+    position: fixed;
+    z-index: 3;
+    left: calc(72px + var(--panel-width) + 20px);
+    bottom: 20px;
+    width: min(560px, calc(100vw - 72px - var(--panel-width) - 40px));
+    max-height: 40vh;
+    margin: 0;
+    padding: 12px 14px;
+    overflow: auto;
+    background: color-mix(in srgb, var(--rail) 92%, transparent);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--r-card);
+  }
+
+  /* Its legend at the other corner, above the attribution. */
+  [data-style="instrument"] .map-pane > .map-legend {
+    left: auto;
+    right: 20px;
+    bottom: 40px;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+  }
+
+  [data-style="instrument"] .map-pane > .map-hint:not(.map-legend) {
+    top: 20px;
+    bottom: auto;
+    left: 20px;
+  }
 }
 
-/* The access column says it already; only "Another service" keeps its note. */
-[data-style="instrument"] label.choice-card:not(:last-child) .choice-note {
-  display: none;
-}
-
-/* ------------------------------------------------- examples and panels */
-
-/* Panels slide out of the rail, over the content, and back into it. */
-[data-style="instrument"] .side-panel {
-  right: auto;
-  left: 0;
-  border-left: none;
-  border-right: 1px solid var(--line-strong);
-}
-
-[data-style="instrument"] .side-panel[data-open="false"] {
-  transform: translateX(-100%);
-}
-
-[data-style="instrument"] .featured-examples h3,
-[data-style="instrument"] .example-group-head {
-  font-family: var(--label-font);
-  font-size: var(--label-size);
-  font-weight: var(--label-weight);
-  text-transform: var(--label-transform);
-  letter-spacing: var(--label-tracking);
-  color: var(--label-color);
-}
-
-/* Featured examples: compact rows, each with its need's mark. */
-[data-style="instrument"] .example-grid,
-[data-style="instrument"] .example-rows {
-  grid-template-columns: minmax(0, 1fr);
-  gap: 0;
-  border: 1px solid var(--line);
+[data-style="instrument"] .map-hint,
+[data-style="instrument"] .map-overlay {
+  border-color: var(--line-strong);
   border-radius: var(--r-card);
-  overflow: hidden;
 }
 
-[data-style="instrument"] .example-grid li + li,
-[data-style="instrument"] .example-rows li + li {
-  border-top: 1px solid var(--line);
-}
+/* ------------------------------------------------------------- my jobs */
 
-[data-style="instrument"] .example-card,
-[data-style="instrument"] .example-row {
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.55rem 0.85rem;
-  border: none;
-  border-radius: 0;
-}
-
-[data-style="instrument"] .example-card:hover:not(:disabled),
-[data-style="instrument"] .example-row:hover:not(:disabled) {
-  box-shadow: inset 2px 0 0 var(--accent-ink);
-}
-
-[data-style="instrument"] .example-more {
-  flex-wrap: nowrap;
-  flex-direction: row-reverse;
-}
-
-[data-style="instrument"] .example-summary {
-  display: none;
-}
-
-[data-style="instrument"] .example-rows .example-summary {
-  display: block;
-  flex-basis: auto;
-  font-size: 0.8rem;
-}
-
-[data-style="instrument"] .example-rows .example-more {
-  flex-direction: row;
-  flex-wrap: wrap;
-}
-
-[data-style="instrument"] .example-rows .example-row {
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.2rem;
-}
-
-/* The filters: keys, each with its mark. */
-[data-style="instrument"] .filter {
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
-}
-
-[data-style="instrument"] .filter .needs {
-  display: inline-flex;
-}
-
-/* My jobs: out of the rail, the status in mono. */
 [data-style="instrument"] .job-status,
 [data-style="instrument"] .job-service {
   font-family: var(--font-mono);
@@ -629,15 +1040,26 @@
 /* On a narrow screen, a listed service's name, address and access stack. */
 @media (max-width: 40rem) {
   [data-style="instrument"] .choice-body {
-    grid-template-columns: minmax(0, 1fr) auto;
+    flex-wrap: wrap;
   }
 
   [data-style="instrument"] .choice-url {
-    grid-column: 1 / -1;
-    grid-row: 2;
+    flex-basis: 100%;
+    order: 1;
   }
 
-  [data-style="instrument"] .choice-note {
-    grid-column: 1 / -1;
+  [data-style="instrument"] .choice-access {
+    padding-left: 0;
+  }
+}
+
+/* The start screen on a narrow screen: the page's gutter, a smaller heading. */
+@media (max-width: 40rem) {
+  [data-style="instrument"] .layout-single .panel[data-stage="choose-endpoint"] {
+    padding: 32px 16px;
+  }
+
+  [data-style="instrument"] .start-card h2 {
+    font-size: 2.25rem;
   }
 }

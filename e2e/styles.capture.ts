@@ -139,7 +139,12 @@ test.describe("styles", () => {
       await page.waitForTimeout(2000);
       await shot(page, `${tag}-5-buildings-form`);
 
-      await page.getByRole("button", { name: /All processes/ }).click();
+      // Instrument's way back beside the map is its rail; the others' is "All processes".
+      await (
+        style === "instrument"
+          ? page.getByRole("button", { name: "Processes", exact: true })
+          : page.getByRole("button", { name: /All processes/ })
+      ).click();
       await page.getByRole("button", { name: "Slow process", exact: true }).click();
       await page.getByRole("textbox", { name: "Seconds (optional)" }).fill("1");
       await page.getByRole("checkbox", { name: "Run in the background" }).check();

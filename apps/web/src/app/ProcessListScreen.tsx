@@ -124,9 +124,13 @@ export function ProcessListScreen(props: ProcessListScreenProps) {
       </h2>
 
       <div className="service-card card" data-main-card="true">
-        <p className="service-title">{service.title ?? endpoint.baseUrl}</p>
-        <p className="service-url mono">{endpoint.baseUrl}</p>
-        {service.description !== undefined && <p className="help">{service.description}</p>}
+        <div className="service-main">
+          {/* Said by the breadcrumb in the other styles; precise hides that. */}
+          <p className="service-status label">Connected</p>
+          <p className="service-title">{service.title ?? endpoint.baseUrl}</p>
+          <p className="service-url mono">{endpoint.baseUrl}</p>
+          {service.description !== undefined && <p className="help">{service.description}</p>}
+        </div>
         <dl className="service-facts">
           <div>
             <dt className="label">Access</dt>
@@ -147,29 +151,31 @@ export function ProcessListScreen(props: ProcessListScreenProps) {
         </dl>
       </div>
 
-      <p className="muted list-count">
-        {count}
-        {total !== undefined &&
-          total > processes.processes.length &&
-          ` of ${String(total)} the server reports`}
-        {processes.truncated &&
-          " — the list was cut short after too many pages; some are not shown"}
-        .
-      </p>
-      {processes.processes.length > 8 && (
-        <p className="search-field">
-          <label htmlFor={`${base}-filter`}>Search processes</label>
-          <input
-            id={`${base}-filter`}
-            type="search"
-            placeholder="Title or identifier"
-            value={filter}
-            onChange={(event) => {
-              setFilter(event.target.value);
-            }}
-          />
+      <div className="list-tools">
+        {processes.processes.length > 8 && (
+          <p className="search-field">
+            <label htmlFor={`${base}-filter`}>Search processes</label>
+            <input
+              id={`${base}-filter`}
+              type="search"
+              placeholder="Title or identifier"
+              value={filter}
+              onChange={(event) => {
+                setFilter(event.target.value);
+              }}
+            />
+          </p>
+        )}
+        <p className="muted list-count">
+          {count}
+          {total !== undefined &&
+            total > processes.processes.length &&
+            ` of ${String(total)} the server reports`}
+          {processes.truncated &&
+            " — the list was cut short after too many pages; some are not shown"}
+          .
         </p>
-      )}
+      </div>
       <ErrorMessage error={error} tone={error?.notice === true ? "notice" : "error"} />
       {opening !== undefined && (
         <p role="status" className="status">
@@ -231,6 +237,10 @@ export function ProcessListScreen(props: ProcessListScreenProps) {
             );
           })}
         </ul>
+        {/* The glyphs' key, for the style that marks what a process needs with them. */}
+        <p className="process-key label">
+          ▢ draw on the map · ↑ upload or link a file · = type values
+        </p>
       </div>
     </section>
   );

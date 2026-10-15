@@ -9,8 +9,11 @@ import { schemaWarnings } from "../forms/schema-warnings.js";
 import type { FieldErrors } from "../forms/validate.js";
 import type { SessionObservation } from "../observations.js";
 import type { JobRow } from "../relay/job-session.js";
+import type { RenderableResult } from "../results/renderable.js";
 import { CONFIRM_WINDOW_MS } from "../relay/reconciler.js";
 import { ErrorMessage } from "./ErrorMessage.js";
+import { needsOfPlan } from "./needs.js";
+import { NeedsTag } from "./NeedsTag.js";
 import { lastExecution, requestLog } from "./request-log.js";
 import { FieldView } from "./FormFields.js";
 import { ResultsView } from "./ResultsView.js";
@@ -251,8 +254,41 @@ function seconds(ms: number): string {
   return ms < 1000 ? `${String(Math.round(ms))} ms` : `${(ms / 1000).toFixed(1)} s`;
 }
 
+function bytes(size: number): string {
+  if (size < 1024) return `${String(size)} bytes`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} kB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/** What the page knows of one output's media type: none for a link not loaded. */
+function mediaTypeOf(result: RenderableResult): string | undefined {
+  switch (result.kind) {
+    case "json":
+      return "application/json";
+    case "text":
+    case "download":
+    case "reference":
+      return result.mediaType;
+  }
+}
+
+/** The bytes the server sent for one output, where the page holds them. */
+function sizeOf(result: RenderableResult): number | undefined {
+  switch (result.kind) {
+    case "text":
+    case "download":
+      return result.blob?.size;
+    case "json":
+    case "reference":
+      return undefined;
+  }
+}
+
+/** The reason phrase HTTP gives the statuses a run ends with. */
+const REASONS: Readonly<Record<number, string>> = { 200: "OK", 201: "Created", 204: "No Content" };
+
 /**
- * One line under a result: how it ended, how it ran, how many outputs, and,
+ * One ruled line under a result: how it ended, in what format, how large, and,
  * for a run in the foreground, how long the server took. Only what the page
  * has: a cell it does not know is left out, never guessed.
  */
@@ -266,31 +302,45 @@ function ResultStrip({
   readonly execution: ReturnType<typeof lastExecution>;
 }) {
   const background = state.jobRef !== undefined;
+  const code = execution?.status;
   const status = background
     ? job?.status?.rawStatus
-    : execution?.status === undefined
+    : code === undefined
       ? undefined
-      : `HTTP ${String(execution.status)}`;
-  const outputs = state.results.length;
+      : [String(code), REASONS[code]].filter(Boolean).join(" ");
+  const ok = background ? job?.status?.status === "successful" : code !== undefined && code < 300;
+  const formats = [...new Set(state.results.flatMap((result) => mediaTypeOf(result) ?? []))].join(
+    " · ",
+  );
+  const sizes = state.results.map(sizeOf);
+  const size = sizes.every((each) => each !== undefined)
+    ? sizes.reduce((sum, each) => sum + each, 0)
+    : undefined;
   return (
     <dl className="result-strip">
       {status !== undefined && (
         <div>
           <dt className="label">Status</dt>
-          <dd className="mono">{status}</dd>
+          <dd className="mono" data-ok={ok}>
+            {status}
+          </dd>
         </div>
       )}
-      <div>
-        <dt className="label">Ran</dt>
-        <dd className="mono">{background ? "in the background" : "in the foreground"}</dd>
-      </div>
-      <div>
-        <dt className="label">Outputs</dt>
-        <dd className="mono">{String(outputs)}</dd>
-      </div>
+      {formats !== "" && (
+        <div>
+          <dt className="label">Format</dt>
+          <dd className="mono">{formats}</dd>
+        </div>
+      )}
+      {size !== undefined && state.results.length > 0 && (
+        <div>
+          <dt className="label">Size</dt>
+          <dd className="mono">{bytes(size)}</dd>
+        </div>
+      )}
       {!background && execution !== undefined && (
         <div>
-          <dt className="label">Time</dt>
+          <dt className="label">Took</dt>
           <dd className="mono">{seconds(execution.elapsedMs)}</dd>
         </div>
       )}
@@ -300,7 +350,8 @@ function ResultStrip({
 
 /**
  * The requests this page made to the service, newest last, as the session
- * recorded them. Shown by the Instrument style; the others leave it out.
+ * recorded them. Shown by the precise and instrument styles; hybrid leaves it
+ * out.
  */
 function RequestLog({
   entries,
@@ -311,29 +362,40 @@ function RequestLog({
 }) {
   const base = useId();
   const requests = requestLog(entries, endpoint, 12);
-  if (requests.length === 0) return null;
   return (
     <section className="request-log" aria-labelledby={`${base}-log`}>
       <h3 id={`${base}-log`} className="label">
         Requests to this service
       </h3>
       <ol>
+        {requests.length === 0 && <li className="mono muted">Nothing sent yet.</li>}
         {requests.map((request, index) => (
           // The same request can repeat (a poll): its place is its identity.
           <li key={index} className="mono">
             <span className="request-method">{request.method}</span>{" "}
+            {/* The path under the service's address: the address is the page's already. */}
+            <span className="request-url" title={request.url}>
+              {pathUnder(request.url, endpoint)}
+            </span>{" "}
             <span
               className="request-status"
               data-ok={request.status !== undefined && request.status < 400}
             >
               {request.status === undefined ? "—" : String(request.status)}
-            </span>{" "}
-            <span className="request-url">{request.url}</span>
+            </span>
           </li>
         ))}
       </ol>
     </section>
   );
+}
+
+/** A request's address under the service's own, as a path; another address whole. */
+function pathUnder(url: string, endpoint: string): string {
+  const base = endpoint.endsWith("/") ? endpoint.slice(0, -1) : endpoint;
+  if (url !== base && !url.startsWith(`${base}/`) && !url.startsWith(`${base}?`)) return url;
+  const rest = url.slice(base.length);
+  return rest.startsWith("/") ? rest : `/${rest}`;
 }
 
 /** Whether the relay registered callbacks for a job; `undefined` for no job. */
@@ -361,6 +423,9 @@ export function ProcessScreen(props: ProcessScreenProps) {
   const { process, plan, values, warnings, mode } = state;
   const base = useId();
   const both = process.execution.sync && process.execution.async;
+  const runs = [process.execution.sync && "sync", process.execution.async && "async"]
+    .filter(Boolean)
+    .join(" · ");
   const onlyAsync = process.execution.async && !process.execution.sync;
   const editable = state.stage === "process";
   const errorCount = fieldErrors.size;
@@ -396,9 +461,23 @@ export function ProcessScreen(props: ProcessScreenProps) {
           <span aria-hidden="true">← </span>All processes
         </button>
       </p>
+      {/* What it needs from you: shown by precise, above the title. */}
+      <p className="process-needs">
+        <NeedsTag needs={needsOfPlan(plan)} />
+      </p>
       <p className="process-path mono">
-        {hostOf(state.endpoint.baseUrl)} <span aria-hidden="true">/</span>
-        <span className="visually-hidden">, process</span> {process.id}
+        <span className="process-service">
+          {state.service.title ?? hostOf(state.endpoint.baseUrl)} <span aria-hidden="true">/</span>
+          <span className="visually-hidden">, process</span>{" "}
+        </span>
+        <span className="process-path-id">{process.id}</span>
+        {runs !== "" && (
+          <span className="process-runs">
+            <span aria-hidden="true"> · </span>
+            <span className="visually-hidden">, runs </span>
+            {runs}
+          </span>
+        )}
       </p>
       <h2
         id={`${base}-heading`}
@@ -407,7 +486,9 @@ export function ProcessScreen(props: ProcessScreenProps) {
       >
         {process.title ?? process.id}
       </h2>
-      {process.description !== undefined && <p>{process.description}</p>}
+      {process.description !== undefined && (
+        <p className="process-summary">{process.description}</p>
+      )}
       <About state={state} />
 
       {process.execution.defaulted && (
@@ -489,15 +570,17 @@ export function ProcessScreen(props: ProcessScreenProps) {
             job={resultJob}
             execution={lastExecution(observations, endpointKey, process.id)}
           />
-          <p className="actions next-steps">
-            <button type="button" onClick={commands.edit}>
-              Change the inputs
-            </button>
-            <button type="button" className="secondary" onClick={commands.backToList}>
-              Choose another process
-            </button>
-          </p>
         </div>
+      )}
+      {state.stage === "result" && (
+        <p className="actions next-steps">
+          <button type="button" onClick={commands.edit}>
+            Change the inputs
+          </button>
+          <button type="button" className="secondary" onClick={commands.backToList}>
+            Choose another process
+          </button>
+        </p>
       )}
 
       {/* While a run is under way and after it, the status or result comes
