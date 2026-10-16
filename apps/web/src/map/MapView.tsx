@@ -24,6 +24,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   INITIAL_BOUNDS,
   PDOK_BRT_ATTRIBUTION,
+  PDOK_BRT_GREY_TILES,
   PDOK_BRT_MAX_ZOOM,
   PDOK_BRT_TILES,
 } from "./basemap.js";
@@ -84,8 +85,18 @@ export const createPdokMap: CreateMap = (container, reducedMotion) => {
           maxzoom: PDOK_BRT_MAX_ZOOM,
           attribution: PDOK_BRT_ATTRIBUTION,
         },
+        // STYLE TRIAL: the grey map over it, shown by the updated Instrument at night.
+        "brt-grey": {
+          type: "raster",
+          tiles: [PDOK_BRT_GREY_TILES],
+          tileSize: 256,
+          maxzoom: PDOK_BRT_MAX_ZOOM,
+        },
       },
-      layers: [{ id: "brt", type: "raster", source: "brt" }],
+      layers: [
+        { id: "brt", type: "raster", source: "brt" },
+        { id: "brt-grey", type: "raster", source: "brt-grey", layout: { visibility: "none" } },
+      ],
     },
     bounds: [
       [INITIAL_BOUNDS[0], INITIAL_BOUNDS[1]],
@@ -96,8 +107,29 @@ export const createPdokMap: CreateMap = (container, reducedMotion) => {
   });
   map.addControl(new AttributionControl({ compact: false }));
   map.addControl(new NavigationControl({ showCompass: false, visualizePitch: false }));
+  followGreyAtNight(map);
   return map;
 };
+
+/**
+ * STYLE TRIAL: show the grey map while the page is the updated Instrument
+ * in the dark theme, and follow every switch. A hidden layer fetches no
+ * tiles, so the other versions never ask PDOK for grey ones.
+ */
+function followGreyAtNight(map: MapLibreMap): void {
+  const root = document.documentElement;
+  const sync = () => {
+    const grey = root.dataset["variant"] === "updated" && root.dataset["theme"] === "dark";
+    if (map.getLayer("brt-grey") === undefined) return;
+    map.setLayoutProperty("brt-grey", "visibility", grey ? "visible" : "none");
+  };
+  const observer = new MutationObserver(sync);
+  observer.observe(root, { attributeFilter: ["data-variant", "data-theme"] });
+  map.on("load", sync);
+  map.on("remove", () => {
+    observer.disconnect();
+  });
+}
 
 function prefersReducedMotion(): boolean {
   try {
