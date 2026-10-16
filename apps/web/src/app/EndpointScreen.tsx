@@ -19,6 +19,7 @@ import type { RelayEndpoint } from "../relay/contract.js";
 import type { Place } from "./address.js";
 import { sameService } from "./address.js";
 import { Wordmark } from "./BrandMark.js";
+import { useUpdated } from "./variant.js";
 import { typedEndpoint } from "./run.js";
 import type { EndpointRef, WorkflowError } from "./workflow.js";
 import { ErrorMessage } from "./ErrorMessage.js";
@@ -67,6 +68,8 @@ export function EndpointScreen(props: EndpointScreenProps) {
   const [choice, setChoice] = useState<string | undefined>();
   const [address, setAddress] = useState(linked?.service ?? "");
   const [addressError, setAddressError] = useState<string | undefined>();
+  // STYLE TRIAL: the updated Instrument fills in the address of a service picked from the list.
+  const updated = useUpdated();
   const keys = [...configured.map((entry) => entry.key), ...presets.map((_, i) => presetKey(i))];
   const hasChoices = keys.length > 0;
   // A linked service is picked for the user: its entry when it is a listed
@@ -195,6 +198,7 @@ export function EndpointScreen(props: EndpointScreenProps) {
                     checked={selected === entry.key}
                     onChange={() => {
                       setChoice(entry.key);
+                      if (updated) setAddress(entry.baseUrl);
                     }}
                   />{" "}
                   <span className="choice-body">
@@ -218,6 +222,7 @@ export function EndpointScreen(props: EndpointScreenProps) {
                     checked={selected === presetKey(index)}
                     onChange={() => {
                       setChoice(presetKey(index));
+                      if (updated) setAddress(preset.url);
                     }}
                   />{" "}
                   <span className="choice-body">

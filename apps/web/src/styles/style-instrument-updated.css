@@ -13,6 +13,15 @@
  * in `app/Versioned.tsx` (`.when-updated`), used once, for a job that can't
  * be cancelled. Keep the update's words and delete the component, or the
  * other way round.
+ *
+ * What the update does in code, where `useUpdated()` (`app/variant.ts`) or
+ * `appearance.style` is read: the start screen fills in a picked service's
+ * address (`EndpointScreen.tsx`); JSON is laid out with tabs
+ * (`app/json-text.ts`, in `FormFields`, `GeometryField`, `ComplexField`,
+ * `MapPane`, `ResultsView`); inputs and outputs have Copy (`CopyButton.tsx`,
+ * in `SentInputs`, `ResultsView`); the request log is in the developer
+ * section (`ProcessScreen`, `App.tsx`); My jobs has `structured` rows
+ * (`JobsPanel.tsx`, `JobFacts`). Keep each branch, or delete it.
  */
 
 /* ------------------------------------------------- the rail, easier to read */
@@ -223,4 +232,285 @@
 
 [data-variant="updated"] .when-updated {
   display: inline;
+}
+
+/* ------------------------------------------- the start screen, and the picture */
+
+/* The heading says what the screen is; the label above it repeated the product. */
+[data-variant="updated"] .start-card .eyebrow {
+  display: none;
+}
+
+/*
+ * Europe behind every page without a map, not only the start screen: the
+ * process list and a process whose inputs need none. Same picture, scrim
+ * and place as on the start screen (`backdrop.css`); the text stays on
+ * cards.
+ */
+[data-variant="updated"][data-theme="light"] .layout-single {
+  background-image:
+    linear-gradient(var(--backdrop-scrim), var(--backdrop-scrim)),
+    url("../assets/backdrop/europe-day.webp");
+}
+
+[data-variant="updated"][data-theme="dark"] .layout-single {
+  background-image:
+    linear-gradient(var(--backdrop-scrim), var(--backdrop-scrim)),
+    url("../assets/backdrop/europe-night.webp");
+}
+
+[data-variant="updated"] .layout-single {
+  position: relative;
+  overflow: clip;
+  background-size: cover;
+  background-position: 43.4% 62.7%;
+}
+
+[data-variant="updated"] .layout-single .panel {
+  display: flex;
+  flex-direction: column;
+  background: transparent;
+}
+
+[data-variant="updated"] .layout-single .process-list-screen {
+  padding: 1.25rem 1.5rem;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-panel);
+}
+
+[data-variant="updated"] .layout-single .process-screen {
+  border-color: var(--line-strong);
+  box-shadow: var(--shadow-panel);
+}
+
+[data-variant="updated"] .layout-single .panel:not([data-stage="choose-endpoint"]) > .developer {
+  margin-top: 16px;
+  padding: 12px 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+}
+
+/*
+ * The credit at the picture's lower right, apart from the cards: pinned to
+ * the window's corner where the cards leave it free, else last on the page,
+ * at its right.
+ */
+[data-variant="updated"] .panel > .backdrop-credit {
+  order: 1;
+  align-self: flex-end;
+  width: fit-content;
+  max-width: 100%;
+  margin: 16px 0 0;
+}
+
+[data-variant="updated"] .panel[data-stage="choose-endpoint"] > .backdrop-credit {
+  margin-top: auto;
+}
+
+@media (min-width: 80rem) {
+  [data-variant="updated"] .panel > .backdrop-credit {
+    position: fixed;
+    z-index: 5;
+    right: 16px;
+    bottom: 16px;
+    max-width: 280px;
+    margin: 0;
+  }
+}
+
+/* ------------------------------------------------- the process page */
+
+/* "About this process": plainly something to open, with an arrow that turns. */
+[data-variant="updated"] details.about > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 12px;
+  font-weight: 600;
+  color: var(--accent-ink);
+  list-style: none;
+  cursor: pointer;
+  border: 1px solid var(--field-border);
+  border-radius: var(--r-control);
+}
+
+[data-variant="updated"] details.about > summary::-webkit-details-marker {
+  display: none;
+}
+
+[data-variant="updated"] details.about > summary::before {
+  content: "";
+  width: 0.45em;
+  height: 0.45em;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 0.15s ease;
+}
+
+[data-variant="updated"] details.about[open] > summary::before {
+  transform: rotate(45deg);
+}
+
+[data-variant="updated"] details.about > summary:hover {
+  background: var(--surface-hover);
+}
+
+/*
+ * Buttons that aren't the screen's one filled button, the file picker's and
+ * a job's Results: an edge in the fields' colour, which stands out from the
+ * page (3:1) in both themes, where the hairline did not.
+ */
+[data-variant="updated"] button.secondary,
+[data-variant="updated"] a.button.secondary,
+[data-variant="updated"] input[type="file"]::file-selector-button,
+[data-variant="updated"] .job-row .actions > a {
+  border-color: var(--field-border);
+}
+
+/* "Inputs you sent": a panel of its own, edged like a field, its Copy beside its title. */
+[data-variant="updated"] .sent-inputs {
+  background: var(--surface-hover);
+  border-color: var(--field-border);
+}
+
+[data-variant="updated"] .sent-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 8px;
+}
+
+[data-variant="updated"] .sent-head .sent-heading {
+  margin: 0;
+}
+
+/* Copy, and what it says it did. */
+[data-variant="updated"] .copy {
+  display: inline-flex;
+  flex-direction: row-reverse;
+  align-items: center;
+  gap: 8px;
+}
+
+[data-variant="updated"] .copy-button {
+  min-height: 32px;
+  padding: 0 12px;
+  font-size: 0.8125rem;
+}
+
+[data-variant="updated"] .copy-status {
+  font-size: var(--label-size);
+  color: var(--success);
+}
+
+[data-variant="updated"] .copy-row {
+  display: flex;
+  justify-content: flex-end;
+  margin: 8px 0 0;
+}
+
+/* JSON is laid out with tabs: four columns each, not the browser's eight. */
+[data-variant="updated"] textarea,
+[data-variant="updated"] pre.code {
+  tab-size: 4;
+}
+
+/* ------------------------------------------------- My jobs */
+
+/* Each job a card: its title and status, its facts one to a line, its actions. */
+[data-variant="updated"] .job-row {
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--field-border);
+  border-radius: var(--r-card);
+}
+
+[data-variant="updated"] .job-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 8px;
+}
+
+[data-variant="updated"] .job-top .job-title {
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+
+/* The status as a badge, in its colours: done, failed, under way, or gone. */
+[data-variant="updated"] .job-badge {
+  flex: none;
+  padding: 2px 8px;
+  font-family: var(--label-font);
+  font-size: var(--label-size);
+  letter-spacing: var(--label-tracking);
+  text-transform: var(--label-transform);
+  color: var(--muted);
+  border: 1px solid currentColor;
+  border-radius: var(--r-tag);
+}
+
+[data-variant="updated"] .job-badge strong {
+  font-weight: 600;
+}
+
+[data-variant="updated"] .job-badge[data-job-state="successful"] {
+  color: var(--success);
+  background: var(--success-surface);
+}
+
+[data-variant="updated"] .job-badge[data-job-state="failed"] {
+  color: var(--error);
+  background: var(--error-surface);
+}
+
+[data-variant="updated"] .job-badge[data-job-state="running"],
+[data-variant="updated"] .job-badge[data-job-state="accepted"] {
+  color: var(--warning);
+}
+
+/* Label and value side by side, the labels in one column. */
+[data-variant="updated"] .job-facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 4px 14px;
+  margin: 0 0 10px;
+  font-size: 0.875rem;
+}
+
+[data-variant="updated"] .job-facts > div {
+  display: contents;
+}
+
+[data-variant="updated"] .job-facts dt {
+  font-family: var(--label-font);
+  font-size: var(--label-size);
+  letter-spacing: var(--label-tracking);
+  text-transform: var(--label-transform);
+  line-height: 1.6;
+  color: var(--label-color);
+}
+
+[data-variant="updated"] .job-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+[data-variant="updated"] .job-progress {
+  font-variant-numeric: tabular-nums;
+}
+
+[data-variant="updated"] .job-row .actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
 }

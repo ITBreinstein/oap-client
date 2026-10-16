@@ -27,6 +27,8 @@ import type {
 import { BboxField } from "./BboxField.js";
 import { ComplexField } from "./ComplexField.js";
 import { GeometryField } from "./GeometryField.js";
+import { formatJsonText } from "./json-text.js";
+import { useUpdated } from "./variant.js";
 
 export interface ControlProps<C extends Control = Control> {
   readonly id: string;
@@ -182,11 +184,13 @@ function BooleanInput(props: ControlProps<CheckboxControl>) {
 }
 
 function JsonInput({ id, value, describedBy, invalid, onChange }: ControlProps<JsonControl>) {
+  // STYLE TRIAL: the updated Instrument lays JSON out with tabs.
+  const updated = useUpdated();
   const text = isRawJson(value)
     ? value.rawJson
     : value === undefined
       ? ""
-      : JSON.stringify(value, null, 2);
+      : JSON.stringify(value, null, updated ? "\t" : 2);
   // Said, never enforced: what is typed here is sent as typed.
   const bare = bareObjectHint({ rawJson: text });
   return (
@@ -204,6 +208,10 @@ function JsonInput({ id, value, describedBy, invalid, onChange }: ControlProps<J
         placeholder="JSON"
         onChange={(event) => {
           onChange({ rawJson: event.target.value });
+        }}
+        onBlur={() => {
+          const laidOut = updated ? formatJsonText(text) : undefined;
+          if (laidOut !== undefined && laidOut !== text) onChange({ rawJson: laidOut });
         }}
       />
       {bare !== undefined && (

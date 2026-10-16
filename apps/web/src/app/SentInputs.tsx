@@ -13,7 +13,10 @@
 import type { ProcessDescription } from "@breinstein/oap-client";
 import type { FormValues } from "../forms/encode.js";
 import type { FormPlan } from "../forms/plan.js";
+import { toExecuteBody } from "../forms/encode.js";
+import { CopyButton } from "./CopyButton.js";
 import { notSentLine, outputsLine, summarise, wasSent, type Summary } from "./sent-inputs.js";
+import { useUpdated } from "./variant.js";
 
 export interface SentInputsProps {
   /** The id of the heading that names this record. */
@@ -57,12 +60,23 @@ export function SentInputs(props: SentInputsProps) {
   const sent = plan.fields.filter((field) => wasSent(field, valueOf(field.id)));
   const outputs = outputsLine(process, linkOutputs, developer);
   const notSent = notSentLine(plan, values);
+  // STYLE TRIAL: the updated Instrument offers the inputs sent, as JSON, to copy.
+  const updated = useUpdated();
 
   return (
     <section className="sent-inputs" aria-labelledby={headingId} data-testid="sent-inputs">
-      <h3 id={headingId} className="sent-heading">
-        Inputs you sent
-      </h3>
+      <div className="sent-head">
+        <h3 id={headingId} className="sent-heading">
+          Inputs you sent
+        </h3>
+        {updated && sent.length > 0 && (
+          <CopyButton
+            label="Copy"
+            name="Copy the inputs you sent, as JSON"
+            text={() => JSON.stringify(toExecuteBody(plan, values).inputs, null, "\t")}
+          />
+        )}
+      </div>
       {sent.length === 0 && outputs === undefined ? (
         <p className="sent-none">
           {plan.fields.length === 0 ? "This process takes no inputs." : "No inputs."}

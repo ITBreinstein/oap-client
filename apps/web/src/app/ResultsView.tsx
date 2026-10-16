@@ -14,9 +14,11 @@
 
 import { DEFAULT_MAX_BUFFER_BYTES } from "@breinstein/oap-client";
 import { useContext, useId, useState } from "react";
+import { CopyButton } from "./CopyButton.js";
 import { MapLimitsContext } from "./map-limits.js";
 import { saveBlob } from "./save.js";
 import { useDataUrl } from "./useDataUrl.js";
+import { useUpdated } from "./variant.js";
 import {
   isShownImage,
   mapImage,
@@ -93,6 +95,8 @@ function ResultItem({
   const [blob] = useState(() => blobOf(result));
   const filename = filenameOf(result, processId);
   const { maxCoordinates } = useContext(MapLimitsContext);
+  // STYLE TRIAL: the updated Instrument lays JSON out with tabs, and offers Copy.
+  const updated = useUpdated();
   const status = plotStatus(result, maxCoordinates);
   const plot = status.kind;
   const imageOnMap = placed?.outputId === result.outputId;
@@ -129,7 +133,16 @@ function ResultItem({
           <summary>
             <strong>{result.outputId}</strong> <span className="muted">JSON</span>
           </summary>
-          <pre className="code">{JSON.stringify(result.value, null, 2)}</pre>
+          <pre className="code">{JSON.stringify(result.value, null, updated ? "\t" : 2)}</pre>
+          {updated && (
+            <p className="copy-row">
+              <CopyButton
+                label="Copy"
+                name={`Copy ${result.outputId}`}
+                text={() => JSON.stringify(result.value, null, "\t")}
+              />
+            </p>
+          )}
         </details>
       )}
       {result.kind === "text" && (
@@ -138,6 +151,11 @@ function ResultItem({
             <strong>{result.outputId}</strong> <span className="muted">{result.mediaType}</span>
           </summary>
           <pre className="code">{result.value}</pre>
+          {updated && (
+            <p className="copy-row">
+              <CopyButton label="Copy" name={`Copy ${result.outputId}`} text={() => result.value} />
+            </p>
+          )}
         </details>
       )}
       {result.kind === "download" && isShownImage(result) && (

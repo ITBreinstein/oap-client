@@ -116,5 +116,60 @@ for (const { style, updated } of VERSIONS) {
         .evaluate((log) => getComputedStyle(log).position);
       expect(position).toBe(updated ? "static" : "fixed");
     });
+
+    test(`picking a listed service ${updated ? "fills in" : "leaves"} the address`, async ({
+      page,
+    }) => {
+      await open(page, style);
+      await expect(page.locator(".start-card .eyebrow")).toBeVisible({ visible: !updated });
+      await page.getByRole("radio", { name: /Another service/ }).check();
+      await page.getByRole("radio", { name: /Reference pygeoapi/ }).check();
+      await expect(page.getByRole("textbox", { name: "Service address" })).toHaveValue(
+        updated ? SERVICE : "",
+      );
+    });
+
+    test(`a process without a map ${updated ? "is" : "isn't"} on the picture, credited`, async ({
+      page,
+    }) => {
+      await open(page, style);
+      await connect(page);
+      await page.getByRole("button", { name: "Hello World", exact: true }).click();
+      await expect(page.getByRole("heading", { level: 2, name: "Hello World" })).toBeVisible();
+      const picture = await page
+        .locator(".layout-single")
+        .evaluate((layout) => getComputedStyle(layout).backgroundImage);
+      expect(picture.includes("europe-")).toBe(updated);
+      await expect(page.locator(".backdrop-credit")).toBeVisible({ visible: updated });
+    });
+
+    test(`the requests are ${updated ? "in the developer section" : "under the form"}; inputs and outputs ${updated ? "copy" : "don't copy"}`, async ({
+      page,
+      context,
+    }) => {
+      await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+      await open(page, style);
+      await connect(page);
+      await page.getByRole("button", { name: "Hello World", exact: true }).click();
+      await expect(page.locator(".process-screen .request-log")).toHaveCount(updated ? 0 : 1);
+      await expect(page.locator("details.developer .request-log")).toHaveCount(updated ? 1 : 0);
+
+      await page.getByRole("textbox", { name: /Name/ }).fill("Geonovum");
+      await page.getByRole("button", { name: "Run", exact: true }).click();
+      await page.getByRole("button", { name: "Change the inputs" }).waitFor();
+      const copyOutput = page.getByRole("button", { name: "Copy echo" });
+      const copyInputs = page.getByRole("button", { name: /^Copy the inputs you sent/ });
+      if (!updated) {
+        await expect(copyOutput).toHaveCount(0);
+        await expect(copyInputs).toHaveCount(0);
+        return;
+      }
+      const clipboard = () => page.evaluate(() => navigator.clipboard.readText());
+      await copyOutput.click();
+      await expect(page.getByRole("status").filter({ hasText: "Copied" })).toBeVisible();
+      expect(await clipboard()).toBe('{\n\t"id": "echo",\n\t"value": "Hello Geonovum!"\n}');
+      await copyInputs.click();
+      await expect.poll(clipboard).toBe('{\n\t"name": "Geonovum"\n}');
+    });
   });
 }

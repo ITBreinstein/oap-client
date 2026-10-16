@@ -77,9 +77,19 @@ export function prefetchOtherBackdrop(theme: ResolvedTheme): () => void {
   });
 }
 
-/** Whether a picture is on screen: the start screen, as `backdrop.css` selects it. */
+/**
+ * Whether a picture is on screen: the start screen, as `backdrop.css`
+ * selects it, and in the updated Instrument every page without a map
+ * (`style-instrument-updated.css`).
+ */
 export function backdropShown(): boolean {
-  return document.querySelector('.layout-single > .panel[data-stage="choose-endpoint"]') !== null;
+  if (document.querySelector('.layout-single > .panel[data-stage="choose-endpoint"]') !== null) {
+    return true;
+  }
+  return (
+    document.documentElement.dataset["variant"] === "updated" &&
+    document.querySelector(".layout-single") !== null
+  );
 }
 
 /** Load and decode a theme's picture: true once it can be drawn at once, false if it can't be had. */

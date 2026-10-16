@@ -17,6 +17,7 @@ import { FieldView } from "./FormFields.js";
 import { ResultsView } from "./ResultsView.js";
 import { SentInputs } from "./SentInputs.js";
 import { Versioned } from "./Versioned.js";
+import { useUpdated } from "./variant.js";
 import { shownOnMap } from "./input-shapes.js";
 import { MapLimitsContext } from "./map-limits.js";
 import { offersLink } from "./run.js";
@@ -355,7 +356,7 @@ function ResultStrip({
  * The requests this page made to the service, newest last, as the session
  * recorded them.
  */
-function RequestLog({
+export function RequestLog({
   entries,
   endpoint,
 }: {
@@ -467,6 +468,7 @@ export function ProcessScreen(props: ProcessScreenProps) {
       : undefined;
   const observations = props.observations ?? [];
   const endpointKey = redactUrl(state.endpoint.baseUrl);
+  const updated = useUpdated();
 
   return (
     <section className="process-screen" aria-labelledby={`${base}-heading`}>
@@ -671,7 +673,8 @@ export function ProcessScreen(props: ProcessScreenProps) {
       {state.stage === "process" && state.error?.inputId !== undefined && (
         <p className="hint">The server’s message names the input “{state.error.inputId}”.</p>
       )}
-      <RequestLog entries={observations} endpoint={endpointKey} />
+      {/* STYLE TRIAL: the updated Instrument has it in the developer section instead (App.tsx). */}
+      {!updated && <RequestLog entries={observations} endpoint={endpointKey} />}
     </section>
   );
 }

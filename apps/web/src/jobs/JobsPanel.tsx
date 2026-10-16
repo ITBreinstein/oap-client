@@ -33,6 +33,11 @@ export interface JobsPanelProps {
    * names it already.
    */
   readonly heading?: boolean | undefined;
+  /**
+   * STYLE TRIAL: the updated Instrument's rows: a title with the status as a
+   * badge beside it, then one labelled line per fact.
+   */
+  readonly structured?: boolean | undefined;
 }
 
 function hostOf(url: string): string {
@@ -94,14 +99,85 @@ function StatusText({ job }: { readonly job: JobRow }) {
   );
 }
 
+/** STYLE TRIAL (updated Instrument): a job's title and status, then its facts, one to a line. */
+function JobFacts({
+  job,
+  titleId,
+  title,
+}: {
+  readonly job: JobRow;
+  readonly titleId: string;
+  readonly title: string;
+}) {
+  const { status } = job;
+  const state = job.gone ? "gone" : (status?.status ?? "checking");
+  return (
+    <>
+      <p className="job-top">
+        <strong className="job-title" id={titleId}>
+          {title}
+        </strong>
+        <span className="job-badge" role="status" data-job-state={state}>
+          <strong data-job-status={status?.status}>
+            {job.gone ? "gone" : (status?.rawStatus ?? "checking…")}
+          </strong>
+          {job.confirmation?.state === "pending" && (
+            <span data-not-yet-confirmed="true"> · not yet confirmed</span>
+          )}
+        </span>
+      </p>
+      <dl className="job-facts">
+        <div>
+          <dt>Service</dt>
+          <dd>{hostOf(job.endpoint)}</dd>
+        </div>
+        {job.startedAt !== undefined && (
+          <div>
+            <dt>Started</dt>
+            <dd>
+              <time dateTime={job.startedAt}>{startedLabel(job.startedAt)}</time>
+            </dd>
+          </div>
+        )}
+        {status?.progress !== undefined && (
+          <div>
+            <dt>Progress</dt>
+            <dd className="job-progress">{status.progress}%</dd>
+          </div>
+        )}
+        {status?.message !== undefined && (
+          <div>
+            <dt>Message</dt>
+            <dd>{status.message}</dd>
+          </div>
+        )}
+        {job.gone && (
+          <div>
+            <dt>Server</dt>
+            <dd>No longer there: dismissed, or expired.</dd>
+          </div>
+        )}
+        {job.lastError !== undefined && (
+          <div>
+            <dt>Last read</dt>
+            <dd>Failed: {job.lastError}</dd>
+          </div>
+        )}
+      </dl>
+    </>
+  );
+}
+
 function JobItem({
   job,
   active,
   advertisedBy,
   message,
+  structured,
   onRemove,
   onDismiss,
 }: {
+  readonly structured: boolean;
   readonly job: JobRow;
   readonly active: boolean;
   readonly advertisedBy: DismissAdvertisedBy;
@@ -122,22 +198,28 @@ function JobItem({
       data-restored={job.restored ? "true" : undefined}
       aria-labelledby={`${base}-title`}
     >
-      {/* One cell each, so a style can lay a row out as a table's. */}
-      <p className="job-head">
-        <strong className="job-title" id={`${base}-title`}>
-          {title}
-        </strong>{" "}
-        <span className="muted job-service">on {hostOf(job.endpoint)}</span>
-        {job.startedAt !== undefined && (
-          <span className="muted job-started">
-            <span className="job-sep">, </span>started{" "}
-            <time dateTime={job.startedAt}>{startedLabel(job.startedAt)}</time>
-          </span>
-        )}
-      </p>
-      <p role="status" className="job-status">
-        <StatusText job={job} />
-      </p>
+      {structured ? (
+        <JobFacts job={job} titleId={`${base}-title`} title={title} />
+      ) : (
+        <>
+          {/* One cell each, so a style can lay a row out as a table's. */}
+          <p className="job-head">
+            <strong className="job-title" id={`${base}-title`}>
+              {title}
+            </strong>{" "}
+            <span className="muted job-service">on {hostOf(job.endpoint)}</span>
+            {job.startedAt !== undefined && (
+              <span className="muted job-started">
+                <span className="job-sep">, </span>started{" "}
+                <time dateTime={job.startedAt}>{startedLabel(job.startedAt)}</time>
+              </span>
+            )}
+          </p>
+          <p role="status" className="job-status">
+            <StatusText job={job} />
+          </p>
+        </>
+      )}
       {job.restored && (
         <p className="hint">From an earlier visit: its status is polled, with no live updates.</p>
       )}
@@ -233,6 +315,7 @@ export function JobsPanel(props: JobsPanelProps) {
             active={job.statusUrl === activeJob}
             advertisedBy={dismissAdvertisedFor(job)}
             message={messages.get(job.statusUrl)}
+            structured={props.structured === true}
             onRemove={() => {
               onRemove(job.statusUrl);
             }}

@@ -19,6 +19,8 @@ import { refuseSize } from "../forms/upload.js";
 import { DrawContext } from "./draw.js";
 import { tooManyToEditMessage, useTooManyToEdit } from "./map-limits.js";
 import type { ControlProps } from "./FormFields.js";
+import { formatJsonText } from "./json-text.js";
+import { useUpdated } from "./variant.js";
 
 const SINGULAR = { Point: "point", LineString: "line", Polygon: "area" } as const;
 const PLURAL = { Point: "points", LineString: "lines", Polygon: "areas" } as const;
@@ -45,6 +47,8 @@ function describeTarget(control: GeometryControl): string {
 
 export function GeometryField(props: ControlProps<GeometryControl>) {
   const { control, value, onChange, inputId } = props;
+  // STYLE TRIAL: the updated Instrument lays GeoJSON out with tabs.
+  const updated = useUpdated();
   const draw = useContext(DrawContext);
   const base = useId();
   const [message, setMessage] = useState<string | undefined>();
@@ -77,6 +81,10 @@ export function GeometryField(props: ControlProps<GeometryControl>) {
           onChange={(event) => {
             setMessage(undefined);
             set(event.target.value);
+          }}
+          onBlur={() => {
+            const laidOut = updated ? formatJsonText(text) : undefined;
+            if (laidOut !== undefined && laidOut !== text) set(laidOut);
           }}
         />
       </p>

@@ -47,6 +47,7 @@ import type { GeometryDrawProps } from "../map/useGeometryDraw.js";
 import type { DrawTarget } from "./draw.js";
 import { MapLimitsContext, tooManyToEdit } from "./map-limits.js";
 import { useDataUrl } from "./useDataUrl.js";
+import { useUpdated } from "./variant.js";
 import type { Workflow } from "./workflow.js";
 
 function toBbox(value: unknown): Bbox | undefined {
@@ -174,6 +175,8 @@ export function MapPane({
       : undefined;
   const shapes = field === undefined ? undefined : shapeBinding(field, current);
   const { maxCoordinates, maxEditableCoordinates } = useContext(MapLimitsContext);
+  // STYLE TRIAL: the updated Instrument writes drawn GeoJSON laid out with tabs.
+  const updated = useUpdated();
   // Never into the draw mode: Terra Draw keeps a feature per vertex and
   // redraws them all on every move. Shown read-only on the input layer
   // instead, and the field says why (map-limits.ts).
@@ -190,7 +193,14 @@ export function MapPane({
           value: shapesOfText(shapes.text),
           onChange: (drawn: readonly MapShape[]) => {
             const { geojson } = toGeoJson(shapes.target, drawn);
-            setValue(field.id, shapes.write(geojson === undefined ? "" : JSON.stringify(geojson)));
+            setValue(
+              field.id,
+              shapes.write(
+                geojson === undefined
+                  ? ""
+                  : JSON.stringify(geojson, null, updated ? "\t" : undefined),
+              ),
+            );
           },
         };
 

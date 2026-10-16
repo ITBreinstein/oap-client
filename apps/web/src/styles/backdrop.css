@@ -88,8 +88,8 @@
   border-radius: var(--r-card);
 }
 
-/* The credit: only Instrument shows one. */
-:root:not([data-style="instrument"]) .backdrop-credit {
+/* The credit goes with the picture: here, the start screen's only. */
+:root:not([data-variant="updated"]) .panel:not([data-stage="choose-endpoint"]) > .backdrop-credit {
   display: none;
 }
 

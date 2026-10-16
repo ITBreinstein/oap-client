@@ -21,6 +21,8 @@ import { refuseJsonObject, refuseSize } from "../forms/upload.js";
 import { DrawContext } from "./draw.js";
 import { tooManyToEditMessage, useTooManyToEdit } from "./map-limits.js";
 import type { ControlProps } from "./FormFields.js";
+import { formatJsonText } from "./json-text.js";
+import { useUpdated } from "./variant.js";
 
 function asComplex(value: unknown): ComplexValue {
   if (typeof value === "object" && value !== null && "format" in value) {
@@ -57,6 +59,8 @@ function readFile(file: File, base64: boolean): Promise<string> {
 
 export function ComplexField(props: ControlProps<ComplexControl>) {
   const { control, value, onChange, inputId } = props;
+  // STYLE TRIAL: the updated Instrument lays a JSON value out with tabs.
+  const updated = useUpdated();
   const draw = useContext(DrawContext);
   const base = useId();
   const [message, setMessage] = useState<string | undefined>();
@@ -160,6 +164,13 @@ export function ComplexField(props: ControlProps<ComplexControl>) {
               onChange={(event) => {
                 setMessage(undefined);
                 onChange({ format: current.format, value: event.target.value });
+              }}
+              onBlur={() => {
+                if (!updated || format?.object !== true) return;
+                const laidOut = formatJsonText(current.value ?? "");
+                if (laidOut !== undefined && laidOut !== current.value) {
+                  onChange({ format: current.format, value: laidOut });
+                }
               }}
             />
           </p>
