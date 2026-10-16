@@ -1567,6 +1567,13 @@ button.secondary.panel-close {
   padding: 1rem 1.25rem 2rem;
 }
 
+/* What a panel pins to its foot, under what scrolls (About's links). */
+.side-panel-foot {
+  flex: none;
+  padding: 0.75rem 1.25rem 1rem;
+  border-top: 1px solid var(--line);
+}
+
 .examples-panel {
   width: min(var(--examples-width), 100%);
 }

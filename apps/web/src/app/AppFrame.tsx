@@ -42,6 +42,8 @@ export interface AppFrameProps {
   readonly railItems?: ReactNode;
   /** The rail's Jobs item. */
   readonly jobsItem?: ReactNode;
+  /** STYLE TRIAL (instrument): the rail's About item, above Appearance. */
+  readonly aboutItem?: ReactNode;
   /**
    * STYLE TRIAL (precise): the way back and where the page is, for the ruled
    * header. Shown by precise only, which hides the panel's own breadcrumb.
@@ -163,6 +165,7 @@ export const ICONS = {
   examples: "M12 3.5l2.5 5.3 5.8.7-4.3 3.9 1.2 5.7-5.2-2.9-5.2 2.9 1.2-5.7-4.3-3.9 5.8-.7z",
   jobs: "M12 4a8 8 0 1 0 0 16 8 8 0 1 0 0-16zM12 8v4l3 2",
   log: "M5 5h14v14H5zM8 9h8M8 13h8M8 17h5",
+  about: "M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18zM12 11v5M12 8h.01",
 } as const;
 
 export function RailItem({
@@ -240,7 +243,17 @@ export function StartLink({
 
 // STYLE TRIAL (instrument): delete with the instrument style.
 function Rail(props: AppFrameProps) {
-  const { inert, appearance, place, onConnect, onProcesses, onLog, railItems, jobsItem } = props;
+  const {
+    inert,
+    appearance,
+    place,
+    onConnect,
+    onProcesses,
+    onLog,
+    railItems,
+    jobsItem,
+    aboutItem,
+  } = props;
   return (
     <header className="app-rail" inert={inert}>
       <h1 className="visually-hidden">{TITLE}</h1>
@@ -267,6 +280,7 @@ function Rail(props: AppFrameProps) {
         </ul>
       </nav>
       <div className="rail-end">
+        {aboutItem !== undefined && <ul className="rail-end-items">{aboutItem}</ul>}
         {appearance}
         <p className="rail-version" data-testid="core-version">
           core {VERSION}

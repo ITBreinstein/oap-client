@@ -121,7 +121,14 @@ function thirdPartyLicences(fileName: string): Plugin {
   };
 }
 
+/** This app's own version, from its package.json: About shows it beside the core's. */
+const appVersion = (
+  JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8")) as Manifest
+).version;
+
 export default defineConfig({
+  // Written into the bundle at build time, not fetched: `src/vite-env.d.ts` types it.
+  define: { __APP_VERSION__: JSON.stringify(appVersion) },
   // Every bundled package's licence, beside the bundle and deployed with it:
   // minifying drops the licence comments that maplibre-gl's BSD-3 licence
   // asks to travel with a binary (review T9).

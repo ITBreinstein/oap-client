@@ -12,6 +12,7 @@ import { MapPane } from "./app/MapPane.js";
 import { needsOfPlan, type Needs } from "./app/needs.js";
 import { ProcessListScreen } from "./app/ProcessListScreen.js";
 import { ProcessScreen } from "./app/ProcessScreen.js";
+import { AboutFooter, AboutPanel } from "./app/AboutPanel.js";
 import { DEV_EXAMPLES, DEV_PRESETS } from "./app/dev-presets.js";
 import { exampleNeeds } from "./app/examples.js";
 import { ExamplesBrowser, FeaturedExamples } from "./app/ExamplesView.js";
@@ -32,10 +33,11 @@ import {
 import type { RelayEndpoint } from "./relay/contract.js";
 
 /** The side panels; one is open at a time. */
-type Panel = "examples" | "jobs";
+type Panel = "examples" | "jobs" | "about";
 const PANEL_IDS: Readonly<Record<Panel, string>> = {
   examples: "examples-panel",
   jobs: "jobs-panel",
+  about: "about-panel",
 };
 
 /**
@@ -365,6 +367,17 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
                 />
               )
             }
+            aboutItem={
+              <RailItem
+                icon="about"
+                label="About"
+                pressed={panelOpen === "about"}
+                controls={PANEL_IDS.about}
+                onClick={() => {
+                  togglePanel("about");
+                }}
+              />
+            }
             jobsItem={
               <RailItem
                 icon="jobs"
@@ -461,6 +474,19 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
                 onRemove={commands.removeJob}
                 onDismiss={commands.dismissJob}
               />
+            </SidePanel>
+            {/* STYLE TRIAL (instrument): only the rail has an About item; the
+                panel stays shut in the other styles, even across a style switch. */}
+            <SidePanel
+              id={PANEL_IDS.about}
+              title="About"
+              open={panelOpen === "about" && appearance.style === "instrument"}
+              inert={offerOpen}
+              onClose={closePanel}
+              className="about-panel"
+              footer={<AboutFooter />}
+            >
+              <AboutPanel />
             </SidePanel>
           </div>
           {offerOpen && (

@@ -133,6 +133,13 @@
   color: var(--ident);
 }
 
+/* About sits above Appearance, at the rail's foot. */
+[data-style="instrument"] .rail-end-items {
+  margin: 0 0 6px;
+  padding: 0;
+  list-style: none;
+}
+
 /* The Appearance popover opens beside the rail, from its foot. */
 [data-style="instrument"] .app-rail .appearance-popover {
   top: auto;
@@ -159,8 +166,10 @@
     border-right: none;
   }
 
+  /* No room for About in the bar at the foot: five places are its most. */
   [data-style="instrument"] .rail-logo,
-  [data-style="instrument"] .rail-version {
+  [data-style="instrument"] .rail-version,
+  [data-style="instrument"] .rail-end-items {
     display: none;
   }
 
@@ -1117,4 +1126,123 @@
   margin-top: 8px;
   font-family: var(--font-mono);
   font-size: 0.75rem;
+}
+
+/* ------------------------------------------------------------ About */
+
+/* Out of the rail like Examples, at its width. */
+[data-style="instrument"] .about-panel {
+  width: min(var(--examples-width), 100%);
+}
+
+[data-style="instrument"] .about-panel .side-panel-head {
+  padding: 20px 20px 12px;
+  border-bottom: none;
+}
+
+[data-style="instrument"] .about-panel .side-panel-head h2 {
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: -0.015em;
+}
+
+/* The sections carry their own padding and rules. */
+[data-style="instrument"] .about-panel .side-panel-body {
+  padding: 0;
+}
+
+[data-style="instrument"] .about-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+[data-style="instrument"] .about-section h3 {
+  margin: 0 0 2px;
+}
+
+[data-style="instrument"] .about-section p {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+[data-style="instrument"] .about-section strong {
+  color: var(--text-secondary);
+}
+
+[data-style="instrument"] .about-intro {
+  gap: 14px;
+  padding-top: 6px;
+}
+
+[data-style="instrument"] .about-logo {
+  display: block;
+  width: 168px;
+  height: auto;
+  color: var(--text);
+}
+
+[data-style="instrument"] .about-section .about-lead {
+  font-size: 0.9375rem;
+  color: var(--text-secondary);
+}
+
+[data-style="instrument"] .about-section .about-lead strong {
+  color: var(--text);
+}
+
+[data-style="instrument"] .about-facts {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr);
+  gap: 7px 14px;
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+[data-style="instrument"] .about-facts dt {
+  color: var(--label-color);
+}
+
+[data-style="instrument"] .about-facts dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+[data-style="instrument"] .about-facts a,
+[data-style="instrument"] .about-links a {
+  font-weight: 700;
+  text-underline-offset: 3px;
+}
+
+[data-style="instrument"] .about-version {
+  font-family: var(--font-mono);
+}
+
+[data-style="instrument"] .about-panel .side-panel-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 14px 20px 16px;
+}
+
+[data-style="instrument"] .about-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 0;
+  font-size: 0.8125rem;
+}
+
+[data-style="instrument"] .about-copyright {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--label-color);
 }

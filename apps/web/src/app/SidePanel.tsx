@@ -1,5 +1,5 @@
 /**
- * A side panel: Examples, My jobs. Not modal: the page beside it stays
+ * A side panel: Examples, My jobs, About. Not modal: the page beside it stays
  * usable. One is open at a time (`App` decides).
  *
  * Opening moves focus to its heading; Escape or the close button closes it
@@ -22,10 +22,12 @@ export interface SidePanelProps {
   readonly onClose: () => void;
   readonly className?: string | undefined;
   readonly children: ReactNode;
+  /** Pinned to the panel's foot, outside what scrolls. */
+  readonly footer?: ReactNode;
 }
 
 export function SidePanel(props: SidePanelProps) {
-  const { id, title, open, onClose, className, children } = props;
+  const { id, title, open, onClose, className, children, footer } = props;
   const base = useId();
   const root = useRef<HTMLElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
@@ -81,6 +83,7 @@ export function SidePanel(props: SidePanelProps) {
         </button>
       </div>
       <div className="side-panel-body">{children}</div>
+      {footer !== undefined && <footer className="side-panel-foot">{footer}</footer>}
     </aside>
   );
 }
