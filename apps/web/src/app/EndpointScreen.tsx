@@ -16,6 +16,7 @@
 import { useId, useState, type ReactNode, type SyntheticEvent } from "react";
 import type { Preset } from "../config/runtime-config.js";
 import type { RelayEndpoint } from "../relay/contract.js";
+import { Wordmark } from "./BrandMark.js";
 import { typedEndpoint } from "./run.js";
 import type { EndpointRef, WorkflowError } from "./workflow.js";
 import { ErrorMessage } from "./ErrorMessage.js";
@@ -116,6 +117,8 @@ export function EndpointScreen(props: EndpointScreenProps) {
   return (
     <section className="start" aria-labelledby={`${base}-heading`}>
       <div className="start-card card" data-main-card="true">
+        {/* STYLE TRIAL (instrument): the wordmark on a narrow screen, where the rail has none. */}
+        <Wordmark className="start-wordmark" />
         <p className="eyebrow label">OGC API - Processes</p>
         <h2 id={`${base}-heading`} tabIndex={-1} data-focus-on-stage>
           Connect to a service

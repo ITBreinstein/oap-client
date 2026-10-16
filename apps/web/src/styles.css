@@ -1450,7 +1450,8 @@ ol.steps li .help {
  * What only some styles show, there for all and hidden here: the request log
  * and the run bar's header; the header's way back and place, the service's
  * status, a process's needs, runs and the glyphs' key (precise); the header's
- * mark, breadcrumb and theme icons (hybrid).
+ * mark, breadcrumb and theme icons (hybrid); the start card's wordmark
+ * (instrument, narrow).
  */
 .request-log,
 .run-hint,
@@ -1459,6 +1460,7 @@ ol.steps li .help {
 .frame-crumbs,
 .frame-mark,
 .theme-icon,
+.start-wordmark,
 .service-status,
 .process-needs,
 .process-runs,

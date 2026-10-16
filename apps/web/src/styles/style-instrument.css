@@ -46,17 +46,24 @@
   border-right: 1px solid var(--line);
 }
 
+/* Breinstein's wordmark, in the rail labels' colour; no fill behind it. */
 [data-style="instrument"] .rail-logo {
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
+  display: block;
+  width: 60px;
   margin: 0 0 14px;
-  font-size: 0.8125rem;
-  font-weight: 800;
-  color: var(--accent-text);
-  background: var(--accent);
-  border-radius: var(--r-item);
+  padding: 4px 0 6px;
+  color: var(--label-color);
+  border-radius: 4px;
+}
+
+[data-style="instrument"] .rail-logo[href]:hover {
+  color: var(--text);
+}
+
+[data-style="instrument"] .rail-logo .wordmark {
+  display: block;
+  width: 100%;
+  height: auto;
 }
 
 [data-style="instrument"] .rail-nav ul {
@@ -155,6 +162,15 @@
   [data-style="instrument"] .rail-logo,
   [data-style="instrument"] .rail-version {
     display: none;
+  }
+
+  /* With the rail at the foot, the wordmark heads the start card instead. */
+  [data-style="instrument"] .start-wordmark {
+    display: block;
+    width: 52px;
+    height: auto;
+    margin: 0 0 12px;
+    color: var(--label-color);
   }
 
   [data-style="instrument"] .rail-nav {

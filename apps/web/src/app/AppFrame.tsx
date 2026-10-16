@@ -15,8 +15,9 @@
  */
 
 import { VERSION } from "@breinstein/oap-client";
-import type { ReactNode } from "react";
+import type { MouseEvent, ReactNode } from "react";
 import type { StyleName } from "./appearance.js";
+import { Wordmark } from "./BrandMark.js";
 
 /** Where in the workflow the page is, for the rail's current item. */
 export type FramePlace = "connect" | "processes" | "process";
@@ -201,15 +202,49 @@ export function RailItem({
   );
 }
 
+/** The start address: the app's own base, so a new tab opens on the start screen too. */
+const START_HREF = import.meta.env.BASE_URL;
+
+/**
+ * STYLE TRIAL (instrument): Breinstein's wordmark, a link to the start screen.
+ * A plain click goes there without reloading, as the Start item does; a click
+ * that asks for a new tab or window is left to the browser. When Start cannot
+ * be used (a run under way) neither can this: no address, so no link to follow.
+ */
+export function StartLink({
+  onConnect,
+  className = "rail-logo",
+}: {
+  readonly onConnect: (() => void) | undefined;
+  readonly className?: string | undefined;
+}) {
+  const go = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+      return;
+    }
+    event.preventDefault();
+    onConnect?.();
+  };
+  return (
+    <a
+      className={className}
+      href={onConnect === undefined ? undefined : START_HREF}
+      aria-label="Breinstein · OGC API Processes client, start"
+      aria-disabled={onConnect === undefined ? true : undefined}
+      onClick={go}
+    >
+      <Wordmark className="wordmark" />
+    </a>
+  );
+}
+
 // STYLE TRIAL (instrument): delete with the instrument style.
 function Rail(props: AppFrameProps) {
   const { inert, appearance, place, onConnect, onProcesses, onLog, railItems, jobsItem } = props;
   return (
     <header className="app-rail" inert={inert}>
       <h1 className="visually-hidden">{TITLE}</h1>
-      <p className="rail-logo" aria-hidden="true">
-        OAP
-      </p>
+      <StartLink onConnect={onConnect} />
       <nav className="rail-nav" aria-label="Workflow">
         <ul>
           {/* "Start", not "Connect": the start screen's own button is Connect. */}
