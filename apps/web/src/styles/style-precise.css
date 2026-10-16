@@ -939,10 +939,12 @@
   overflow-wrap: anywhere;
 }
 
-[data-style="precise"] .layout:not(.layout-single) .sent-heading {
+[data-style="precise"] .layout:not(.layout-single) .sent-inputs {
   margin: 20px 28px 0;
-  padding: 0;
-  border: none;
+}
+
+[data-style="precise"] .layout:not(.layout-single) .sent-list {
+  grid-template-columns: fit-content(45%) minmax(0, 1fr);
 }
 
 [data-style="precise"] .layout:not(.layout-single) form {
@@ -1089,20 +1091,6 @@
   overflow: hidden;
 }
 
-[data-style="precise"] .layout-single .sent-heading {
-  margin: 0 0 -24px;
-  padding: 12px 20px;
-  background: var(--surface);
-  border: 1px solid var(--line-strong);
-  border-bottom-color: var(--line-strong);
-  border-radius: var(--r-card) var(--r-card) 0 0;
-}
-
-[data-style="precise"] .layout-single .sent-heading + form {
-  border-top: none;
-  border-radius: 0 0 var(--r-card) var(--r-card);
-}
-
 /* Its caption, for sight: the fieldset's own legend names it for screen readers. */
 [data-style="precise"] .layout-single .panel[data-stage="process"] .form-body::before {
   content: "Inputs" / "";
@@ -1201,10 +1189,82 @@
   font-size: 0.9375rem;
 }
 
-/* Sent: the values stay, read-only, quietly. */
-[data-style="precise"] .form-body:disabled :is(input, textarea, select) {
+/*
+ * What was sent: a ruled two-column table, the label in mono capitals on the
+ * shaded left, the value on the right; the line for what was left out along
+ * its foot.
+ */
+[data-style="precise"] .sent-inputs {
+  padding: 0;
+  overflow: hidden;
+  background: var(--surface);
+  border-color: var(--line-strong);
+}
+
+[data-style="precise"] .sent-heading {
+  margin: 0;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--line-strong);
+}
+
+[data-style="precise"] .sent-list {
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 0;
+}
+
+[data-style="precise"] .sent-row > * {
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+[data-style="precise"] .sent-row:last-child > * {
+  border-bottom: none;
+}
+
+[data-style="precise"] .sent-row dt {
+  font-family: var(--label-font);
+  font-size: var(--label-size);
+  font-weight: var(--label-weight);
+  text-transform: var(--label-transform);
+  letter-spacing: var(--label-tracking);
+  color: var(--label-color);
   background: var(--surface-2);
-  border-color: var(--line);
+  border-right: 1px solid var(--line-mid);
+}
+
+[data-style="precise"] .sent-row dd {
+  font-weight: 500;
+}
+
+[data-style="precise"] .sent-none,
+[data-style="precise"] .sent-not-sent {
+  margin: 0;
+  padding: 10px 20px;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  background: var(--surface-2);
+  border-top: 1px solid var(--line-mid);
+}
+
+[data-style="precise"] .sent-none {
+  border-top: none;
+}
+
+@media (max-width: 40rem) {
+  [data-style="precise"] .sent-list,
+  [data-style="precise"] .layout:not(.layout-single) .sent-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  [data-style="precise"] .sent-row dt {
+    padding-bottom: 4px;
+    border-right: none;
+    border-bottom: none;
+  }
+
+  [data-style="precise"] .sent-row dd {
+    margin: 0;
+  }
 }
 
 /* Run first, on the shaded foot of the table, the choice of how beside it. */

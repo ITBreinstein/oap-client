@@ -1015,18 +1015,87 @@ ol.steps li .help {
 }
 
 /*
- * After a run: the result's two ways on, then the inputs that were sent,
- * read-only, under their own heading.
+ * After a run: the result's two ways on, then what was sent, as text: one
+ * card, each input's label and its value, a long value folding out whole, and
+ * a line for what was left out (`SentInputs`). Nothing in it looks clickable
+ * but the folds.
  */
 .next-steps {
   margin: 1rem 0 0.5rem;
 }
 
+.sent-inputs {
+  margin: 1.5rem 0 0;
+  padding: 1rem 1.25rem;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+}
+
 .sent-heading {
-  margin: 1.75rem 0 0.75rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--line);
+  margin: 0 0 0.75rem;
   font-size: 1rem;
+}
+
+.sent-list {
+  display: grid;
+  grid-template-columns: fit-content(40%) minmax(0, 1fr);
+  gap: 0.5rem 1.25rem;
+  margin: 0;
+}
+
+.sent-row {
+  display: contents;
+}
+
+.sent-row dt {
+  color: var(--muted);
+}
+
+.sent-row dd {
+  min-width: 0;
+  margin: 0;
+  font-weight: 600;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.sent-full {
+  margin-top: 0.35rem;
+  font-weight: normal;
+}
+
+.sent-full summary {
+  font-size: 0.875rem;
+  color: var(--accent-ink);
+  cursor: pointer;
+}
+
+.sent-full pre {
+  margin: 0.4rem 0 0;
+}
+
+.sent-none,
+.sent-not-sent {
+  margin: 0.75rem 0 0;
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+.sent-none {
+  margin-top: 0;
+}
+
+/* Narrow: each label over its value. */
+@media (max-width: 40rem) {
+  .sent-list {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.1rem;
+  }
+
+  .sent-row dd {
+    margin-bottom: 0.6rem;
+  }
 }
 
 /* The process list: what has been run here, and where the user came back from. */

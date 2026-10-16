@@ -1346,6 +1346,39 @@
   color: var(--text-strong);
 }
 
+/* What was sent: the base card at the designs' measures; smaller beside the map. */
+[data-style="hybrid"] .sent-inputs {
+  margin: 0 0 22px;
+  padding: 20px 24px;
+}
+
+[data-style="hybrid"] .sent-heading {
+  margin-bottom: 12px;
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+[data-style="hybrid"] .sent-list {
+  gap: 8px 16px;
+  font-size: 0.9375rem;
+}
+
+[data-style="hybrid"] .layout:not(.layout-single) .sent-inputs {
+  margin-bottom: 20px;
+  padding: 14px 16px;
+  border-radius: var(--r-item);
+}
+
+[data-style="hybrid"] .layout:not(.layout-single) .sent-heading {
+  margin-bottom: 8px;
+  font-size: 0.9375rem;
+}
+
+[data-style="hybrid"] .layout:not(.layout-single) .sent-list {
+  gap: 6px 16px;
+  font-size: 0.875rem;
+}
+
 /* The area: how to give it first, as chips; then the GeoJSON and a file. */
 [data-style="hybrid"] .geometry {
   display: flex;

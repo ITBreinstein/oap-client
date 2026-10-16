@@ -28,10 +28,12 @@ function asComplex(value: unknown): ComplexValue {
     const format = record["format"];
     const text = record["value"];
     const href = record["href"];
+    const file = record["file"];
     return {
       format: typeof format === "number" ? format : 0,
       ...(typeof text === "string" ? { value: text } : {}),
       ...(typeof href === "string" ? { href } : {}),
+      ...(typeof file === "string" ? { file } : {}),
     };
   }
   return { format: 0 };
@@ -193,7 +195,7 @@ export function ComplexField(props: ControlProps<ComplexControl>) {
                     return;
                   }
                   setMessage(undefined);
-                  onChange({ format: chosen, value: text });
+                  onChange({ format: chosen, value: text, file: file.name });
                 })();
               }}
             />

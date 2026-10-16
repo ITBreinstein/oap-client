@@ -54,6 +54,11 @@ export interface ComplexValue {
   readonly value?: string | undefined;
   /** By reference: sent as `{ "href": …, "type": … }` when non-empty. */
   readonly href?: string | undefined;
+  /**
+   * The name of the file the inline value was read from, for the record of
+   * what was sent. Gone once the value is typed or drawn; never sent.
+   */
+  readonly file?: string | undefined;
 }
 
 /**

@@ -686,6 +686,70 @@ test.describe("the workflow in a browser", () => {
     expect((await request).postData()).toContain(`"ratio":${typed}`);
   });
 
+  test("after a run, says what was sent as text, with nothing to click, and gives the form back to change it", async ({
+    page,
+  }) => {
+    await connectTyped(page, PYGEOAPI);
+    await openProcess(page, "Hello World");
+    await page.getByRole("textbox", { name: "Name (required)" }).fill("Groningen");
+    await page.getByRole("button", { name: "Run", exact: true }).click();
+
+    const sent = page.getByRole("region", { name: "Inputs you sent" });
+    await expect(sent).toBeVisible();
+    await expect(sent.locator("input, textarea, select, button, a")).toHaveCount(0);
+    await expect(sent.getByRole("term")).toHaveText(["Name"]);
+    await expect(sent.getByRole("definition")).toHaveText(["Groningen"]);
+    await expect(sent).toContainText("Not sent: Message (optional, left empty).");
+
+    await page.getByRole("button", { name: "Change the inputs" }).click();
+    const name = page.getByRole("textbox", { name: "Name (required)" });
+    await expect(name).toBeEnabled();
+    await expect(name).toHaveValue("Groningen");
+  });
+
+  test("after a run, names the file a value was read from, and folds the value out whole", async ({
+    page,
+  }) => {
+    const features = {
+      type: "FeatureCollection",
+      features: [0, 1].map((at) => ({
+        type: "Feature",
+        properties: {},
+        geometry: {
+          type: "Polygon",
+          coordinates: [
+            [
+              [4.884 + at * 0.003, 52.366],
+              [4.886 + at * 0.003, 52.366],
+              [4.886 + at * 0.003, 52.368],
+              [4.884 + at * 0.003, 52.366],
+            ],
+          ],
+        },
+      })),
+    };
+    const text = JSON.stringify(features);
+    await connectTyped(page, PYGEOAPI);
+    await openProcess(page, "Area of each feature");
+    await page.getByLabel("Or read the value from a file").setInputFiles({
+      name: "areas.geojson",
+      mimeType: "application/geo+json",
+      buffer: Buffer.from(text),
+    });
+    await expect(page.getByRole("textbox", { name: "Value (JSON)" })).toHaveValue(text);
+    await page.getByRole("button", { name: "Run", exact: true }).click();
+
+    const sent = page.getByRole("region", { name: "Inputs you sent" });
+    const value = sent.getByRole("definition");
+    await expect(value).toContainText("From a file: areas.geojson");
+    await expect(value).toContainText("FeatureCollection, 2 features (polygons)");
+    await expect(sent.locator("input, textarea, select, button")).toHaveCount(0);
+    const fold = sent.locator("details");
+    await expect(fold).not.toHaveAttribute("open");
+    await fold.locator("summary").click();
+    await expect(fold.locator("pre")).toHaveText(text);
+  });
+
   test("runs in the background through the relay, then cancels a second run", async ({ page }) => {
     await requireService(`${RELAY}/healthz`, "the relay");
     await page.goto("/");

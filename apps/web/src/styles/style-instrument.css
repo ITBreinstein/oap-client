@@ -903,10 +903,8 @@
     margin-top: 12px;
   }
 
-  [data-style="instrument"] .layout:not(.layout-single) .sent-heading {
+  [data-style="instrument"] .layout:not(.layout-single) .sent-inputs {
     margin-top: 20px;
-    padding: 0;
-    border: none;
   }
 
   /* The inputs, then the run bar pinned to the sheet's foot. */
@@ -1062,4 +1060,45 @@
   [data-style="instrument"] .start-card h2 {
     font-size: 2.25rem;
   }
+}
+
+/* ------------------------------------------------------------ what was sent */
+
+/* Compact rows: the label in mono capitals, the value beside it. */
+[data-style="instrument"] .sent-inputs {
+  padding: 12px 14px;
+}
+
+[data-style="instrument"] .sent-heading {
+  margin: 0 0 8px;
+}
+
+[data-style="instrument"] .sent-list {
+  gap: 4px 14px;
+  font-size: 0.8125rem;
+}
+
+[data-style="instrument"] .sent-row dt {
+  padding-top: 1px;
+  font-family: var(--label-font);
+  font-size: var(--label-size);
+  font-weight: var(--label-weight);
+  text-transform: var(--label-transform);
+  letter-spacing: var(--label-tracking);
+  color: var(--label-color);
+}
+
+[data-style="instrument"] .sent-row dd {
+  font-weight: 500;
+}
+
+[data-style="instrument"] .sent-full summary {
+  font-size: 0.75rem;
+}
+
+[data-style="instrument"] .sent-none,
+[data-style="instrument"] .sent-not-sent {
+  margin-top: 8px;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
 }

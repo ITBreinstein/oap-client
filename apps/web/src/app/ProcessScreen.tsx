@@ -4,7 +4,7 @@
  */
 
 import { redactUrl } from "@breinstein/oap-client";
-import { useId, useMemo, type SyntheticEvent } from "react";
+import { useContext, useId, useMemo, type SyntheticEvent } from "react";
 import { schemaWarnings } from "../forms/schema-warnings.js";
 import type { FieldErrors } from "../forms/validate.js";
 import type { SessionObservation } from "../observations.js";
@@ -17,6 +17,9 @@ import { NeedsTag } from "./NeedsTag.js";
 import { lastExecution, requestLog } from "./request-log.js";
 import { FieldView } from "./FormFields.js";
 import { ResultsView } from "./ResultsView.js";
+import { SentInputs } from "./SentInputs.js";
+import { shownOnMap } from "./input-shapes.js";
+import { MapLimitsContext } from "./map-limits.js";
 import { offersLink } from "./run.js";
 import type { WorkflowCommands, WorkflowView } from "./useWorkflow.js";
 import type { Workflow } from "./workflow.js";
@@ -96,12 +99,10 @@ function About({ state }: { readonly state: Open }) {
 function OutputChoices({
   state,
   developer,
-  editable,
   onChange,
 }: {
   readonly state: Open;
   readonly developer: boolean;
-  readonly editable: boolean;
   readonly onChange: WorkflowCommands["setTransmission"];
 }) {
   const { process, linkOutputs } = state;
@@ -109,7 +110,7 @@ function OutputChoices({
   if (process.outputs.length === 0 || (!allowed && !developer)) return null;
   if (!allowed) {
     return (
-      <fieldset className="outputs developer" disabled={!editable}>
+      <fieldset className="outputs developer">
         <legend>Developer: ask for a link anyway</legend>
         <p className="muted">
           The description does not offer outputs by reference (
@@ -134,7 +135,7 @@ function OutputChoices({
     );
   }
   return (
-    <fieldset className="outputs" disabled={!editable}>
+    <fieldset className="outputs">
       <legend>Outputs</legend>
       {process.outputs.map((output) => {
         const link = linkOutputs.includes(output.id);
@@ -428,6 +429,7 @@ export function ProcessScreen(props: ProcessScreenProps) {
     .join(" · ");
   const onlyAsync = process.execution.async && !process.execution.sync;
   const editable = state.stage === "process";
+  const { maxCoordinates } = useContext(MapLimitsContext);
   const errorCount = fieldErrors.size;
   // Recomputed only when the values change, not on every job snapshot.
   const schemaNotes = useMemo(
@@ -584,49 +586,50 @@ export function ProcessScreen(props: ProcessScreenProps) {
       )}
 
       {/* While a run is under way and after it, the status or result comes
-          first, and the form below it is what was sent: read-only, under its
-          own heading. */}
+          first, and below it the record of what was sent, as text, under its
+          own heading. "Change the inputs" brings the form back. */}
       {!editable && (
-        <h3 id={`${base}-sent`} className="sent-heading">
-          Inputs you sent
-        </h3>
-      )}
-      <form
-        onSubmit={onSubmit}
-        noValidate
-        aria-labelledby={editable ? `${base}-heading` : `${base}-sent`}
-      >
-        <fieldset disabled={!editable} className="form-body">
-          <legend className="visually-hidden">Inputs</legend>
-          {plan.fields.length === 0 && <p>This process takes no inputs.</p>}
-          {plan.fields.map((field, index) => (
-            <FieldView
-              key={field.id}
-              field={field}
-              index={index}
-              values={values}
-              error={fieldErrors.get(field.id)}
-              warnings={schemaNotes?.get(field.id)}
-              onChange={commands.setValue}
-            />
-          ))}
-        </fieldset>
-
-        <OutputChoices
-          state={state}
+        <SentInputs
+          headingId={`${base}-sent`}
+          plan={plan}
+          values={values}
+          process={process}
+          linkOutputs={state.linkOutputs}
           developer={developer}
-          editable={editable}
-          onChange={commands.setTransmission}
+          done={state.stage === "result"}
+          onMap={(fieldId, value) => {
+            const field = plan.fields.find((candidate) => candidate.id === fieldId);
+            return field !== undefined && shownOnMap(field, value, maxCoordinates);
+          }}
         />
+      )}
+      {editable && (
+        <form onSubmit={onSubmit} noValidate aria-labelledby={`${base}-heading`}>
+          <fieldset className="form-body">
+            <legend className="visually-hidden">Inputs</legend>
+            {plan.fields.length === 0 && <p>This process takes no inputs.</p>}
+            {plan.fields.map((field, index) => (
+              <FieldView
+                key={field.id}
+                field={field}
+                index={index}
+                values={values}
+                error={fieldErrors.get(field.id)}
+                warnings={schemaNotes?.get(field.id)}
+                onChange={commands.setValue}
+              />
+            ))}
+          </fieldset>
 
-        {errorCount > 0 && (
-          <p className="error-box" role="alert">
-            {errorCount === 1 ? "One input needs" : `${String(errorCount)} inputs need`} attention
-            before this can run. The messages are next to each one.
-          </p>
-        )}
+          <OutputChoices state={state} developer={developer} onChange={commands.setTransmission} />
 
-        {state.stage === "process" && (
+          {errorCount > 0 && (
+            <p className="error-box" role="alert">
+              {errorCount === 1 ? "One input needs" : `${String(errorCount)} inputs need`} attention
+              before this can run. The messages are next to each one.
+            </p>
+          )}
+
           <div className="run-bar">
             {both && (
               <label className="choice">
@@ -648,8 +651,8 @@ export function ProcessScreen(props: ProcessScreenProps) {
             )}
             <button type="submit">{onlyAsync ? "Run in the background" : "Run"}</button>
           </div>
-        )}
-      </form>
+        </form>
+      )}
 
       {state.stage === "process" && (
         <ErrorMessage
