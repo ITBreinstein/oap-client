@@ -476,17 +476,23 @@
   white-space: nowrap;
 }
 
+/* Room at its end for the count, so neither the hint nor what's typed runs under it. */
 [data-style="instrument"] .examples-tools input[type="search"] {
   min-height: 40px;
+  padding-right: 96px;
   font-family: var(--font-mono);
   font-size: 0.8125rem;
   border-color: var(--line-strong);
 }
 
-/* How many are shown, at the heading's end. */
+/*
+ * How many are shown, at the search field's end, centred in it. Placed from
+ * the panel's scrolling body, which is positioned (styles.css) and clips:
+ * the heading row above it is out of reach without moving the count's markup.
+ */
 [data-style="instrument"] .examples-panel .examples-count {
-  top: 34px;
-  right: 76px;
+  top: 24px;
+  right: 34px;
   width: auto;
   height: auto;
   clip-path: none;
