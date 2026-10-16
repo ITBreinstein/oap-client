@@ -99,24 +99,33 @@
   border-radius: var(--r-control);
 }
 
-/* On a phone: the card takes the width, without the examples (they're in the bar). */
+/*
+ * With the rail a bar at the foot: no examples in the card (they're in the
+ * bar), and the credit in the flow under the card, in line with it, where the
+ * page scrolls it clear of the bar.
+ */
 @media (max-width: 52rem) {
   [data-style="instrument"] .start .featured-examples {
     display: none;
   }
+
+  [data-style="instrument"] .backdrop-credit {
+    margin: 0;
+  }
 }
 
+/* On a phone: the card takes the width. */
 @media (max-width: 40rem) {
   [data-style="instrument"] .layout-single .panel[data-stage="choose-endpoint"] {
     padding: 12px;
   }
 
   [data-style="instrument"] .start {
-    margin-bottom: 0;
+    margin-bottom: 8px;
     padding: 20px 18px;
   }
 
-  [data-style="instrument"] .backdrop-credit {
-    margin: 8px 0 0;
+  [data-style="instrument"] .panel[data-stage="choose-endpoint"] > .developer {
+    margin-bottom: 8px;
   }
 }
