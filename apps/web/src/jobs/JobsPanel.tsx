@@ -38,6 +38,18 @@ export interface JobsPanelProps {
    * badge beside it, then one labelled line per fact.
    */
   readonly structured?: boolean | undefined;
+  /**
+   * STYLE TRIAL (updated Instrument): run a job's process again. `filled`
+   * says whether its inputs are known (a job started this visit), so the
+   * button says what it will do; `busy` while a run can't be left.
+   */
+  readonly rerun?:
+    | {
+        readonly start: (job: JobRow) => void;
+        readonly filled: (job: JobRow) => boolean;
+        readonly busy: boolean;
+      }
+    | undefined;
 }
 
 function hostOf(url: string): string {
@@ -174,10 +186,16 @@ function JobItem({
   advertisedBy,
   message,
   structured,
+  onRerun,
+  rerunFilled,
+  rerunBusy,
   onRemove,
   onDismiss,
 }: {
   readonly structured: boolean;
+  readonly onRerun: (() => void) | undefined;
+  readonly rerunFilled: boolean;
+  readonly rerunBusy: boolean;
   readonly job: JobRow;
   readonly active: boolean;
   readonly advertisedBy: DismissAdvertisedBy;
@@ -261,6 +279,25 @@ function JobItem({
               </a>{" "}
             </>
           )}
+          {onRerun !== undefined && (
+            <>
+              <button
+                type="button"
+                className="secondary"
+                disabled={rerunBusy}
+                title={
+                  rerunBusy
+                    ? "A run is under way."
+                    : rerunFilled
+                      ? "Opens the process with this job's inputs filled in, ready to run."
+                      : "Its inputs aren't kept between visits: the process opens with an empty form."
+                }
+                onClick={onRerun}
+              >
+                {rerunFilled ? "Run again" : "Open the process"}
+              </button>{" "}
+            </>
+          )}
           <button
             type="button"
             className="secondary"
@@ -316,6 +353,15 @@ export function JobsPanel(props: JobsPanelProps) {
             advertisedBy={dismissAdvertisedFor(job)}
             message={messages.get(job.statusUrl)}
             structured={props.structured === true}
+            onRerun={
+              props.rerun === undefined || job.processId === undefined
+                ? undefined
+                : () => {
+                    props.rerun?.start(job);
+                  }
+            }
+            rerunFilled={props.rerun?.filled(job) === true}
+            rerunBusy={props.rerun?.busy === true}
             onRemove={() => {
               onRemove(job.statusUrl);
             }}

@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Appearance } from "./app/appearance.js";
 import { AppearanceControl } from "./app/AppearanceControl.js";
 import { UpdatedContext } from "./app/variant.js";
-import { useAddress } from "./app/address.js";
+import { sameService, useAddress } from "./app/address.js";
 import { AppFrame, RailItem, type FramePlace } from "./app/AppFrame.js";
 import { DeveloperPanel } from "./app/DeveloperPanel.js";
 import { activeDrawField, DrawContext, type DrawRequest, type DrawTarget } from "./app/draw.js";
@@ -22,6 +22,8 @@ import { ExamplesBrowser, FeaturedExamples } from "./app/ExamplesView.js";
 import { typedEndpoint } from "./app/run.js";
 import { SidePanel } from "./app/SidePanel.js";
 import type { EndpointRef } from "./app/workflow.js";
+import type { FormValues } from "./forms/encode.js";
+import type { JobRow } from "./relay/job-session.js";
 import { JobsPanel } from "./jobs/JobsPanel.js";
 import { RelayBanner, RelayOffer } from "./app/RelayRoute.js";
 import { useAppearance } from "./app/useAppearance.js";
@@ -149,6 +151,48 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
         <span className="visually-hidden"> running</span>
       </span>
     );
+  // STYLE TRIAL (updated Instrument): "Run again" in My jobs. The inputs of
+  // each background job started this visit, by its status URL: in memory
+  // only, never stored, so a job from an earlier visit opens an empty form.
+  const sentFor = useRef(new Map<string, FormValues>());
+  useEffect(() => {
+    if (state.stage === "running" && state.run.mode === "async" && state.run.jobRef !== undefined) {
+      sentFor.current.set(state.run.jobRef, state.values);
+    } else if (state.stage === "result" && state.jobRef !== undefined) {
+      sentFor.current.set(state.jobRef, state.values);
+    }
+  }, [state]);
+  const pendingRerun = useRef<{ processId: string; values?: FormValues | undefined }>(undefined);
+  useEffect(() => {
+    const pending = pendingRerun.current;
+    if (
+      pending === undefined ||
+      state.stage !== "process" ||
+      state.process.id !== pending.processId
+    ) {
+      return;
+    }
+    pendingRerun.current = undefined;
+    if (pending.values === undefined) return;
+    for (const [id, value] of Object.entries(pending.values)) commands.setValue(id, value);
+    commands.setMode("async");
+  }, [state, commands]);
+  const rerun = (job: JobRow) => {
+    if (job.processId === undefined) return;
+    const here = state.stage === "choose-endpoint" ? undefined : state.endpoint;
+    const listed = view.configured.find((entry) => entry.key === job.endpointKey);
+    const endpoint: EndpointRef | undefined =
+      here !== undefined && sameService(here.baseUrl, job.endpoint)
+        ? here
+        : listed !== undefined
+          ? { source: "configured", ...listed }
+          : typedEndpoint(job.endpoint);
+    if (endpoint === undefined) return;
+    pendingRerun.current = { processId: job.processId, values: sentFor.current.get(job.statusUrl) };
+    setPanelOpen(undefined);
+    commands.openExample(endpoint, job.processId);
+  };
+
   const openExample = (example: Example) => {
     const endpoint = exampleEndpoint(example, view.configured);
     if (endpoint === undefined) return;
@@ -447,6 +491,15 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
                 <JobsPanel
                   heading={false}
                   structured={appearance.style === "instrument-updated"}
+                  rerun={
+                    appearance.style === "instrument-updated"
+                      ? {
+                          start: rerun,
+                          filled: (job) => sentFor.current.has(job.statusUrl),
+                          busy: state.stage === "running",
+                        }
+                      : undefined
+                  }
                   jobs={view.snapshot?.jobs ?? []}
                   activeJob={
                     state.stage === "running" && state.run.mode === "async"

@@ -7,6 +7,7 @@
  */
 
 import { expect, test, type Page } from "@playwright/test";
+import { RELAY } from "./servers.js";
 import { requireService } from "./services.js";
 
 const PYGEOAPI = "http://localhost:5080";
@@ -194,5 +195,92 @@ test("instrument-updated: the background box is centred on its words, beside the
     });
     expect(Math.abs(offset)).toBeLessThanOrEqual(1);
     await page.getByRole("banner").getByRole("button", { name: "Processes", exact: true }).click();
+  }
+});
+
+for (const { style, updated } of VERSIONS) {
+  test(`${style}: a job ${updated ? "can" : "can't"} be run again from My jobs, its inputs filled in`, async ({
+    page,
+  }) => {
+    test.setTimeout(60_000);
+    await requireService(`${RELAY}/healthz`, "the relay");
+    // Through the relay: it finds a background job where a page alone can't.
+    await page.route("**/config.json", (route) =>
+      route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({ relay: { url: RELAY }, presets: [], examples: [] }),
+      }),
+    );
+    await page.goto(`/?style=${style}&theme=light`);
+    await page.getByRole("radio", { name: /pygeoapi-cors/ }).check();
+    await page.getByRole("button", { name: "Connect", exact: true }).click();
+    await page.getByRole("button", { name: "Slow process", exact: true }).click();
+    await page.getByRole("textbox", { name: "Seconds (optional)" }).fill("1");
+    await page.getByRole("checkbox", { name: "Run in the background" }).check();
+    await page.getByRole("button", { name: "Run", exact: true }).click();
+    await page.locator('[data-output-id="slept"]').waitFor({ timeout: 30_000 });
+    await page.getByRole("button", { name: "Choose another process" }).click();
+
+    await rail(page, "Jobs").click();
+    const again = page.getByTestId("my-jobs").getByRole("button", { name: "Run again" });
+    if (!updated) {
+      await expect(again).toHaveCount(0);
+      return;
+    }
+    await again.click();
+    await expect(page.getByRole("heading", { level: 2, name: "Slow process" })).toBeVisible();
+    await expect(page.getByRole("textbox", { name: "Seconds (optional)" })).toHaveValue("1");
+    await expect(page.getByRole("checkbox", { name: "Run in the background" })).toBeChecked();
+  });
+}
+
+test("instrument-updated: About as a box like Developer, the way back a button, the credit in the corner, Copy an icon", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await open(page, "instrument-updated");
+  await connect(page);
+  await page.getByRole("button", { name: "Hello World", exact: true }).click();
+
+  const boxOf = (selector: string) =>
+    page.locator(selector).evaluate((element) => {
+      const style = getComputedStyle(element);
+      return [style.borderTopStyle, style.borderTopWidth, style.paddingTop, style.borderRadius];
+    });
+  expect(await boxOf("details.about")).toEqual(await boxOf("details.developer"));
+
+  const back = page.getByRole("button", { name: "All processes" });
+  expect(await back.evaluate((button) => getComputedStyle(button).borderTopStyle)).toBe("solid");
+
+  const credit = await page.locator(".backdrop-credit").evaluate((chip) => {
+    const box = chip.getBoundingClientRect();
+    return {
+      position: getComputedStyle(chip).position,
+      right: innerWidth - box.right,
+      bottom: innerHeight - box.bottom,
+    };
+  });
+  expect(credit).toEqual({ position: "fixed", right: 12, bottom: 12 });
+
+  await page.getByRole("textbox", { name: /Name/ }).fill("hello");
+  await page.getByRole("button", { name: "Run", exact: true }).click();
+  const copy = page.locator(".code-box").getByRole("button", { name: "Copy echo" });
+  await expect(copy).toBeVisible();
+  await expect(copy).toHaveText("");
+  await expect(copy.locator("svg")).toHaveCount(1);
+
+  // Beside the map, the draw tools are filled, not the panel's own colour.
+  await page.getByRole("banner").getByRole("button", { name: "Processes", exact: true }).click();
+  await page.getByRole("button", { name: "Buildings in an area", exact: true }).click();
+  await page.locator(".map-pane canvas").waitFor();
+  for (const name of ["Draw on the map", "Clear"]) {
+    const filled = await page
+      .getByRole("button", { name, exact: true })
+      .evaluate(
+        (button) =>
+          getComputedStyle(button).backgroundColor !==
+          getComputedStyle(button.closest(".panel") ?? document.body).backgroundColor,
+      );
+    expect(filled).toBe(true);
   }
 });

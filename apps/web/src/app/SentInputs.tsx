@@ -71,7 +71,6 @@ export function SentInputs(props: SentInputsProps) {
         </h3>
         {updated && sent.length > 0 && (
           <CopyButton
-            label="Copy"
             name="Copy the inputs you sent, as JSON"
             text={() => JSON.stringify(toExecuteBody(plan, values).inputs, null, "\t")}
           />

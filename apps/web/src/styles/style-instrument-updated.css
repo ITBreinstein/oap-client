@@ -20,8 +20,9 @@
  * (`app/json-text.ts`, in `FormFields`, `GeometryField`, `ComplexField`,
  * `MapPane`, `ResultsView`); inputs and outputs have Copy (`CopyButton.tsx`,
  * in `SentInputs`, `ResultsView`); the request log is in the developer
- * section (`ProcessScreen`, `App.tsx`); My jobs has `structured` rows
- * (`JobsPanel.tsx`, `JobFacts`). Keep each branch, or delete it.
+ * section (`ProcessScreen`, `App.tsx`); My jobs has `structured` rows and
+ * "Run again" (`JobsPanel.tsx`, `JobFacts`; the inputs, kept in memory for
+ * the visit, in `App.tsx`). Keep each branch, or delete it.
  */
 
 /* ------------------------------------------------- the rail, easier to read */
@@ -269,6 +270,8 @@
 [data-variant="updated"] .layout-single .panel {
   display: flex;
   flex-direction: column;
+  /* Its own layer, so the credit can lie under its cards and over the picture. */
+  isolation: isolate;
   background: transparent;
 }
 
@@ -294,9 +297,10 @@
 }
 
 /*
- * The credit at the picture's lower right, apart from the cards: pinned to
- * the window's corner where the cards leave it free, else last on the page,
- * at its right.
+ * The credit in the picture's lower right corner, quiet: small, muted, on a
+ * thin wash. Under the cards, so where one reaches the corner it covers the
+ * credit rather than the other way round. On a phone the picture runs the
+ * page's length, and the credit ends the page, at its right.
  */
 [data-variant="updated"] .panel > .backdrop-credit {
   order: 1;
@@ -304,60 +308,46 @@
   width: fit-content;
   max-width: 100%;
   margin: 16px 0 0;
+  padding: 2px 6px;
+  font-size: 0.625rem;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  border: none;
 }
 
 [data-variant="updated"] .panel[data-stage="choose-endpoint"] > .backdrop-credit {
   margin-top: auto;
 }
 
-@media (min-width: 80rem) {
+@media (min-width: 52rem) {
   [data-variant="updated"] .panel > .backdrop-credit {
     position: fixed;
-    z-index: 5;
-    right: 16px;
-    bottom: 16px;
-    max-width: 280px;
+    z-index: -1;
+    right: 12px;
+    bottom: 12px;
+    max-width: 240px;
     margin: 0;
   }
 }
 
 /* ------------------------------------------------- the process page */
 
-/* "About this process": plainly something to open, with an arrow that turns. */
+/* "About this process": a box that opens, as the developer section is. */
+[data-variant="updated"] details.about {
+  padding: 12px 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+}
+
 [data-variant="updated"] details.about > summary {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 36px;
-  padding: 0 12px;
   font-weight: 600;
-  color: var(--accent-ink);
-  list-style: none;
+  color: var(--text);
   cursor: pointer;
-  border: 1px solid var(--field-border);
-  border-radius: var(--r-control);
 }
 
-[data-variant="updated"] details.about > summary::-webkit-details-marker {
-  display: none;
-}
-
-[data-variant="updated"] details.about > summary::before {
-  content: "";
-  width: 0.45em;
-  height: 0.45em;
-  border-right: 2px solid currentColor;
-  border-bottom: 2px solid currentColor;
-  transform: rotate(-45deg);
-  transition: transform 0.15s ease;
-}
-
-[data-variant="updated"] details.about[open] > summary::before {
-  transform: rotate(45deg);
-}
-
-[data-variant="updated"] details.about > summary:hover {
-  background: var(--surface-hover);
+[data-variant="updated"] details.about[open] > summary {
+  margin-bottom: 8px;
 }
 
 /*
@@ -369,7 +359,65 @@
 [data-variant="updated"] a.button.secondary,
 [data-variant="updated"] input[type="file"]::file-selector-button,
 [data-variant="updated"] .job-row .actions > a {
+  color: var(--text-strong);
+  background: var(--surface-hover);
   border-color: var(--field-border);
+}
+
+[data-variant="updated"] button.secondary:hover:not(:disabled),
+[data-variant="updated"] a.button.secondary:hover,
+[data-variant="updated"] input[type="file"]::file-selector-button:hover,
+[data-variant="updated"] .job-row .actions > a:hover {
+  background: var(--selected-bg);
+  border-color: var(--accent-ink);
+}
+
+/*
+ * The same for the buttons Instrument draws its own way: the draw tools
+ * beside the map ("Draw on the map", "Clear") and the ways on after a
+ * result ("Change the inputs", "Choose another process").
+ */
+[data-variant="updated"] .actions button.secondary,
+[data-variant="updated"] .next-steps button {
+  color: var(--text-strong);
+  background: var(--surface-hover);
+  border-color: var(--field-border);
+}
+
+[data-variant="updated"] .actions button.secondary:hover:not(:disabled),
+[data-variant="updated"] .next-steps button:hover:not(:disabled) {
+  background: var(--selected-bg);
+  border-color: var(--accent-ink);
+}
+
+/* The way back, a button like the others, its arrow included: not a line of text. */
+[data-variant="updated"] .breadcrumb button.link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 12px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-strong);
+  text-decoration: none;
+  background: var(--surface-hover);
+  border: 1px solid var(--field-border);
+  border-radius: var(--r-control);
+}
+
+[data-variant="updated"] .breadcrumb button.link:hover:not(:disabled) {
+  color: var(--text-strong);
+  background: var(--selected-bg);
+  border-color: var(--accent-ink);
+}
+
+[data-variant="updated"] .breadcrumb button.link:disabled {
+  opacity: 0.5;
+}
+
+[data-variant="updated"] .process-screen > .breadcrumb {
+  margin-bottom: 12px;
 }
 
 /* "Inputs you sent": a panel of its own, edged like a field, its Copy beside its title. */
@@ -390,7 +438,30 @@
   margin: 0;
 }
 
-/* Copy, and what it says it did. */
+/* Each input's name and value on one baseline, whatever their sizes. */
+[data-variant="updated"] .sent-list {
+  align-items: baseline;
+}
+
+[data-variant="updated"] .sent-row dt {
+  padding-top: 0;
+}
+
+/* Copy: an icon in the corner of what it copies. */
+[data-variant="updated"] .code-box {
+  position: relative;
+}
+
+[data-variant="updated"] .code-box > pre {
+  padding-right: 48px;
+}
+
+[data-variant="updated"] .code-box > .copy {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+}
+
 [data-variant="updated"] .copy {
   display: inline-flex;
   flex-direction: row-reverse;
@@ -399,20 +470,37 @@
 }
 
 [data-variant="updated"] .copy-button {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
   min-height: 32px;
-  padding: 0 12px;
-  font-size: 0.8125rem;
+  height: 32px;
+  padding: 0;
+  color: var(--text-secondary);
+  background: var(--surface);
+  border: 1px solid var(--field-border);
+  border-radius: var(--r-control);
+}
+
+[data-variant="updated"] .copy-button:hover:not(:disabled) {
+  color: var(--text-strong);
+  background: var(--surface-hover);
+  border-color: var(--accent-ink);
+}
+
+[data-variant="updated"] .copy-button[data-copied] {
+  color: var(--success);
+  border-color: var(--success);
+}
+
+[data-variant="updated"] .copy-button .icon {
+  width: 16px;
+  height: 16px;
 }
 
 [data-variant="updated"] .copy-status {
   font-size: var(--label-size);
-  color: var(--success);
-}
-
-[data-variant="updated"] .copy-row {
-  display: flex;
-  justify-content: flex-end;
-  margin: 8px 0 0;
+  color: var(--error);
 }
 
 /* "Run in the background": the box centred on its words, at any text size. */

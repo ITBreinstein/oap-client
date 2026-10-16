@@ -133,15 +133,16 @@ function ResultItem({
           <summary>
             <strong>{result.outputId}</strong> <span className="muted">JSON</span>
           </summary>
-          <pre className="code">{JSON.stringify(result.value, null, updated ? "\t" : 2)}</pre>
-          {updated && (
-            <p className="copy-row">
+          {updated ? (
+            <div className="code-box">
+              <pre className="code">{JSON.stringify(result.value, null, "\t")}</pre>
               <CopyButton
-                label="Copy"
                 name={`Copy ${result.outputId}`}
                 text={() => JSON.stringify(result.value, null, "\t")}
               />
-            </p>
+            </div>
+          ) : (
+            <pre className="code">{JSON.stringify(result.value, null, 2)}</pre>
           )}
         </details>
       )}
@@ -150,11 +151,13 @@ function ResultItem({
           <summary>
             <strong>{result.outputId}</strong> <span className="muted">{result.mediaType}</span>
           </summary>
-          <pre className="code">{result.value}</pre>
-          {updated && (
-            <p className="copy-row">
-              <CopyButton label="Copy" name={`Copy ${result.outputId}`} text={() => result.value} />
-            </p>
+          {updated ? (
+            <div className="code-box">
+              <pre className="code">{result.value}</pre>
+              <CopyButton name={`Copy ${result.outputId}`} text={() => result.value} />
+            </div>
+          ) : (
+            <pre className="code">{result.value}</pre>
           )}
         </details>
       )}

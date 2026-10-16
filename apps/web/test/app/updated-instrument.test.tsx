@@ -125,3 +125,68 @@ describe("a job in My jobs, in the updated Instrument", () => {
     expect(facts[3]?.[1]).toBe("Job complete");
   });
 });
+
+describe("Run again in My jobs, in the updated Instrument", () => {
+  const JOB = "http://localhost:5080/jobs/2";
+  const job: JobRow = {
+    statusUrl: JOB,
+    ref: undefined,
+    status: status("successful", JOB),
+    polls: 1,
+    doorbells: 0,
+    lastError: undefined,
+    settled: true,
+    gone: false,
+    acceptedSince: undefined,
+    acceptedLong: false,
+    confirmation: undefined,
+    endpointKey: "typed",
+    endpoint: "http://localhost:5080",
+    route: "direct",
+    processId: "slow",
+    startedAt: "2026-09-30T10:00:00.000Z",
+    restored: true,
+  };
+
+  function panelWith(filled: boolean, busy: boolean) {
+    const start = vi.fn();
+    const view = render(
+      <JobsPanel
+        jobs={[job]}
+        activeJob={undefined}
+        dismissAdvertisedFor={() => "nothing"}
+        messages={new Map()}
+        onRemove={vi.fn()}
+        onDismiss={vi.fn()}
+        structured
+        rerun={{ start, filled: () => filled, busy }}
+      />,
+    );
+    return { view, start };
+  }
+
+  const buttonText = (view: HTMLElement) =>
+    [...view.querySelectorAll(".actions button")].map((button) => button.textContent);
+
+  it("says it runs again when this visit has the inputs, and starts it", () => {
+    const { view, start } = panelWith(true, false);
+    expect(buttonText(view)).toContain("Run again");
+    act(() => {
+      [...view.querySelectorAll<HTMLButtonElement>(".actions button")]
+        .find((button) => button.textContent === "Run again")
+        ?.click();
+    });
+    expect(start).toHaveBeenCalledWith(job);
+  });
+
+  it("says it only opens the process when the inputs are from an earlier visit", () => {
+    expect(buttonText(panelWith(false, false).view)).toContain("Open the process");
+  });
+
+  it("can't be used while a run is under way", () => {
+    const button = [
+      ...panelWith(true, true).view.querySelectorAll<HTMLButtonElement>(".actions button"),
+    ].find((candidate) => candidate.textContent === "Run again");
+    expect(button?.disabled).toBe(true);
+  });
+});
