@@ -96,10 +96,9 @@ more), which is why their licences are listed too.
 Not code, and not bundled: fetched by the browser while the app runs, and
 credited on screen as its licence requires.
 
-| What                                                                             | From                                                                                                        | Licence               | Credited as                                                            |
-| -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | --------------------- | ---------------------------------------------------------------------- |
-| BRT-Achtergrondkaart, "standaard" (EPSG:3857 tiles)                              | PDOK, `https://service.pdok.nl/kadaster/brt-achtergrondkaart/wmts/v2_0/standaard/EPSG:3857/{z}/{x}/{y}.png` | CC BY 4.0, © Kadaster | "Kaartgegevens © Kadaster (BRT-Achtergrondkaart, CC BY 4.0), via PDOK" |
-| BRT-Achtergrondkaart, "grijs" (EPSG:3857 tiles; the updated Instrument at night) | PDOK, `https://service.pdok.nl/kadaster/brt-achtergrondkaart/wmts/v2_0/grijs/EPSG:3857/{z}/{x}/{y}.png`     | CC BY 4.0, © Kadaster | the same                                                               |
+| What                                                | From                                                                                                        | Licence               | Credited as                                                            |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | --------------------- | ---------------------------------------------------------------------- |
+| BRT-Achtergrondkaart, "standaard" (EPSG:3857 tiles) | PDOK, `https://service.pdok.nl/kadaster/brt-achtergrondkaart/wmts/v2_0/standaard/EPSG:3857/{z}/{x}/{y}.png` | CC BY 4.0, © Kadaster | "Kaartgegevens © Kadaster (BRT-Achtergrondkaart, CC BY 4.0), via PDOK" |
 
 ## 5. Trademarks
 

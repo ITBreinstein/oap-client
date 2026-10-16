@@ -11,12 +11,6 @@ import { requireService } from "./services.js";
 
 const PYGEOAPI = "http://localhost:5080";
 const SERVICE = "https://pygeoapi.example.test";
-/** A 1×1 transparent PNG: a tile, as far as the map is concerned. */
-const PIXEL = Buffer.from(
-  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
-  "base64",
-);
-
 const VERSIONS = [
   { style: "instrument", updated: false },
   { style: "instrument-updated", updated: true },
@@ -121,36 +115,6 @@ for (const { style, updated } of VERSIONS) {
         .locator(".request-log")
         .evaluate((log) => getComputedStyle(log).position);
       expect(position).toBe(updated ? "static" : "fixed");
-    });
-
-    test(`at night the map is ${updated ? "grey" : "the standard one"}; by day the standard one`, async ({
-      page,
-    }) => {
-      // Tiles answered here, counted by variant: the test needs no network.
-      const asked = { standaard: 0, grijs: 0 };
-      await page.route("https://service.pdok.nl/kadaster/brt-achtergrondkaart/**", (route) => {
-        const variant = /\/v2_0\/(\w+)\//.exec(route.request().url())?.[1];
-        if (variant === "standaard" || variant === "grijs") asked[variant] += 1;
-        return route.fulfill({ contentType: "image/png", body: PIXEL });
-      });
-      await open(page, style);
-      await connect(page);
-      await page.getByRole("button", { name: "Buildings in an area", exact: true }).click();
-      await page.locator(".map-pane canvas").waitFor();
-      await expect.poll(() => asked.standaard).toBeGreaterThan(0);
-      expect(asked.grijs).toBe(0);
-
-      await page.getByRole("banner").getByRole("button", { name: "Appearance" }).click();
-      await page
-        .getByRole("dialog", { name: "Appearance" })
-        .getByRole("radio", { name: "On" })
-        .check();
-      await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
-      if (updated) await expect.poll(() => asked.grijs).toBeGreaterThan(0);
-      else {
-        await page.waitForTimeout(1000);
-        expect(asked.grijs).toBe(0);
-      }
     });
   });
 }

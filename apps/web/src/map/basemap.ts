@@ -12,15 +12,6 @@
 export const PDOK_BRT_TILES =
   "https://service.pdok.nl/kadaster/brt-achtergrondkaart/wmts/v2_0/standaard/EPSG:3857/{z}/{x}/{y}.png";
 
-/**
- * STYLE TRIAL: the same map in grey, for the updated Instrument at night
- * (`MapView.tsx`), so a dark page doesn't frame a bright map. The same
- * capabilities list it (layer `grijs`, no fees, no access constraints;
- * checked 2026-10-16); the same data and licence, so the same attribution.
- */
-export const PDOK_BRT_GREY_TILES =
-  "https://service.pdok.nl/kadaster/brt-achtergrondkaart/wmts/v2_0/grijs/EPSG:3857/{z}/{x}/{y}.png";
-
 /** The capabilities list tile matrices 00–19 for EPSG:3857. */
 export const PDOK_BRT_MAX_ZOOM = 19;
 
