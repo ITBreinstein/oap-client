@@ -102,10 +102,14 @@ export function ProcessListScreen(props: ProcessListScreenProps) {
   const returnTo = shown.some((process) => process.id === props.lastOpened)
     ? props.lastOpened
     : undefined;
+  // While searching, how many of the list match; else how many it has.
+  const listed = processes.processes.length;
+  const noun = listed === 1 ? "process" : "processes";
   const count =
-    processes.processes.length === 1
-      ? "1 process"
-      : `${String(processes.processes.length)} processes`;
+    needle === ""
+      ? `${String(listed)} ${noun}`
+      : `${String(shown.length)} of ${String(listed)} ${noun}`;
+  const nothingMatches = needle !== "" && shown.length === 0;
 
   return (
     <section className="process-list-screen" aria-labelledby={`${base}-heading`}>
@@ -166,9 +170,10 @@ export function ProcessListScreen(props: ProcessListScreenProps) {
             />
           </p>
         )}
-        <p className="muted list-count">
+        <p className="muted list-count" role="status">
           {count}
-          {total !== undefined &&
+          {needle === "" &&
+            total !== undefined &&
             total > processes.processes.length &&
             ` of ${String(total)} the server reports`}
           {processes.truncated &&
@@ -182,62 +187,66 @@ export function ProcessListScreen(props: ProcessListScreenProps) {
           Reading the description of {opening}…
         </p>
       )}
-      <div className="process-table">
-        {/* The column heads, for sight only: each row names its own cells. */}
-        <p className="process-head" aria-hidden="true">
-          <span className="label">Process</span>
-          <span className="label">Needs</span>
-          <span className="label">Runs</span>
-          <span className="label">This visit</span>
-        </p>
-        <ul className="process-list">
-          {shown.map((process) => {
-            const runs = runsLabel(process);
-            const needs = props.needs?.get(process.id);
-            return (
-              <li key={process.id} data-last-opened={process.id === returnTo ? true : undefined}>
-                <span className="cell cell-process">
-                  <button
-                    type="button"
-                    className="link process-link"
-                    disabled={opening !== undefined}
-                    data-focus-on-stage={process.id === returnTo ? true : undefined}
-                    onClick={() => {
-                      onOpen(process);
-                    }}
-                  >
-                    {process.title ?? process.id}
-                  </button>{" "}
-                  <code className="process-id">{process.id}</code>
-                  {process.description !== undefined && (
-                    <span className="help process-description">{process.description}</span>
-                  )}
-                </span>
-                <span className="cell cell-needs" data-known={needs !== undefined}>
-                  <span className="visually-hidden">Needs: </span>
-                  <NeedsTag needs={needs} />
-                </span>
-                <span className="cell cell-runs mono">
-                  <span className="visually-hidden">Runs: </span>
-                  {runs ?? (
-                    <>
-                      <span aria-hidden="true">—</span>
-                      <span className="visually-hidden">not stated</span>
-                    </>
-                  )}
-                </span>
-                <span className="cell cell-ran">
-                  {ran.includes(process.id) && (
-                    <span className="tag" data-ran="true">
-                      <span aria-hidden="true">✓ </span>Ran
-                    </span>
-                  )}
-                </span>
-              </li>
-            );
-          })}
-        </ul>
-      </div>
+      {nothingMatches ? (
+        <p className="list-empty">No process has “{filter.trim()}” in its title or identifier.</p>
+      ) : (
+        <div className="process-table">
+          {/* The column heads, for sight only: each row names its own cells. */}
+          <p className="process-head" aria-hidden="true">
+            <span className="label">Process</span>
+            <span className="label">Needs</span>
+            <span className="label">Runs</span>
+            <span className="label">This visit</span>
+          </p>
+          <ul className="process-list">
+            {shown.map((process) => {
+              const runs = runsLabel(process);
+              const needs = props.needs?.get(process.id);
+              return (
+                <li key={process.id} data-last-opened={process.id === returnTo ? true : undefined}>
+                  <span className="cell cell-process">
+                    <button
+                      type="button"
+                      className="link process-link"
+                      disabled={opening !== undefined}
+                      data-focus-on-stage={process.id === returnTo ? true : undefined}
+                      onClick={() => {
+                        onOpen(process);
+                      }}
+                    >
+                      {process.title ?? process.id}
+                    </button>{" "}
+                    <code className="process-id">{process.id}</code>
+                    {process.description !== undefined && (
+                      <span className="help process-description">{process.description}</span>
+                    )}
+                  </span>
+                  <span className="cell cell-needs" data-known={needs !== undefined}>
+                    <span className="visually-hidden">Needs: </span>
+                    <NeedsTag needs={needs} />
+                  </span>
+                  <span className="cell cell-runs mono">
+                    <span className="visually-hidden">Runs: </span>
+                    {runs ?? (
+                      <>
+                        <span aria-hidden="true">—</span>
+                        <span className="visually-hidden">not stated</span>
+                      </>
+                    )}
+                  </span>
+                  <span className="cell cell-ran">
+                    {ran.includes(process.id) && (
+                      <span className="tag" data-ran="true">
+                        <span aria-hidden="true">✓ </span>Ran
+                      </span>
+                    )}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
     </section>
   );
 }

@@ -1297,6 +1297,22 @@ ol.steps li .help {
   margin: 0 0 0.5rem;
 }
 
+/* A search that finds nothing says so, in place of an empty table. */
+.list-empty {
+  margin: 1rem 0;
+  color: var(--muted);
+}
+
+/* A long address in a result wraps rather than pushing the panel sideways. */
+.reference-href {
+  overflow-wrap: anywhere;
+}
+
+/* A job's percentage keeps its width as it counts up. */
+.progress-figure {
+  font-variant-numeric: tabular-nums;
+}
+
 /*
  * The process list: one row per process. The column heads are for styles
  * that draw a table; each row names its own cells for a screen reader.

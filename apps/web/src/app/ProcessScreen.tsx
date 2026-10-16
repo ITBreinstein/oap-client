@@ -179,12 +179,15 @@ function JobStatusLine({ job }: { readonly job: JobRow | undefined }) {
       </>
     );
   }
-  const progress = job.status.progress === undefined ? "" : `, ${String(job.status.progress)}%`;
   return (
     <>
       Job <code>{job.status.jobId}</code>:{" "}
       <strong data-job-status={job.status.status}>{job.status.rawStatus}</strong>
-      {progress}
+      {job.status.progress !== undefined && (
+        <>
+          , <span className="progress-figure">{job.status.progress}%</span>
+        </>
+      )}
       {job.status.message !== undefined && <span className="muted"> — {job.status.message}</span>}
       {job.acceptedLong && job.status.status === "accepted" && (
         // Information, not a warning: nothing is known to be wrong, and the
