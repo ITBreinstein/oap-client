@@ -655,12 +655,13 @@
   display: block;
 }
 
+/* "ran": a success, in the success colours, as the design marks it. */
 [data-style="instrument"] .tag {
   font-family: var(--font-mono);
   font-weight: 500;
-  color: var(--accent-ink);
-  background: none;
-  border-color: var(--line-strong);
+  color: var(--success);
+  background: var(--success-surface);
+  border-color: transparent;
 }
 
 /* What a process needs: a mark, with its words for screen readers. */
@@ -829,7 +830,7 @@
 }
 
 [data-style="instrument"] .request-status[data-ok="true"] {
-  color: var(--accent-ink);
+  color: var(--success);
 }
 
 /* -------------------------- one process, beside the map: the left sheet */
