@@ -4,9 +4,9 @@
  * the popover and puts focus back on the button, as does choosing the button
  * again; a click elsewhere closes it and leaves focus where it went.
  *
- * Shown always while the three styles are on trial. Once one is chosen,
- * delete the "Style" fieldset below (and `STYLE_LABELS`), and keep "Night
- * mode": it stays (`docs/adr/0002-switchable-styles.md`).
+ * The "Style" group is a trial: once one is chosen, delete that fieldset
+ * (and `STYLE_LABELS`), and keep "Night mode"
+ * (`docs/adr/0002-switchable-styles.md`).
  */
 
 import { useEffect, useId, useRef, useState } from "react";
@@ -20,9 +20,8 @@ import {
 
 // STYLE TRIAL: delete with the "Style" fieldset once a style is chosen.
 const STYLE_LABELS: Readonly<Record<StyleName, string>> = {
-  hybrid: "Soft-precise hybrid",
   instrument: "Instrument",
-  precise: "Precise",
+  "instrument-updated": "Instrument (updated)",
 };
 
 const THEME_LABELS: Readonly<Record<ThemePreference, string>> = {
@@ -45,34 +44,6 @@ export function AppearanceIcon() {
     <svg className="icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
       <circle cx="10" cy="10" r="7" fill="none" stroke="currentColor" strokeWidth="1.6" />
       <path d="M10 3a7 7 0 0 1 0 14z" fill="currentColor" />
-    </svg>
-  );
-}
-
-/**
- * STYLE TRIAL (hybrid): a sun on a light page, a moon on a dark one. Both are
- * drawn; the page's theme decides which shows, in CSS.
- */
-const THEME_ICONS = {
-  sun: "M12 4V2M12 22v-2M4 12H2M22 12h-2M5.6 5.6L4.2 4.2M19.8 19.8l-1.4-1.4M5.6 18.4l-1.4 1.4M19.8 4.2l-1.4 1.4M12 7a5 5 0 1 0 0 10a5 5 0 1 0 0-10",
-  moon: "M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z",
-} as const;
-
-function ThemeIcon({ name }: { readonly name: keyof typeof THEME_ICONS }) {
-  return (
-    <svg
-      className={`icon theme-icon theme-icon-${name}`}
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <path
-        d={THEME_ICONS[name]}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
     </svg>
   );
 }
@@ -130,8 +101,6 @@ export function AppearanceControl(props: AppearanceControlProps) {
         }}
       >
         <AppearanceIcon />
-        <ThemeIcon name="sun" />
-        <ThemeIcon name="moon" />
         <span className="appearance-label">Appearance</span>
       </button>
       {open && (

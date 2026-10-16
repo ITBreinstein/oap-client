@@ -1,11 +1,10 @@
 /**
- * Europe behind Instrument's start screen, and the switch between light and
- * dark in every style.
+ * Europe behind the start screen, and the switch between light and dark, in
+ * both versions of Instrument.
  *
  * - The theme picks the picture. On load the page asks for the one it shows;
  *   once the page is idle, the other one, once, so a switch has it at hand.
  *   Not when the connection asks to save data.
- * - The other styles never ask for either.
  * - A switch fades where the browser can, is instant where motion is
  *   reduced, and quick toggling ends on the last choice.
  * - Both pictures come from this site, never from NASA's or Wikimedia's
@@ -209,7 +208,7 @@ test("instrument: a switch back while a fade is starting ends on the newer choic
   await expect.poll(() => drawn(page)).toMatch(/europe-day/);
 });
 
-for (const style of ["hybrid", "precise", "instrument"]) {
+for (const style of ["instrument", "instrument-updated"]) {
   test(`${style}: a switch fades, and is instant where motion is reduced`, async ({ page }) => {
     await countTransitions(page);
     await open(page, `style=${style}&theme=light`);
@@ -236,16 +235,3 @@ test("instrument following the system: the system's switch fades too", async ({ 
   await expect.poll(() => drawn(page)).toMatch(/europe-night/);
   expect(await transitions(page)).toBe(1);
 });
-
-for (const style of ["hybrid", "precise"]) {
-  for (const theme of ["light", "dark"]) {
-    test(`${style} ${theme} keeps its streets and never asks for a picture`, async ({ page }) => {
-      const seen = requests(page);
-      await open(page, `style=${style}&theme=${theme}`);
-      await idle(page);
-      await page.waitForTimeout(500);
-      expect(pictures(seen)).toEqual([]);
-      expectNoThirdParty(seen);
-    });
-  }
-}

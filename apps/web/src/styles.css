@@ -88,36 +88,7 @@ legend,
   height: 100dvh;
 }
 
-.app-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.6rem 1.25rem;
-  background: var(--surface);
-  border-bottom: 1px solid var(--line-strong);
-}
-
-.app-header h1 {
-  margin: 0;
-  font-size: 1.15rem;
-  line-height: 1.3;
-  color: var(--text-strong);
-}
-
-.app-header .tagline {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.9rem;
-}
-
-.app-header .version {
-  margin: 0;
-  font-size: 0.85rem;
-  white-space: nowrap;
-}
-
-/* A site-wide note under the header: this deployment's configuration failed. */
+/* A site-wide note above the page: this deployment's configuration failed. */
 .config-warning {
   margin: 0;
   padding: 0.45rem 1.25rem;
@@ -1135,13 +1106,7 @@ ol.steps li .help {
   scroll-margin-top: 8rem;
 }
 
-/* The header's tools, and the Appearance control's popover under its button. */
-.header-tools {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
+/* The Appearance control, and its popover. */
 .appearance {
   position: relative;
 }
@@ -1188,9 +1153,7 @@ ol.steps li .help {
 }
 
 /*
- * Cards: the surface a screen's main content sits on. Each style decides
- * their edge and elevation; `data-main-card` marks the one a screen leads
- * with (precise puts its corner ticks there).
+ * Cards: the surface a screen's main content sits on.
  */
 .card {
   position: relative;
@@ -1199,10 +1162,6 @@ ol.steps li .help {
   border: 1px solid var(--line-strong);
   border-radius: var(--r-card);
   box-shadow: var(--shadow-card);
-}
-
-[data-main-card] {
-  position: relative;
 }
 
 .eyebrow {
@@ -1458,24 +1417,12 @@ ol.steps li .help {
 }
 
 /*
- * What only some styles show, there for all and hidden here: the request log
- * and the run bar's header; the header's way back and place, the service's
- * status, a process's needs, runs and the glyphs' key (precise); the header's
- * mark, breadcrumb and theme icons (hybrid); the start card's wordmark
- * (instrument, narrow).
+ * Hidden here, shown by `style-instrument.css`: the request log, the run
+ * bar's hint and, on a narrow screen, the start card's wordmark.
  */
 .request-log,
 .run-hint,
-.frame-back,
-.frame-context,
-.frame-crumbs,
-.frame-mark,
-.theme-icon,
-.start-wordmark,
-.service-status,
-.process-needs,
-.process-runs,
-.process-key {
+.start-wordmark {
   display: none;
 }
 
@@ -1501,12 +1448,6 @@ ol.steps li .help {
 
 .request-status[data-ok="false"] {
   color: var(--error);
-}
-
-/* The map's scale bar and compass belong to the precise style's map frame. */
-.map-pane .maplibregl-ctrl-scale,
-.map-pane .maplibregl-ctrl-group .maplibregl-ctrl-compass {
-  display: none;
 }
 
 /*
@@ -1898,13 +1839,7 @@ button.secondary.panel-close {
   overflow-wrap: anywhere;
 }
 
-/* My jobs: the button that opens it, its count of running jobs, and the panel. */
-.jobs-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-}
-
+/* My jobs: its count of running jobs, and the panel. */
 .badge {
   display: inline-grid;
   place-items: center;
@@ -1930,10 +1865,6 @@ button.secondary.panel-close {
   font-weight: 600;
 }
 
-.jobs-head {
-  display: none;
-}
-
 .my-jobs-panel .jobs-panel > .help {
   margin-top: 0;
 }
@@ -1948,51 +1879,6 @@ button.secondary.panel-close {
 
 .job-row .actions {
   margin-top: 0.4rem;
-}
-
-/*
- * The header on a narrow screen: the title on its own, the tools beside it,
- * Appearance as an icon (its name stays, for screen readers).
- */
-@media (max-width: 52rem) {
-  .app-header {
-    flex-wrap: wrap;
-    gap: 0.4rem 0.75rem;
-    padding: 0.5rem 1rem;
-  }
-
-  .app-header h1 {
-    font-size: 1rem;
-  }
-
-  .app-header .tagline {
-    display: none;
-  }
-
-  .header-tools {
-    gap: 0.5rem;
-    margin-left: auto;
-  }
-
-  .app-header .version {
-    font-size: 0.75rem;
-  }
-
-  .app-header .appearance-label {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
-
-  .app-header .appearance-button {
-    justify-content: center;
-    width: 2.75rem;
-    height: 2.75rem;
-    padding: 0;
-  }
 }
 
 /* The start screen on a narrow screen: the page's gutter, and less padding in the card. */

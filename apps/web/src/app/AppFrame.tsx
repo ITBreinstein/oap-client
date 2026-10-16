@@ -1,36 +1,22 @@
 /**
- * The app's frame: the one place that asks which style is on (ADR 0002).
- * Everything else differs between styles in CSS only.
- *
- * - Soft-precise hybrid and precise: a header across the top, with the title
- *   and the page's tools at its end.
- * - Instrument: a rail down the left edge (a bar along the bottom on a narrow
- *   screen), with one item per place in the workflow and the page's tools.
- *
- * Both carry the same title, the core's version and the same tools, so
- * nothing a test or a screen reader relies on depends on the style. The
- * header also has the way back and the page's place, which only precise shows
- * (in place of the panel's breadcrumb, which it hides), and a breadcrumb of
- * the service and the process, which only hybrid shows, beside its mark.
+ * The app's frame: a rail down the left edge (a bar along the bottom on a
+ * narrow screen), with Breinstein's wordmark, one item per place in the
+ * workflow, the side panels' items, Appearance and the core's version.
  */
 
 import { VERSION } from "@breinstein/oap-client";
 import type { MouseEvent, ReactNode } from "react";
-import type { StyleName } from "./appearance.js";
 import { Wordmark } from "./BrandMark.js";
 
 /** Where in the workflow the page is, for the rail's current item. */
 export type FramePlace = "connect" | "processes" | "process";
 
 export interface AppFrameProps {
-  readonly style: StyleName;
   /** Set while a modal question is open: nothing in the frame can be reached. */
   readonly inert: boolean;
   /** The Appearance control. */
   readonly appearance: ReactNode;
-  /** Tools beside it in the header, before it: My jobs. */
-  readonly tools?: ReactNode;
-  /** STYLE TRIAL (instrument): what the rail needs. */
+  /** Where in the workflow the page is. */
   readonly place: FramePlace;
   /** Back to the start screen; undefined where it cannot be left (a run under way). */
   readonly onConnect: (() => void) | undefined;
@@ -40,105 +26,11 @@ export interface AppFrameProps {
   readonly railItems?: ReactNode;
   /** The rail's Jobs item. */
   readonly jobsItem?: ReactNode;
-  /** STYLE TRIAL (instrument): the rail's About item, above Appearance. */
+  /** The rail's About item, above Appearance. */
   readonly aboutItem?: ReactNode;
-  /**
-   * STYLE TRIAL (precise): the way back and where the page is, for the ruled
-   * header. Shown by precise only, which hides the panel's own breadcrumb.
-   */
-  readonly back?: FrameBack | undefined;
-  readonly context?: string | undefined;
-  /**
-   * STYLE TRIAL (hybrid): where the page is, as a breadcrumb beside the title:
-   * the service, then the process. The last one is the page itself.
-   */
-  readonly crumbs?: readonly FrameCrumb[] | undefined;
-}
-
-/** One step of the breadcrumb: its words, and where it goes (undefined: not a way back now). */
-export interface FrameCrumb {
-  readonly label: string;
-  readonly onClick: (() => void) | undefined;
-}
-
-/** The header's way back: its words, and what it does (undefined: not now). */
-export interface FrameBack {
-  readonly label: string;
-  readonly onClick: (() => void) | undefined;
 }
 
 const TITLE = "OGC API - Processes client";
-
-/** STYLE TRIAL (hybrid): the product's mark, a rising line on a gridded square. */
-function Mark() {
-  return (
-    <svg className="frame-mark" viewBox="0 0 26 26" aria-hidden="true" focusable="false">
-      <rect className="frame-mark-ground" x="1" y="1" width="24" height="24" rx="6" />
-      <path className="frame-mark-grid" d="M1 9h24M1 17h24M9 1v24M17 1v24" />
-      <path className="frame-mark-line" d="M6 19l5-7 4 3 5-8" />
-    </svg>
-  );
-}
-
-function Crumbs({ crumbs }: { readonly crumbs: readonly FrameCrumb[] }) {
-  return (
-    <nav className="frame-crumbs" aria-label="Breadcrumb">
-      <ol>
-        {crumbs.map((crumb, index) => (
-          <li key={index}>
-            {index === crumbs.length - 1 ? (
-              <span aria-current="page">{crumb.label}</span>
-            ) : crumb.onClick === undefined ? (
-              <span>{crumb.label}</span>
-            ) : (
-              <button type="button" className="link" onClick={crumb.onClick}>
-                {crumb.label}
-              </button>
-            )}
-          </li>
-        ))}
-      </ol>
-    </nav>
-  );
-}
-
-export function AppFrame(props: AppFrameProps) {
-  const { style, inert, appearance, tools, back, context, crumbs } = props;
-  // STYLE TRIAL: once a style is chosen, keep one branch and delete the other.
-  if (style === "instrument") return <Rail {...props} />;
-  return (
-    <header className="app-header" inert={inert} data-back={back !== undefined}>
-      {back !== undefined && (
-        <button
-          type="button"
-          className="link frame-back"
-          disabled={back.onClick === undefined}
-          onClick={back.onClick}
-        >
-          <span aria-hidden="true">← </span>
-          {back.label}
-        </button>
-      )}
-      <div className="app-title">
-        {/* One name for every style; hybrid shows only its end, beside the mark. */}
-        <h1>
-          <Mark />
-          <span className="title-prefix">OGC API - </span>Processes client
-        </h1>
-        <p className="tagline">Discover, run and view geospatial calculations</p>
-      </div>
-      {crumbs !== undefined && <Crumbs crumbs={crumbs} />}
-      {context !== undefined && <p className="frame-context label">{context}</p>}
-      <div className="header-tools">
-        <p className="muted version" data-testid="core-version">
-          core {VERSION}
-        </p>
-        {tools}
-        {appearance}
-      </div>
-    </header>
-  );
-}
 
 /** A small line icon, drawn in the current text colour, on the design's 24-unit grid. */
 function Icon({ d }: { readonly d: string }) {
@@ -206,7 +98,7 @@ export function RailItem({
 const START_HREF = import.meta.env.BASE_URL;
 
 /**
- * STYLE TRIAL (instrument): Breinstein's wordmark, a link to the start screen.
+ * Breinstein's wordmark, a link to the start screen.
  * A plain click goes there without reloading, as the Start item does; a click
  * that asks for a new tab or window is left to the browser. When Start cannot
  * be used (a run under way) neither can this: no address, so no link to follow.
@@ -238,8 +130,7 @@ export function StartLink({
   );
 }
 
-// STYLE TRIAL (instrument): delete with the instrument style.
-function Rail(props: AppFrameProps) {
+export function AppFrame(props: AppFrameProps) {
   const { inert, appearance, place, onConnect, onProcesses, railItems, jobsItem, aboutItem } =
     props;
   return (

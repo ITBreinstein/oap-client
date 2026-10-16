@@ -1,24 +1,15 @@
 /**
- * STYLE TRIAL (instrument): when the other theme's backdrop is fetched ahead
- * of time, and which picture belongs to which theme.
+ * When the other theme's backdrop is fetched ahead of time, and which
+ * picture belongs to which theme.
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BACKDROP, saveDataRequested, shouldPrefetch } from "../../src/app/backdrop.js";
-import type { StyleName } from "../../src/app/appearance.js";
 
 describe("shouldPrefetch", () => {
-  const cases: [StyleName, boolean, boolean][] = [
-    ["instrument", false, true],
-    ["instrument", true, false],
-    ["hybrid", false, false],
-    ["hybrid", true, false],
-    ["precise", false, false],
-    ["precise", true, false],
-  ];
-
-  it.each(cases)("%s, save data %s: %s", (style, saveData, expected) => {
-    expect(shouldPrefetch(style, saveData)).toBe(expected);
+  it("fetches ahead unless the connection saves data", () => {
+    expect(shouldPrefetch(false)).toBe(true);
+    expect(shouldPrefetch(true)).toBe(false);
   });
 });
 

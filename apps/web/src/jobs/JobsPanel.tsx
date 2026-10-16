@@ -225,14 +225,6 @@ export function JobsPanel(props: JobsPanelProps) {
         Background jobs started from this browser. Removing one from the list does not stop it on
         the server.
       </p>
-      {/* The column heads, for a style that lays the rows out as a table. */}
-      <p className="jobs-head" aria-hidden="true">
-        <span className="label">Process</span>
-        <span className="label">Service</span>
-        <span className="label">Status</span>
-        <span className="label">Started</span>
-        <span className="label">Actions</span>
-      </p>
       <ul>
         {[...jobs].reverse().map((job) => (
           <JobItem

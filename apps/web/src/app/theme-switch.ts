@@ -103,7 +103,7 @@ export function switchTheme(apply: () => void, ready?: () => Promise<boolean>): 
     apply();
     return () => undefined;
   }
-  // No picture to wait for (hybrid, precise, or not on the start screen).
+  // No picture to wait for: not on the start screen.
   if (ready === undefined) {
     fade(apply);
     return () => undefined;

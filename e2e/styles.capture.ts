@@ -1,11 +1,12 @@
 /**
- * `pnpm capture:styles`: not a test lane. Screenshots of every style × theme
- * (ADR 0002) on the same path through the app, for choosing a style:
+ * `pnpm capture:styles`: not a test lane. Screenshots of both versions of
+ * Instrument × theme (ADR 0002) on the same path through the app, to compare
+ * them:
  *
  *   start · Browse all open · list · Hello World's result · Buildings' form
  *   · My jobs open, with a background job in it
  *
- * at 1440×960, and once per style at 390×844. Saved to
+ * at 1440×960, and once per version at 390×844. Saved to
  * `test-results/styles/<style>-<theme>[-mobile]-<screen>.png`, which git
  * ignores. Needs the lane's pygeoapi and relay, as the blocking specs do.
  *
@@ -84,10 +85,10 @@ async function shot(page: Page, name: string) {
 }
 
 const RUNS = [
-  ...(["hybrid", "precise", "instrument"] as const).flatMap((style) =>
+  ...(["instrument", "instrument-updated"] as const).flatMap((style) =>
     (["light", "dark"] as const).map((theme) => ({ style, theme, mobile: false })),
   ),
-  ...(["hybrid", "precise", "instrument"] as const).map((style) => ({
+  ...(["instrument", "instrument-updated"] as const).map((style) => ({
     style,
     theme: "light" as const,
     mobile: true,
@@ -139,18 +140,14 @@ test.describe("styles", () => {
       await page.waitForTimeout(2000);
       await shot(page, `${tag}-5-buildings-form`);
 
-      // Instrument's way back beside the map is its rail; the others' is "All processes".
-      await (
-        style === "instrument"
-          ? page.getByRole("button", { name: "Processes", exact: true })
-          : page.getByRole("button", { name: /All processes/ })
-      ).click();
+      // The way back beside the map is the rail's Processes item.
+      await page.getByRole("button", { name: "Processes", exact: true }).click();
       await page.getByRole("button", { name: "Slow process", exact: true }).click();
       await page.getByRole("textbox", { name: "Seconds (optional)" }).fill("1");
       await page.getByRole("checkbox", { name: "Run in the background" }).check();
       await page.getByRole("button", { name: "Run", exact: true }).click();
       await page.locator('[data-output-id="slept"]').waitFor({ timeout: 30_000 });
-      await page.getByRole("button", { name: /^(My jobs|Jobs)/ }).click();
+      await page.getByRole("banner").getByRole("button", { name: /^Jobs/ }).click();
       await shot(page, `${tag}-6-my-jobs`);
     });
   }

@@ -733,10 +733,6 @@
 
 /* -------------------------------------------------------- one process */
 
-[data-style="instrument"] .process-runs {
-  display: none;
-}
-
 [data-style="instrument"] .breadcrumb button.link {
   color: var(--muted);
   text-decoration: none;

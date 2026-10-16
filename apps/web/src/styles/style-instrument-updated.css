@@ -1,0 +1,11 @@
+/*
+ * STYLE TRIAL: Instrument, updated after a UI/UX review, to compare with
+ * Instrument as it is. Appearance → Style → "Instrument (updated)", or
+ * `?style=instrument-updated`. Both versions are `data-style="instrument"`;
+ * this one is also `data-variant="updated"`, and every rule here is under it.
+ *
+ * Once one is chosen: if the update wins, drop the `[data-variant="updated"]`
+ * prefix and move these rules into `style-instrument.css`; if it loses,
+ * delete this file. Either way, delete the second entry of `STYLE_NAMES`
+ * (`app/appearance.ts`) and `data-variant` (ADR 0002).
+ */

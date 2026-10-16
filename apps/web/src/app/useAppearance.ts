@@ -81,19 +81,16 @@ export function useAppearance(initial?: Appearance): AppearanceView {
       apply();
       return undefined;
     }
-    // STYLE TRIAL (instrument): a fade waits for the backdrop it ends on.
-    const ready =
-      appearance.style === "instrument" && backdropShown()
-        ? () => backdropReady(resolvedTheme)
-        : undefined;
+    // On the start screen, a fade waits for the backdrop it ends on.
+    const ready = backdropShown() ? () => backdropReady(resolvedTheme) : undefined;
     return switchTheme(apply, ready);
   }, [appearance, resolvedTheme]);
 
-  // STYLE TRIAL (instrument): the other theme's backdrop, fetched when idle.
+  // The other theme's backdrop, fetched when idle.
   useEffect(() => {
-    if (!shouldPrefetch(appearance.style, saveDataRequested())) return undefined;
+    if (!shouldPrefetch(saveDataRequested())) return undefined;
     return prefetchOtherBackdrop(resolvedTheme);
-  }, [appearance.style, resolvedTheme]);
+  }, [resolvedTheme]);
 
   const setStyle = useCallback((style: StyleName) => {
     setAppearance((current) => ({ ...current, style }));

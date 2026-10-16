@@ -43,25 +43,28 @@ const throwingStorage: AppearanceStorage = {
 };
 
 describe("parseAppearance", () => {
-  it("starts from the defaults: the hybrid style, following the system", () => {
-    expect(parseAppearance("", undefined)).toEqual({ style: "hybrid", theme: "system" });
-    expect(DEFAULT_APPEARANCE).toEqual({ style: "hybrid", theme: "system" });
+  it("starts from the defaults: the instrument style, following the system", () => {
+    expect(parseAppearance("", undefined)).toEqual({ style: "instrument", theme: "system" });
+    expect(DEFAULT_APPEARANCE).toEqual({ style: "instrument", theme: "system" });
   });
 
   it("takes the saved choice over the defaults", () => {
-    expect(parseAppearance("", { style: "precise", theme: "dark" })).toEqual({
-      style: "precise",
+    expect(parseAppearance("", { style: "instrument-updated", theme: "dark" })).toEqual({
+      style: "instrument-updated",
       theme: "dark",
     });
   });
 
   it("takes the address over the saved choice, member by member", () => {
-    const saved = { style: "precise", theme: "dark" };
+    const saved = { style: "instrument-updated", theme: "dark" };
     expect(parseAppearance("?style=instrument", saved)).toEqual({
       style: "instrument",
       theme: "dark",
     });
-    expect(parseAppearance("?theme=light", saved)).toEqual({ style: "precise", theme: "light" });
+    expect(parseAppearance("?theme=light", saved)).toEqual({
+      style: "instrument-updated",
+      theme: "light",
+    });
     expect(parseAppearance("?style=instrument&theme=system", saved)).toEqual({
       style: "instrument",
       theme: "system",
@@ -70,16 +73,16 @@ describe("parseAppearance", () => {
 
   it("ignores values it does not know, from either source, without a word", () => {
     expect(parseAppearance("?style=brutalist&theme=sepia", undefined)).toEqual(DEFAULT_APPEARANCE);
-    expect(parseAppearance("?style=PRECISE", undefined)).toEqual(DEFAULT_APPEARANCE);
-    expect(parseAppearance("?style=", { style: "precise" })).toEqual({
-      style: "precise",
+    expect(parseAppearance("?style=INSTRUMENT", undefined)).toEqual(DEFAULT_APPEARANCE);
+    expect(parseAppearance("?style=", { style: "instrument-updated" })).toEqual({
+      style: "instrument-updated",
       theme: "system",
     });
     for (const stored of [
       null,
       42,
-      "precise",
-      ["precise", "dark"],
+      "instrument",
+      ["instrument", "dark"],
       { style: 1, theme: true },
       { style: "toString", theme: "__proto__" },
     ]) {
@@ -89,7 +92,7 @@ describe("parseAppearance", () => {
 
   it("keeps a good member of a saved value whose other member is bad", () => {
     expect(parseAppearance("", { style: "nope", theme: "dark" })).toEqual({
-      style: "hybrid",
+      style: "instrument",
       theme: "dark",
     });
   });
@@ -106,8 +109,8 @@ describe("resolveTheme", () => {
 
 describe("saved choice", () => {
   it("reads what was saved, and nothing from text that is not JSON", () => {
-    const storage = memoryStorage({ [APPEARANCE_STORAGE_KEY]: '{"style":"precise"}' });
-    expect(readStoredAppearance(storage)).toEqual({ style: "precise" });
+    const storage = memoryStorage({ [APPEARANCE_STORAGE_KEY]: '{"style":"instrument-updated"}' });
+    expect(readStoredAppearance(storage)).toEqual({ style: "instrument-updated" });
     expect(readStoredAppearance(memoryStorage({ [APPEARANCE_STORAGE_KEY]: "{not json" }))).toBe(
       undefined,
     );
@@ -116,12 +119,12 @@ describe("saved choice", () => {
 
   it("writes only the member the user changed, so a style from the address stays out", () => {
     const storage = memoryStorage({
-      [APPEARANCE_STORAGE_KEY]: JSON.stringify({ style: "hybrid", theme: "light" }),
+      [APPEARANCE_STORAGE_KEY]: JSON.stringify({ style: "instrument", theme: "light" }),
     });
-    // The page was opened with ?style=precise; the user then turned night mode on.
+    // The page was opened with ?style=instrument-updated; the user then turned night mode on.
     saveAppearanceChoice(storage, { theme: "dark" });
     expect(JSON.parse(storage.items.get(APPEARANCE_STORAGE_KEY) ?? "")).toEqual({
-      style: "hybrid",
+      style: "instrument",
       theme: "dark",
     });
   });
@@ -129,10 +132,10 @@ describe("saved choice", () => {
   it("never throws when storage does", () => {
     expect(readStoredAppearance(throwingStorage)).toBeUndefined();
     expect(() => {
-      saveAppearanceChoice(throwingStorage, { style: "precise" });
+      saveAppearanceChoice(throwingStorage, { style: "instrument-updated" });
     }).not.toThrow();
     expect(parseAppearance("?theme=dark", readStoredAppearance(throwingStorage))).toEqual({
-      style: "hybrid",
+      style: "instrument",
       theme: "dark",
     });
   });
@@ -176,6 +179,7 @@ describe("useAppearance", () => {
     vi.unstubAllGlobals();
     delete document.documentElement.dataset["style"];
     delete document.documentElement.dataset["theme"];
+    delete document.documentElement.dataset["variant"];
   });
 
   function mount(initial: Parameters<typeof useAppearance>[0]) {
@@ -202,7 +206,7 @@ describe("useAppearance", () => {
   });
 
   it("stops following it once the user picks a theme, and saves the pick", () => {
-    mount({ style: "hybrid", theme: "system" });
+    mount({ style: "instrument", theme: "system" });
     act(() => {
       view?.setTheme("light");
     });
@@ -212,18 +216,20 @@ describe("useAppearance", () => {
     });
     expect(view?.resolvedTheme).toBe("light");
     expect(JSON.parse(localStorage.getItem(APPEARANCE_STORAGE_KEY) ?? "")).toEqual({
-      style: "hybrid",
+      style: "instrument",
       theme: "light",
     });
   });
 
-  it("changes the style at once, on <html> too", () => {
-    mount({ style: "hybrid", theme: "dark" });
+  it("changes the version at once, on <html> too: both are the instrument style", () => {
+    mount({ style: "instrument", theme: "dark" });
+    expect(document.documentElement.dataset["variant"]).toBe("current");
     act(() => {
-      view?.setStyle("precise");
+      view?.setStyle("instrument-updated");
     });
-    expect(view?.appearance).toEqual({ style: "precise", theme: "dark" });
-    expect(document.documentElement.dataset["style"]).toBe("precise");
+    expect(view?.appearance).toEqual({ style: "instrument-updated", theme: "dark" });
+    expect(document.documentElement.dataset["style"]).toBe("instrument");
+    expect(document.documentElement.dataset["variant"]).toBe("updated");
     expect(document.documentElement.dataset["theme"]).toBe("dark");
   });
 });
@@ -248,7 +254,7 @@ describe("the Appearance control", () => {
     act(() => {
       created.render(
         <AppearanceControl
-          appearance={{ style: "hybrid", theme: "system" }}
+          appearance={{ style: "instrument", theme: "system" }}
           onStyle={onStyle}
           onTheme={onTheme}
         />,
@@ -262,13 +268,13 @@ describe("the Appearance control", () => {
     const legends = [...host.querySelectorAll("legend")].map((legend) => legend.textContent);
     expect(legends).toEqual(["Style", "Night mode"]);
     // Focus moved in, onto the choice already made.
-    expect(document.activeElement).toBe(host.querySelector("input[value='hybrid']"));
+    expect(document.activeElement).toBe(host.querySelector("input[value='instrument']"));
 
     act(() => {
-      host.querySelector<HTMLInputElement>("input[value='precise']")?.click();
+      host.querySelector<HTMLInputElement>("input[value='instrument-updated']")?.click();
       host.querySelector<HTMLInputElement>("input[value='dark']")?.click();
     });
-    expect(onStyle).toHaveBeenCalledWith("precise");
+    expect(onStyle).toHaveBeenCalledWith("instrument-updated");
     expect(onTheme).toHaveBeenCalledWith("dark");
 
     act(() => {

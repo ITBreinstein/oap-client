@@ -116,7 +116,7 @@ export function EndpointScreen(props: EndpointScreenProps) {
 
   return (
     <section className="start" aria-labelledby={`${base}-heading`}>
-      <div className="start-card card" data-main-card="true">
+      <div className="start-card card">
         {/* STYLE TRIAL (instrument): the wordmark on a narrow screen, where the rail has none. */}
         <Wordmark className="start-wordmark" />
         <p className="eyebrow label">OGC API - Processes</p>

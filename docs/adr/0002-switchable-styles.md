@@ -1,7 +1,8 @@
 # 2. Three switchable styles on trial, and how to remove two
 
-- **Status:** accepted, for the trial. Once a style is chosen, this ADR's
-  "Removing a style" is carried out and its status names the one kept.
+- **Status:** accepted. Instrument is kept; hybrid and precise were removed
+  on 2026-10-16. Instrument is now compared with an updated version of
+  itself (below), until one of the two is chosen.
 - **Date:** 2026-10-14
 - **Where:** `apps/web` only: `src/styles/`, `src/styles.css`,
   `src/app/appearance.ts`, `src/app/useAppearance.ts`,
@@ -125,6 +126,24 @@ Examples and Jobs, and the Log item is gone: the developer section is reached
 from its fold at the foot of the page. The web app's version (0.5.0, from its
 `package.json` at build time) shows in About beside the core's.
 
+### Instrument kept; its update on trial (2026-10-16)
+
+Hybrid and precise are gone: their stylesheets, colour blocks, the header
+branch of `AppFrame` (with its breadcrumb, way back and mark), the elements
+only they showed, and IBM Plex. `AppFrame` is now the rail alone.
+
+A UI/UX review of instrument led to an updated version, to be compared with
+instrument as it is before one is kept. The Appearance control's "Style"
+group now offers "Instrument" and "Instrument (updated)" (`?style=` takes
+`instrument` and `instrument-updated`). Both are `data-style="instrument"`,
+so every instrument rule applies to both; the updated one is also
+`data-variant="updated"`, and its changes live in
+`src/styles/style-instrument-updated.css`, all under that attribute.
+
+Fixes that change nothing on screen (what screen readers are told, where
+focus goes) and plain bugs apply to both versions; only what changes how
+the app looks or reads is the update's.
+
 ## Consequences
 
 - The trial costs three stylesheets, six colour blocks and one branch in
@@ -134,86 +153,48 @@ from its fold at the foot of the page. The web app's version (0.5.0, from its
 - Fonts for both families ship in the build (about 185 KB of woff2; a
   browser fetches a font only when the page's text uses it).
 
-## Removing a style
+## Removing what is left of the trial
 
-Do this twice, once per losing style. Then, optionally, flatten (below).
+Hybrid and precise were removed on 2026-10-16, following the steps this
+section held until then (in the history of this file).
 
-### Soft-precise hybrid
+### Instrument or its update
 
-1. Delete `src/styles/style-hybrid.css` and its import in `src/main.tsx`.
-2. In `src/styles/tokens.css`, delete the `[data-style="hybrid"]` shape block
-   and both `[data-style="hybrid"][data-theme=…]` colour blocks. **`:root` is
-   grouped with them**: add `:root,` to the winner's shape block and to its
-   light colour block, so the page still has tokens before `main.tsx` runs.
-   Point the `prefers-color-scheme` fallback at the winner's dark `--page`
-   and `--text`.
-3. `src/app/appearance.ts`: drop `"hybrid"` from `STYLE_NAMES`, and make
-   `DEFAULT_APPEARANCE.style` the winner.
-4. `src/app/AppearanceControl.tsx`: drop it from `STYLE_LABELS`.
-5. Tests: `test/styles/tokens.test.ts` (`STYLES`), `test/app/appearance.test.tsx`.
+When one of the two versions is chosen:
 
-### Precise
+1. If the update is kept, move the rules of
+   `src/styles/style-instrument-updated.css` into `style-instrument.css`
+   without the `[data-variant="updated"]` prefix; if it is not, leave them
+   out. Either way, delete the file and its import in `src/main.tsx`.
+2. `src/app/appearance.ts`: drop `"instrument-updated"` from `STYLE_NAMES`
+   and stop writing `data-variant`; `src/app/AppearanceControl.tsx`: drop
+   the "Style" fieldset and `STYLE_LABELS`, keeping "Night mode".
+3. Markup that only the update shows, hidden by default in `styles.css`: keep
+   it and its rules, or delete both, as step 1 decides. Each is listed in
+   the header of `style-instrument-updated.css`.
+4. Tests: `test/app/appearance.test.tsx`, and the version loops in
+   `e2e/instrument-backdrop.spec.ts` and `e2e/styles.capture.ts`.
 
-1. Delete `src/styles/style-precise.css` and its import in `src/main.tsx`.
-2. `tokens.css`: delete the `[data-style="precise"]` shape block and both
-   colour blocks. `--ticks` is used by precise only: remove it from every
-   block and from `COLOUR_TOKENS` in the token test. `data-main-card` (on the
-   start card, the service card and the result) then marks nothing; remove
-   the attribute and its rule in `styles.css`.
-3. `src/app/AppFrame.tsx`: the `back` and `context` props and what they
-   render, and their computation in `App.tsx`; in `ProcessListScreen.tsx` and
-   `ProcessScreen.tsx`, `.service-status`, `.process-key`, `.process-needs`
-   and `.process-runs`, and their rule in `styles.css`. Then
-   `src/map/MapView.tsx`: the `ScaleControl` and the compass
-   (`showCompass: true`) are precise's; set `showCompass: false`, remove the
-   scale control, and the rule hiding both in `styles.css`.
-4. `src/jobs/JobsPanel.tsx`: the `jobs-head` row of column heads is shown by
-   precise only; remove it and its rule in `styles.css`.
-5. `src/app/appearance.ts`, `AppearanceControl.tsx` and the tests as for
-   hybrid.
+### Removing the backdrop
 
-### Instrument
-
-1. Delete `src/styles/style-instrument.css` and its import in `src/main.tsx`.
-2. `tokens.css`: delete the `[data-style="instrument"]` shape block and both
-   colour blocks. `--rail` is used by the rail only: remove it from every
-   block and from the token test.
-3. `src/app/AppFrame.tsx`: delete `Rail`, `RailItem`, `ICONS`,
-   `FramePlace`, `StartLink` and the props only the rail reads (`place`,
-   `onConnect`, `onProcesses`, `railItems`, `jobsItem`, `aboutItem`), and the
-   branch on `style`. In `src/App.tsx`, delete what computes them.
-4. Fonts: remove the Manrope and JetBrains Mono imports from
-   `src/styles/fonts.ts`, the two packages from `apps/web/package.json`, and
-   their rows in `THIRD_PARTY.md`.
-5. Shown by instrument only, so delete them or decide to show them in the
-   winner: `.run-hint` and the needs marks (`.needs-mark` in `NeedsTag.tsx`
-   and the filters' marks in `ExamplesView.tsx`). If precise goes too, the
-   request log (`RequestLog` in `ProcessScreen.tsx`, `src/app/request-log.ts`
-   and its rules) goes with them.
-6. `src/app/appearance.ts`, `AppearanceControl.tsx` and the tests as for
-   hybrid.
-7. Breinstein's mark and About: delete `src/app/BrandMark.tsx` (and its
-   trademark note in `THIRD_PARTY.md`), its `.start-wordmark` in
-   `EndpointScreen.tsx`, `src/app/AboutPanel.tsx`, the About `SidePanel` in
-   `App.tsx`, `test/app/about.test.tsx` and `e2e/instrument-breinstein.spec.ts`;
-   or move the mark and About into the winner, which then needs a place to
-   open About from. `__APP_VERSION__` and `SidePanel`'s `footer` can stay.
-8. Europe behind the start screen: delete `src/styles/backdrop.css` and its
-   import in `src/main.tsx`, the two pictures in `src/assets/backdrop/`, the
-   credit chip (`.backdrop-credit` in `App.tsx`), `scripts/fetch-backdrops.sh`,
-   the three entries in section 6 of `THIRD_PARTY.md`, the "Start screen
-   imagery" row in About and `e2e/instrument-backdrop.spec.ts`; and drop
-   `--backdrop-scrim` from every block in `tokens.css` and from the token test.
-   The theme switch's side of it goes too: `src/app/backdrop.ts` and
-   `test/app/backdrop.test.ts`, and in `useAppearance.ts` the `ready` it
-   passes to `switchTheme` and the effect that fetches the other picture. The
-   crossfade itself (`theme-switch.ts`) belongs to every style and stays.
+Europe behind the start screen: delete `src/styles/backdrop.css` and its
+import in `src/main.tsx`, the two pictures in `src/assets/backdrop/`, the
+credit chip (`.backdrop-credit` in `App.tsx`), `scripts/fetch-backdrops.sh`,
+the three entries in section 6 of `THIRD_PARTY.md`, the "Start screen
+imagery" row in About and `e2e/instrument-backdrop.spec.ts`; and drop
+`--backdrop-scrim` from every block in `tokens.css` and from the token test.
+The theme switch's side of it goes too: `src/app/backdrop.ts` and
+`test/app/backdrop.test.ts`, and in `useAppearance.ts` the `ready` it
+passes to `switchTheme` and the effect that fetches the other picture. The
+crossfade itself (`theme-switch.ts`) belongs to every style and stays.
 
 ### Then, optionally: flatten
 
-With one style left, the style dimension can go: remove `StyleName` and the
-style half of `appearance.ts` and the Appearance control (keep the theme
-half), stop writing `data-style`, fold the winner's shape block into `:root`
-and its colour blocks into `[data-theme="light"]` and `[data-theme="dark"]`,
-and move its `style-*.css` rules into `styles.css` without the
-`[data-style="…"]` prefix. `AppFrame` keeps the winner's branch.
+With one version left, the style dimension can go: remove `StyleName` and
+the style half of `appearance.ts` and the Appearance control (keep the theme
+half), stop writing `data-style`, fold the shape block into `:root` and the
+colour blocks into `[data-theme="light"]` and `[data-theme="dark"]`, and
+move `style-instrument.css` into `styles.css` without the
+`[data-style="instrument"]` prefix. The streets in `styles.css` and the
+`--backdrop-*` tokens other than `--backdrop-scrim` can go then too: they
+are all in the page colour.

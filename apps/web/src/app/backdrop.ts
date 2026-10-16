@@ -1,6 +1,6 @@
 /**
- * STYLE TRIAL (instrument): the two pictures behind Instrument's start screen
- * (`styles/backdrop.css`), seen from the code that switches theme.
+ * The two pictures behind the start screen (`styles/backdrop.css`), seen
+ * from the code that switches theme.
  *
  * Imported here, Vite gives each picture the same hashed address as the
  * stylesheet's `url()`, so the browser downloads each one once, whoever asks.
@@ -11,19 +11,19 @@
  * - Before a fade to a theme, its picture is decoded, so the fade ends on the
  *   whole picture (`theme-switch.ts`).
  *
- * Hybrid and precise never fetch either. Deleting the backdrop deletes this
- * file and its two uses in `useAppearance.ts` (ADR 0002).
+ * Deleting the backdrop deletes this file and its two uses in
+ * `useAppearance.ts` (ADR 0002).
  */
 
 import day from "../assets/backdrop/europe-day.webp";
 import night from "../assets/backdrop/europe-night.webp";
-import type { ResolvedTheme, StyleName } from "./appearance.js";
+import type { ResolvedTheme } from "./appearance.js";
 
 export const BACKDROP: Readonly<Record<ResolvedTheme, string>> = { light: day, dark: night };
 
-/** Whether to fetch the other theme's picture ahead of time. */
-export function shouldPrefetch(style: StyleName, saveData: boolean): boolean {
-  return style === "instrument" && !saveData;
+/** Whether to fetch the other theme's picture ahead of time: not when the connection saves data. */
+export function shouldPrefetch(saveData: boolean): boolean {
+  return !saveData;
 }
 
 /** Whether the connection asks pages to save data (`Save-Data`). False where the browser doesn't say. */

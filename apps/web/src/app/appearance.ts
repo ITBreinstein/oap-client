@@ -2,23 +2,26 @@
  * How the page looks: a **style** and a **theme**, kept apart.
  *
  * - The style is shape, type and layout: corner radii, borders or shadows,
- *   fonts, label treatment, where panels dock. Three are on trial
- *   (`docs/adr/0002-switchable-styles.md`); two will be deleted.
+ *   fonts, label treatment, where panels dock. Of the three on trial, one
+ *   is left: instrument (`docs/adr/0002-switchable-styles.md`). It comes in
+ *   two versions to compare, as it is and updated after a UI/UX review.
  * - The theme is colour only, light or dark. It never changes a radius or a
  *   layout.
  *
- * Both are written to `<html>` as `data-style` and `data-theme`, which is all
- * the stylesheets read (`styles/tokens.css`). Nothing else in the page asks
- * which style is on, apart from the app's frame (`AppFrame`).
+ * Both are written to `<html>`: `data-style="instrument"` for either
+ * version, `data-variant` (`current` or `updated`) for which, and
+ * `data-theme`. That is all the stylesheets read (`styles/tokens.css`,
+ * `styles/instrument-updated.css`); no component asks.
  *
  * Where the choice comes from, first match wins: the address
- * (`?style=precise&theme=dark`), then what this browser saved, then the
+ * (`?style=instrument&theme=dark`), then what this browser saved, then the
  * defaults. An address never overwrites the saved choice, so opening a shared
  * link does not change anyone's own setting. Anything unrecognised, from
  * either source, is ignored silently: neither is ours to trust.
  */
 
-export const STYLE_NAMES = ["hybrid", "instrument", "precise"] as const;
+/** STYLE TRIAL: the two versions of instrument, until one is chosen. */
+export const STYLE_NAMES = ["instrument", "instrument-updated"] as const;
 export type StyleName = (typeof STYLE_NAMES)[number];
 
 export const THEME_PREFERENCES = ["system", "light", "dark"] as const;
@@ -31,7 +34,7 @@ export interface Appearance {
   readonly theme: ThemePreference;
 }
 
-export const DEFAULT_APPEARANCE: Appearance = { style: "hybrid", theme: "system" };
+export const DEFAULT_APPEARANCE: Appearance = { style: "instrument", theme: "system" };
 
 /** Where this browser keeps the choice. One key, one small JSON object. */
 export const APPEARANCE_STORAGE_KEY = "oap.appearance";
@@ -172,6 +175,7 @@ export function applyAppearance(
   appearance: Appearance,
   resolved: ResolvedTheme,
 ): void {
-  root.dataset["style"] = appearance.style;
+  root.dataset["style"] = "instrument";
+  root.dataset["variant"] = appearance.style === "instrument-updated" ? "updated" : "current";
   root.dataset["theme"] = resolved;
 }

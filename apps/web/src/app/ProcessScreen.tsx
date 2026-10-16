@@ -12,8 +12,6 @@ import type { JobRow } from "../relay/job-session.js";
 import type { RenderableResult } from "../results/renderable.js";
 import { CONFIRM_WINDOW_MS } from "../relay/reconciler.js";
 import { ErrorMessage } from "./ErrorMessage.js";
-import { needsOfPlan } from "./needs.js";
-import { NeedsTag } from "./NeedsTag.js";
 import { lastExecution, requestLog } from "./request-log.js";
 import { FieldView } from "./FormFields.js";
 import { ResultsView } from "./ResultsView.js";
@@ -351,8 +349,7 @@ function ResultStrip({
 
 /**
  * The requests this page made to the service, newest last, as the session
- * recorded them. Shown by the precise and instrument styles; hybrid leaves it
- * out.
+ * recorded them.
  */
 function RequestLog({
   entries,
@@ -424,9 +421,6 @@ export function ProcessScreen(props: ProcessScreenProps) {
   const { process, plan, values, warnings, mode } = state;
   const base = useId();
   const both = process.execution.sync && process.execution.async;
-  const runs = [process.execution.sync && "sync", process.execution.async && "async"]
-    .filter(Boolean)
-    .join(" · ");
   const onlyAsync = process.execution.async && !process.execution.sync;
   const editable = state.stage === "process";
   const { maxCoordinates } = useContext(MapLimitsContext);
@@ -463,23 +457,12 @@ export function ProcessScreen(props: ProcessScreenProps) {
           <span aria-hidden="true">← </span>All processes
         </button>
       </p>
-      {/* What it needs from you: shown by precise, above the title. */}
-      <p className="process-needs">
-        <NeedsTag needs={needsOfPlan(plan)} />
-      </p>
       <p className="process-path mono">
         <span className="process-service">
           {state.service.title ?? hostOf(state.endpoint.baseUrl)} <span aria-hidden="true">/</span>
           <span className="visually-hidden">, process</span>{" "}
         </span>
         <span className="process-path-id">{process.id}</span>
-        {runs !== "" && (
-          <span className="process-runs">
-            <span aria-hidden="true"> · </span>
-            <span className="visually-hidden">, runs </span>
-            {runs}
-          </span>
-        )}
       </p>
       <h2
         id={`${base}-heading`}
@@ -554,7 +537,6 @@ export function ProcessScreen(props: ProcessScreenProps) {
         // milliseconds of the doorbell that prompted the read.
         <div
           className="result-block"
-          data-main-card="true"
           data-result-of={state.jobRef}
           data-doorbells={resultJob?.doorbells}
           data-callbacks={callbacksOf(resultJob)}

@@ -6,65 +6,28 @@
  *
  * Two kinds of block, kept apart so a theme can never change a shape:
  *
- * - a **shape** block per style, `[data-style=…]`: fonts, label treatment,
+ * - a **shape** block, `[data-style="instrument"]`: fonts, label treatment,
  *   radii. Never a colour.
- * - a **colour** block per style and theme, `[data-style=…][data-theme=…]`:
+ * - a **colour** block per theme, `[data-style="instrument"][data-theme=…]`:
  *   colours and shadows. Never a size.
  *
- * Deleting a style is deleting its three blocks here (one shape, two colour)
- * and its `style-*.css` file. Contrast: text at least 4.5:1 and field borders
- * at least 3:1 against what they sit on; `test/styles/tokens.test.ts` checks
- * both for every block.
+ * Contrast: text at least 4.5:1 and field borders at least 3:1 against what
+ * they sit on; `test/styles/tokens.test.ts` checks both for every block.
  *
- * `:root` carries the hybrid blocks too, so the page has a complete set
- * before `main.tsx` has written `data-style` and `data-theme`.
+ * `:root` carries the shape block and the light colours too, so the page has
+ * a complete set before `main.tsx` has written `data-style` and `data-theme`.
  *
  * Lines come in four weights: `--line` (hairlines inside a container),
- * `--line-mid` (precise's middle rule), `--line-strong` (container edges) and
- * `--line-label` (the thin box around a label). The backdrop's veils are the
- * designs' wash over the streets: 40% on the start screen, 72% under the
- * process list and 80% under a process without a map. `--backdrop-scrim` is
- * the wash over Instrument's picture of Europe (`backdrop.css`): its page
- * colour at 20%. The other styles show no picture; theirs is their page.
+ * `--line-mid` (a middle rule), `--line-strong` (container edges) and
+ * `--line-label` (the thin box around a label). The `--backdrop-*` streets
+ * tokens are all the page colour: the start screen shows a picture of
+ * Europe instead (`backdrop.css`), under `--backdrop-scrim`, the page colour
+ * at 20%.
  */
 
 /* ---------------------------------------------------------------- shapes */
 
 :root,
-[data-style="hybrid"] {
-  --font-ui: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
-  --font-heading: var(--font-ui);
-  --heading-weight: 600;
-  --heading-tracking: -0.005em;
-  --label-font: var(--font-ui);
-  --label-size: 0.9375rem;
-  --label-weight: 600;
-  --label-transform: none;
-  --label-tracking: 0;
-  --r-card: 12px;
-  --r-item: 10px;
-  --r-control: 8px;
-  --r-tag: 6px;
-}
-
-[data-style="precise"] {
-  --font-ui: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
-  --font-heading: var(--font-ui);
-  --heading-weight: 700;
-  --heading-tracking: -0.01em;
-  --label-font: var(--font-mono);
-  --label-size: 0.75rem;
-  --label-weight: 500;
-  --label-transform: uppercase;
-  --label-tracking: 0.08em;
-  --r-card: 2px;
-  --r-item: 2px;
-  --r-control: 2px;
-  --r-tag: 2px;
-}
-
 [data-style="instrument"] {
   --font-ui: "Manrope", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
@@ -80,247 +43,6 @@
   --r-item: 6px;
   --r-control: 4px;
   --r-tag: 4px;
-}
-
-/* --------------------------------------------- Soft-precise hybrid colours */
-
-:root,
-[data-style="hybrid"][data-theme="light"] {
-  --page: #f5f7fa;
-  --surface: #ffffff;
-  --surface-2: #f5f7fa;
-  --surface-hover: #f3f7fc;
-  --field: #ffffff;
-  --rail: var(--surface);
-  --rail-hover: var(--surface-hover);
-  --text: #1f2933;
-  --text-strong: #1f2933;
-  --text-secondary: #1f2933;
-  --muted: #52606d;
-  --ident: #52606d;
-  --label-color: #1f2933;
-  --line: #e4e7eb;
-  --line-strong: #cbd2d9;
-  --line-mid: #cbd2d9;
-  --line-label: #9aa5b1;
-  --field-border: #7b8794;
-  --accent: #1f4e8c;
-  --accent-hover: #163a69;
-  --accent-text: #ffffff;
-  --accent-ink: #1f4e8c;
-  --selected-bg: #e8eef7;
-  --selected-text: #163a69;
-  --selected-line: #1f4e8c;
-  --focus: #b45309;
-  --need-area-fg: #8a4b08;
-  --need-area-bg: #fdf0e1;
-  --need-data-fg: #163a69;
-  --need-data-bg: #e8eef7;
-  --need-values-fg: #1d5a35;
-  --need-values-bg: #e3f4e8;
-  --result-fg: #163a69;
-  --result-surface: #e8eef7;
-  --result-line: #1f4e8c;
-  --success: #1d5a35;
-  --success-surface: #e3f4e8;
-  --warning: #8a4b08;
-  --error: #9b1c1c;
-  --error-surface: #fdecec;
-  --notice-surface: #fff7e6;
-  --notice-line: #f0c36d;
-  --ticks: #1f4e8c;
-  --overlay: rgb(31 41 51 / 45%);
-  --shadow-card: 0 1px 2px rgb(31 41 51 / 6%), 0 8px 24px rgb(31 41 51 / 6%);
-  --shadow-panel: -8px 0 24px rgb(31 41 51 / 6%);
-  --shadow-popover: 0 8px 24px rgb(31 41 51 / 14%);
-  --backdrop-ground: #eef0ea;
-  --backdrop-line-1: #e2e5dc;
-  --backdrop-line-2: #e7eae2;
-  --backdrop-water: #d6e4ee;
-  --backdrop-park: #dfe8d6;
-  --backdrop-veil: rgb(245 247 250 / 40%);
-  --backdrop-veil-list: rgb(245 247 250 / 72%);
-  --backdrop-veil-sheet: rgb(245 247 250 / 80%);
-  --backdrop-scrim: var(--page);
-}
-
-[data-style="hybrid"][data-theme="dark"] {
-  --page: #0f1720;
-  --surface: #16212e;
-  --surface-2: #121b26;
-  --surface-hover: #1b2939;
-  --field: #0f1720;
-  --rail: var(--surface);
-  --rail-hover: var(--surface-hover);
-  --text: #e6ebf0;
-  --text-strong: #f5f7fa;
-  --text-secondary: #e6ebf0;
-  --muted: #9fb0c0;
-  --ident: #9fb0c0;
-  --label-color: #cbd5df;
-  --line: #2b3a4b;
-  --line-strong: #2b3a4b;
-  --line-mid: #2b3a4b;
-  --line-label: #3a4b5e;
-  --field-border: #64778c;
-  --accent: #7fb2f0;
-  --accent-hover: #9cc3f5;
-  --accent-text: #0b1520;
-  --accent-ink: #7fb2f0;
-  --selected-bg: #172a40;
-  --selected-text: #9cc3f5;
-  --selected-line: #7fb2f0;
-  --focus: #f2b766;
-  --need-area-fg: #f2b766;
-  --need-area-bg: #2a2114;
-  --need-data-fg: #9cc3f5;
-  --need-data-bg: #172a40;
-  --need-values-fg: #86d6a2;
-  --need-values-bg: #15291e;
-  --result-fg: #9cc3f5;
-  --result-surface: #172a40;
-  --result-line: #7fb2f0;
-  --success: #86d6a2;
-  --success-surface: #15291e;
-  --warning: #f2b766;
-  --error: #ff9b9b;
-  --error-surface: #3a1a1d;
-  --notice-surface: #2a2114;
-  --notice-line: #7a5a26;
-  --ticks: #7fb2f0;
-  --overlay: rgb(0 0 0 / 60%);
-  --shadow-card: 0 24px 60px rgb(0 0 0 / 45%);
-  --shadow-panel: none;
-  --shadow-popover: 0 16px 40px rgb(0 0 0 / 50%);
-  --backdrop-ground: #0f1720;
-  --backdrop-line-1: #18222e;
-  --backdrop-line-2: #141d28;
-  --backdrop-water: #122638;
-  --backdrop-park: #13241a;
-  --backdrop-veil: transparent;
-  --backdrop-veil-list: rgb(15 23 32 / 72%);
-  --backdrop-veil-sheet: rgb(15 23 32 / 80%);
-  --backdrop-scrim: var(--page);
-}
-
-/* ---------------------------------------------------------- Precise colours */
-
-[data-style="precise"][data-theme="light"] {
-  --page: #f5f7fa;
-  --surface: #ffffff;
-  --surface-2: #f5f7fa;
-  --surface-hover: #f3f7fc;
-  --field: #ffffff;
-  --rail: var(--surface);
-  --rail-hover: var(--surface-hover);
-  --text: #1f2933;
-  --text-strong: #1f2933;
-  --text-secondary: #1f2933;
-  --muted: #52606d;
-  --ident: #52606d;
-  --label-color: #3e4c59;
-  --line: #e4e7eb;
-  --line-strong: #1f2933;
-  --line-mid: #cbd2d9;
-  --line-label: #9aa5b1;
-  --field-border: #1f2933;
-  --accent: #1f4e8c;
-  --accent-hover: #163a69;
-  --accent-text: #ffffff;
-  --accent-ink: #1f4e8c;
-  --selected-bg: #1f2933;
-  --selected-text: #ffffff;
-  --selected-line: #1f2933;
-  --focus: #b45309;
-  --need-area-fg: #8a4b08;
-  --need-area-bg: transparent;
-  --need-data-fg: #163a69;
-  --need-data-bg: transparent;
-  --need-values-fg: #1d5a35;
-  --need-values-bg: transparent;
-  --result-fg: #163a69;
-  --result-surface: #e8eef7;
-  --result-line: #1f4e8c;
-  --success: #1d5a35;
-  --success-surface: #e3f4e8;
-  --warning: #8a4b08;
-  --error: #9b1c1c;
-  --error-surface: #fdecec;
-  --notice-surface: #fff7e6;
-  --notice-line: #f0c36d;
-  --ticks: #1f4e8c;
-  --overlay: rgb(31 41 51 / 45%);
-  --shadow-card: 6px 6px 0 rgb(31 41 51 / 10%);
-  --shadow-panel: none;
-  --shadow-popover: 4px 4px 0 rgb(31 41 51 / 14%);
-  --backdrop-ground: #eef0ea;
-  --backdrop-line-1: #e2e5dc;
-  --backdrop-line-2: #e7eae2;
-  --backdrop-water: #d6e4ee;
-  --backdrop-park: #dfe8d6;
-  --backdrop-veil: rgb(245 247 250 / 40%);
-  --backdrop-veil-list: rgb(245 247 250 / 72%);
-  --backdrop-veil-sheet: rgb(245 247 250 / 80%);
-  --backdrop-scrim: var(--page);
-}
-
-[data-style="precise"][data-theme="dark"] {
-  --page: #0f1720;
-  --surface: #16212e;
-  --surface-2: #121b26;
-  --surface-hover: #1b2939;
-  --field: #0f1720;
-  --rail: var(--surface);
-  --rail-hover: var(--surface-hover);
-  --text: #e6ebf0;
-  --text-strong: #f5f7fa;
-  --text-secondary: #e6ebf0;
-  --muted: #9fb0c0;
-  --ident: #9fb0c0;
-  --label-color: #9fb0c0;
-  --line: #2b3a4b;
-  --line-strong: #8193a6;
-  --line-mid: #3a4b5e;
-  --line-label: #64778c;
-  --field-border: #8193a6;
-  --accent: #7fb2f0;
-  --accent-hover: #9cc3f5;
-  --accent-text: #0b1520;
-  --accent-ink: #7fb2f0;
-  --selected-bg: #e6ebf0;
-  --selected-text: #0f1720;
-  --selected-line: #e6ebf0;
-  --focus: #f2b766;
-  --need-area-fg: #f2b766;
-  --need-area-bg: transparent;
-  --need-data-fg: #9cc3f5;
-  --need-data-bg: transparent;
-  --need-values-fg: #86d6a2;
-  --need-values-bg: transparent;
-  --result-fg: #9cc3f5;
-  --result-surface: #172a40;
-  --result-line: #7fb2f0;
-  --success: #86d6a2;
-  --success-surface: #15291e;
-  --warning: #f2b766;
-  --error: #ff9b9b;
-  --error-surface: #3a1a1d;
-  --notice-surface: #2a2114;
-  --notice-line: #7a5a26;
-  --ticks: #7fb2f0;
-  --overlay: rgb(0 0 0 / 60%);
-  --shadow-card: 6px 6px 0 rgb(0 0 0 / 35%);
-  --shadow-panel: none;
-  --shadow-popover: 4px 4px 0 rgb(0 0 0 / 40%);
-  --backdrop-ground: #0f1720;
-  --backdrop-line-1: #18222e;
-  --backdrop-line-2: #141d28;
-  --backdrop-water: #122638;
-  --backdrop-park: #13241a;
-  --backdrop-veil: transparent;
-  --backdrop-veil-list: rgb(15 23 32 / 72%);
-  --backdrop-veil-sheet: rgb(15 23 32 / 80%);
-  --backdrop-scrim: var(--page);
 }
 
 /* ------------------------------------------------------- Instrument colours */
@@ -377,7 +99,6 @@
   --error-surface: #3a0d14;
   --notice-surface: #232531;
   --notice-line: #6b6420;
-  --ticks: #be98eb;
   --overlay: rgb(2 4 25 / 60%);
   --shadow-card: none;
   --shadow-panel: 24px 0 48px rgb(0 0 0 / 50%);
@@ -393,6 +114,7 @@
   --backdrop-scrim: rgb(4 7 39 / 20%);
 }
 
+:root,
 [data-style="instrument"][data-theme="light"] {
   --page: #f4f4f4;
   --surface: #ffffff;
@@ -436,7 +158,6 @@
   --error-surface: #fdecec;
   --notice-surface: #fdf8d8;
   --notice-line: #e8d77a;
-  --ticks: #7327ce;
   --overlay: rgb(4 7 39 / 45%);
   --shadow-card: none;
   --shadow-panel: 24px 0 48px rgb(4 7 39 / 12%);
@@ -470,7 +191,7 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
     color-scheme: dark;
-    --page: #0f1720;
-    --text: #e6ebf0;
+    --page: #040727;
+    --text: #f4f4f4;
   }
 }

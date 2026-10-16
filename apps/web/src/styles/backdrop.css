@@ -1,11 +1,12 @@
 /*
- * STYLE TRIAL (instrument): Europe behind the start screen, by day in the
+ * Europe behind the start screen, by day in the
  * light theme and by night in the dark one. Both pictures sit on one grid
  * (`scripts/fetch-backdrops.sh`), so switching theme swaps the picture without
  * anything moving. Sources and credits: THIRD_PARTY.md.
  *
- * The picture replaces the streets on the selector that draws them for the
- * other styles, so there is still one backdrop and no new element. With text
+ * The picture goes on the selector that draws the streets in `styles.css`
+ * (left over from the removed styles, all in the page colour), so there is
+ * one backdrop and no element of its own. With text
  * on a photograph unreadable, everything on the start screen moves into one
  * card, and the credit is a chip of its own.
  *

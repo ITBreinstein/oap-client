@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Appearance } from "./app/appearance.js";
 import { AppearanceControl } from "./app/AppearanceControl.js";
-import { AppFrame, RailItem, type FrameCrumb, type FramePlace } from "./app/AppFrame.js";
+import { AppFrame, RailItem, type FramePlace } from "./app/AppFrame.js";
 import { DeveloperPanel } from "./app/DeveloperPanel.js";
 import { activeDrawField, DrawContext, type DrawRequest, type DrawTarget } from "./app/draw.js";
 import { EndpointScreen } from "./app/EndpointScreen.js";
@@ -291,59 +291,18 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
       : state.stage === "process" || state.stage === "result"
         ? commands.backToList
         : undefined;
-  // STYLE TRIAL (precise): the header's way back and the page's place in it.
-  const back =
-    state.stage === "connected"
-      ? { label: "Change service", onClick: commands.disconnect }
-      : state.stage === "choose-endpoint"
-        ? undefined
-        : { label: "All processes", onClick: onProcesses };
-  const context =
-    state.stage === "choose-endpoint"
-      ? undefined
-      : state.stage === "connected"
-        ? "OGC API - Processes"
-        : (state.service.title ?? state.endpoint.baseUrl);
-  // STYLE TRIAL (hybrid): where the page is, as a breadcrumb: the service, then the process.
-  const crumbs: readonly FrameCrumb[] | undefined =
-    state.stage === "choose-endpoint"
-      ? undefined
-      : state.stage === "connected"
-        ? [{ label: state.service.title ?? state.endpoint.baseUrl, onClick: undefined }]
-        : [
-            { label: state.service.title ?? state.endpoint.baseUrl, onClick: onProcesses },
-            { label: state.process.title ?? state.process.id, onClick: undefined },
-          ];
-
   return (
     <MapLimitsContext value={mapLimits}>
       <DrawContext.Provider value={draw}>
         <div className="app" data-relay-stream={view.snapshot?.relay}>
           <AppFrame
-            style={appearance.style}
             inert={offerOpen}
             appearance={
               <AppearanceControl appearance={appearance} onStyle={setStyle} onTheme={setTheme} />
             }
             place={place}
-            back={back}
-            context={context}
-            crumbs={crumbs}
             onConnect={onConnect}
             onProcesses={onProcesses}
-            tools={
-              <button
-                type="button"
-                className="secondary jobs-button"
-                aria-expanded={panelOpen === "jobs"}
-                aria-controls={PANEL_IDS.jobs}
-                onClick={() => {
-                  togglePanel("jobs");
-                }}
-              >
-                My jobs{jobsBadge}
-              </button>
-            }
             railItems={
               examples.length > 0 && (
                 <RailItem
@@ -396,7 +355,7 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
               <main className="panel" ref={panel} data-stage={state.stage}>
                 {state.stage !== "choose-endpoint" && state.route === "relay" && <RelayBanner />}
                 {screen}
-                {/* STYLE TRIAL (instrument): the credit for the picture behind the start screen (backdrop.css). */}
+                {/* The credit for the picture behind the start screen (backdrop.css). */}
                 {state.stage === "choose-endpoint" && (
                   <p className="backdrop-credit">
                     Imagery: NASA Blue Marble and Blue Marble clouds · NASA Earth at Night 2012
@@ -471,12 +430,10 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
                 onDismiss={commands.dismissJob}
               />
             </SidePanel>
-            {/* STYLE TRIAL (instrument): only the rail has an About item; the
-                panel stays shut in the other styles, even across a style switch. */}
             <SidePanel
               id={PANEL_IDS.about}
               title="About"
-              open={panelOpen === "about" && appearance.style === "instrument"}
+              open={panelOpen === "about"}
               inert={offerOpen}
               onClose={closePanel}
               className="about-panel"

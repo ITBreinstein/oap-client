@@ -1,8 +1,6 @@
 /**
- * What a process needs, as one tag. The words are always in it: each style
- * decides how much of them shows, a tinted tag (hybrid), a glyph and mono
- * capitals (precise) or a mark with the words for screen readers only
- * (instrument). Colour is never the only signal.
+ * What a process needs, as one tag: a mark, with the words for screen
+ * readers. Colour is never the only signal.
  */
 
 import { NEEDS_LABELS, type Needs } from "./needs.js";

@@ -15,7 +15,6 @@ import {
   AttributionControl,
   Map as MapLibreMap,
   NavigationControl,
-  ScaleControl,
   setWorkerUrl,
 } from "maplibre-gl";
 // MapLibre 6 looks for its worker next to its own module, which a bundle moves.
@@ -96,12 +95,7 @@ export const createPdokMap: CreateMap = (container, reducedMotion) => {
     fadeDuration: reducedMotion ? 0 : 300,
   });
   map.addControl(new AttributionControl({ compact: false }));
-  // The compass and the scale bar are the precise style's north indicator and
-  // scale (ADR 0002); the other styles hide both. The compass turns with the
-  // map, so it is right after a rotation, and pressing it turns north up.
-  map.addControl(new NavigationControl({ showCompass: true, visualizePitch: false }));
-  // Bottom left, as on a printed sheet; the attribution keeps the bottom right.
-  map.addControl(new ScaleControl({ unit: "metric", maxWidth: 160 }), "bottom-left");
+  map.addControl(new NavigationControl({ showCompass: false, visualizePitch: false }));
   return map;
 };
 

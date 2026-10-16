@@ -12,10 +12,9 @@ import { loadRuntimeConfig } from "./config/runtime-config.js";
 import "./styles/fonts.js";
 import "./styles/tokens.css";
 import "./styles.css";
-import "./styles/style-hybrid.css";
-import "./styles/style-precise.css";
 import "./styles/style-instrument.css";
 import "./styles/backdrop.css";
+import "./styles/style-instrument-updated.css";
 
 const root = document.getElementById("root");
 if (!root) throw new Error("#root not found");

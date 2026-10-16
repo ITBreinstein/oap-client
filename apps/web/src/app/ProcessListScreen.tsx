@@ -123,10 +123,8 @@ export function ProcessListScreen(props: ProcessListScreenProps) {
         Processes
       </h2>
 
-      <div className="service-card card" data-main-card="true">
+      <div className="service-card card">
         <div className="service-main">
-          {/* Said by the breadcrumb in the other styles; precise hides that. */}
-          <p className="service-status label">Connected</p>
           <p className="service-title">{service.title ?? endpoint.baseUrl}</p>
           <p className="service-url mono">{endpoint.baseUrl}</p>
           {service.description !== undefined && <p className="help">{service.description}</p>}
@@ -237,10 +235,6 @@ export function ProcessListScreen(props: ProcessListScreenProps) {
             );
           })}
         </ul>
-        {/* The glyphs' key, for the style that marks what a process needs with them. */}
-        <p className="process-key label">
-          ▢ draw on the map · ↑ upload or link a file · = type values
-        </p>
       </div>
     </section>
   );

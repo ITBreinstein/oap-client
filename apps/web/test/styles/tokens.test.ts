@@ -20,7 +20,7 @@ const styleSheets: Record<string, string> = import.meta.glob(
   },
 );
 
-const STYLES = ["hybrid", "precise", "instrument"] as const;
+const STYLES = ["instrument"] as const;
 const THEMES = ["light", "dark"] as const;
 
 const SHAPE_TOKENS = [
@@ -83,7 +83,6 @@ const COLOUR_TOKENS = [
   "--error-surface",
   "--notice-surface",
   "--notice-line",
-  "--ticks",
   "--overlay",
   "--shadow-card",
   "--shadow-panel",
