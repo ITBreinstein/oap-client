@@ -15,6 +15,7 @@ import "./styles.css";
 import "./styles/style-hybrid.css";
 import "./styles/style-precise.css";
 import "./styles/style-instrument.css";
+import "./styles/backdrop.css";
 
 const root = document.getElementById("root");
 if (!root) throw new Error("#root not found");

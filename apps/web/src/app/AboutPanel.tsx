@@ -83,6 +83,8 @@ export function AboutPanel() {
           <dd>BRT Achtergrondkaart © Kadaster, via PDOK (CC BY 4.0)</dd>
           <dt>Map</dt>
           <dd>MapLibre GL JS (BSD-3-Clause)</dd>
+          <dt>Start screen imagery</dt>
+          <dd>NASA Blue Marble, Blue Marble clouds, Earth at Night 2012</dd>
           <dt>Fonts</dt>
           <dd>Manrope, JetBrains Mono (SIL Open Font License)</dd>
           <dt>Tested with</dt>

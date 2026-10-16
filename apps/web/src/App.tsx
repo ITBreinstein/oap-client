@@ -396,6 +396,12 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
               <main className="panel" ref={panel} data-stage={state.stage}>
                 {state.stage !== "choose-endpoint" && state.route === "relay" && <RelayBanner />}
                 {screen}
+                {/* STYLE TRIAL (instrument): the credit for the picture behind the start screen (backdrop.css). */}
+                {state.stage === "choose-endpoint" && (
+                  <p className="backdrop-credit">
+                    Imagery: NASA Blue Marble and Blue Marble clouds · NASA Earth at Night 2012
+                  </p>
+                )}
                 <DeveloperPanel
                   observations={view.snapshot?.observations ?? []}
                   dropped={view.snapshot?.droppedObservations ?? 0}

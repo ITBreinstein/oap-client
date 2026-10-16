@@ -1,0 +1,122 @@
+/*
+ * STYLE TRIAL (instrument): Europe behind the start screen, by day in the
+ * light theme and by night in the dark one. Both pictures sit on one grid
+ * (`scripts/fetch-backdrops.sh`), so switching theme swaps the picture without
+ * anything moving. Sources and credits: THIRD_PARTY.md.
+ *
+ * The picture replaces the streets on the selector that draws them for the
+ * other styles, so there is still one backdrop and no new element. With text
+ * on a photograph unreadable, everything on the start screen moves into one
+ * card, and the credit is a chip of its own.
+ *
+ * Removing the backdrop is deleting this file, the two pictures, the credit
+ * chip in `App.tsx`, the script and its THIRD_PARTY.md entries,
+ * and `--backdrop-scrim` (ADR 0002). The start screen is then as it was.
+ */
+
+/*
+ * Two layers, the first on top: the scrim, the page colour at 20%, then the
+ * picture. A browser fetches a background only while its rule applies, so a
+ * visit loads one picture, and switching theme loads the other once.
+ * `data-theme` holds the resolved theme: "Follow system" swaps the picture
+ * when the system does.
+ */
+[data-style="instrument"][data-theme="light"]
+  .layout-single:has(> .panel[data-stage="choose-endpoint"]) {
+  background-image:
+    linear-gradient(var(--backdrop-scrim), var(--backdrop-scrim)),
+    url("../assets/backdrop/europe-day.webp");
+}
+
+[data-style="instrument"][data-theme="dark"]
+  .layout-single:has(> .panel[data-stage="choose-endpoint"]) {
+  background-image:
+    linear-gradient(var(--backdrop-scrim), var(--backdrop-scrim)),
+    url("../assets/backdrop/europe-night.webp");
+}
+
+/* The Netherlands stays at the same place in the window as in the picture. */
+[data-style="instrument"] .layout-single:has(> .panel[data-stage="choose-endpoint"]) {
+  background-size: cover;
+  background-position: 43.4% 62.7%;
+}
+
+/* No water and no park on the picture. */
+[data-style="instrument"] .layout-single:has(> .panel[data-stage="choose-endpoint"])::before,
+[data-style="instrument"] .layout-single:has(> .panel[data-stage="choose-endpoint"])::after {
+  content: none;
+}
+
+/*
+ * The panel: a column, so the credit can sit at its foot when the card is
+ * short and under the card when it is long. Never over it.
+ */
+[data-style="instrument"] .layout-single .panel[data-stage="choose-endpoint"] {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 32px calc(32px + var(--dock, 0px)) 16px 32px;
+}
+
+/* The card: the whole start screen, examples and the folded notes too. */
+[data-style="instrument"] .start {
+  flex: none;
+  width: 100%;
+  max-width: calc(836px + 2 * 48px + 2px);
+  margin-bottom: 16px;
+  padding: 40px 48px;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-panel);
+}
+
+/* The developer section, when it's open, gets a surface of its own. */
+[data-style="instrument"] .panel[data-stage="choose-endpoint"] > .developer {
+  width: 100%;
+  max-width: calc(836px + 2 * 48px + 2px);
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+}
+
+/* The credit: only Instrument shows one. */
+:root:not([data-style="instrument"]) .backdrop-credit {
+  display: none;
+}
+
+[data-style="instrument"] .backdrop-credit {
+  order: 1;
+  margin: auto 0 0 -16px;
+  padding: 4px 8px;
+  font-size: var(--label-size);
+  line-height: 1.4;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-control);
+}
+
+/* On a phone: the card takes the width, without the examples (they're in the bar). */
+@media (max-width: 52rem) {
+  [data-style="instrument"] .start .featured-examples {
+    display: none;
+  }
+}
+
+@media (max-width: 40rem) {
+  [data-style="instrument"] .layout-single .panel[data-stage="choose-endpoint"] {
+    padding: 12px;
+  }
+
+  [data-style="instrument"] .start {
+    margin-bottom: 0;
+    padding: 20px 18px;
+  }
+
+  [data-style="instrument"] .backdrop-credit {
+    margin: 8px 0 0;
+  }
+}

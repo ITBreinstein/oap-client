@@ -9,12 +9,16 @@ import { describe, expect, it } from "vitest";
 import structure from "../../src/styles.css?raw";
 import tokensCss from "../../src/styles/tokens.css?raw";
 
-// Each style's own sheet, found by name: deleting a losing style needs no edit here.
-const styleSheets: Record<string, string> = import.meta.glob("../../src/styles/style-*.css", {
-  query: "?raw",
-  import: "default",
-  eager: true,
-});
+// Each style's own sheet, and Instrument's backdrop, found by name: deleting a
+// losing style needs no edit here.
+const styleSheets: Record<string, string> = import.meta.glob(
+  ["../../src/styles/style-*.css", "../../src/styles/backdrop.css"],
+  {
+    query: "?raw",
+    import: "default",
+    eager: true,
+  },
+);
 
 const STYLES = ["hybrid", "precise", "instrument"] as const;
 const THEMES = ["light", "dark"] as const;
@@ -92,6 +96,7 @@ const COLOUR_TOKENS = [
   "--backdrop-veil",
   "--backdrop-veil-list",
   "--backdrop-veil-sheet",
+  "--backdrop-scrim",
 ];
 
 /** Top-level rules of a stylesheet, `@media` blocks and comments left out. */

@@ -23,7 +23,9 @@
  * `--line-mid` (precise's middle rule), `--line-strong` (container edges) and
  * `--line-label` (the thin box around a label). The backdrop's veils are the
  * designs' wash over the streets: 40% on the start screen, 72% under the
- * process list and 80% under a process without a map.
+ * process list and 80% under a process without a map. `--backdrop-scrim` is
+ * the wash over Instrument's picture of Europe (`backdrop.css`): its page
+ * colour at 20%. The other styles show no picture; theirs is their page.
  */
 
 /* ---------------------------------------------------------------- shapes */
@@ -139,6 +141,7 @@
   --backdrop-veil: rgb(245 247 250 / 40%);
   --backdrop-veil-list: rgb(245 247 250 / 72%);
   --backdrop-veil-sheet: rgb(245 247 250 / 80%);
+  --backdrop-scrim: var(--page);
 }
 
 [data-style="hybrid"][data-theme="dark"] {
@@ -197,6 +200,7 @@
   --backdrop-veil: transparent;
   --backdrop-veil-list: rgb(15 23 32 / 72%);
   --backdrop-veil-sheet: rgb(15 23 32 / 80%);
+  --backdrop-scrim: var(--page);
 }
 
 /* ---------------------------------------------------------- Precise colours */
@@ -257,6 +261,7 @@
   --backdrop-veil: rgb(245 247 250 / 40%);
   --backdrop-veil-list: rgb(245 247 250 / 72%);
   --backdrop-veil-sheet: rgb(245 247 250 / 80%);
+  --backdrop-scrim: var(--page);
 }
 
 [data-style="precise"][data-theme="dark"] {
@@ -315,6 +320,7 @@
   --backdrop-veil: transparent;
   --backdrop-veil-list: rgb(15 23 32 / 72%);
   --backdrop-veil-sheet: rgb(15 23 32 / 80%);
+  --backdrop-scrim: var(--page);
 }
 
 /* ------------------------------------------------------- Instrument colours */
@@ -384,6 +390,7 @@
   --backdrop-veil: transparent;
   --backdrop-veil-list: transparent;
   --backdrop-veil-sheet: transparent;
+  --backdrop-scrim: rgb(4 7 39 / 20%);
 }
 
 [data-style="instrument"][data-theme="light"] {
@@ -442,6 +449,7 @@
   --backdrop-veil: transparent;
   --backdrop-veil-list: transparent;
   --backdrop-veil-sheet: transparent;
+  --backdrop-scrim: rgb(244 244 244 / 20%);
 }
 
 /* ------------------------------------------------------------ both themes */
