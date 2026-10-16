@@ -1452,11 +1452,13 @@ ol.steps li .help {
 
 /*
  * Hidden here, shown by `style-instrument.css`: the request log, the run
- * bar's hint and, on a narrow screen, the start card's wordmark.
+ * bar's hint and, on a narrow screen, the start card's wordmark; and by
+ * `style-instrument-updated.css`, the updated version's words.
  */
 .request-log,
 .run-hint,
-.start-wordmark {
+.start-wordmark,
+.when-updated {
   display: none;
 }
 

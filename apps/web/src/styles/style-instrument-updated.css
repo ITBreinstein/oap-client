@@ -8,4 +8,219 @@
  * prefix and move these rules into `style-instrument.css`; if it loses,
  * delete this file. Either way, delete the second entry of `STYLE_NAMES`
  * (`app/appearance.ts`) and `data-variant` (ADR 0002).
+ *
+ * Markup only the update shows, hidden by default in `styles.css`: the words
+ * in `app/Versioned.tsx` (`.when-updated`), used once, for a job that can't
+ * be cancelled. Keep the update's words and delete the component, or the
+ * other way round.
  */
+
+/* ------------------------------------------------- the rail, easier to read */
+
+/* Labels at 12px, not 10: the rail widens to hold them. */
+[data-variant="updated"] .app-rail {
+  width: 84px;
+}
+
+[data-variant="updated"] .rail-item,
+[data-variant="updated"] .app-rail .appearance-button {
+  width: 72px;
+  font-size: 0.75rem;
+}
+
+/*
+ * With the rail a bar at the foot, About is in it too, beside Appearance:
+ * below 52rem (a phone, or a page zoomed in) it was out of reach. Six
+ * places share the bar.
+ */
+@media (max-width: 52rem) {
+  [data-variant="updated"] .app-rail {
+    width: auto;
+  }
+
+  /* Six to a bar: the labels shrink a little with the screen, never below 9px. */
+  [data-variant="updated"] .rail-item,
+  [data-variant="updated"] .app-rail .appearance-button {
+    width: 100%;
+    font-size: clamp(0.5625rem, 2.7vw, 0.6875rem);
+  }
+
+  [data-variant="updated"] .rail-nav {
+    flex: 4 1 0;
+  }
+
+  [data-variant="updated"] .rail-end {
+    display: contents;
+  }
+
+  [data-variant="updated"] .rail-end-items {
+    display: block;
+    flex: 1 1 0;
+    margin: 0;
+  }
+
+  [data-variant="updated"] .rail-end-items li,
+  [data-variant="updated"] .app-rail .appearance {
+    height: 100%;
+  }
+
+  [data-variant="updated"] .app-rail .appearance {
+    flex: 1 1 0;
+  }
+}
+
+/* ------------------------------------------------ side panels, set apart */
+
+/*
+ * An open panel (Examples, Jobs, About) dims what it covers, so its edge is
+ * plain in both themes. Only a wash: the page behind it still works, as the
+ * panel is not modal.
+ */
+[data-variant="updated"] .app-body:has(> .side-panel[data-open="true"])::after {
+  content: "";
+  position: absolute;
+  z-index: 11;
+  inset: 0;
+  background: color-mix(in srgb, var(--overlay) 60%, transparent);
+  pointer-events: none;
+}
+
+/* ------------------------------------------------- targets a finger can hit */
+
+/* Text buttons ("Change service", "← All processes"): 24px, and 44px for a finger. */
+[data-variant="updated"] button.link {
+  min-height: 24px;
+}
+
+@media (pointer: coarse) {
+  [data-variant="updated"] button.link {
+    min-height: 44px;
+  }
+}
+
+/* A whole row opens its process, not only its name. */
+[data-variant="updated"] .process-list li {
+  position: relative;
+}
+
+[data-variant="updated"] .process-list .process-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
+[data-variant="updated"] .process-list li:hover .process-link {
+  text-decoration: underline;
+}
+
+/* A listed service's focus ring goes round the whole row, not its 8px dot. */
+[data-variant="updated"] label.choice-card:has(input:focus-visible) {
+  outline: 3px solid var(--focus);
+  outline-offset: -3px;
+}
+
+[data-variant="updated"] label.choice-card input[type="radio"]:focus-visible {
+  outline: none;
+}
+
+/* ------------------------------------------------- the process list's columns */
+
+/*
+ * "Needs" is known only once a process has been opened, "This visit" only
+ * once one has run: until then each column is a dash or blank on every row,
+ * so it stays out.
+ */
+[data-variant="updated"] .process-table:not(:has(.cell-needs[data-known="true"])) .cell-needs,
+[data-variant="updated"]
+  .process-table:not(:has(.cell-needs[data-known="true"]))
+  .process-head
+  .label:nth-child(2),
+[data-variant="updated"] .process-table:not(:has(.cell-ran .tag)) .cell-ran,
+[data-variant="updated"]
+  .process-table:not(:has(.cell-ran .tag))
+  .process-head
+  .label:nth-child(4) {
+  display: none;
+}
+
+@media (min-width: 52rem) {
+  [data-variant="updated"] .process-table:not(:has(.cell-needs[data-known="true"])) .process-head,
+  [data-variant="updated"]
+    .process-table:not(:has(.cell-needs[data-known="true"]))
+    .process-list
+    li {
+    grid-template-columns: minmax(0, 1fr) 6.5rem 5.5rem;
+  }
+
+  [data-variant="updated"] .process-table:not(:has(.cell-ran .tag)) .process-head,
+  [data-variant="updated"] .process-table:not(:has(.cell-ran .tag)) .process-list li {
+    grid-template-columns: minmax(0, 1fr) 7rem 6.5rem;
+  }
+
+  [data-variant="updated"]
+    .process-table:not(:has(.cell-needs[data-known="true"])):not(:has(.cell-ran .tag))
+    .process-head,
+  [data-variant="updated"]
+    .process-table:not(:has(.cell-needs[data-known="true"])):not(:has(.cell-ran .tag))
+    .process-list
+    li {
+    grid-template-columns: minmax(0, 1fr) 6.5rem;
+  }
+}
+
+/* ------------------------------------------------- the map, uncovered */
+
+/* The request log stays in the form's column instead of lying over the map. */
+@media (min-width: 52rem) {
+  [data-variant="updated"] .layout:not(.layout-single) .request-log {
+    position: static;
+    width: auto;
+    max-height: none;
+    margin: 16px 22px 0;
+    background: var(--surface);
+  }
+}
+
+/* ------------------------------------------------- controls that match */
+
+/* The file picker's button, like every other secondary button. */
+[data-variant="updated"] input[type="file"]::file-selector-button {
+  min-height: 40px;
+  margin-right: 10px;
+  padding: 0 14px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-control);
+  cursor: pointer;
+}
+
+/* A job's Results, a button beside "Remove from list" rather than a link. */
+[data-variant="updated"] .job-row .actions > a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 14px;
+  font-weight: 600;
+  color: var(--text);
+  text-decoration: none;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-control);
+}
+
+[data-variant="updated"] .job-row .actions > a:hover {
+  background: var(--surface-hover);
+}
+
+/* ------------------------------------------------- words */
+
+/* Where the two versions say something differently (`Versioned.tsx`). */
+[data-variant="updated"] .when-current {
+  display: none;
+}
+
+[data-variant="updated"] .when-updated {
+  display: inline;
+}

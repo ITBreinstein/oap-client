@@ -16,6 +16,7 @@ import { lastExecution, requestLog } from "./request-log.js";
 import { FieldView } from "./FormFields.js";
 import { ResultsView } from "./ResultsView.js";
 import { SentInputs } from "./SentInputs.js";
+import { Versioned } from "./Versioned.js";
 import { shownOnMap } from "./input-shapes.js";
 import { MapLimitsContext } from "./map-limits.js";
 import { offersLink } from "./run.js";
@@ -542,7 +543,10 @@ export function ProcessScreen(props: ProcessScreenProps) {
                   {dismissAdvertisedBy === "nothing" && (
                     <span className="muted">
                       {" "}
-                      This server does not advertise that jobs can be cancelled; trying is recorded.
+                      <Versioned
+                        current="This server does not advertise that jobs can be cancelled; trying is recorded."
+                        updated="This service doesn’t say it supports cancelling. You can still try; what happens is noted below."
+                      />
                     </span>
                   )}
                 </p>
