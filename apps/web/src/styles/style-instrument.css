@@ -399,6 +399,13 @@
   border-color: var(--line);
 }
 
+/* As wide as the known services and the examples, not the whole column. */
+[data-style="instrument"] .how-it-works,
+[data-style="instrument"] .about-access,
+[data-style="instrument"] .start-card form > .notice {
+  max-width: 760px;
+}
+
 [data-style="instrument"] ol.steps li::before {
   border-radius: var(--r-tag);
   font-family: var(--font-mono);
