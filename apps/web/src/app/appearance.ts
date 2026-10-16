@@ -178,4 +178,14 @@ export function applyAppearance(
   root.dataset["style"] = "instrument";
   root.dataset["variant"] = appearance.style === "instrument-updated" ? "updated" : "current";
   root.dataset["theme"] = resolved;
+  // The browser's own bars (a phone's address bar) in the page's colour.
+  const page = getComputedStyle(root).getPropertyValue("--page").trim();
+  if (page === "") return;
+  let meta = root.ownerDocument.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+  if (meta === null) {
+    meta = root.ownerDocument.createElement("meta");
+    meta.name = "theme-color";
+    root.ownerDocument.head.append(meta);
+  }
+  meta.content = page;
 }

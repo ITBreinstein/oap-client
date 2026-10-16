@@ -71,6 +71,24 @@ legend,
   animation-timing-function: ease-out;
 }
 
+/* Past the rail to the page itself: out of sight until a keyboard lands on it. */
+.skip-link {
+  position: absolute;
+  z-index: 30;
+  top: 8px;
+  left: 8px;
+  padding: 8px 12px;
+  font-weight: 600;
+  color: var(--accent-text);
+  background: var(--accent);
+  border-radius: var(--r-control);
+  transform: translateY(-200%);
+}
+
+.skip-link:focus {
+  transform: none;
+}
+
 .visually-hidden {
   position: absolute;
   width: 1px;

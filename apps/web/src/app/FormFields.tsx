@@ -34,6 +34,8 @@ export interface ControlProps<C extends Control = Control> {
   readonly value: unknown;
   readonly required: boolean;
   readonly describedBy: string | undefined;
+  /** The field has an error: said to screen readers on the control itself. */
+  readonly invalid?: boolean | undefined;
   readonly onChange: (value: unknown) => void;
   /** The label text, for inputs inside a group that need their own. */
   readonly label: string;
@@ -47,11 +49,19 @@ function asText(value: unknown): string {
   return "";
 }
 
-function TextInput({ id, control, value, describedBy, onChange }: ControlProps<TextControl>) {
+function TextInput({
+  id,
+  control,
+  value,
+  describedBy,
+  invalid,
+  onChange,
+}: ControlProps<TextControl>) {
   const common = {
     id,
     value: asText(value),
     "aria-describedby": describedBy,
+    "aria-invalid": invalid === true ? true : undefined,
     onChange: (event: { target: { value: string } }) => {
       onChange(event.target.value);
     },
@@ -63,7 +73,14 @@ function TextInput({ id, control, value, describedBy, onChange }: ControlProps<T
   );
 }
 
-function NumberInput({ id, control, value, describedBy, onChange }: ControlProps<NumberControl>) {
+function NumberInput({
+  id,
+  control,
+  value,
+  describedBy,
+  invalid,
+  onChange,
+}: ControlProps<NumberControl>) {
   // A text input, not type="number": a number input empties itself on a
   // partial entry like "0." and applies the browser's locale to the decimal
   // separator. The client-side check (T5) says what is wrong instead.
@@ -74,6 +91,7 @@ function NumberInput({ id, control, value, describedBy, onChange }: ControlProps
       inputMode={control.integer ? "numeric" : "decimal"}
       value={asText(value)}
       aria-describedby={describedBy}
+      aria-invalid={invalid === true ? true : undefined}
       onChange={(event) => {
         onChange(event.target.value);
       }}
@@ -87,6 +105,7 @@ function SelectInput({
   value,
   required,
   describedBy,
+  invalid,
   onChange,
 }: ControlProps<SelectControl>) {
   const selected = control.options.findIndex(
@@ -97,6 +116,7 @@ function SelectInput({
       id={id}
       value={selected < 0 ? "" : String(selected)}
       aria-describedby={describedBy}
+      aria-invalid={invalid === true ? true : undefined}
       onChange={(event) => {
         const index = Number(event.target.value);
         onChange(event.target.value === "" ? undefined : control.options[index]?.value);
@@ -113,7 +133,7 @@ function SelectInput({
 }
 
 function BooleanInput(props: ControlProps<CheckboxControl>) {
-  const { id, value, required, describedBy, onChange, label } = props;
+  const { id, value, required, describedBy, invalid, onChange, label } = props;
   if (required) {
     return (
       <input
@@ -121,6 +141,7 @@ function BooleanInput(props: ControlProps<CheckboxControl>) {
         type="checkbox"
         checked={value === true}
         aria-describedby={describedBy}
+        aria-invalid={invalid === true ? true : undefined}
         onChange={(event) => {
           onChange(event.target.checked);
         }}
@@ -141,6 +162,7 @@ function BooleanInput(props: ControlProps<CheckboxControl>) {
       role="radiogroup"
       aria-label={label}
       aria-describedby={describedBy}
+      aria-invalid={invalid === true ? true : undefined}
     >
       {choices.map(([text, choice]) => (
         <label key={text} className="choice">
@@ -159,7 +181,7 @@ function BooleanInput(props: ControlProps<CheckboxControl>) {
   );
 }
 
-function JsonInput({ id, value, describedBy, onChange }: ControlProps<JsonControl>) {
+function JsonInput({ id, value, describedBy, invalid, onChange }: ControlProps<JsonControl>) {
   const text = isRawJson(value)
     ? value.rawJson
     : value === undefined
@@ -178,6 +200,7 @@ function JsonInput({ id, value, describedBy, onChange }: ControlProps<JsonContro
         aria-describedby={
           bare === undefined ? describedBy : `${describedBy ?? ""} ${id}-bare`.trim()
         }
+        aria-invalid={invalid === true ? true : undefined}
         placeholder="JSON"
         onChange={(event) => {
           onChange({ rawJson: event.target.value });
@@ -199,7 +222,7 @@ function JsonInput({ id, value, describedBy, onChange }: ControlProps<JsonContro
  * where the list's first row did.
  */
 function ListInput(props: ControlProps<ListControl>) {
-  const { id, control, value, required, onChange, label, describedBy } = props;
+  const { id, control, value, required, onChange, label } = props;
   const items: readonly unknown[] = Array.isArray(value)
     ? value
     : value === undefined
@@ -210,7 +233,7 @@ function ListInput(props: ControlProps<ListControl>) {
     onChange(items.map((item, at) => (at === index ? next : item)));
   };
   return (
-    <div className="list" aria-describedby={describedBy}>
+    <div className="list">
       <ol>
         {items.map((item, index) => (
           <li key={index}>
@@ -367,6 +390,7 @@ export function FieldView({ field, index, values, error, warnings, onChange }: F
       value={value}
       required={field.required}
       describedBy={describedBy}
+      invalid={error !== undefined}
       label={field.title}
       inputId={field.id}
       onChange={(next) => {
@@ -397,7 +421,8 @@ export function FieldView({ field, index, values, error, warnings, onChange }: F
       data-control={field.control.kind}
     >
       {group ? (
-        <fieldset>
+        // A group's help and error are said with its legend, on entering it.
+        <fieldset aria-describedby={describedBy}>
           <legend>{title}</legend>
           {notes}
           {control}

@@ -102,7 +102,7 @@ export function DeveloperPanel({
       </p>
       {dropped > 0 && (
         <p role="alert">
-          {dropped} older observations were dropped to keep the page's memory bounded. The downloads
+          {dropped} older observations were dropped to keep the page’s memory bounded. The downloads
           are incomplete, and say so.
         </p>
       )}
@@ -157,7 +157,7 @@ export function DeveloperPanel({
               download(observations, dropped, endpoint);
             }}
           >
-            Download this endpoint's observations
+            Download this endpoint’s observations
           </button>
         )}
         {onDescribeAll !== undefined && (

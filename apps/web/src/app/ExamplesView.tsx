@@ -139,7 +139,9 @@ export function ExamplesBrowser({
           <input
             id={`${base}-search`}
             type="search"
-            placeholder="Title, summary or process id"
+            autoComplete="off"
+            spellCheck={false}
+            placeholder="Title, summary or process id…"
             value={query}
             onChange={(event) => {
               setQuery(event.target.value);

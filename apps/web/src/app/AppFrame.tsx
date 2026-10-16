@@ -118,11 +118,15 @@ export function StartLink({
     onConnect?.();
   };
   return (
+    // With no address (a run under way) it is not a link but a picture, which
+    // the page's title already names: hidden from screen readers then.
     <a
       className={className}
       href={onConnect === undefined ? undefined : START_HREF}
-      aria-label="Breinstein · OGC API Processes client, start"
-      aria-disabled={onConnect === undefined ? true : undefined}
+      aria-label={
+        onConnect === undefined ? undefined : "Breinstein · OGC API Processes client, start"
+      }
+      aria-hidden={onConnect === undefined ? true : undefined}
       onClick={go}
     >
       <Wordmark className="wordmark" />

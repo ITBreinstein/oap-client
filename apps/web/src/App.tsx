@@ -295,6 +295,10 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
     <MapLimitsContext value={mapLimits}>
       <DrawContext.Provider value={draw}>
         <div className="app" data-relay-stream={view.snapshot?.relay}>
+          {/* The first stop for a keyboard: past the rail, to the page itself. */}
+          <a className="skip-link" href="#content">
+            Skip to content
+          </a>
           <AppFrame
             inert={offerOpen}
             appearance={
@@ -352,7 +356,13 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
               </p>
             )}
             <div className={showMap ? "layout" : "layout layout-single"} inert={offerOpen}>
-              <main className="panel" ref={panel} data-stage={state.stage}>
+              <main
+                id="content"
+                tabIndex={-1}
+                className="panel"
+                ref={panel}
+                data-stage={state.stage}
+              >
                 {state.stage !== "choose-endpoint" && state.route === "relay" && <RelayBanner />}
                 {screen}
                 {/* The credit for the picture behind the start screen (backdrop.css). */}

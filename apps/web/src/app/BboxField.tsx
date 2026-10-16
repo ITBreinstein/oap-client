@@ -174,7 +174,7 @@ export function BboxField(props: ControlProps<BboxControl>) {
   }
 
   return (
-    <div className="bbox" aria-describedby={describedBy}>
+    <div className="bbox">
       {control.crs.length > 1 ? (
         <p>
           <label htmlFor={`${base}-crs`}>Coordinate reference system</label>

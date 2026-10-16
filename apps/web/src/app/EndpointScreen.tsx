@@ -13,7 +13,7 @@
  * screen shows the card and the examples.
  */
 
-import { useId, useState, type ReactNode, type SyntheticEvent } from "react";
+import { useId, useRef, useState, type ReactNode, type SyntheticEvent } from "react";
 import type { Preset } from "../config/runtime-config.js";
 import type { RelayEndpoint } from "../relay/contract.js";
 import { Wordmark } from "./BrandMark.js";
@@ -73,8 +73,10 @@ export function EndpointScreen(props: EndpointScreenProps) {
   const target =
     selectedEntry?.key ??
     selectedPreset?.title ??
-    (address.trim() === "" ? "the address you type" : address.trim());
+    // Only an address that is one: a half-typed word is not where Connect goes.
+    (typedEndpoint(address) === undefined ? "the address you type" : address.trim());
 
+  const addressField = useRef<HTMLInputElement>(null);
   const onSubmit = (event: SyntheticEvent) => {
     event.preventDefault();
     setAddressError(undefined);
@@ -85,6 +87,8 @@ export function EndpointScreen(props: EndpointScreenProps) {
     const typed = typedEndpoint(selectedPreset?.url ?? address);
     if (typed === undefined) {
       setAddressError("Enter the full address of a service, starting with http:// or https://.");
+      // Back to the field, so the error is read with it and can be put right there.
+      addressField.current?.focus();
       return;
     }
     onConnect(typed);
@@ -98,6 +102,7 @@ export function EndpointScreen(props: EndpointScreenProps) {
 
   const addressInput = (
     <input
+      ref={addressField}
       id={`${base}-address`}
       type="url"
       inputMode="url"
@@ -140,7 +145,7 @@ export function EndpointScreen(props: EndpointScreenProps) {
               Its landing page, often ending in <code>/ogcapi</code>. Always reached directly.
             </p>
             {addressError !== undefined && (
-              <p id={`${base}-address-error`} className="field-error">
+              <p id={`${base}-address-error`} className="field-error" role="alert">
                 {addressError}
               </p>
             )}

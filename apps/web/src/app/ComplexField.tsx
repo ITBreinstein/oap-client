@@ -56,7 +56,7 @@ function readFile(file: File, base64: boolean): Promise<string> {
 }
 
 export function ComplexField(props: ControlProps<ComplexControl>) {
-  const { control, value, onChange, describedBy, inputId } = props;
+  const { control, value, onChange, inputId } = props;
   const draw = useContext(DrawContext);
   const base = useId();
   const [message, setMessage] = useState<string | undefined>();
@@ -74,7 +74,7 @@ export function ComplexField(props: ControlProps<ComplexControl>) {
   }, [drawing, tooMany, draw]);
 
   return (
-    <div className="complex" aria-describedby={describedBy}>
+    <div className="complex">
       {control.formats.length > 1 ? (
         <p>
           <label htmlFor={`${base}-format`}>Format</label>
@@ -135,8 +135,11 @@ export function ComplexField(props: ControlProps<ComplexControl>) {
           <input
             id={`${base}-href`}
             type="url"
+            inputMode="url"
+            autoComplete="off"
+            spellCheck={false}
             value={current.href ?? ""}
-            placeholder="https://"
+            placeholder="https://example.org/data.json"
             onChange={(event) => {
               onChange({ format: current.format, href: event.target.value });
             }}

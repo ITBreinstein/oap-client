@@ -986,7 +986,7 @@ test.describe("the workflow in a browser", () => {
     await expect(page.locator(".observation-list > li")).toHaveCount(total);
 
     const download = page.waitForEvent("download");
-    await page.getByRole("button", { name: "Download this endpoint's observations" }).click();
+    await page.getByRole("button", { name: "Download this endpoint’s observations" }).click();
     const exported = JSON.parse(await readFile(await (await download).path(), "utf8")) as {
       endpoint: string;
       observations: { kind: string; processId?: string }[];

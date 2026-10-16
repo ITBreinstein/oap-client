@@ -149,7 +149,7 @@ async function exportEndpoint(page: Page, endpoint: string): Promise<void> {
   await developerPanel(page);
   await page.getByRole("combobox", { name: "Observations from" }).selectOption(endpoint);
   const download = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Download this endpoint's observations" }).click();
+  await page.getByRole("button", { name: "Download this endpoint’s observations" }).click();
   const file = await download;
   await mkdir(OUT, { recursive: true });
   const path = join(OUT, file.suggestedFilename());

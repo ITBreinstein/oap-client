@@ -156,7 +156,9 @@ export function ProcessListScreen(props: ProcessListScreenProps) {
             <input
               id={`${base}-filter`}
               type="search"
-              placeholder="Title or identifier"
+              autoComplete="off"
+              spellCheck={false}
+              placeholder="Title or identifier…"
               value={filter}
               onChange={(event) => {
                 setFilter(event.target.value);

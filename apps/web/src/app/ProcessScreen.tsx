@@ -4,7 +4,7 @@
  */
 
 import { redactUrl } from "@breinstein/oap-client";
-import { useContext, useId, useMemo, type SyntheticEvent } from "react";
+import { useContext, useEffect, useId, useMemo, useRef, type SyntheticEvent } from "react";
 import { schemaWarnings } from "../forms/schema-warnings.js";
 import type { FieldErrors } from "../forms/validate.js";
 import type { SessionObservation } from "../observations.js";
@@ -431,10 +431,29 @@ export function ProcessScreen(props: ProcessScreenProps) {
     [editable, process, plan, values],
   );
 
+  // After a Run the form refused, focus goes to the first input in error,
+  // so it is read with its message and can be put right at once.
+  const form = useRef<HTMLFormElement>(null);
+  const submitted = useRef(false);
   const onSubmit = (event: SyntheticEvent) => {
     event.preventDefault();
+    submitted.current = true;
     commands.run();
   };
+  useEffect(() => {
+    if (!submitted.current) return;
+    submitted.current = false;
+    if (fieldErrors.size === 0) return;
+    form.current
+      ?.querySelector<HTMLElement>(
+        ".field.has-error :is(input:not([type='hidden']), select, textarea, button)",
+      )
+      ?.focus();
+  }, [fieldErrors]);
+  // A Run that went ahead leaves nothing to focus later.
+  useEffect(() => {
+    submitted.current = false;
+  }, [state.stage]);
 
   const run = state.stage === "running" ? state.run : undefined;
   const job = run?.mode === "async" ? jobs.find((row) => row.statusUrl === run.jobRef) : undefined;
@@ -506,7 +525,7 @@ export function ProcessScreen(props: ProcessScreenProps) {
           {/* Movement only: the words below say what is happening. */}
           <div className="progress-line" aria-hidden="true" />
           {state.run.mode === "sync" ? (
-            <p>Running… waiting for the server's answer.</p>
+            <p>Running… waiting for the server’s answer.</p>
           ) : (
             <>
               <p>
@@ -586,7 +605,7 @@ export function ProcessScreen(props: ProcessScreenProps) {
         />
       )}
       {editable && (
-        <form onSubmit={onSubmit} noValidate aria-labelledby={`${base}-heading`}>
+        <form ref={form} onSubmit={onSubmit} noValidate aria-labelledby={`${base}-heading`}>
           <fieldset className="form-body">
             <legend className="visually-hidden">Inputs</legend>
             {plan.fields.length === 0 && <p>This process takes no inputs.</p>}
@@ -643,7 +662,7 @@ export function ProcessScreen(props: ProcessScreenProps) {
         />
       )}
       {state.stage === "process" && state.error?.inputId !== undefined && (
-        <p className="hint">The server's message names the input “{state.error.inputId}”.</p>
+        <p className="hint">The server’s message names the input “{state.error.inputId}”.</p>
       )}
       <RequestLog entries={observations} endpoint={endpointKey} />
     </section>

@@ -44,7 +44,7 @@ function describeTarget(control: GeometryControl): string {
 }
 
 export function GeometryField(props: ControlProps<GeometryControl>) {
-  const { control, value, onChange, describedBy, inputId } = props;
+  const { control, value, onChange, inputId } = props;
   const draw = useContext(DrawContext);
   const base = useId();
   const [message, setMessage] = useState<string | undefined>();
@@ -63,7 +63,7 @@ export function GeometryField(props: ControlProps<GeometryControl>) {
   };
 
   return (
-    <div className="geometry" aria-describedby={describedBy}>
+    <div className="geometry">
       <p className="help">{describeTarget(control)}</p>
       <p>
         <label htmlFor={`${base}-geojson`}>GeoJSON</label>
