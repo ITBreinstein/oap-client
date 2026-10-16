@@ -115,6 +115,16 @@ component, `SidePanel`; where they dock is each style's CSS.
 - **Google Fonts**: refused by the policy (`font-src 'self'`), and a request
   to a third party on every visit.
 
+### Instrument in Breinstein's colours (2026-10-16)
+
+Instrument now uses Breinstein's colours: midnight navy, and violet as the one
+main colour in both themes; lime is gone. Its rail carries Breinstein's
+wordmark (`src/app/BrandMark.tsx`) as a link to the start screen, an About
+item above Appearance opens an About panel (`src/app/AboutPanel.tsx`) like
+Examples and Jobs, and the Log item is gone: the developer section is reached
+from its fold at the foot of the page. The web app's version (0.5.0, from its
+`package.json` at build time) shows in About beside the core's.
+
 ## Consequences
 
 - The trial costs three stylesheets, six colour blocks and one branch in
@@ -169,9 +179,9 @@ Do this twice, once per losing style. Then, optionally, flatten (below).
    colour blocks. `--rail` is used by the rail only: remove it from every
    block and from the token test.
 3. `src/app/AppFrame.tsx`: delete `Rail`, `RailItem`, `ICONS`,
-   `FramePlace` and the props only the rail reads (`place`, `onConnect`,
-   `onProcesses`, `onLog`, `railItems`, `jobsItem`), and the branch on
-   `style`. In `src/App.tsx`, delete what computes them.
+   `FramePlace`, `StartLink` and the props only the rail reads (`place`,
+   `onConnect`, `onProcesses`, `railItems`, `jobsItem`, `aboutItem`), and the
+   branch on `style`. In `src/App.tsx`, delete what computes them.
 4. Fonts: remove the Manrope and JetBrains Mono imports from
    `src/styles/fonts.ts`, the two packages from `apps/web/package.json`, and
    their rows in `THIRD_PARTY.md`.
@@ -182,6 +192,12 @@ Do this twice, once per losing style. Then, optionally, flatten (below).
    and its rules) goes with them.
 6. `src/app/appearance.ts`, `AppearanceControl.tsx` and the tests as for
    hybrid.
+7. Breinstein's mark and About: delete `src/app/BrandMark.tsx` (and its
+   trademark note in `THIRD_PARTY.md`), its `.start-wordmark` in
+   `EndpointScreen.tsx`, `src/app/AboutPanel.tsx`, the About `SidePanel` in
+   `App.tsx`, `test/app/about.test.tsx` and `e2e/instrument-breinstein.spec.ts`;
+   or move the mark and About into the winner, which then needs a place to
+   open About from. `__APP_VERSION__` and `SidePanel`'s `footer` can stay.
 
 ### Then, optionally: flatten
 

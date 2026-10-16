@@ -101,3 +101,12 @@ credited on screen as its licence requires.
 | What                                                | From                                                                                                        | Licence               | Credited as                                                            |
 | --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | --------------------- | ---------------------------------------------------------------------- |
 | BRT-Achtergrondkaart, "standaard" (EPSG:3857 tiles) | PDOK, `https://service.pdok.nl/kadaster/brt-achtergrondkaart/wmts/v2_0/standaard/EPSG:3857/{z}/{x}/{y}.png` | CC BY 4.0, © Kadaster | "Kaartgegevens © Kadaster (BRT-Achtergrondkaart, CC BY 4.0), via PDOK" |
+
+## 5. Trademarks
+
+The Breinstein logo and wordmark, drawn inline in
+`apps/web/src/app/BrandMark.tsx` from files Breinstein supplied, are
+Breinstein's trademarks. They are not covered by this project's MIT licence
+and may not be reused without Breinstein's permission. A fork or a deployment
+by anyone else removes them, with `BrandMark.tsx` and the places it is used
+(the rail, the start card and the About panel in the instrument style).
