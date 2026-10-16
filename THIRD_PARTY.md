@@ -110,3 +110,73 @@ Breinstein's trademarks. They are not covered by this project's MIT licence
 and may not be reused without Breinstein's permission. A fork or a deployment
 by anyone else removes them, with `BrandMark.tsx` and the places it is used
 (the rail, the start card and the About panel in the instrument style).
+
+## 6. Imagery in the web app
+
+The pictures of Europe behind the instrument style's start screen. Made once
+by `apps/web/scripts/fetch-backdrops.sh` and committed as
+`apps/web/src/assets/backdrop/europe-day.webp` and `europe-night.webp`: the
+build never runs the script, and the page never calls NASA or Wikimedia. They
+are not covered by this project's MIT licence. NASA asks to be acknowledged
+and not to be presented as endorsing anything; there is no NASA logo.
+Credited on screen as "Imagery: NASA Blue Marble and Blue Marble clouds ·
+NASA Earth at Night 2012", and in the About panel.
+
+Both pictures share one grid: EPSG:3857, BBOX
+`-2782987,3895304,5009377,11753185` (lon −25…45°, lat 33…72°), 2400 × 2420 px.
+The GDAL steps run in `ghcr.io/osgeo/gdal:ubuntu-small-3.13.3`, pinned by
+digest in the script.
+
+### Europe by day: NASA Blue Marble, from GIBS
+
+- **Acknowledgement**, as GIBS asks
+  (<https://www.earthdata.nasa.gov/engage/open-data-services-software/earthdata-developer-portal/gibs-api>):
+  "We acknowledge the use of imagery provided by services from NASA's Global
+  Imagery Browse Services (GIBS), part of NASA's Earth Science Data and
+  Information System (ESDIS)."
+- **Request:** one WMS 1.3.0 GetMap, `image/png`, from
+  `https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi`, layer
+  `BlueMarble_NextGeneration` (no time dimension), `CRS=EPSG:3857`, the BBOX
+  and size above.
+- **Fetched** 2026-10-16. GIBS draws the picture on request, so there is no
+  published hash; the PNG behind the committed picture had SHA-256
+  `9e9e406cd00d8be0a644a7f077441a1d5924f161b67578e1802a32fd8b883b10`. The
+  script prints the hash of each fetch, so a rerun shows whether it got the
+  same picture.
+- **Clouds** blended in before encoding (below).
+- **WebP:** lossy, quality 60, method 6: 401 KB.
+
+### Clouds: NASA Blue Marble clouds
+
+- **Page:** <https://science.nasa.gov/earth/earth-observatory/the-blue-marble-true-color-global-imagery-at-1km-resolution/>
+  (Visible Earth id 57747).
+- **File:** `https://eoimages.gsfc.nasa.gov/images/imagerecords/57000/57747/cloud_combined_8192.tif`,
+  8192 × 4096 px, 35 870 468 bytes, SHA-256
+  `d137775d8966ab8d443fd5126dc6e7ad72072bc1ed50555c5818d221735daf0f`
+  (checked by the script). Downloaded by the script only; never committed.
+- **Credit**, from NASA's page: "Credits: NASA Goddard Space Flight Center.
+  Image by Reto Stöckli (land surface, shallow water, clouds). Enhancements by
+  Robert Simmon (ocean color, compositing, 3D globes, animation)."
+- **Blend**, per pixel, with strength 0.7 and exponent 0.8:
+  `c = cloud / 255`; `a = 0.7 × c^0.8`; `out = day × (1 − a) + rgb(248 249 250) × a`.
+
+### Europe by night: NASA Earth at Night 2012
+
+- **Page:** <https://commons.wikimedia.org/wiki/File:The_earth_at_night.jpg>
+- **File:** `https://upload.wikimedia.org/wikipedia/commons/b/ba/The_earth_at_night.jpg`,
+  13 500 × 6 750 px, 7 813 537 bytes, SHA-256
+  `43b8c6cb6fdab028cb24478e431022df2e01fc62b39e5a01be004d4130cc01f2`
+  (checked by the script).
+- **Licence**, as the Commons page states it: public domain.
+- **Credit:** NASA Earth Observatory. Original source: NASA's Earth at Night
+  2012 (<http://earthobservatory.nasa.gov/NaturalHazards/view.php?id=79765>).
+- **GDAL** (the cloud map takes the same three steps):
+
+  ```sh
+  gdal_translate -of VRT -a_srs EPSG:4326 -a_ullr -180 90 180 -90 night.jpg night-4326.vrt
+  gdalwarp -t_srs EPSG:3857 -te -2782987 3895304 5009377 11753185 \
+    -ts 2400 2420 -r lanczos night-4326.vrt night-3857.tif
+  gdal_translate -of PNG night-3857.tif night.png
+  ```
+
+- **WebP:** lossy, quality 50, method 6: 398 KB.

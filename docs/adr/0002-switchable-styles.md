@@ -198,6 +198,12 @@ Do this twice, once per losing style. Then, optionally, flatten (below).
    `App.tsx`, `test/app/about.test.tsx` and `e2e/instrument-breinstein.spec.ts`;
    or move the mark and About into the winner, which then needs a place to
    open About from. `__APP_VERSION__` and `SidePanel`'s `footer` can stay.
+8. Europe behind the start screen: delete `src/styles/backdrop.css` and its
+   import in `src/main.tsx`, the two pictures in `src/assets/backdrop/`, the
+   credit chip (`.backdrop-credit` in `App.tsx`), `scripts/fetch-backdrops.sh`,
+   the three entries in section 6 of `THIRD_PARTY.md`, the "Start screen
+   imagery" row in About and `e2e/instrument-backdrop.spec.ts`; and drop
+   `--backdrop-scrim` from every block in `tokens.css` and from the token test.
 
 ### Then, optionally: flatten
 
