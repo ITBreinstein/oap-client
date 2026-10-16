@@ -49,6 +49,34 @@ export function AppearanceIcon() {
   );
 }
 
+/**
+ * STYLE TRIAL (hybrid): a sun on a light page, a moon on a dark one. Both are
+ * drawn; the page's theme decides which shows, in CSS.
+ */
+const THEME_ICONS = {
+  sun: "M12 4V2M12 22v-2M4 12H2M22 12h-2M5.6 5.6L4.2 4.2M19.8 19.8l-1.4-1.4M5.6 18.4l-1.4 1.4M19.8 4.2l-1.4 1.4M12 7a5 5 0 1 0 0 10a5 5 0 1 0 0-10",
+  moon: "M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z",
+} as const;
+
+function ThemeIcon({ name }: { readonly name: keyof typeof THEME_ICONS }) {
+  return (
+    <svg
+      className={`icon theme-icon theme-icon-${name}`}
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        d={THEME_ICONS[name]}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 export function AppearanceControl(props: AppearanceControlProps) {
   const { appearance, onStyle, onTheme, className } = props;
   const base = useId();
@@ -102,6 +130,8 @@ export function AppearanceControl(props: AppearanceControlProps) {
         }}
       >
         <AppearanceIcon />
+        <ThemeIcon name="sun" />
+        <ThemeIcon name="moon" />
         <span className="appearance-label">Appearance</span>
       </button>
       {open && (

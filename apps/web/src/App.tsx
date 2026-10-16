@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Appearance } from "./app/appearance.js";
 import { AppearanceControl } from "./app/AppearanceControl.js";
-import { AppFrame, RailItem, type FramePlace } from "./app/AppFrame.js";
+import { AppFrame, RailItem, type FrameCrumb, type FramePlace } from "./app/AppFrame.js";
 import { DeveloperPanel } from "./app/DeveloperPanel.js";
 import { activeDrawField, DrawContext, type DrawRequest, type DrawTarget } from "./app/draw.js";
 import { EndpointScreen } from "./app/EndpointScreen.js";
@@ -302,6 +302,16 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
       : state.stage === "connected"
         ? "OGC API - Processes"
         : (state.service.title ?? state.endpoint.baseUrl);
+  // STYLE TRIAL (hybrid): where the page is, as a breadcrumb: the service, then the process.
+  const crumbs: readonly FrameCrumb[] | undefined =
+    state.stage === "choose-endpoint"
+      ? undefined
+      : state.stage === "connected"
+        ? [{ label: state.service.title ?? state.endpoint.baseUrl, onClick: undefined }]
+        : [
+            { label: state.service.title ?? state.endpoint.baseUrl, onClick: onProcesses },
+            { label: state.process.title ?? state.process.id, onClick: undefined },
+          ];
   const onLog = developer
     ? () => {
         const details = panel.current?.querySelector<HTMLDetailsElement>("details.developer");
@@ -325,6 +335,7 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
             place={place}
             back={back}
             context={context}
+            crumbs={crumbs}
             onConnect={onConnect}
             onProcesses={onProcesses}
             onLog={onLog}

@@ -10,7 +10,8 @@
  * Both carry the same title, the core's version and the same tools, so
  * nothing a test or a screen reader relies on depends on the style. The
  * header also has the way back and the page's place, which only precise shows
- * (in place of the panel's breadcrumb, which it hides).
+ * (in place of the panel's breadcrumb, which it hides), and a breadcrumb of
+ * the service and the process, which only hybrid shows, beside its mark.
  */
 
 import { VERSION } from "@breinstein/oap-client";
@@ -46,6 +47,17 @@ export interface AppFrameProps {
    */
   readonly back?: FrameBack | undefined;
   readonly context?: string | undefined;
+  /**
+   * STYLE TRIAL (hybrid): where the page is, as a breadcrumb beside the title:
+   * the service, then the process. The last one is the page itself.
+   */
+  readonly crumbs?: readonly FrameCrumb[] | undefined;
+}
+
+/** One step of the breadcrumb: its words, and where it goes (undefined: not a way back now). */
+export interface FrameCrumb {
+  readonly label: string;
+  readonly onClick: (() => void) | undefined;
 }
 
 /** The header's way back: its words, and what it does (undefined: not now). */
@@ -56,8 +68,41 @@ export interface FrameBack {
 
 const TITLE = "OGC API - Processes client";
 
+/** STYLE TRIAL (hybrid): the product's mark, a rising line on a gridded square. */
+function Mark() {
+  return (
+    <svg className="frame-mark" viewBox="0 0 26 26" aria-hidden="true" focusable="false">
+      <rect className="frame-mark-ground" x="1" y="1" width="24" height="24" rx="6" />
+      <path className="frame-mark-grid" d="M1 9h24M1 17h24M9 1v24M17 1v24" />
+      <path className="frame-mark-line" d="M6 19l5-7 4 3 5-8" />
+    </svg>
+  );
+}
+
+function Crumbs({ crumbs }: { readonly crumbs: readonly FrameCrumb[] }) {
+  return (
+    <nav className="frame-crumbs" aria-label="Breadcrumb">
+      <ol>
+        {crumbs.map((crumb, index) => (
+          <li key={index}>
+            {index === crumbs.length - 1 ? (
+              <span aria-current="page">{crumb.label}</span>
+            ) : crumb.onClick === undefined ? (
+              <span>{crumb.label}</span>
+            ) : (
+              <button type="button" className="link" onClick={crumb.onClick}>
+                {crumb.label}
+              </button>
+            )}
+          </li>
+        ))}
+      </ol>
+    </nav>
+  );
+}
+
 export function AppFrame(props: AppFrameProps) {
-  const { style, inert, appearance, tools, back, context } = props;
+  const { style, inert, appearance, tools, back, context, crumbs } = props;
   // STYLE TRIAL: once a style is chosen, keep one branch and delete the other.
   if (style === "instrument") return <Rail {...props} />;
   return (
@@ -74,9 +119,14 @@ export function AppFrame(props: AppFrameProps) {
         </button>
       )}
       <div className="app-title">
-        <h1>{TITLE}</h1>
+        {/* One name for every style; hybrid shows only its end, beside the mark. */}
+        <h1>
+          <Mark />
+          <span className="title-prefix">OGC API - </span>Processes client
+        </h1>
         <p className="tagline">Discover, run and view geospatial calculations</p>
       </div>
+      {crumbs !== undefined && <Crumbs crumbs={crumbs} />}
       {context !== undefined && <p className="frame-context label">{context}</p>}
       <div className="header-tools">
         <p className="muted version" data-testid="core-version">

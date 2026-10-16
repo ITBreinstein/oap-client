@@ -1380,12 +1380,16 @@ ol.steps li .help {
 /*
  * What only some styles show, there for all and hidden here: the request log
  * and the run bar's header; the header's way back and place, the service's
- * status, a process's needs, runs and the glyphs' key (precise).
+ * status, a process's needs, runs and the glyphs' key (precise); the header's
+ * mark, breadcrumb and theme icons (hybrid).
  */
 .request-log,
 .run-hint,
 .frame-back,
 .frame-context,
+.frame-crumbs,
+.frame-mark,
+.theme-icon,
 .service-status,
 .process-needs,
 .process-runs,
@@ -1483,7 +1487,10 @@ button.secondary.panel-close {
   border-color: var(--line-strong);
 }
 
+/* Positioned, as the panel is, so visually hidden words in a long list stay
+   inside the scroller instead of stretching the page below the window. */
 .side-panel-body {
+  position: relative;
   flex: 1;
   overflow-y: auto;
   padding: 1rem 1.25rem 2rem;

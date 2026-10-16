@@ -9,12 +9,336 @@
  * `tokens.css`) removes the style and nothing else (ADR 0002).
  */
 
+/* The designs' measures: the map's sheet, the side panels. */
+:root[data-style="hybrid"] {
+  --panel-width: 440px;
+  --examples-width: 470px;
+}
+
+/* ------------------------------------------------------------ buttons */
+
+/* A secondary button: ink on the surface, edged like a field. */
+[data-style="hybrid"] button.secondary,
+[data-style="hybrid"] a.button.secondary,
+[data-style="hybrid"] .next-steps button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 16px;
+  font-size: 0.9375rem;
+  color: var(--text);
+  background: var(--surface);
+  border-color: var(--field-border);
+}
+
+[data-style="hybrid"] button.secondary:hover:not(:disabled),
+[data-style="hybrid"] .next-steps button:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--surface-hover);
+  border-color: var(--field-border);
+}
+
+/* Open, or pressed: the selected colours, edged in the accent. */
+[data-style="hybrid"] button.secondary[aria-expanded="true"],
+[data-style="hybrid"] button.secondary[aria-expanded="true"]:hover:not(:disabled),
+[data-style="hybrid"] button.secondary[aria-pressed="true"],
+[data-style="hybrid"] button.secondary[aria-pressed="true"]:hover:not(:disabled),
+[data-style="hybrid"] .appearance-button[aria-expanded="true"],
+[data-style="hybrid"] .appearance-button[aria-expanded="true"]:hover:not(:disabled) {
+  color: var(--selected-text);
+  background: var(--selected-bg);
+  border-color: var(--selected-line);
+}
+
+/* A small action in a row or a status: an underlined word. */
+[data-style="hybrid"] .running .actions button.secondary,
+[data-style="hybrid"] .job-row > .actions button.secondary,
+[data-style="hybrid"] .job-row > .actions a {
+  min-height: 0;
+  padding: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--accent-ink);
+  background: none;
+  border: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+[data-style="hybrid"] .running .actions button.secondary:hover:not(:disabled),
+[data-style="hybrid"] .job-row > .actions button.secondary:hover:not(:disabled) {
+  color: var(--accent-hover);
+  background: none;
+}
+
+/* Tags: tinted, no edge. */
+[data-style="hybrid"] .tag,
+[data-style="hybrid"] .needs:not(.needs-unknown) {
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.5;
+  border: none;
+  border-radius: var(--r-tag);
+}
+
+[data-style="hybrid"] .tag[data-ran] {
+  color: var(--success);
+  background: var(--success-surface);
+}
+
+/* ------------------------------------------------------------ header */
+
+/* The mark and the product's name, then where the page is; My jobs and appearance at the end. */
+[data-style="hybrid"] .app-header {
+  justify-content: flex-start;
+  gap: 14px;
+  min-height: 64px;
+  padding: 0 32px;
+}
+
+[data-style="hybrid"] .app-header h1 {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+/* The full name stays for screen readers; the mark says the rest. */
+[data-style="hybrid"] .title-prefix,
+[data-style="hybrid"] .app-header .version {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+[data-style="hybrid"] .app-header .tagline {
+  display: none;
+}
+
+[data-style="hybrid"] .frame-mark {
+  display: block;
+  flex: none;
+  width: 26px;
+  height: 26px;
+}
+
+[data-style="hybrid"] .frame-mark-ground {
+  fill: var(--accent);
+}
+
+[data-style="hybrid"] .frame-mark-grid {
+  fill: none;
+  stroke: var(--accent-text);
+  stroke-width: 1;
+  opacity: 0.35;
+}
+
+[data-style="hybrid"] .frame-mark-line {
+  fill: none;
+  stroke: var(--accent-text);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* The breadcrumb, after a rule: the service, then the process. */
+[data-style="hybrid"] .frame-crumbs {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+[data-style="hybrid"] .frame-crumbs::before {
+  content: "";
+  flex: none;
+  width: 1px;
+  height: 24px;
+  background: var(--line-strong);
+}
+
+[data-style="hybrid"] .frame-crumbs ol {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.9375rem;
+}
+
+[data-style="hybrid"] .frame-crumbs li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+[data-style="hybrid"] .frame-crumbs li + li::before {
+  content: "›" / "";
+  color: var(--muted);
+}
+
+[data-style="hybrid"] .frame-crumbs button.link {
+  color: var(--text);
+  text-decoration: none;
+}
+
+[data-style="hybrid"] .frame-crumbs button.link:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+[data-style="hybrid"] .frame-crumbs [aria-current] {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+[data-style="hybrid"] .header-tools {
+  gap: 14px;
+  margin-left: auto;
+}
+
+/* "1 running", in words: the count's hidden word shows here. */
+[data-style="hybrid"] .jobs-button .badge {
+  display: inline-block;
+  min-width: 0;
+  height: auto;
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--selected-text);
+  background: var(--selected-bg);
+  border-radius: var(--r-tag);
+}
+
+[data-style="hybrid"] .jobs-button .badge > .visually-hidden:last-child {
+  position: static;
+  width: auto;
+  height: auto;
+  overflow: visible;
+  clip-path: none;
+}
+
+/* Appearance: an icon button, a sun on a light page and a moon on a dark one. */
+[data-style="hybrid"] .app-header .appearance-button {
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
+  border-color: var(--field-border);
+}
+
+[data-style="hybrid"] .app-header .appearance-button:hover:not(:disabled, [aria-expanded="true"]) {
+  border-color: var(--field-border);
+}
+
+[data-style="hybrid"] .app-header .appearance-button[aria-expanded="true"] {
+  border-color: var(--selected-line);
+}
+
+[data-style="hybrid"] .app-header .appearance-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+[data-style="hybrid"] .appearance-button > .icon:not(.theme-icon) {
+  display: none;
+}
+
+[data-style="hybrid"] .theme-icon {
+  width: 20px;
+  height: 20px;
+}
+
+[data-style="hybrid"][data-theme="light"] .theme-icon-sun,
+[data-style="hybrid"][data-theme="dark"] .theme-icon-moon {
+  display: block;
+}
+
+[data-style="hybrid"] .appearance-popover {
+  top: calc(100% + 10px);
+  width: 260px;
+  padding: 14px 16px 16px;
+  border-radius: var(--r-item);
+  box-shadow: var(--shadow-card);
+}
+
+[data-style="hybrid"] .appearance-popover fieldset {
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+[data-style="hybrid"] .appearance-popover fieldset + fieldset {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+[data-style="hybrid"] .appearance-popover legend {
+  float: left;
+  width: 100%;
+  padding: 0 0 6px;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+[data-style="hybrid"] .appearance-popover label.choice {
+  clear: both;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  margin: 0;
+  font-size: 0.9375rem;
+  cursor: pointer;
+}
+
+[data-style="hybrid"] .appearance-popover input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
 /* ------------------------------------------------------- start screen */
 
-/* The card says it all in its heading: no eyebrow, no lead. */
-[data-style="hybrid"] .start-card .eyebrow,
-[data-style="hybrid"] .start-card .lead {
+/* The card's heading says what to do, its lead says how; no eyebrow. */
+[data-style="hybrid"] .start-card .eyebrow {
   display: none;
+}
+
+/* The card is the column's width, its padding inside, as the examples under it. */
+[data-style="hybrid"] .start > .start-card {
+  max-width: 620px;
+  gap: 16px;
+}
+
+[data-style="hybrid"] .start .lead {
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--muted);
 }
 
 /* An address is typed in the UI face here; mono is for what the page shows. */
@@ -22,12 +346,29 @@
   font-family: var(--font-ui);
 }
 
-/* On the backdrop, the examples' heading sits on a small card of its own. */
+[data-style="hybrid"] .input-with-button button {
+  padding: 0 28px;
+}
+
 [data-style="hybrid"] .featured-head h3 {
-  padding: 6px 12px;
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+/* A card: its edge turns the accent on hover, its title underlined. */
+[data-style="hybrid"] .example-card:hover:not(:disabled) {
   background: var(--surface);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--r-control);
+  border-color: var(--accent);
+}
+
+[data-style="hybrid"] .example-card:hover:not(:disabled) .example-title,
+[data-style="hybrid"] .example-row:hover:not(:disabled) .example-title {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+[data-style="hybrid"] .example-card .example-service {
+  color: var(--muted);
 }
 
 /* The known services, two to a row where there is room. */
@@ -59,6 +400,36 @@
   }
 }
 
+/* --------------------------------------------------------- side panels */
+
+[data-style="hybrid"] .side-panel {
+  width: min(470px, 100%);
+}
+
+[data-style="hybrid"] .side-panel-head,
+[data-style="hybrid"] .examples-panel .side-panel-head {
+  padding: 18px 24px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+[data-style="hybrid"] .side-panel-head h2,
+[data-style="hybrid"] .examples-panel .side-panel-head h2 {
+  font-size: 1.375rem;
+  font-weight: 700;
+}
+
+[data-style="hybrid"] button.secondary.panel-close {
+  border-color: var(--field-border);
+}
+
+[data-style="hybrid"] .side-panel-body {
+  padding: 0;
+}
+
+[data-style="hybrid"] .examples-tools {
+  gap: 10px;
+}
+
 /* The panel's search is named by its placeholder's words; the label is for screen readers. */
 [data-style="hybrid"] .examples-tools .search-field label {
   position: absolute;
@@ -69,30 +440,419 @@
   white-space: nowrap;
 }
 
-/* Rows in the panel: a rounded fill on hover. */
+[data-style="hybrid"] .filter {
+  padding: 0 12px;
+}
+
+[data-style="hybrid"] .examples-browser {
+  padding: 4px 12px 16px;
+}
+
+[data-style="hybrid"] .examples-browser > .examples-tools {
+  margin: -4px -12px 0;
+}
+
+[data-style="hybrid"] .example-group,
+[data-style="hybrid"] .example-group + .example-group {
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+[data-style="hybrid"] .example-group-head {
+  margin: 12px 12px 4px;
+}
+
+/* A row: its title and what it needs; then one line, then its id. */
+[data-style="hybrid"] .example-row {
+  gap: 4px 12px;
+  border-radius: var(--r-control);
+}
+
 [data-style="hybrid"] .example-row:hover:not(:disabled) {
   border-color: transparent;
 }
 
-/* ---------------------------------------------------------- the list */
+[data-style="hybrid"] .example-row .needs {
+  display: inline-flex;
+  grid-column: 2;
+  grid-row: 1;
+  align-self: start;
+}
 
-/* The process list: one card, rows with a rounded hover fill. */
-[data-style="hybrid"] .process-table {
-  padding: 0.35rem;
+[data-style="hybrid"] .example-row .example-summary {
+  grid-column: 1 / -1;
+}
+
+[data-style="hybrid"] .example-row .example-id {
+  grid-column: 1 / -1;
+  grid-row: auto;
+  max-width: none;
+  text-align: left;
+  color: var(--muted);
+}
+
+/* ------------------------------------------------------------ my jobs */
+
+[data-style="hybrid"] .my-jobs-panel .jobs-panel > .help {
+  margin: 0;
+  padding: 14px 24px;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  border-bottom: 1px solid var(--line);
+}
+
+[data-style="hybrid"] .jobs-panel ul {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+}
+
+/*
+ * A row: the process, and where and when it started; its status, with the
+ * server's progress and message; then what can be done, at the row's end.
+ */
+[data-style="hybrid"] .job-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 12px;
+  border-top: none;
+  border-radius: var(--r-control);
+}
+
+[data-style="hybrid"] .job-row:has([data-job-status="running"], [data-job-status="accepted"]) {
+  background: var(--surface-hover);
+}
+
+[data-style="hybrid"] .job-row > * {
+  margin: 0;
+}
+
+[data-style="hybrid"] .job-title {
+  display: block;
+  font-weight: 600;
+}
+
+[data-style="hybrid"] .job-service,
+[data-style="hybrid"] .job-started {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+}
+
+[data-style="hybrid"] .job-row > .job-status {
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+[data-style="hybrid"] .job-row > .actions {
+  justify-content: flex-end;
+  gap: 14px;
+}
+
+/* The status as a tag in the colour of what it says. */
+[data-style="hybrid"] .job-status [data-job-status] {
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--selected-text);
+  background: var(--selected-bg);
+  border-radius: var(--r-tag);
+}
+
+[data-style="hybrid"] .job-status [data-job-status="successful"] {
+  color: var(--success);
+  background: var(--success-surface);
+}
+
+[data-style="hybrid"] .job-status [data-job-status="failed"] {
+  color: var(--error);
+  background: var(--error-surface);
+}
+
+[data-style="hybrid"] .job-status [data-job-status="dismissed"] {
+  color: var(--muted);
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+
+/* Dismissing asks first, in a box edged in the error colour. */
+[data-style="hybrid"] .job-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 1px solid var(--error);
+  border-radius: var(--r-control);
+}
+
+[data-style="hybrid"] .job-confirm p {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+[data-style="hybrid"] .job-confirm .actions button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 16px;
+  font-size: 0.9375rem;
+  color: var(--text);
+  background: var(--surface);
+  border-color: var(--field-border);
+}
+
+[data-style="hybrid"] .job-confirm .actions button:not(.secondary) {
+  color: var(--error);
+  border-color: var(--error);
+}
+
+[data-style="hybrid"] .job-confirm .actions button:not(.secondary):hover:not(:disabled) {
+  background: var(--error-surface);
+  border-color: var(--error);
+}
+
+/* Nothing yet: a clock, what will appear here, and why it might not. */
+[data-style="hybrid"] .jobs-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px;
+}
+
+[data-style="hybrid"] .jobs-empty::before {
+  content: "";
+  width: 40px;
+  height: 40px;
+  background: var(--muted);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='8'/%3E%3Cpath d='M12 8v4l3 2'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+}
+
+[data-style="hybrid"] .jobs-empty p {
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.55;
+}
+
+[data-style="hybrid"] .jobs-empty p:first-child {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+/* ------------------------------------------------- the list of processes */
+
+[data-style="hybrid"] .layout-single .panel[data-stage="connected"] {
+  --column: 976px;
+
+  padding-top: 32px;
+  padding-bottom: 56px;
+}
+
+[data-style="hybrid"] .process-list-screen {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+[data-style="hybrid"] .process-list-screen > * {
+  order: 2;
+  margin: 0;
+}
+
+/* On a narrow screen the way back stays first; wider, it moves into the card (below). */
+[data-style="hybrid"] .process-list-screen > .breadcrumb {
+  order: 0;
+}
+
+/* The service card: which service, how it is reached, what it supports. */
+[data-style="hybrid"] .process-list-screen > .service-card {
+  order: 1;
+  padding: 0;
+}
+
+[data-style="hybrid"] .service-main {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 24px 28px 20px;
+}
+
+[data-style="hybrid"] .service-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-ui);
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--success);
+}
+
+[data-style="hybrid"] .service-status::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+[data-style="hybrid"] .service-title {
+  font-size: 1.875rem;
+  line-height: 1.15;
+  font-weight: 700;
+}
+
+[data-style="hybrid"] .service-url {
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+[data-style="hybrid"] .service-main .help {
+  max-width: 520px;
+  margin-top: 6px;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+[data-style="hybrid"] .service-facts {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  margin: 0;
+  border-top: 1px solid var(--line);
+}
+
+[data-style="hybrid"] .service-facts div {
+  padding: 14px 20px;
+  border-right: 1px solid var(--line);
+}
+
+[data-style="hybrid"] .service-facts div:first-child {
+  padding-left: 28px;
+}
+
+[data-style="hybrid"] .service-facts div:last-child {
+  border-right: none;
+}
+
+[data-style="hybrid"] .service-facts dt {
+  font-family: var(--font-ui);
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+[data-style="hybrid"] .service-facts dd {
+  margin-top: 2px;
+  font-family: var(--font-ui);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+/* Change service: at the card's top right, where the designs put it. */
+@media (min-width: 40rem) {
+  [data-style="hybrid"] .process-list-screen > .breadcrumb {
+    position: absolute;
+    z-index: 1;
+    top: 24px;
+    right: 28px;
+    font-size: 0;
+  }
+
+  [data-style="hybrid"] .process-list-screen > .breadcrumb strong {
+    font-size: 0;
+  }
+
+  [data-style="hybrid"] .process-list-screen > .breadcrumb button.link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 16px;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--text);
+    text-decoration: none;
+    background: var(--surface);
+    border: 1px solid var(--field-border);
+    border-radius: var(--r-control);
+  }
+
+  [data-style="hybrid"] .process-list-screen > .breadcrumb button.link:hover:not(:disabled) {
+    background: var(--surface-hover);
+  }
+
+  [data-style="hybrid"] .service-main {
+    padding-right: 200px;
+  }
+}
+
+/* Search, with the count right under it, as the answer to what was typed. */
+[data-style="hybrid"] .list-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 420px;
+}
+
+[data-style="hybrid"] .list-tools .search-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+}
+
+[data-style="hybrid"] .list-tools input[type="search"],
+[data-style="hybrid"] .examples-tools input[type="search"] {
+  min-height: 46px;
+  padding: 0 14px;
+  font-size: 1rem;
+}
+
+[data-style="hybrid"] .list-count {
+  font-size: 0.875rem;
+}
+
+/* The heading names the list, inside its card's top edge. */
+[data-style="hybrid"] .process-list-screen > h2 {
+  order: 3;
+  position: relative;
+  z-index: 1;
+  height: 40px;
+  margin: 0 0 -60px;
+  padding: 16px 22px 0;
+  font-family: var(--font-ui);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--muted);
+}
+
+/* The list: one card, rows with a rounded hover fill. */
+[data-style="hybrid"] .process-list-screen > .process-table {
+  order: 3;
+  padding: 40px 6px 6px;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
   border-radius: var(--r-card);
   box-shadow: var(--shadow-card);
 }
 
+/* A row: the title (and Ran), one line under it; what it needs; its id. */
 [data-style="hybrid"] .process-list li {
-  padding: 0.6rem 0.75rem;
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, max-content) minmax(0, 1fr) auto minmax(190px, auto);
+  align-items: center;
+  gap: 2px 12px;
+  padding: 14px 16px;
   border-bottom: none;
-  border-radius: var(--r-item);
-}
-
-[data-style="hybrid"] .process-list li + li {
-  margin-top: 0.15rem;
+  border-radius: var(--r-control);
 }
 
 [data-style="hybrid"] .process-list li:hover {
@@ -101,7 +861,71 @@
 
 [data-style="hybrid"] .process-list li[data-last-opened] {
   margin: 0;
-  padding-inline: 0.75rem;
+  padding-inline: 16px;
+}
+
+[data-style="hybrid"] .process-list .cell-process {
+  display: contents;
+}
+
+/* The title is the row's one button; it reaches over the whole row. */
+[data-style="hybrid"] .process-list .process-link {
+  grid-column: 1;
+  grid-row: 1;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+  text-decoration: none;
+}
+
+[data-style="hybrid"] .process-list .process-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+[data-style="hybrid"] .process-list li:hover .process-link {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+[data-style="hybrid"] .process-list .process-link:focus-visible {
+  outline: none;
+}
+
+[data-style="hybrid"] .process-list li:has(.process-link:focus-visible) {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+[data-style="hybrid"] .process-list .cell-ran {
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: start;
+}
+
+[data-style="hybrid"] .process-list .process-description {
+  grid-column: 1 / 3;
+  grid-row: 2;
+  font-size: 0.875rem;
+}
+
+[data-style="hybrid"] .process-list .cell-needs {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+}
+
+[data-style="hybrid"] .process-list .process-id {
+  grid-column: 4;
+  grid-row: 1 / span 2;
+  font-size: 0.75rem;
+  text-align: right;
+  color: var(--muted);
+}
+
+[data-style="hybrid"] .process-list .cell-runs {
+  display: none;
 }
 
 /* A need not known yet says nothing in a list of tags. */
@@ -109,27 +933,637 @@
   display: none;
 }
 
+@media (max-width: 40rem) {
+  [data-style="hybrid"] .process-list li {
+    grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
+  }
+
+  [data-style="hybrid"] .process-list .cell-needs,
+  [data-style="hybrid"] .process-list .process-id {
+    grid-column: 1 / -1;
+    grid-row: auto;
+    justify-self: start;
+    text-align: left;
+  }
+
+  [data-style="hybrid"] .service-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  [data-style="hybrid"] .service-facts div:nth-child(2) {
+    border-right: none;
+  }
+
+  [data-style="hybrid"] .service-facts div:nth-child(3) {
+    padding-left: 28px;
+  }
+}
+
 /* ----------------------------------------------------- one process */
 
-/* A process with nothing for the map: the whole of it on one card. */
-[data-style="hybrid"] .layout-single .process-screen {
-  padding: 1.25rem 1.5rem;
+/* No map: one column, 760px with its padding. */
+[data-style="hybrid"]
+  .layout-single
+  .panel:is([data-stage="process"], [data-stage="running"], [data-stage="result"]) {
+  --column: 696px;
+
+  padding-top: 28px;
+  padding-bottom: 56px;
+}
+
+/* Beside the map: the sheet. */
+[data-style="hybrid"] .layout:not(.layout-single) .panel {
+  padding: 20px 28px 28px;
+  border-right: 1px solid var(--line-strong);
+}
+
+/*
+ * The heading block: the way back, what it needs, the title, the id and what
+ * it does; then the status, the result and the form, each apart.
+ */
+[data-style="hybrid"] .process-screen {
+  display: flex;
+  flex-direction: column;
+}
+
+[data-style="hybrid"] .process-screen > * {
+  order: 5;
+  margin: 0 0 22px;
+}
+
+[data-style="hybrid"] .process-screen > :is(.breadcrumb, .process-needs) {
+  order: 0;
+}
+
+[data-style="hybrid"] .process-screen > h2 {
+  order: 1;
+}
+
+[data-style="hybrid"] .process-screen > .process-path {
+  order: 2;
+}
+
+[data-style="hybrid"] .process-screen > .process-summary {
+  order: 3;
+}
+
+[data-style="hybrid"] .process-screen > .about {
+  order: 4;
+}
+
+[data-style="hybrid"] .process-screen > .breadcrumb button.link {
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+[data-style="hybrid"] .process-screen > .breadcrumb button.link:hover:not(:disabled) {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+[data-style="hybrid"] .process-screen > .process-needs {
+  display: block;
+  margin-bottom: 10px;
+}
+
+[data-style="hybrid"] .layout-single .process-needs .needs[data-needs="values"] .needs-text::after {
+  content: " · no map needed";
+}
+
+[data-style="hybrid"] .process-screen > h2 {
+  margin-bottom: 6px;
+  font-size: 2rem;
+  line-height: 1.15;
+  font-weight: 700;
+}
+
+[data-style="hybrid"] .process-screen > .process-path {
+  margin-bottom: 10px;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+/* The service is in the header's breadcrumb: here, the process's id alone. */
+[data-style="hybrid"] .process-service {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+[data-style="hybrid"] .process-summary {
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+[data-style="hybrid"] .about summary {
+  font-weight: 600;
+  cursor: pointer;
+}
+
+[data-style="hybrid"] .layout:not(.layout-single) .process-screen > * {
+  margin-bottom: 20px;
+}
+
+[data-style="hybrid"] .layout:not(.layout-single) .process-screen > .process-needs,
+[data-style="hybrid"] .layout:not(.layout-single) .process-screen > .process-path {
+  margin-bottom: 10px;
+}
+
+[data-style="hybrid"] .layout:not(.layout-single) .process-screen > h2 {
+  margin-bottom: 6px;
+  font-size: 1.625rem;
+  line-height: 1.2;
+}
+
+[data-style="hybrid"] .layout:not(.layout-single) .process-summary {
+  font-size: 0.9375rem;
+}
+
+/* A run under way: what is happening, a moving bar, and the honest way out. */
+[data-style="hybrid"] .running {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  background: var(--surface-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-card);
+}
+
+[data-style="hybrid"] .running > * {
+  order: 2;
+  margin: 0;
+}
+
+[data-style="hybrid"] .running > p:first-of-type {
+  order: 0;
+  font-weight: 600;
+}
+
+[data-style="hybrid"] .running > .progress-line {
+  order: 1;
+  height: 6px;
+  border-radius: 6px;
+}
+
+[data-style="hybrid"] .progress-line::after {
+  background: var(--accent);
+  border-radius: 6px;
+}
+
+/* The result: a card of its own. */
+[data-style="hybrid"] .result-block {
+  overflow: hidden;
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-strong);
   border-radius: var(--r-card);
   box-shadow: var(--shadow-card);
 }
 
-/* The result: tinted, so it reads as the answer. */
+[data-style="hybrid"] .result-block > .notice,
+[data-style="hybrid"] .result-block > .hint {
+  margin: 16px 16px 0;
+}
+
+[data-style="hybrid"] .results {
+  margin: 0;
+}
+
 [data-style="hybrid"] .result {
-  background: var(--result-surface);
-  border: 1px solid var(--result-line);
+  margin: 0;
+  padding: 0;
+  background: none;
+  border: none;
+}
+
+[data-style="hybrid"] .result + .result {
+  margin-top: 12px;
+}
+
+[data-style="hybrid"] .result > p {
+  margin: 0 0 8px;
+}
+
+[data-style="hybrid"] .result summary {
+  font-weight: 600;
+  cursor: pointer;
 }
 
 [data-style="hybrid"] .result pre.code {
-  background: var(--surface);
+  margin: 8px 0 0;
+  padding: 12px 14px;
+  font-size: 0.8125rem;
+  line-height: 1.6;
 }
 
-[data-style="hybrid"] .result-strip {
+[data-style="hybrid"] .result .actions {
+  margin: 12px 0 0;
+}
+
+/* No map: "Result", the outputs, then the run's record in one line. */
+[data-style="hybrid"] .layout-single .results {
+  padding: 22px 24px 8px;
+}
+
+[data-style="hybrid"] .layout-single .results > h3 {
+  margin: 0 0 8px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: 0;
   color: var(--muted);
+}
+
+[data-style="hybrid"] .layout-single .result-strip {
+  gap: 8px 12px;
+  margin: 0;
+  padding: 0 24px 22px;
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+[data-style="hybrid"] .layout-single .result-strip div:not(:last-child) dt {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+[data-style="hybrid"] .result-strip dt {
+  font-family: var(--font-ui);
+  font-size: inherit;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+[data-style="hybrid"] .result-strip dd {
+  font-size: 0.8125rem;
+}
+
+[data-style="hybrid"] .layout-single .result-strip dd[data-ok] {
+  padding: 2px 8px;
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: var(--r-tag);
+}
+
+[data-style="hybrid"] .layout-single .result-strip dd[data-ok="true"] {
+  color: var(--success);
+  background: var(--success-surface);
+}
+
+[data-style="hybrid"] .layout-single .result-strip dd[data-ok="false"] {
+  color: var(--error);
+  background: var(--error-surface);
+}
+
+/* Beside the map: a band that says "Result", the outputs, then the record as rows. */
+[data-style="hybrid"] .layout:not(.layout-single) .results > h3 {
+  margin: 0;
+  padding: 14px 16px;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  color: var(--selected-text);
+  background: var(--selected-bg);
+}
+
+[data-style="hybrid"] .layout:not(.layout-single) .result {
+  padding: 16px 16px 0;
+}
+
+[data-style="hybrid"] .layout:not(.layout-single) .result .actions {
+  margin: 12px 0 0;
+}
+
+[data-style="hybrid"] .layout:not(.layout-single) .result-strip {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px 16px;
+  margin: 0;
+  padding: 16px;
+}
+
+[data-style="hybrid"] .layout:not(.layout-single) .result-strip div {
+  display: contents;
+}
+
+[data-style="hybrid"] .layout:not(.layout-single) .result-strip dd {
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+/* The ways on, all alike. */
+[data-style="hybrid"] .next-steps {
+  gap: 8px;
+}
+
+/* --------------------------------------------------------- the form */
+
+[data-style="hybrid"] .process-screen form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+[data-style="hybrid"] .form-body {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin: 0;
+}
+
+/* A field: its label, the control, then what it is for. */
+[data-style="hybrid"] .form-body .field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+}
+
+[data-style="hybrid"] .form-body .field > * {
+  margin: 0;
+}
+
+[data-style="hybrid"] .form-body .field > :is(.help, .hint) {
+  order: 1;
+}
+
+[data-style="hybrid"] .form-body .field > .field-error {
+  order: 2;
+}
+
+[data-style="hybrid"] .form-body .field > .field-warnings {
+  order: 3;
+}
+
+[data-style="hybrid"] .form-body .help,
+[data-style="hybrid"] .form-body .hint {
+  font-size: 0.875rem;
+}
+
+[data-style="hybrid"] .form-body fieldset {
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+[data-style="hybrid"] .form-body legend {
+  padding: 0 0 8px;
+}
+
+[data-style="hybrid"]
+  .process-screen
+  :is(input[type="text"], input[type="url"], input[type="date"], select) {
+  min-height: 46px;
+  padding: 0 14px;
+}
+
+[data-style="hybrid"] .process-screen textarea {
+  padding: 10px 14px;
+}
+
+/* No map: the form is a card, "Inputs" at its head. */
+[data-style="hybrid"] .layout-single .process-screen form {
+  padding: 24px;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-card);
+}
+
+[data-style="hybrid"] .layout-single .panel[data-stage="process"] .form-body::before {
+  content: "Inputs";
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+/* The area: how to give it first, as chips; then the GeoJSON and a file. */
+[data-style="hybrid"] .geometry {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+[data-style="hybrid"] .geometry > * {
+  order: 1;
+  margin: 0;
+}
+
+[data-style="hybrid"] .geometry > .actions {
+  order: 0;
+  gap: 6px;
+}
+
+[data-style="hybrid"] .geometry .actions button,
+[data-style="hybrid"] .map-tools button {
+  min-height: 40px;
+  padding: 0 12px;
+  font-size: 0.875rem;
+  font-weight: 400;
+  color: var(--text);
+  background: var(--surface);
+  border-color: var(--line-strong);
+}
+
+[data-style="hybrid"] .geometry .actions button:hover:not(:disabled),
+[data-style="hybrid"] .map-tools button:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--surface-hover);
+  border-color: var(--line-strong);
+}
+
+[data-style="hybrid"] .geometry .actions button[aria-pressed="true"],
+[data-style="hybrid"] .map-tools button[aria-pressed="true"] {
+  font-weight: 600;
+  color: var(--selected-text);
+  background: var(--selected-bg);
+  border-color: var(--selected-line);
+}
+
+[data-style="hybrid"] .geometry label {
+  margin-bottom: 6px;
+}
+
+[data-style="hybrid"] input[type="file"] {
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+[data-style="hybrid"] input[type="file"]::file-selector-button {
+  min-height: 40px;
+  margin-right: 10px;
+  padding: 0 12px;
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-control);
+  cursor: pointer;
+}
+
+/* When to run: the choice as an option card; Run below it. */
+[data-style="hybrid"] .run-bar {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 4px 0 0;
+  border-top: none;
+}
+
+[data-style="hybrid"] .run-bar label.choice {
+  align-self: stretch;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 0;
+  padding: 12px 14px;
+  font-weight: 600;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-item);
+  cursor: pointer;
+}
+
+[data-style="hybrid"] .run-bar label.choice:has(input:checked) {
+  background: var(--selected-bg);
+  border-color: var(--selected-line);
+  box-shadow: inset 0 0 0 1px var(--selected-line);
+}
+
+[data-style="hybrid"] .run-bar label.choice input {
+  width: 18px;
+  height: 18px;
+  margin: 3px 0 0;
+  accent-color: var(--accent);
+}
+
+[data-style="hybrid"] .run-bar button[type="submit"] {
+  min-height: 52px;
+  padding: 0 28px;
+  font-size: 1.0625rem;
+}
+
+[data-style="hybrid"] .layout:not(.layout-single) .run-bar {
+  align-items: stretch;
+}
+
+/* ---------------------------------------------------------- the map */
+
+[data-style="hybrid"] .map-pane .maplibregl-ctrl-top-right .maplibregl-ctrl {
+  margin: 20px 20px 0 0;
+}
+
+[data-style="hybrid"] .map-pane .maplibregl-ctrl-group {
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-control);
+  box-shadow: var(--shadow-card);
+}
+
+[data-style="hybrid"] .map-pane .maplibregl-ctrl-group button {
+  width: 44px;
+  height: 44px;
+  background-color: var(--surface);
+}
+
+[data-style="hybrid"] .map-pane .maplibregl-ctrl-group button + button {
+  border-top: 1px solid var(--line-strong);
+}
+
+[data-style="hybrid"][data-theme="dark"] .map-pane .maplibregl-ctrl-icon {
+  filter: invert(1);
+}
+
+/* The scale bar: a small card at the bottom left. */
+[data-style="hybrid"] .map-pane .maplibregl-ctrl-bottom-left .maplibregl-ctrl-scale {
+  display: block;
+  box-sizing: content-box;
+  margin: 0 0 20px 20px;
+  padding: 16px 10px 6px;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  line-height: 1;
+  color: var(--text);
+  /* The bar: a bracket open at the top, as long as the distance it names. */
+  background:
+    linear-gradient(currentColor 0 0) left 10px top 10.5px / calc(100% - 20px) 1.5px no-repeat,
+    linear-gradient(currentColor 0 0) left 10px top 6px / 1.5px 6px no-repeat,
+    linear-gradient(currentColor 0 0) right 10px top 6px / 1.5px 6px no-repeat,
+    var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+}
+
+/* What floats on the map: cards with the soft shadow. */
+[data-style="hybrid"] .map-hint,
+[data-style="hybrid"] .map-overlay {
+  padding: 10px 14px;
+  font-size: 0.875rem;
+  border-radius: var(--r-control);
+  box-shadow: var(--shadow-card);
+}
+
+[data-style="hybrid"] .map-pane > .map-hint:not(.map-legend),
+[data-style="hybrid"] .map-pane > .map-overlay {
+  top: 20px;
+  left: 20px;
+  bottom: auto;
+  max-width: 300px;
+}
+
+/* The legend: "On the map", at the bottom right, above the attribution. */
+[data-style="hybrid"] .map-pane > .map-legend {
+  left: auto;
+  right: 20px;
+  bottom: 36px;
+  max-width: 260px;
+  padding: 10px 14px 12px;
+  border-radius: var(--r-item);
+}
+
+[data-style="hybrid"] .map-pane > .map-legend::before {
+  content: "On the map";
+  display: block;
+  margin-bottom: 4px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+[data-style="hybrid"] .map-legend .swatch {
+  width: 18px;
+  height: 12px;
+  margin-right: 6px;
+}
+
+/* ------------------------------------------------- a narrow screen */
+
+@media (max-width: 52rem) {
+  [data-style="hybrid"] .app-header {
+    gap: 8px 14px;
+    padding: 10px 16px;
+  }
+
+  [data-style="hybrid"] .frame-crumbs {
+    order: 3;
+    flex-basis: 100%;
+  }
+
+  [data-style="hybrid"] .frame-crumbs::before {
+    display: none;
+  }
+
+  [data-style="hybrid"] .layout:not(.layout-single) .panel {
+    padding: 20px 16px 28px;
+    border-right: none;
+  }
 }
