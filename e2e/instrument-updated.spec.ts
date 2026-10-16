@@ -173,3 +173,26 @@ for (const { style, updated } of VERSIONS) {
     });
   });
 }
+
+test("instrument-updated: the background box is centred on its words, beside the map too", async ({
+  page,
+}) => {
+  await open(page, "instrument-updated");
+  await connect(page);
+  for (const name of ["Hello World", "Buildings in an area"]) {
+    await page.getByRole("button", { name, exact: true }).click();
+    const offset = await page.locator(".run-bar label.choice").evaluate((label) => {
+      const box = label.querySelector("input")?.getBoundingClientRect();
+      const words = [...label.childNodes].find(
+        (node) => node.nodeType === Node.TEXT_NODE && (node.textContent ?? "").trim() !== "",
+      );
+      if (box === undefined || words === undefined) return Number.NaN;
+      const range = document.createRange();
+      range.selectNodeContents(words);
+      const text = range.getBoundingClientRect();
+      return (box.top + box.bottom - (text.top + text.bottom)) / 2;
+    });
+    expect(Math.abs(offset)).toBeLessThanOrEqual(1);
+    await page.getByRole("banner").getByRole("button", { name: "Processes", exact: true }).click();
+  }
+});

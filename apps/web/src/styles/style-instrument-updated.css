@@ -415,6 +415,16 @@
   margin: 8px 0 0;
 }
 
+/* "Run in the background": the box centred on its words, at any text size. */
+[data-variant="updated"] .run-bar label.choice {
+  align-items: center;
+}
+
+[data-variant="updated"] .run-bar label.choice input[type="checkbox"] {
+  flex: none;
+  margin: 0;
+}
+
 /* JSON is laid out with tabs: four columns each, not the browser's eight. */
 [data-variant="updated"] textarea,
 [data-variant="updated"] pre.code {
