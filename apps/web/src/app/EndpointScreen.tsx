@@ -16,6 +16,8 @@
 import { useId, useRef, useState, type ReactNode, type SyntheticEvent } from "react";
 import type { Preset } from "../config/runtime-config.js";
 import type { RelayEndpoint } from "../relay/contract.js";
+import type { Place } from "./address.js";
+import { sameService } from "./address.js";
 import { Wordmark } from "./BrandMark.js";
 import { typedEndpoint } from "./run.js";
 import type { EndpointRef, WorkflowError } from "./workflow.js";
@@ -35,6 +37,8 @@ export interface EndpointScreenProps {
   readonly onConnect: (endpoint: EndpointRef) => void;
   /** The featured examples, shown under the connect card. */
   readonly examples?: ReactNode;
+  /** A place the page was opened with a link to: filled in, waiting for Connect. */
+  readonly linked?: Place | undefined;
 }
 
 /** The four stages of the workflow, in the words a first-time visitor needs. */
@@ -55,17 +59,30 @@ const STEPS: readonly { readonly title: string; readonly text: string }[] = [
 ];
 
 export function EndpointScreen(props: EndpointScreenProps) {
-  const { configured, configuredError, presets, connecting, error, staticOnly, onConnect } = props;
+  const { configured, configuredError, presets, connecting, error, staticOnly, onConnect, linked } =
+    props;
   const base = useId();
   // Undefined until the user picks: the first service offered is then picked
   // for them, so a listed service is one click away.
   const [choice, setChoice] = useState<string | undefined>();
-  const [address, setAddress] = useState("");
+  const [address, setAddress] = useState(linked?.service ?? "");
   const [addressError, setAddressError] = useState<string | undefined>();
   const keys = [...configured.map((entry) => entry.key), ...presets.map((_, i) => presetKey(i))];
   const hasChoices = keys.length > 0;
+  // A linked service is picked for the user: its entry when it is a listed
+  // one, else the address it fills in.
+  const linkedService = linked?.service;
+  const linkedIndex =
+    linkedService === undefined
+      ? -1
+      : presets.findIndex((preset) => sameService(preset.url, linkedService));
+  const linkedKey =
+    linkedService === undefined
+      ? undefined
+      : (configured.find((entry) => sameService(entry.baseUrl, linkedService))?.key ??
+        (linkedIndex < 0 ? TYPED : presetKey(linkedIndex)));
   const selected =
-    choice === undefined ? (keys[0] ?? TYPED) : keys.includes(choice) ? choice : TYPED;
+    choice === undefined ? (linkedKey ?? keys[0] ?? TYPED) : keys.includes(choice) ? choice : TYPED;
 
   // What Connect will open, said next to the button when there is a choice.
   const selectedEntry = configured.find((entry) => entry.key === selected);
@@ -132,6 +149,17 @@ export function EndpointScreen(props: EndpointScreenProps) {
           Try the calculations an OGC API - Processes service offers, without writing code: pick
           one, fill in a form, and see the result on the map.
         </p>
+        {linkedService !== undefined && (
+          <p className="notice link-notice" data-testid="link-notice">
+            This link opens <strong>{linkedService}</strong>
+            {linked?.process !== undefined && (
+              <>
+                , process <code>{linked.process}</code>
+              </>
+            )}
+            . Nothing is sent to it until you press Connect.
+          </p>
+        )}
 
         <form onSubmit={onSubmit} noValidate>
           <div className="field address-field">

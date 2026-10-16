@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Appearance } from "./app/appearance.js";
 import { AppearanceControl } from "./app/AppearanceControl.js";
+import { useAddress } from "./app/address.js";
 import { AppFrame, RailItem, type FramePlace } from "./app/AppFrame.js";
 import { DeveloperPanel } from "./app/DeveloperPanel.js";
 import { activeDrawField, DrawContext, type DrawRequest, type DrawTarget } from "./app/draw.js";
@@ -94,6 +95,7 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
     [config.maxMapCoordinates, config.maxEditableCoordinates],
   );
   const { state, commands } = view;
+  const address = useAddress(state, commands);
   const [developer] = useState(developerRequested);
   const [mapAvailable, setMapAvailable] = useState(false);
 
@@ -194,13 +196,16 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
     case "choose-endpoint":
       screen = (
         <EndpointScreen
+          // A new link to answer starts the screen afresh, its address filled in.
+          key={address.linked?.service ?? ""}
           configured={view.configured}
           configuredError={view.configuredError}
           presets={presets}
           connecting={state.connecting}
           error={state.error}
           staticOnly={relayUrl === undefined}
-          onConnect={commands.connect}
+          onConnect={address.connect}
+          linked={address.linked}
           examples={
             <FeaturedExamples
               examples={examples}

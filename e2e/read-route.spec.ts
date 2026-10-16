@@ -207,10 +207,10 @@ test.describe("the relay's read route", () => {
     await expect(restored).toHaveAttribute("data-restored", "true");
     await expect(restored).toContainText("last read failed", { timeout: 15_000 });
 
-    // Confirming the relay again for the endpoint takes the restored job
-    // with it: it was read direct for ever after a reload, and Dismiss failed.
-    await page.getByRole("radio", { name: /^pygeoapi-nocors-relay / }).check();
-    await page.getByRole("button", { name: "Connect" }).click();
+    // The reload comes back to the process, so it asks about the relay again:
+    // the relay is used only on the user's yes, on every visit. Confirming it
+    // takes the restored job with it: it was read direct for ever after a
+    // reload, and Dismiss failed.
     await page.getByRole("button", { name: "Use relay" }).click();
     await expect(restored.locator("[data-job-status]")).toHaveAttribute(
       "data-job-status",
