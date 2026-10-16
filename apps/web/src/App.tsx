@@ -314,15 +314,6 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
             { label: state.service.title ?? state.endpoint.baseUrl, onClick: onProcesses },
             { label: state.process.title ?? state.process.id, onClick: undefined },
           ];
-  const onLog = developer
-    ? () => {
-        const details = panel.current?.querySelector<HTMLDetailsElement>("details.developer");
-        if (details === null || details === undefined) return;
-        details.open = true;
-        details.scrollIntoView({ block: "start" });
-        details.querySelector("summary")?.focus();
-      }
-    : undefined;
 
   return (
     <MapLimitsContext value={mapLimits}>
@@ -340,7 +331,6 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
             crumbs={crumbs}
             onConnect={onConnect}
             onProcesses={onProcesses}
-            onLog={onLog}
             tools={
               <button
                 type="button"

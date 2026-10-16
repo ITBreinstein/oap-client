@@ -36,8 +36,6 @@ export interface AppFrameProps {
   readonly onConnect: (() => void) | undefined;
   /** Back to the list; undefined before connecting, or while a run is under way. */
   readonly onProcesses: (() => void) | undefined;
-  /** Open the developer panel; undefined without `?developer`. */
-  readonly onLog: (() => void) | undefined;
   /** Rail items for the side panels: Examples. */
   readonly railItems?: ReactNode;
   /** The rail's Jobs item. */
@@ -164,7 +162,6 @@ export const ICONS = {
   processes: "M4 6h16M4 12h16M4 18h10",
   examples: "M12 3.5l2.5 5.3 5.8.7-4.3 3.9 1.2 5.7-5.2-2.9-5.2 2.9 1.2-5.7-4.3-3.9 5.8-.7z",
   jobs: "M12 4a8 8 0 1 0 0 16 8 8 0 1 0 0-16zM12 8v4l3 2",
-  log: "M5 5h14v14H5zM8 9h8M8 13h8M8 17h5",
   about: "M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18zM12 11v5M12 8h.01",
 } as const;
 
@@ -243,17 +240,8 @@ export function StartLink({
 
 // STYLE TRIAL (instrument): delete with the instrument style.
 function Rail(props: AppFrameProps) {
-  const {
-    inert,
-    appearance,
-    place,
-    onConnect,
-    onProcesses,
-    onLog,
-    railItems,
-    jobsItem,
-    aboutItem,
-  } = props;
+  const { inert, appearance, place, onConnect, onProcesses, railItems, jobsItem, aboutItem } =
+    props;
   return (
     <header className="app-rail" inert={inert}>
       <h1 className="visually-hidden">{TITLE}</h1>
@@ -276,7 +264,6 @@ function Rail(props: AppFrameProps) {
           />
           {railItems}
           {jobsItem}
-          {onLog !== undefined && <RailItem icon="log" label="Log" onClick={onLog} />}
         </ul>
       </nav>
       <div className="rail-end">

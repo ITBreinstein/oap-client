@@ -1,7 +1,7 @@
 /**
  * Instrument in Breinstein's colours, in both themes: the wordmark is a link
- * to the start screen, and About opens out of the rail like Examples and
- * Jobs, one panel at a time.
+ * to the start screen, About opens out of the rail like Examples and Jobs,
+ * one panel at a time, and the rail has no Log item.
  *
  * `config.json` allows https: services only, so the example names a test
  * address, which this spec answers from the local pygeoapi.
@@ -77,6 +77,16 @@ for (const theme of ["light", "dark"] as const) {
       await page.keyboard.press("Escape");
       await expect(panel).toBeHidden();
       await expect(about).toBeFocused();
+    });
+
+    test("the rail has no Log item, even with ?developer; the developer section stays in the page", async ({
+      page,
+    }) => {
+      await instrument(page, theme, "&developer");
+      await expect(rail(page, "About")).toBeVisible();
+      await expect(rail(page, "Log")).toHaveCount(0);
+      // Its way in is the section itself, at the foot of every page.
+      await expect(page.locator("details.developer > summary")).toBeVisible();
     });
 
     test("one panel at a time: About closes Examples and Jobs, and they close About", async ({
