@@ -204,6 +204,10 @@ Do this twice, once per losing style. Then, optionally, flatten (below).
    the three entries in section 6 of `THIRD_PARTY.md`, the "Start screen
    imagery" row in About and `e2e/instrument-backdrop.spec.ts`; and drop
    `--backdrop-scrim` from every block in `tokens.css` and from the token test.
+   The theme switch's side of it goes too: `src/app/backdrop.ts` and
+   `test/app/backdrop.test.ts`, and in `useAppearance.ts` the `ready` it
+   passes to `switchTheme` and the effect that fetches the other picture. The
+   crossfade itself (`theme-switch.ts`) belongs to every style and stays.
 
 ### Then, optionally: flatten
 

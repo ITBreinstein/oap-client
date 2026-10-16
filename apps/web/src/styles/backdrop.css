@@ -10,8 +10,9 @@
  * card, and the credit is a chip of its own.
  *
  * Removing the backdrop is deleting this file, the two pictures, the credit
- * chip in `App.tsx`, the script and its THIRD_PARTY.md entries,
- * and `--backdrop-scrim` (ADR 0002). The start screen is then as it was.
+ * chip in `App.tsx`, `app/backdrop.ts`, the script and its THIRD_PARTY.md
+ * entries, and `--backdrop-scrim` (ADR 0002). The start screen is then as
+ * it was.
  */
 
 /*

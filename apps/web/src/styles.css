@@ -60,6 +60,17 @@ legend,
   }
 }
 
+/*
+ * Light to dark and back: the browser fades the page as it was into the page
+ * as it is (app/theme-switch.ts), quickly, slowing at the end. Never where
+ * motion is reduced: the switch is instant there, with no transition at all.
+ */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 280ms;
+  animation-timing-function: ease-out;
+}
+
 .visually-hidden {
   position: absolute;
   width: 1px;

@@ -6,9 +6,12 @@
  * The system's light or dark setting is read with `useSyncExternalStore`, so
  * a change in the operating system's setting re-renders the page while the
  * preference is "Follow system", with no effect of our own keeping a copy.
+ *
+ * A change of theme, from the control or from the system, goes through
+ * `switchTheme`: a short crossfade where the browser can draw one.
  */
 
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   applyAppearance,
   browserStorage,
@@ -22,6 +25,14 @@ import {
   type StyleName,
   type ThemePreference,
 } from "./appearance.js";
+import {
+  backdropReady,
+  backdropShown,
+  prefetchOtherBackdrop,
+  saveDataRequested,
+  shouldPrefetch,
+} from "./backdrop.js";
+import { skipThemeFade, switchTheme } from "./theme-switch.js";
 
 /** Listen for the system's dark setting changing. A no-op where `matchMedia` is missing. */
 function subscribeToSystemTheme(onChange: () => void): () => void {
@@ -56,10 +67,33 @@ export function useAppearance(initial?: Appearance): AppearanceView {
   const resolvedTheme = resolveTheme(appearance.theme, systemDark);
 
   // `main.tsx` wrote the starting appearance before the first render; this
-  // keeps `<html>` in step with every change after it.
+  // keeps `<html>` in step with every change after it. Writing always takes
+  // the latest choice, so a switch that lands late can't undo a newer one.
+  const latest = useRef({ appearance, resolvedTheme });
   useEffect(() => {
-    applyAppearance(document.documentElement, appearance, resolvedTheme);
+    latest.current = { appearance, resolvedTheme };
+    const root = document.documentElement;
+    const apply = () => {
+      applyAppearance(root, latest.current.appearance, latest.current.resolvedTheme);
+    };
+    if (root.dataset["theme"] === resolvedTheme) {
+      skipThemeFade();
+      apply();
+      return undefined;
+    }
+    // STYLE TRIAL (instrument): a fade waits for the backdrop it ends on.
+    const ready =
+      appearance.style === "instrument" && backdropShown()
+        ? () => backdropReady(resolvedTheme)
+        : undefined;
+    return switchTheme(apply, ready);
   }, [appearance, resolvedTheme]);
+
+  // STYLE TRIAL (instrument): the other theme's backdrop, fetched when idle.
+  useEffect(() => {
+    if (!shouldPrefetch(appearance.style, saveDataRequested())) return undefined;
+    return prefetchOtherBackdrop(resolvedTheme);
+  }, [appearance.style, resolvedTheme]);
 
   const setStyle = useCallback((style: StyleName) => {
     setAppearance((current) => ({ ...current, style }));
