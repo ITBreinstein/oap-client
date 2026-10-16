@@ -319,123 +319,126 @@
 
 /* ------------------------------------------------------- Instrument colours */
 
+/*
+ * Breinstein's colours: midnight navy, and violet as the one main colour in
+ * both themes. Buttons are violet under white text. Violet as text on navy
+ * is too faint, so --accent-ink, a lighter violet at night and a deeper one
+ * by day, carries links, the rail's bar and selected edges. Yellow is focus
+ * and "running" at night. Orange and cyan, also Breinstein's, mark what the
+ * user gives (an area) and what comes back (a result).
+ */
+
 [data-style="instrument"][data-theme="dark"] {
-  --page: #0e1217;
-  --surface: #11161d;
-  --surface-2: #121820;
-  --surface-hover: #18202a;
-  --field: #0b0f14;
-  --rail: #0a0d11;
-  --rail-hover: #151b22;
-  --text: #e6ebf0;
-  --text-strong: #e6ebf0;
-  --text-secondary: #c3ccd6;
-  --muted: #a9b5c2;
-  --ident: #7d8c9c;
-  --label-color: #93a1b0;
-  --line: #1f2733;
-  --line-strong: #2f3a4a;
-  --line-mid: #2f3a4a;
-  --line-label: #2f3a4a;
-  --field-border: #5d6d82;
-  --accent: #c6f432;
-  --accent-hover: #dcff6e;
-  --accent-text: #10140a;
-  --accent-ink: #c6f432;
-  --selected-bg: rgb(198 244 50 / 14%);
-  --selected-text: #e6ebf0;
-  --selected-line: #c6f432;
-  --focus: #c6f432;
-  --need-area-fg: #ffb020;
+  --page: #040727;
+  --surface: #0b1036;
+  --surface-2: #0d1238;
+  --surface-hover: #151b47;
+  --field: #020419;
+  --rail: #020419;
+  --rail-hover: #151b47;
+  --text: #f4f4f4;
+  --text-strong: #f4f4f4;
+  --text-secondary: #d5d9e3;
+  --muted: #b4bfd0;
+  --ident: #94a3b8;
+  --label-color: #94a3b8;
+  --line: #1b2250;
+  --line-strong: #2b3363;
+  --line-mid: #2b3363;
+  --line-label: #2b3363;
+  --field-border: #646d9c;
+  --accent: #8b47dc;
+  --accent-hover: #7327ce;
+  --accent-text: #ffffff;
+  --accent-ink: #be98eb;
+  --selected-bg: rgb(139 71 220 / 22%);
+  --selected-text: #f4f4f4;
+  --selected-line: #be98eb;
+  --focus: #fce403;
+  --need-area-fg: #ff7600;
   --need-area-bg: transparent;
-  --need-data-fg: #39c5ff;
+  --need-data-fg: #29d5d6;
   --need-data-bg: transparent;
-  --need-values-fg: #c3ccd6;
+  --need-values-fg: #d5d9e3;
   --need-values-bg: transparent;
-  --result-fg: #7fd8ff;
-  --result-surface: #0d1d26;
-  --result-line: #1d5f7a;
-  --success: #86d6a2;
-  --success-surface: #12241a;
-  --warning: #ffcf7a;
-  --error: #ff8a8a;
-  --error-surface: #2a1416;
-  --notice-surface: #221c10;
-  --notice-line: #6b5420;
-  --ticks: #c6f432;
-  --overlay: rgb(0 0 0 / 60%);
+  --result-fg: #29d5d6;
+  --result-surface: #08202e;
+  --result-line: #1a6f78;
+  --success: #60d937;
+  --success-surface: rgb(96 217 55 / 14%);
+  --warning: #fce403;
+  --error: #ff6b6e;
+  --error-surface: #3a0d14;
+  --notice-surface: #232531;
+  --notice-line: #6b6420;
+  --ticks: #be98eb;
+  --overlay: rgb(2 4 25 / 60%);
   --shadow-card: none;
-  --shadow-panel: 24px 0 48px rgb(0 0 0 / 45%);
+  --shadow-panel: 24px 0 48px rgb(0 0 0 / 50%);
   --shadow-popover: 0 16px 40px rgb(0 0 0 / 55%);
-  --backdrop-ground: #0e1217;
-  --backdrop-line-1: #0e1217;
-  --backdrop-line-2: #0e1217;
-  --backdrop-water: #0e1217;
-  --backdrop-park: #0e1217;
+  --backdrop-ground: #040727;
+  --backdrop-line-1: #040727;
+  --backdrop-line-2: #040727;
+  --backdrop-water: #040727;
+  --backdrop-park: #040727;
   --backdrop-veil: transparent;
   --backdrop-veil-list: transparent;
   --backdrop-veil-sheet: transparent;
 }
 
-/*
- * Not on the design canvas: derived for this trial. Lime cannot be text or a
- * thin line on white (1.3:1), so it is a fill only, under dark text, and
- * --accent-ink, a dark olive, carries links, the rail's bar, selected edges
- * and focus.
- */
 [data-style="instrument"][data-theme="light"] {
-  --page: #f4f6f8;
+  --page: #f4f4f4;
   --surface: #ffffff;
   --surface-2: #ffffff;
-  --surface-hover: #eef2f6;
+  --surface-hover: #eef0f5;
   --field: #ffffff;
-  --rail: #e9edf1;
-  --rail-hover: #dde3e9;
-  --text: #0e1217;
-  --text-strong: #0e1217;
-  --text-secondary: #2d3a46;
-  --muted: #3e4c59;
-  --ident: #616e7c;
-  --label-color: #52606d;
-  --line: #d5dbe2;
-  --line-strong: #9aa5b1;
-  --line-mid: #c2cad3;
-  --line-label: #9aa5b1;
+  --rail: #e6e6e8;
+  --rail-hover: #eef0f5;
+  --text: #040727;
+  --text-strong: #040727;
+  --text-secondary: #1b2250;
+  --muted: #475569;
+  --ident: #55617a;
+  --label-color: #55617a;
+  --line: #dfe1e8;
+  --line-strong: #94a3b8;
+  --line-mid: #c3c8d4;
+  --line-label: #94a3b8;
   --field-border: #7b8794;
-  --accent: #c6f432;
-  --accent-hover: #dcff6e;
-  --accent-text: #10140a;
-  --accent-ink: #3f6212;
-  --selected-bg: rgb(198 244 50 / 28%);
-  --selected-text: #0e1217;
-  --selected-line: #3f6212;
-  --focus: #3f6212;
-  --need-area-fg: #b45309;
+  --accent: #8b47dc;
+  --accent-hover: #7327ce;
+  --accent-text: #ffffff;
+  --accent-ink: #7327ce;
+  --selected-bg: rgb(139 71 220 / 10%);
+  --selected-text: #040727;
+  --selected-line: #7327ce;
+  --focus: #7327ce;
+  --need-area-fg: #c2410c;
   --need-area-bg: transparent;
-  --need-data-fg: #0369a1;
+  --need-data-fg: #0e7490;
   --need-data-bg: transparent;
-  --need-values-fg: #52606d;
+  --need-values-fg: #475569;
   --need-values-bg: transparent;
-  --result-fg: #0369a1;
-  --result-surface: #e6f4fb;
-  --result-line: #7cc4e8;
-  --success: #1d5a35;
-  --success-surface: #e3f4e8;
-  --warning: #b45309;
-  --error: #9b1c1c;
+  --result-fg: #0e7490;
+  --result-surface: #e6f7f7;
+  --result-line: #7fd3d4;
+  --success: #2f7d1a;
+  --success-surface: #eef8e9;
+  --warning: #92400e;
+  --error: #b91c1c;
   --error-surface: #fdecec;
-  --notice-surface: #fff7e6;
-  --notice-line: #f0c36d;
-  --ticks: #3f6212;
-  --overlay: rgb(14 18 23 / 45%);
+  --notice-surface: #fdf8d8;
+  --notice-line: #e8d77a;
+  --ticks: #7327ce;
+  --overlay: rgb(4 7 39 / 45%);
   --shadow-card: none;
-  --shadow-panel: 24px 0 48px rgb(14 18 23 / 12%);
-  --shadow-popover: 0 12px 32px rgb(14 18 23 / 16%);
-  --backdrop-ground: #f4f6f8;
-  --backdrop-line-1: #f4f6f8;
-  --backdrop-line-2: #f4f6f8;
-  --backdrop-water: #f4f6f8;
-  --backdrop-park: #f4f6f8;
+  --shadow-panel: 24px 0 48px rgb(4 7 39 / 12%);
+  --shadow-popover: 0 12px 32px rgb(4 7 39 / 16%);
+  --backdrop-ground: #f4f4f4;
+  --backdrop-line-1: #f4f4f4;
+  --backdrop-line-2: #f4f4f4;
+  --backdrop-water: #f4f4f4;
+  --backdrop-park: #f4f4f4;
   --backdrop-veil: transparent;
   --backdrop-veil-list: transparent;
   --backdrop-veil-sheet: transparent;
