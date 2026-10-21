@@ -51,6 +51,28 @@ async function connect(page: Page) {
   await expect(page.getByRole("button", { name: "Hello World", exact: true })).toBeVisible();
 }
 
+/** Copy is 44px high to press, and its tooltip says its name on hover and on focus; Escape hides it. */
+async function tooltipSaysIts(page: Page, name: string) {
+  const button = page.getByRole("button", { name, exact: true });
+  expect((await button.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+  // The tooltip says the name, on hover and on keyboard focus; Escape hides it.
+  const tip = page.locator(".copy", { has: button }).locator(".copy-tip");
+  await expect(tip).toBeHidden();
+  await button.hover();
+  await expect(tip).toBeVisible();
+  await expect(tip).toHaveText(name);
+  await page.keyboard.press("Escape");
+  await expect(tip).toBeHidden();
+  await page.mouse.move(0, 0);
+  await button.focus();
+  await page.keyboard.press("Shift+Tab");
+  await page.keyboard.press("Tab");
+  await expect(button).toBeFocused();
+  await expect(tip).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(tip).toBeHidden();
+}
+
 const rail = (page: Page, name: string) =>
   page.getByRole("banner").getByRole("button", { name, exact: true });
 
@@ -155,41 +177,38 @@ for (const { style, updated } of VERSIONS) {
       await expect(page.locator(".process-screen .request-log")).toHaveCount(updated ? 0 : 1);
       await expect(page.locator("details.developer .request-log")).toHaveCount(updated ? 1 : 0);
 
-      await page.getByRole("textbox", { name: /Name/ }).fill("Geonovum");
+      const field = page.getByRole("textbox", { name: /Name/ });
+      const copyName = page.getByRole("button", { name: "Copy Name", exact: true });
+      const copyOutput = page.getByRole("button", { name: "Copy result", exact: true });
+      const clipboard = () => page.evaluate(() => navigator.clipboard.readText());
+      // In the box: none while it is empty.
+      await expect(copyName).toHaveCount(0);
+      await field.fill("Geonovum");
+      await expect(copyName).toHaveCount(updated ? 1 : 0);
+      if (updated) {
+        await expect(
+          page.locator(".copy-field", { has: field }).locator(".copy-button"),
+        ).toHaveCount(1);
+        // Pasted back into the box, the same value.
+        await copyName.click();
+        await expect.poll(clipboard).toBe("Geonovum");
+        await field.fill("");
+        await field.focus();
+        await page.keyboard.press("ControlOrMeta+V");
+        await expect(field).toHaveValue("Geonovum");
+      }
+
       await page.getByRole("button", { name: "Run", exact: true }).click();
       await page.getByRole("button", { name: "Change the inputs" }).waitFor();
-      const copyOutput = page.getByRole("button", { name: "Copy result", exact: true });
-      const copyInputs = page.getByRole("button", { name: "Copy request", exact: true });
-      const copyName = page.getByRole("button", { name: "Copy Name", exact: true });
+      // The record of what was sent has no Copy; the result has, in the update.
+      await expect(page.getByTestId("sent-inputs").getByRole("button")).toHaveCount(0);
       if (!updated) {
         await expect(copyOutput).toHaveCount(0);
-        await expect(copyInputs).toHaveCount(0);
-        await expect(copyName).toHaveCount(0);
         return;
       }
-      const clipboard = () => page.evaluate(() => navigator.clipboard.readText());
       await copyOutput.click();
       await expect(page.getByRole("status").filter({ hasText: "Copied" })).toBeVisible();
       expect(await clipboard()).toBe('{\n\t"id": "echo",\n\t"value": "Hello Geonovum!"\n}');
-      await copyInputs.click();
-      const request = '{\n\t"inputs": {\n\t\t"name": "Geonovum"\n\t}\n}';
-      await expect.poll(clipboard).toBe(request);
-      // What was copied is an execute request: sent as it is, the service runs it.
-      const again = await page.request.post(`${PYGEOAPI}/processes/hello-world/execution`, {
-        headers: { "content-type": "application/json" },
-        data: await clipboard(),
-      });
-      expect(again.status()).toBe(200);
-      expect(await again.json()).toEqual({ id: "echo", value: "Hello Geonovum!" });
-      // One input as its field shows it: pasted back into the field, the same value.
-      await copyName.click();
-      await expect.poll(clipboard).toBe("Geonovum");
-      await page.getByRole("button", { name: "Change the inputs" }).click();
-      const field = page.getByRole("textbox", { name: /Name/ });
-      await field.fill("");
-      await field.focus();
-      await page.keyboard.press("ControlOrMeta+V");
-      await expect(field).toHaveValue("Geonovum");
     });
   });
 }
@@ -279,6 +298,7 @@ test("instrument-updated: About as a box like Developer, the way back a button, 
   expect(credit).toEqual({ right: 12, bottom: 12 });
 
   await page.getByRole("textbox", { name: /Name/ }).fill("hello");
+  await tooltipSaysIts(page, "Copy Name");
   await page.getByRole("button", { name: "Run", exact: true }).click();
   const copy = page.locator(".code-box").getByRole("button", { name: "Copy result", exact: true });
   await expect(copy).toBeVisible();
@@ -291,26 +311,7 @@ test("instrument-updated: About as a box like Developer, the way back a button, 
     return [outer.width, outer.height, face?.width, face?.height];
   });
   expect(sizes).toEqual([44, 44, 32, 32]);
-  for (const name of ["Copy result", "Copy request", "Copy Name"]) {
-    const button = page.getByRole("button", { name, exact: true });
-    expect((await button.boundingBox())?.height).toBeGreaterThanOrEqual(44);
-    // The tooltip says the name, on hover and on keyboard focus; Escape hides it.
-    const tip = page.locator(".copy", { has: button }).locator(".copy-tip");
-    await expect(tip).toBeHidden();
-    await button.hover();
-    await expect(tip).toBeVisible();
-    await expect(tip).toHaveText(name);
-    await page.keyboard.press("Escape");
-    await expect(tip).toBeHidden();
-    await page.mouse.move(0, 0);
-    await button.focus();
-    await page.keyboard.press("Shift+Tab");
-    await page.keyboard.press("Tab");
-    await expect(button).toBeFocused();
-    await expect(tip).toBeVisible();
-    await page.keyboard.press("Escape");
-    await expect(tip).toBeHidden();
-  }
+  await tooltipSaysIts(page, "Copy result");
 
   // Beside the map, the draw tools are filled, not the panel's own colour.
   await page.getByRole("banner").getByRole("button", { name: "Processes", exact: true }).click();

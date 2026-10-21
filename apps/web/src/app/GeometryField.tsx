@@ -19,6 +19,7 @@ import { refuseSize } from "../forms/upload.js";
 import { DrawContext } from "./draw.js";
 import { tooManyToEditMessage, useTooManyToEdit } from "./map-limits.js";
 import type { ControlProps } from "./FormFields.js";
+import { CopyField } from "./CopyButton.js";
 import { formatJsonText } from "./json-text.js";
 import { useUpdated } from "./variant.js";
 
@@ -46,7 +47,7 @@ function describeTarget(control: GeometryControl): string {
 }
 
 export function GeometryField(props: ControlProps<GeometryControl>) {
-  const { control, value, onChange, inputId } = props;
+  const { control, value, onChange, inputId, label } = props;
   // STYLE TRIAL: the updated Instrument lays GeoJSON out with tabs.
   const updated = useUpdated();
   const draw = useContext(DrawContext);
@@ -71,22 +72,24 @@ export function GeometryField(props: ControlProps<GeometryControl>) {
       <p className="help">{describeTarget(control)}</p>
       <p>
         <label htmlFor={`${base}-geojson`}>GeoJSON</label>
-        <textarea
-          id={`${base}-geojson`}
-          className="code"
-          rows={5}
-          spellCheck={false}
-          value={text}
-          placeholder='{ "type": "Polygon", "coordinates": … }'
-          onChange={(event) => {
-            setMessage(undefined);
-            set(event.target.value);
-          }}
-          onBlur={() => {
-            const laidOut = updated ? formatJsonText(text) : undefined;
-            if (laidOut !== undefined && laidOut !== text) set(laidOut);
-          }}
-        />
+        <CopyField text={text} name={`Copy ${label}`} multiline>
+          <textarea
+            id={`${base}-geojson`}
+            className="code"
+            rows={5}
+            spellCheck={false}
+            value={text}
+            placeholder='{ "type": "Polygon", "coordinates": … }'
+            onChange={(event) => {
+              setMessage(undefined);
+              set(event.target.value);
+            }}
+            onBlur={() => {
+              const laidOut = updated ? formatJsonText(text) : undefined;
+              if (laidOut !== undefined && laidOut !== text) set(laidOut);
+            }}
+          />
+        </CopyField>
       </p>
       <p>
         <label htmlFor={`${base}-file`}>Or load a GeoJSON file</label>

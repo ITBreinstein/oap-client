@@ -13,11 +13,7 @@
 import type { ProcessDescription } from "@breinstein/oap-client";
 import type { FormValues } from "../forms/encode.js";
 import type { FormPlan } from "../forms/plan.js";
-import { toExecuteBody } from "../forms/encode.js";
-import { CopyButton } from "./CopyButton.js";
-import { fieldText } from "./field-text.js";
 import { notSentLine, outputsLine, summarise, wasSent, type Summary } from "./sent-inputs.js";
-import { useUpdated } from "./variant.js";
 
 export interface SentInputsProps {
   /** The id of the heading that names this record. */
@@ -61,24 +57,12 @@ export function SentInputs(props: SentInputsProps) {
   const sent = plan.fields.filter((field) => wasSent(field, valueOf(field.id)));
   const outputs = outputsLine(process, linkOutputs, developer);
   const notSent = notSentLine(plan, values);
-  // STYLE TRIAL: the updated Instrument offers each input to copy as its
-  // field shows it, to paste back (`field-text.ts`), and the whole request
-  // (`{"inputs": …}`, as sent) to send again elsewhere as it is.
-  const updated = useUpdated();
 
   return (
     <section className="sent-inputs" aria-labelledby={headingId} data-testid="sent-inputs">
-      <div className="sent-head">
-        <h3 id={headingId} className="sent-heading">
-          Inputs you sent
-        </h3>
-        {updated && sent.length > 0 && (
-          <CopyButton
-            name="Copy request"
-            text={() => JSON.stringify({ inputs: toExecuteBody(plan, values).inputs }, null, "\t")}
-          />
-        )}
-      </div>
+      <h3 id={headingId} className="sent-heading">
+        Inputs you sent
+      </h3>
       {sent.length === 0 && outputs === undefined ? (
         <p className="sent-none">
           {plan.fields.length === 0 ? "This process takes no inputs." : "No inputs."}
@@ -87,7 +71,6 @@ export function SentInputs(props: SentInputsProps) {
         <dl className="sent-list">
           {sent.map((field) => {
             const value = valueOf(field.id);
-            const text = updated ? fieldText(field.control, value) : undefined;
             return (
               <div key={field.id} className="sent-row" data-input-id={field.id}>
                 <dt>{field.title}</dt>
@@ -96,11 +79,6 @@ export function SentInputs(props: SentInputsProps) {
                     summary={summarise(field, value, { onMap: onMap(field.id, value), done })}
                   />
                 </dd>
-                {text !== undefined && (
-                  <span className="sent-copy">
-                    <CopyButton name={`Copy ${field.title}`} text={() => text} />
-                  </span>
-                )}
               </div>
             );
           })}

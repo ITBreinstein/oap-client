@@ -27,6 +27,7 @@ import type {
 import { BboxField } from "./BboxField.js";
 import { ComplexField } from "./ComplexField.js";
 import { GeometryField } from "./GeometryField.js";
+import { CopyField } from "./CopyButton.js";
 import { formatJsonText } from "./json-text.js";
 import { useUpdated } from "./variant.js";
 
@@ -58,6 +59,7 @@ function TextInput({
   describedBy,
   invalid,
   onChange,
+  label,
 }: ControlProps<TextControl>) {
   const common = {
     id,
@@ -68,10 +70,15 @@ function TextInput({
       onChange(event.target.value);
     },
   };
-  return control.multiline === true ? (
-    <textarea {...common} rows={4} />
-  ) : (
-    <input {...common} type={control.format === "date" ? "date" : "text"} />
+  // STYLE TRIAL: the updated Instrument has Copy in the box (`CopyField`).
+  return (
+    <CopyField text={common.value} name={`Copy ${label}`} multiline={control.multiline === true}>
+      {control.multiline === true ? (
+        <textarea {...common} rows={4} />
+      ) : (
+        <input {...common} type={control.format === "date" ? "date" : "text"} />
+      )}
+    </CopyField>
   );
 }
 
@@ -82,22 +89,25 @@ function NumberInput({
   describedBy,
   invalid,
   onChange,
+  label,
 }: ControlProps<NumberControl>) {
   // A text input, not type="number": a number input empties itself on a
   // partial entry like "0." and applies the browser's locale to the decimal
   // separator. The client-side check (T5) says what is wrong instead.
   return (
-    <input
-      id={id}
-      type="text"
-      inputMode={control.integer ? "numeric" : "decimal"}
-      value={asText(value)}
-      aria-describedby={describedBy}
-      aria-invalid={invalid === true ? true : undefined}
-      onChange={(event) => {
-        onChange(event.target.value);
-      }}
-    />
+    <CopyField text={asText(value)} name={`Copy ${label}`}>
+      <input
+        id={id}
+        type="text"
+        inputMode={control.integer ? "numeric" : "decimal"}
+        value={asText(value)}
+        aria-describedby={describedBy}
+        aria-invalid={invalid === true ? true : undefined}
+        onChange={(event) => {
+          onChange(event.target.value);
+        }}
+      />
+    </CopyField>
   );
 }
 
@@ -183,7 +193,14 @@ function BooleanInput(props: ControlProps<CheckboxControl>) {
   );
 }
 
-function JsonInput({ id, value, describedBy, invalid, onChange }: ControlProps<JsonControl>) {
+function JsonInput({
+  id,
+  value,
+  describedBy,
+  invalid,
+  onChange,
+  label,
+}: ControlProps<JsonControl>) {
   // STYLE TRIAL: the updated Instrument lays JSON out with tabs.
   const updated = useUpdated();
   const text = isRawJson(value)
@@ -195,25 +212,27 @@ function JsonInput({ id, value, describedBy, invalid, onChange }: ControlProps<J
   const bare = bareObjectHint({ rawJson: text });
   return (
     <>
-      <textarea
-        id={id}
-        className="code"
-        rows={5}
-        spellCheck={false}
-        value={text}
-        aria-describedby={
-          bare === undefined ? describedBy : `${describedBy ?? ""} ${id}-bare`.trim()
-        }
-        aria-invalid={invalid === true ? true : undefined}
-        placeholder="JSON"
-        onChange={(event) => {
-          onChange({ rawJson: event.target.value });
-        }}
-        onBlur={() => {
-          const laidOut = updated ? formatJsonText(text) : undefined;
-          if (laidOut !== undefined && laidOut !== text) onChange({ rawJson: laidOut });
-        }}
-      />
+      <CopyField text={text} name={`Copy ${label}`} multiline>
+        <textarea
+          id={id}
+          className="code"
+          rows={5}
+          spellCheck={false}
+          value={text}
+          aria-describedby={
+            bare === undefined ? describedBy : `${describedBy ?? ""} ${id}-bare`.trim()
+          }
+          aria-invalid={invalid === true ? true : undefined}
+          placeholder="JSON"
+          onChange={(event) => {
+            onChange({ rawJson: event.target.value });
+          }}
+          onBlur={() => {
+            const laidOut = updated ? formatJsonText(text) : undefined;
+            if (laidOut !== undefined && laidOut !== text) onChange({ rawJson: laidOut });
+          }}
+        />
+      </CopyField>
       {bare !== undefined && (
         <p id={`${id}-bare`} className="hint" data-bare-object-hint="true">
           {bare}
