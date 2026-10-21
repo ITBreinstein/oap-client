@@ -122,7 +122,7 @@ for (const { style, updated } of VERSIONS) {
       await page.getByRole("button", { name: "Hello World", exact: true }).click();
       await page.getByRole("textbox", { name: /Name/ }).fill("Geonovum");
       await page.getByRole("button", { name: "Run", exact: true }).click();
-      await page.getByRole("button", { name: "Choose another process" }).click();
+      await page.getByRole("button", { name: "All processes" }).click();
       await expect(heads.filter({ hasText: "This visit" })).toBeVisible();
       await expect(heads.filter({ hasText: "Needs" })).toBeVisible();
     });
@@ -257,7 +257,7 @@ for (const { style, updated } of VERSIONS) {
     await page.getByRole("checkbox", { name: "Run in the background" }).check();
     await page.getByRole("button", { name: "Run", exact: true }).click();
     await page.locator('[data-output-id="slept"]').waitFor({ timeout: 30_000 });
-    await page.getByRole("button", { name: "Choose another process" }).click();
+    await page.getByRole("button", { name: "All processes" }).click();
 
     await rail(page, "Jobs").click();
     const again = page.getByTestId("my-jobs").getByRole("button", { name: "Run again" });
@@ -457,5 +457,127 @@ for (const theme of ["light", "dark"] as const) {
       document.documentElement.dataset["theme"] = value;
     }, theme);
     for (const ratio of await creditContrast(page)) expect(ratio).toBeGreaterThanOrEqual(4.5);
+  });
+}
+
+const SQUARE =
+  '{"type":"Polygon","coordinates":[[[5.1,52.1],[5.1,52.11],[5.11,52.11],[5.11,52.1],[5.1,52.1]]]}';
+
+for (const { style, updated } of VERSIONS) {
+  test(`${style}: beside the map, ${updated ? "the way back on top, Run after the inputs, the error beside Run, drawing back after Change the inputs" : "as it was"}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 960 });
+    await open(page, style);
+    await connect(page);
+    await page
+      .getByRole("button", { name: "Rotate a polygon a quarter turn", exact: true })
+      .click();
+    await page.locator(".map-pane canvas").waitFor();
+
+    const back = page.getByRole("button", { name: "All processes" });
+    await expect(back).toBeVisible({ visible: updated });
+    const gap = await page.evaluate(() => {
+      const bar = document.querySelector(".run-bar")?.getBoundingClientRect();
+      const inputs = document.querySelector(".form-body")?.getBoundingClientRect();
+      return bar === undefined || inputs === undefined ? Number.NaN : bar.top - inputs.bottom;
+    });
+    if (updated) expect(gap).toBeLessThanOrEqual(24);
+    else expect(gap).toBeGreaterThan(24);
+
+    // The server refuses: its answer is beside Run in the update, in view.
+    await page.route("**/processes/breinstein-rotate/execution**", (route) =>
+      route.fulfill({
+        status: 400,
+        contentType: "application/json",
+        body: JSON.stringify({
+          type: "InvalidParameterValue",
+          title: "Too large",
+          detail: "This polygon is too large.",
+        }),
+      }),
+    );
+    await page.getByRole("button", { name: "Draw on the map" }).click();
+    await page.getByRole("textbox", { name: "GeoJSON" }).fill(SQUARE);
+    await page.getByRole("button", { name: "Run", exact: true }).click();
+    const refused = page.getByRole("alert").filter({ hasText: "HTTP 400" });
+    await expect(refused).toBeVisible();
+    await expect(page.locator("form .server-error + .run-bar")).toHaveCount(updated ? 1 : 0);
+    if (updated) {
+      const [box, bar] = await Promise.all([
+        refused.boundingBox(),
+        page.locator(".run-bar").boundingBox(),
+      ]);
+      expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(bar?.y ?? 0);
+      expect(box?.y ?? -1).toBeGreaterThanOrEqual(0);
+    }
+
+    await page.unroute("**/processes/breinstein-rotate/execution**");
+    await page.getByRole("button", { name: "Run", exact: true }).click();
+    await page.getByRole("button", { name: "Change the inputs" }).waitFor();
+    await expect(page.getByRole("button", { name: "Choose another process" })).toHaveCount(
+      updated ? 0 : 1,
+    );
+    await page.getByRole("button", { name: "Change the inputs" }).click();
+    // The drawing comes back with its tools in the update; Instrument ends it.
+    await expect(page.locator(".map-pane").getByRole("button", { name: "Add area" })).toHaveCount(
+      updated ? 1 : 0,
+    );
+  });
+}
+
+for (const { style, updated } of VERSIONS) {
+  test(`${style}: a background job ${updated ? "has a link, and can be left for another process" : "keeps the page until it ends"}`, async ({
+    page,
+    context,
+  }) => {
+    test.setTimeout(60_000);
+    await requireService(`${RELAY}/healthz`, "the relay");
+    const config = { relay: { url: RELAY }, presets: [], examples: [] };
+    await context.route("**/config.json", (route) =>
+      route.fulfill({ contentType: "application/json", body: JSON.stringify(config) }),
+    );
+    await page.goto(`/?style=${style}&theme=light`);
+    await page.getByRole("radio", { name: /pygeoapi-cors/ }).check();
+    await page.getByRole("button", { name: "Connect", exact: true }).click();
+    await page.getByRole("button", { name: "Slow process", exact: true }).click();
+    await page.getByRole("textbox", { name: "Seconds (optional)" }).fill("3");
+    await page.getByRole("checkbox", { name: "Run in the background" }).check();
+    await page.getByRole("button", { name: "Run", exact: true }).click();
+    await page.locator(".running[data-job-ref]").waitFor();
+
+    const link = page.getByRole("textbox", { name: "The job’s link" });
+    if (!updated) {
+      await expect(link).toHaveCount(0);
+      await expect(page.getByRole("button", { name: "All processes" })).toBeDisabled();
+      return;
+    }
+    // The link is the page's own address, which names the job.
+    await expect(link).toBeVisible();
+    const url = await link.inputValue();
+    expect(url).toBe(page.url());
+    expect(new URL(url).searchParams.get("job")).toMatch(/\S/);
+    await expect(page.getByRole("button", { name: "Copy the job’s link" })).toBeVisible();
+
+    // Another process meanwhile; the job goes on in My jobs.
+    await page.getByRole("button", { name: "Start another process" }).click();
+    await expect(page.getByRole("button", { name: "Hello World", exact: true })).toBeVisible();
+
+    // Opened elsewhere, the link waits for Connect, then shows the job's results.
+    const other = await context.newPage();
+    await other.goto(url);
+    await expect(other.getByTestId("link-notice")).toContainText("and its job");
+    await other.getByRole("button", { name: "Connect", exact: true }).click();
+    await other.locator('[data-output-id="slept"]').waitFor({ timeout: 30_000 });
+    await expect(other.getByText("This page didn’t start this job")).toBeVisible();
+
+    // And from My jobs, here.
+    await rail(page, "Jobs").click();
+    await page
+      .getByTestId("my-jobs")
+      .getByRole("button", { name: "Show the results" })
+      .click({ timeout: 30_000 });
+    await page.locator('[data-output-id="slept"]').waitFor({ timeout: 30_000 });
+    expect(page.url()).toBe(url);
   });
 }

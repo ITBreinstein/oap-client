@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Appearance } from "./app/appearance.js";
 import { AppearanceControl } from "./app/AppearanceControl.js";
 import { UpdatedContext } from "./app/variant.js";
-import { sameService, useAddress } from "./app/address.js";
+import { sameService, useAddress, wouldLoseWork } from "./app/address.js";
 import { AppFrame, RailItem, type FramePlace } from "./app/AppFrame.js";
 import { DeveloperPanel } from "./app/DeveloperPanel.js";
 import { activeDrawField, DrawContext, type DrawRequest, type DrawTarget } from "./app/draw.js";
@@ -137,8 +137,12 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
   const closePanel = () => {
     setPanelOpen(undefined);
   };
+  // STYLE TRIAL: in the updated Instrument a background job with a link can
+  // be left, from the rail too: it goes on in My jobs.
+  const leaveJob =
+    appearance.style === "instrument-updated" && state.stage === "running" && !wouldLoseWork(state);
   const busy =
-    state.stage === "running" ||
+    (state.stage === "running" && !leaveJob) ||
     (state.stage === "choose-endpoint" && state.connecting !== undefined);
   const jobs = view.snapshot?.jobs ?? [];
   // Running only: a finished job needs nothing from anyone.
@@ -156,9 +160,15 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
   // only, never stored, so a job from an earlier visit opens an empty form.
   const sentFor = useRef(new Map<string, FormValues>());
   useEffect(() => {
-    if (state.stage === "running" && state.run.mode === "async" && state.run.jobRef !== undefined) {
+    // A job this page only followed: its inputs are not the form's.
+    if (
+      state.stage === "running" &&
+      state.run.mode === "async" &&
+      state.run.jobRef !== undefined &&
+      state.run.watched !== true
+    ) {
       sentFor.current.set(state.run.jobRef, state.values);
-    } else if (state.stage === "result" && state.jobRef !== undefined) {
+    } else if (state.stage === "result" && state.jobRef !== undefined && state.watched !== true) {
       sentFor.current.set(state.jobRef, state.values);
     }
   }, [state]);
@@ -177,20 +187,29 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
     for (const [id, value] of Object.entries(pending.values)) commands.setValue(id, value);
     commands.setMode("async");
   }, [state, commands]);
-  const rerun = (job: JobRow) => {
-    if (job.processId === undefined) return;
+  /** The service a listed job ran on, reached the way this page reaches it. */
+  const endpointOfJob = (job: JobRow): EndpointRef | undefined => {
     const here = state.stage === "choose-endpoint" ? undefined : state.endpoint;
     const listed = view.configured.find((entry) => entry.key === job.endpointKey);
-    const endpoint: EndpointRef | undefined =
-      here !== undefined && sameService(here.baseUrl, job.endpoint)
-        ? here
-        : listed !== undefined
-          ? { source: "configured", ...listed }
-          : typedEndpoint(job.endpoint);
-    if (endpoint === undefined) return;
+    return here !== undefined && sameService(here.baseUrl, job.endpoint)
+      ? here
+      : listed !== undefined
+        ? { source: "configured", ...listed }
+        : typedEndpoint(job.endpoint);
+  };
+  const rerun = (job: JobRow) => {
+    const endpoint = endpointOfJob(job);
+    if (job.processId === undefined || endpoint === undefined) return;
     pendingRerun.current = { processId: job.processId, values: sentFor.current.get(job.statusUrl) };
     setPanelOpen(undefined);
     commands.openExample(endpoint, job.processId);
+  };
+  // STYLE TRIAL (updated Instrument): a job in My jobs shown here, as its link shows it.
+  const followJob = (job: JobRow) => {
+    const endpoint = endpointOfJob(job);
+    if (job.processId === undefined || endpoint === undefined) return;
+    setPanelOpen(undefined);
+    address.followJob(endpoint, job.processId, job.statusUrl);
   };
 
   const openExample = (example: Example) => {
@@ -294,8 +313,11 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
             ...commands,
             // Running ends drawing: the form it was drawing for is read-only
             // from here, and coming back to edit should not resume it.
+            // STYLE TRIAL: in the updated Instrument, "Change the inputs"
+            // brings the drawing back, its tools and its shape to edit: the
+            // drawing is kept, and is the open form's again once it is back.
             run: () => {
-              setDrawFor(undefined);
+              if (appearance.style !== "instrument-updated") setDrawFor(undefined);
               commands.run();
             },
           }}
@@ -333,13 +355,13 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
   const onConnect =
     state.stage === "choose-endpoint"
       ? focusStage
-      : state.stage === "running"
+      : state.stage === "running" && !leaveJob
         ? undefined
         : commands.disconnect;
   const onProcesses =
     state.stage === "connected"
       ? focusStage
-      : state.stage === "process" || state.stage === "result"
+      : state.stage === "process" || state.stage === "result" || leaveJob
         ? commands.backToList
         : undefined;
   return (
@@ -496,7 +518,9 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
                       ? {
                           start: rerun,
                           filled: (job) => sentFor.current.has(job.statusUrl),
-                          busy: state.stage === "running",
+                          follow: followJob,
+                          // A run that can't be left: a background job with a link can.
+                          busy: wouldLoseWork(state) && state.stage === "running",
                         }
                       : undefined
                   }

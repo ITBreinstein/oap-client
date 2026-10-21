@@ -41,13 +41,16 @@ export interface JobsPanelProps {
   /**
    * STYLE TRIAL (updated Instrument): run a job's process again. `filled`
    * says whether its inputs are known (a job started this visit), so the
-   * button says what it will do; `busy` while a run can't be left.
+   * button says what it will do; `busy` while a run can't be left. And
+   * `follow`: show a job on this page, its progress then its results, as its
+   * link does.
    */
   readonly rerun?:
     | {
         readonly start: (job: JobRow) => void;
         readonly filled: (job: JobRow) => boolean;
         readonly busy: boolean;
+        readonly follow?: ((job: JobRow) => void) | undefined;
       }
     | undefined;
 }
@@ -187,6 +190,7 @@ function JobItem({
   message,
   structured,
   onRerun,
+  onFollow,
   rerunFilled,
   rerunBusy,
   onRemove,
@@ -194,6 +198,7 @@ function JobItem({
 }: {
   readonly structured: boolean;
   readonly onRerun: (() => void) | undefined;
+  readonly onFollow: (() => void) | undefined;
   readonly rerunFilled: boolean;
   readonly rerunBusy: boolean;
   readonly job: JobRow;
@@ -208,6 +213,12 @@ function JobItem({
   const results = resultsHref(job);
   const canDismiss = advertisedBy !== "nothing" && !job.gone && job.status?.status !== "dismissed";
   const title = job.processId ?? job.status?.jobId ?? job.statusUrl;
+  // Shown on the page: a job under way, or one with results, not the one on screen.
+  const followable =
+    !active &&
+    !job.gone &&
+    job.processId !== undefined &&
+    (results !== undefined || job.status === undefined || !job.status.terminal);
 
   return (
     <li
@@ -272,10 +283,23 @@ function JobItem({
         </div>
       ) : (
         <p className="actions">
+          {followable && onFollow !== undefined && (
+            <>
+              <button
+                type="button"
+                className="secondary"
+                disabled={rerunBusy}
+                title={rerunBusy ? "A run is under way." : undefined}
+                onClick={onFollow}
+              >
+                {results !== undefined ? "Show the results" : "Follow the job"}
+              </button>{" "}
+            </>
+          )}
           {results !== undefined && (
             <>
               <a href={results} target="_blank" rel="noopener noreferrer">
-                Results
+                {onFollow === undefined ? "Results" : "Results as JSON"}
               </a>{" "}
             </>
           )}
@@ -358,6 +382,13 @@ export function JobsPanel(props: JobsPanelProps) {
                 ? undefined
                 : () => {
                     props.rerun?.start(job);
+                  }
+            }
+            onFollow={
+              props.rerun?.follow === undefined
+                ? undefined
+                : () => {
+                    props.rerun?.follow?.(job);
                   }
             }
             rerunFilled={props.rerun?.filled(job) === true}

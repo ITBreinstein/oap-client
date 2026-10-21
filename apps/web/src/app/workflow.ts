@@ -96,7 +96,15 @@ interface ProcessOpen extends Connected {
   readonly linkOutputs: readonly string[];
 }
 
-export type AsyncRun = { readonly mode: "async"; readonly jobRef?: string | undefined };
+export type AsyncRun = {
+  readonly mode: "async";
+  readonly jobRef?: string | undefined;
+  /**
+   * A job this page follows but did not start: opened from a link to it, or
+   * from My jobs. Its inputs are not known here.
+   */
+  readonly watched?: true | undefined;
+};
 export type Run = { readonly mode: "sync" } | AsyncRun;
 
 export type Workflow =
@@ -140,6 +148,8 @@ export type Workflow =
       readonly results: readonly RenderableResult[];
       /** The job the results came from, for an asynchronous run. */
       readonly jobRef?: string | undefined;
+      /** That job was followed, not started here: its inputs are not known. */
+      readonly watched?: true | undefined;
     });
 
 export type WorkflowAction =
@@ -192,6 +202,8 @@ export type WorkflowAction =
     }
   | { readonly type: "run-started"; readonly runId: string; readonly mode: ExecutionMode }
   | { readonly type: "job-started"; readonly runId: string; readonly jobRef: string }
+  /** Follow a job already on the server, from the open process. */
+  | { readonly type: "watch-job"; readonly runId: string; readonly jobRef: string }
   | {
       readonly type: "results";
       readonly runId: string;
@@ -262,6 +274,22 @@ function openPart(state: ProcessOpen): ProcessOpen {
   };
 }
 
+/**
+ * Whether the screen may move on from `state` to the list or another
+ * process. Not mid-run, where leaving would abandon a run the user has not
+ * been told the fate of: except a background job the server has named,
+ * which goes on in My jobs and has its own link.
+ */
+function leavable(
+  state: Workflow,
+): state is Extract<Workflow, { stage: "process" | "running" | "result" }> {
+  return (
+    state.stage === "process" ||
+    state.stage === "result" ||
+    (state.stage === "running" && state.run.mode === "async" && state.run.jobRef !== undefined)
+  );
+}
+
 export function workflowReducer(state: Workflow, action: WorkflowAction): Workflow {
   switch (action.type) {
     case "connect":
@@ -272,12 +300,11 @@ export function workflowReducer(state: Workflow, action: WorkflowAction): Workfl
 
     case "open-example":
       // A connect that remembers which process to open. From the start
-      // screen, or from anywhere connected — never mid-run, nor while the
-      // relay question is open.
+      // screen, or from anywhere connected — never mid-run (but a background
+      // job: `leavable`), nor while the relay question is open.
       return (state.stage === "choose-endpoint" && state.offer === undefined) ||
         state.stage === "connected" ||
-        state.stage === "process" ||
-        state.stage === "result"
+        leavable(state)
         ? { stage: "choose-endpoint", connecting: action.endpoint, openAfter: action.processId }
         : state;
 
@@ -339,8 +366,9 @@ export function workflowReducer(state: Workflow, action: WorkflowAction): Workfl
 
     case "open-process":
       // From the list, from a form, or from a result — never mid-run, where
-      // leaving would abandon a job the user has not been told the fate of.
-      return state.stage === "connected" || state.stage === "process" || state.stage === "result"
+      // leaving would abandon a job the user has not been told the fate of
+      // (but a background job: `leavable`).
+      return state.stage === "connected" || leavable(state)
         ? {
             stage: "connected",
             ...connectedPart(state),
@@ -375,9 +403,7 @@ export function workflowReducer(state: Workflow, action: WorkflowAction): Workfl
         : state;
 
     case "back-to-list":
-      return state.stage === "process" || state.stage === "result"
-        ? { stage: "connected", ...connectedPart(state) }
-        : state;
+      return leavable(state) ? { stage: "connected", ...connectedPart(state) } : state;
 
     case "set-value":
       return state.stage === "process"
@@ -417,6 +443,16 @@ export function workflowReducer(state: Workflow, action: WorkflowAction): Workfl
           }
         : state;
 
+    case "watch-job":
+      return state.stage === "process"
+        ? {
+            stage: "running",
+            ...openPart(state),
+            run: { mode: "async", jobRef: action.jobRef, watched: true },
+            runId: action.runId,
+          }
+        : state;
+
     case "job-started":
       // A synchronous request the server answered with a job becomes an
       // asynchronous run: the server decides, and the screen follows.
@@ -437,6 +473,7 @@ export function workflowReducer(state: Workflow, action: WorkflowAction): Workfl
             runId: state.runId,
             results: action.results,
             jobRef: state.run.mode === "async" ? state.run.jobRef : undefined,
+            watched: state.run.mode === "async" ? state.run.watched : undefined,
           }
         : state;
 

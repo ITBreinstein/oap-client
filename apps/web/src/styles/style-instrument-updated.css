@@ -23,7 +23,12 @@
  * `ComplexField`; `CopyButton` in `ResultsView`); the request log is in the developer
  * section (`ProcessScreen`, `App.tsx`); My jobs has `structured` rows and
  * "Run again" (`JobsPanel.tsx`, `JobFacts`; the inputs, kept in memory for
- * the visit, in `App.tsx`). Keep each branch, or delete it.
+ * the visit, in `App.tsx`); a background job shows its link and can be left
+ * for another process, and My jobs shows a job here (`ProcessScreen`,
+ * `JobsPanel`, `App.tsx` `followJob`); the server's error is beside Run and
+ * "Choose another process" only at the top (`ProcessScreen`); "Change the
+ * inputs" brings drawing back (`App.tsx`, `run`). Keep each branch, or
+ * delete it.
  */
 
 /* ------------------------------------------------- the rail, easier to read */
@@ -341,6 +346,59 @@
 }
 
 /* ------------------------------------------------- the process page */
+
+/*
+ * Beside the map: the way back to the list at the top, as on a page of its
+ * own (Instrument leaves it to the rail), and the Run bar straight after the
+ * inputs, not at the sheet's foot. It still stays in view while a long form
+ * scrolls.
+ */
+@media (min-width: 52rem) {
+  [data-variant="updated"] .layout:not(.layout-single) .process-screen > .breadcrumb {
+    display: block;
+    margin: 16px 22px 0;
+  }
+
+  [data-variant="updated"] .layout:not(.layout-single) .process-screen > .process-path {
+    margin-top: 12px;
+  }
+
+  [data-variant="updated"] .layout:not(.layout-single) .run-bar {
+    margin-top: 0;
+  }
+
+  [data-variant="updated"] .layout:not(.layout-single) .form-body,
+  [data-variant="updated"] .layout:not(.layout-single) .form-body > .field:last-child {
+    margin-bottom: 0;
+  }
+}
+
+/* The server's answer to Run, just above it: scrolled to clear of the Run bar. */
+[data-variant="updated"] .server-error {
+  scroll-margin-bottom: 120px;
+}
+
+[data-variant="updated"] .server-error > :last-child {
+  margin-bottom: 0;
+}
+
+/* A background job's link, to copy or open later; then the way on. */
+[data-variant="updated"] .job-link {
+  margin: 12px 0;
+}
+
+[data-variant="updated"] .job-link p {
+  margin: 0 0 6px;
+}
+
+[data-variant="updated"] .job-link input {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+
+[data-variant="updated"] .sent-unknown {
+  margin: 16px 0 0;
+}
 
 /* "About this process": a box that opens, as the developer section is. */
 [data-variant="updated"] details.about {

@@ -11,6 +11,8 @@ import type { SessionObservation } from "../observations.js";
 import type { JobRow } from "../relay/job-session.js";
 import type { RenderableResult } from "../results/renderable.js";
 import { CONFIRM_WINDOW_MS } from "../relay/reconciler.js";
+import { linkTo, placeOf } from "./address.js";
+import { CopyField } from "./CopyButton.js";
 import { ErrorMessage } from "./ErrorMessage.js";
 import { lastExecution, requestLog } from "./request-log.js";
 import { FieldView } from "./FormFields.js";
@@ -455,6 +457,16 @@ export function ProcessScreen(props: ProcessScreenProps) {
       )
       ?.focus();
   }, [fieldErrors]);
+  // STYLE TRIAL: in the updated Instrument the server's answer is beside Run,
+  // and is scrolled into view when it comes, clear of the Run bar.
+  const serverErrorBox = useRef<HTMLDivElement>(null);
+  const shownError = state.stage === "process" ? state.error : undefined;
+  useEffect(() => {
+    if (shownError === undefined) return;
+    const box = serverErrorBox.current;
+    // Not in every DOM: jsdom, for one, has no scrolling.
+    if (box !== null && "scrollIntoView" in box) box.scrollIntoView({ block: "nearest" });
+  }, [shownError]);
   // A Run that went ahead leaves nothing to focus later.
   useEffect(() => {
     submitted.current = false;
@@ -469,16 +481,29 @@ export function ProcessScreen(props: ProcessScreenProps) {
   const observations = props.observations ?? [];
   const endpointKey = redactUrl(state.endpoint.baseUrl);
   const updated = useUpdated();
+  // STYLE TRIAL: in the updated Instrument a background job with a link can be
+  // left for another process; its link is on screen, and it goes on in My jobs.
+  const place = placeOf(state);
+  const jobLink = place.job === undefined ? undefined : linkTo(place);
+  const leavable = state.stage !== "running" || (updated && jobLink !== undefined);
+  const watched =
+    (state.stage === "running" && state.run.mode === "async" && state.run.watched === true) ||
+    (state.stage === "result" && state.watched === true);
+  // The server's answer to the last Run: beside the Run button in the updated
+  // Instrument, below the form in Instrument as it is.
+  const serverError = state.stage === "process" && (
+    <>
+      <ErrorMessage error={state.error} tone={state.error?.notice === true ? "notice" : "error"} />
+      {state.error?.inputId !== undefined && (
+        <p className="hint">The server’s message names the input “{state.error.inputId}”.</p>
+      )}
+    </>
+  );
 
   return (
     <section className="process-screen" aria-labelledby={`${base}-heading`}>
       <p className="breadcrumb">
-        <button
-          type="button"
-          className="link"
-          onClick={commands.backToList}
-          disabled={state.stage === "running"}
-        >
+        <button type="button" className="link" onClick={commands.backToList} disabled={!leavable}>
           <span aria-hidden="true">← </span>All processes
         </button>
       </p>
@@ -537,8 +562,32 @@ export function ProcessScreen(props: ProcessScreenProps) {
               <p>
                 <JobStatusLine job={job} />
               </p>
+              {updated && jobLink !== undefined && (
+                <div className="job-link">
+                  <p>
+                    The job runs on the service, whether this page is open or not. Its link shows
+                    its progress, then its results, wherever you open it:
+                  </p>
+                  <CopyField text={jobLink} name="Copy the job’s link">
+                    <input
+                      type="text"
+                      readOnly
+                      value={jobLink}
+                      aria-label="The job’s link"
+                      onFocus={(event) => {
+                        event.currentTarget.select();
+                      }}
+                    />
+                  </CopyField>
+                </div>
+              )}
               {state.run.jobRef !== undefined && (
                 <p className="actions">
+                  {updated && jobLink !== undefined && (
+                    <button type="button" onClick={commands.backToList}>
+                      Start another process
+                    </button>
+                  )}
                   <button type="button" className="secondary" onClick={commands.cancelJob}>
                     Cancel job
                   </button>
@@ -589,16 +638,24 @@ export function ProcessScreen(props: ProcessScreenProps) {
           <button type="button" onClick={commands.edit}>
             Change the inputs
           </button>
-          <button type="button" className="secondary" onClick={commands.backToList}>
-            Choose another process
-          </button>
+          {/* STYLE TRIAL: the updated Instrument has the way back at the top only. */}
+          {!updated && (
+            <button type="button" className="secondary" onClick={commands.backToList}>
+              Choose another process
+            </button>
+          )}
         </p>
       )}
 
       {/* While a run is under way and after it, the status or result comes
           first, and below it the record of what was sent, as text, under its
           own heading. "Change the inputs" brings the form back. */}
-      {!editable && (
+      {!editable && watched && (
+        <p className="muted sent-unknown">
+          This page didn’t start this job, so it doesn’t know its inputs.
+        </p>
+      )}
+      {!editable && !watched && (
         <SentInputs
           headingId={`${base}-sent`}
           plan={plan}
@@ -640,6 +697,12 @@ export function ProcessScreen(props: ProcessScreenProps) {
             </p>
           )}
 
+          {updated && shownError !== undefined && (
+            <div className="server-error" ref={serverErrorBox}>
+              {serverError}
+            </div>
+          )}
+
           <div className="run-bar">
             {both && (
               <label className="choice">
@@ -664,15 +727,7 @@ export function ProcessScreen(props: ProcessScreenProps) {
         </form>
       )}
 
-      {state.stage === "process" && (
-        <ErrorMessage
-          error={state.error}
-          tone={state.error?.notice === true ? "notice" : "error"}
-        />
-      )}
-      {state.stage === "process" && state.error?.inputId !== undefined && (
-        <p className="hint">The server’s message names the input “{state.error.inputId}”.</p>
-      )}
+      {!updated && serverError}
       {/* STYLE TRIAL: the updated Instrument has it in the developer section instead (App.tsx). */}
       {!updated && <RequestLog entries={observations} endpoint={endpointKey} />}
     </section>

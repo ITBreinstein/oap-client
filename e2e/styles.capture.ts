@@ -134,7 +134,7 @@ test.describe("styles", () => {
       await page.getByRole("button", { name: "Change the inputs" }).waitFor();
       await shot(page, `${tag}-4-hello-result`);
 
-      await page.getByRole("button", { name: "Choose another process" }).click();
+      await page.getByRole("button", { name: "All processes" }).click();
       await page.getByRole("button", { name: "Buildings in an area", exact: true }).click();
       await page.locator(".map-pane canvas").waitFor();
       await page.waitForTimeout(2000);

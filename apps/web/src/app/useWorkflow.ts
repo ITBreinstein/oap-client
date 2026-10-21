@@ -90,6 +90,11 @@ export interface WorkflowCommands {
   /** Task 8, T2: ask for one output as a value (as the server prefers) or a link. */
   readonly setTransmission: (outputId: string, transmission: "value" | "reference") => void;
   readonly run: () => void;
+  /**
+   * Follow a job already on the server, from the open process: the job a
+   * link names, or one in My jobs. Its status, then its results, as a run's.
+   */
+  readonly watchJob: (statusUrl: string) => void;
   readonly cancelJob: () => void;
   readonly edit: () => void;
   /**
@@ -668,6 +673,28 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
     })();
   };
 
+  const watchJob = (statusUrl: string) => {
+    const connection = client.current;
+    const active = session.current;
+    if (state.stage !== "process" || connection === undefined || active === undefined) return;
+    const { process, linkOutputs } = state;
+    const runId = newRunId();
+    lastRun.current = {
+      runId,
+      endpoint: connection.endpoint.baseUrl,
+      processId: process.id,
+      declaredTransmission: process.outputTransmission,
+      linkOutputs,
+    };
+    setFieldErrors(NO_ERRORS);
+    setJobNotice(undefined);
+    // A job My jobs already follows keeps its record (when it started, how).
+    if (snapshot?.jobs.some((row) => row.statusUrl === statusUrl) !== true) {
+      active.track(relayEndpointFor(connection.endpoint), statusUrl, connection.reads, process.id);
+    }
+    dispatch({ type: "watch-job", runId, jobRef: statusUrl });
+  };
+
   // An asynchronous run ends when the reconciler says the job did: read its
   // results once it succeeded, or say why there are none.
   useEffect(() => {
@@ -967,6 +994,7 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
       dispatch({ type: "set-transmission", outputId, transmission });
     },
     run,
+    watchJob,
     cancelJob,
     edit: () => {
       dispatch({ type: "edit" });

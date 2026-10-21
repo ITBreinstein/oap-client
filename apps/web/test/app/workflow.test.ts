@@ -145,6 +145,43 @@ describe("workflowReducer: the legal path", () => {
     expect(failed).toMatchObject({ stage: "process", error: { title: "400" } });
   });
 
+  it("follows a job it did not start, from the open process, to its results", () => {
+    const watching = reduce(open, {
+      type: "watch-job",
+      runId: "run-9",
+      jobRef: "http://localhost:5080/jobs/9",
+    });
+    expect(watching).toMatchObject({
+      stage: "running",
+      runId: "run-9",
+      run: { mode: "async", jobRef: "http://localhost:5080/jobs/9", watched: true },
+    });
+    const done = reduce(watching, { type: "results", runId: "run-9", results: [] });
+    expect(done).toMatchObject({
+      stage: "result",
+      jobRef: "http://localhost:5080/jobs/9",
+      watched: true,
+    });
+    // Only from the open process.
+    expect(reduce(result, { type: "watch-job", runId: "x", jobRef: "j" })).toBe(result);
+  });
+
+  it("leaves a background job the server named, for the list or another process; never a run without one", () => {
+    const job = reduce(
+      open,
+      { type: "run-started", runId: "run-1", mode: "async" },
+      { type: "job-started", runId: "run-1", jobRef: "http://localhost:5080/jobs/1" },
+    );
+    expect(reduce(job, { type: "back-to-list" }).stage).toBe("connected");
+    expect(reduce(job, { type: "open-process", processId: "other" })).toMatchObject({
+      stage: "connected",
+      opening: "other",
+    });
+    expect(reduce(running, { type: "back-to-list" })).toBe(running);
+    const unnamed = reduce(open, { type: "run-started", runId: "run-2", mode: "async" });
+    expect(reduce(unnamed, { type: "back-to-list" })).toBe(unnamed);
+  });
+
   it("goes back to the list, and disconnects", () => {
     expect(reduce(open, { type: "back-to-list" }).stage).toBe("connected");
     expect(reduce(result, { type: "back-to-list" }).stage).toBe("connected");

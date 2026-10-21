@@ -160,6 +160,11 @@ export function EndpointScreen(props: EndpointScreenProps) {
                 , process <code>{linked.process}</code>
               </>
             )}
+            {linked?.job !== undefined && (
+              <>
+                , and its job <code>{linked.job}</code>
+              </>
+            )}
             . Nothing is sent to it until you press Connect.
           </p>
         )}
