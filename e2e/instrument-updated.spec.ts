@@ -622,3 +622,64 @@ test("instrument-updated: a refused Run's error is in view and has the focus, in
     })
     .toBe(true);
 });
+
+for (const { style, updated } of VERSIONS) {
+  test(`${style}: the start screen ${updated ? "picks no service" : "picks the first service"} for you`, async ({
+    page,
+  }) => {
+    await open(page, style);
+    await expect(page.locator(".service-choices input[type=radio]:checked")).toHaveCount(
+      updated ? 0 : 1,
+    );
+    if (!updated) return;
+    await page.getByRole("button", { name: "Connect", exact: true }).click();
+    await expect(page.getByRole("alert")).toContainText("Choose a service from the list");
+    await expect(page.locator(".connect-target")).toHaveCount(0);
+    await page.getByRole("radio", { name: /Reference pygeoapi/ }).check();
+    await expect(page.locator(".connect-target")).toHaveText("Reference pygeoapi");
+  });
+}
+
+test("instrument-updated: beside the map, Developer stays at the foot with Run; About's words are centred in its box", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1432, height: 816 });
+  await open(page, "instrument-updated");
+  await connect(page);
+  await page.getByRole("button", { name: "Buildings in an area", exact: true }).click();
+  await page.locator(".map-pane canvas").waitFor();
+
+  const about = await page.locator("details.about").evaluate((box) => {
+    const style = getComputedStyle(box);
+    const inputs = document.querySelector(".form-body")?.getBoundingClientRect();
+    return {
+      even: style.paddingTop === style.paddingBottom,
+      left: Math.round(box.getBoundingClientRect().left - (inputs?.left ?? 0)),
+    };
+  });
+  expect(about).toEqual({ even: true, left: 0 });
+
+  const bars = () =>
+    page.evaluate(() => {
+      const panel = document.querySelector("main.panel")?.getBoundingClientRect();
+      const run = document.querySelector(".run-bar")?.getBoundingClientRect();
+      const developer = document.querySelector("main.panel > .developer")?.getBoundingClientRect();
+      if (panel === undefined || run === undefined || developer === undefined) return undefined;
+      return {
+        runOnDeveloper: Math.round(developer.top - run.bottom),
+        developerAtFoot: Math.round(panel.bottom - developer.bottom),
+        developerHeight: Math.round(developer.height),
+      };
+    });
+  await page.locator("main.panel").evaluate((panel) => {
+    panel.scrollTo(0, 120);
+  });
+  expect(await bars()).toEqual({ runOnDeveloper: 0, developerAtFoot: 0, developerHeight: 45 });
+
+  // Opened, it keeps its place and a fixed height, and scrolls within.
+  await page.locator("details.developer > summary").click();
+  const opened = await bars();
+  expect(opened?.runOnDeveloper).toBe(0);
+  expect(opened?.developerAtFoot).toBe(0);
+  expect(opened?.developerHeight).toBe(Math.round(816 * 0.4));
+});

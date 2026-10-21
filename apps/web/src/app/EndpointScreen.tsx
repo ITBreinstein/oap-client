@@ -84,8 +84,11 @@ export function EndpointScreen(props: EndpointScreenProps) {
       ? undefined
       : (configured.find((entry) => sameService(entry.baseUrl, linkedService))?.key ??
         (linkedIndex < 0 ? TYPED : presetKey(linkedIndex)));
-  const selected =
-    choice === undefined ? (linkedKey ?? keys[0] ?? TYPED) : keys.includes(choice) ? choice : TYPED;
+  // STYLE TRIAL: the updated Instrument picks nothing for the user: Connect
+  // goes where they chose, or to the address they typed.
+  const unpicked = updated ? (hasChoices ? undefined : TYPED) : (keys[0] ?? TYPED);
+  const selected: string | undefined =
+    choice === undefined ? (linkedKey ?? unpicked) : keys.includes(choice) ? choice : TYPED;
 
   // What Connect will open, said next to the button when there is a choice.
   const selectedEntry = configured.find((entry) => entry.key === selected);
@@ -106,7 +109,11 @@ export function EndpointScreen(props: EndpointScreenProps) {
     }
     const typed = typedEndpoint(selectedPreset?.url ?? address);
     if (typed === undefined) {
-      setAddressError("Enter the full address of a service, starting with http:// or https://.");
+      setAddressError(
+        selected === undefined && address.trim() === ""
+          ? "Choose a service from the list, or enter the full address of one, starting with http:// or https://."
+          : "Enter the full address of a service, starting with http:// or https://.",
+      );
       // Back to the field, so the error is read with it and can be put right there.
       addressField.current?.focus();
       return;
@@ -190,10 +197,12 @@ export function EndpointScreen(props: EndpointScreenProps) {
           {hasChoices && (
             <fieldset className="service-choices">
               <legend>Known services</legend>
-              {/* Which one Connect opens, said where the choice is made. */}
-              <p className="muted connect-line">
-                Connect opens <strong className="connect-target">{target}</strong>
-              </p>
+              {/* Which one Connect opens, said where the choice is made: once there is one. */}
+              {(selected !== undefined || address.trim() !== "") && (
+                <p className="muted connect-line">
+                  Connect opens <strong className="connect-target">{target}</strong>
+                </p>
+              )}
               {configured.map((entry) => (
                 <label key={entry.key} className="choice choice-card">
                   <input

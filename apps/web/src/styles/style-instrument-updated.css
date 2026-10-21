@@ -365,6 +365,46 @@
 
   [data-variant="updated"] .layout:not(.layout-single) .run-bar {
     margin-top: 0;
+    /* Just above the Developer bar, which holds the sheet's foot. */
+    bottom: var(--developer-bar);
+  }
+
+  /*
+   * The Developer section stays at the sheet's foot with Run, as one bar.
+   * Opened, it keeps a fixed height and scrolls within, so it stays in the
+   * bar rather than move to the end of the sheet.
+   */
+  [data-variant="updated"] .layout:not(.layout-single) .panel:has(> .process-screen) {
+    --developer-bar: 45px;
+  }
+
+  [data-variant="updated"]
+    .layout:not(.layout-single)
+    .panel:has(> .process-screen):has(> .developer[open]) {
+    --developer-bar: 40vh;
+  }
+
+  [data-variant="updated"] .layout:not(.layout-single) .panel:has(> .process-screen) > .developer {
+    position: sticky;
+    z-index: 3;
+    bottom: 0;
+    /* Its height, never less: the panel is a column that shrinks what scrolls. */
+    flex: none;
+    height: var(--developer-bar);
+    margin: auto 0 0;
+    padding: 10px 22px;
+    overflow: auto;
+    overscroll-behavior: contain;
+    line-height: 24px;
+    background: var(--surface-2);
+    border-top: 1px solid var(--line);
+  }
+
+  /* "About this process" as wide as the rest of the sheet, its words centred in it. */
+  [data-variant="updated"] .layout:not(.layout-single) .process-screen > details.about {
+    margin: 12px 22px 0;
+    padding: 12px 16px;
+    border: 1px solid var(--line);
   }
 
   [data-variant="updated"] .layout:not(.layout-single) .form-body,
@@ -373,9 +413,12 @@
   }
 }
 
-/* The server's answer to Run, just above it: scrolled to clear of the Run bar. */
+/*
+ * The server's answer to Run, just above it: scrolled to clear of the Run
+ * bar, and of the Developer bar under it beside the map.
+ */
 [data-variant="updated"] .server-error {
-  scroll-margin-bottom: 120px;
+  scroll-margin-bottom: calc(120px + var(--developer-bar, 0px));
 }
 
 [data-variant="updated"] .server-error > :last-child {
