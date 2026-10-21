@@ -47,6 +47,16 @@ describe("About", () => {
     );
   });
 
+  it("says who made it, and names the npm package under this version, linked", () => {
+    const container = render(<AboutPanel />);
+    expect(container.textContent).toContain("Made by Munib Özdemir.");
+    const version = container.querySelector('[aria-labelledby="about-version"]');
+    const npm = [...(version?.querySelectorAll("a") ?? [])].find(
+      (a) => a.textContent === "@breinstein/oap-client",
+    );
+    expect(npm?.getAttribute("href")).toBe("https://www.npmjs.com/package/@breinstein/oap-client");
+  });
+
   it("names the logo, and links the standard and the source", () => {
     const container = render(<AboutPanel />);
     expect(container.querySelector('svg[role="img"] title')?.textContent).toBe(

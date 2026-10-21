@@ -13,6 +13,8 @@ import { FullLogo } from "./BrandMark.js";
 
 const REPOSITORY = "https://github.com/ITBreinstein/oap-client";
 const STANDARD = "https://docs.ogc.org/is/18-062r2/18-062r2.html";
+const PACKAGE = "@breinstein/oap-client";
+const NPM = `https://www.npmjs.com/package/${PACKAGE}`;
 
 /** This build's version, then the core's: testers need to know both. */
 export function versionLine(app: string, core: string): string {
@@ -29,7 +31,7 @@ export function AboutPanel() {
           fill in the forms built from its process descriptions, and see the results, on a map when
           they have a place.
         </p>
-        <p>Made by Breinstein.</p>
+        <p>Made by Munib Özdemir.</p>
       </section>
 
       <section className="about-section" aria-labelledby="about-version">
@@ -44,6 +46,10 @@ export function AboutPanel() {
           <dt>Standard</dt>
           <dd>
             <a href={STANDARD}>OGC API – Processes, Part 1: Core 1.0</a>
+          </dd>
+          <dt>npm package</dt>
+          <dd>
+            <a href={NPM}>{PACKAGE}</a>
           </dd>
           <dt>Source code</dt>
           <dd>
