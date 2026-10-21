@@ -60,7 +60,9 @@ export function SentInputs(props: SentInputsProps) {
   const sent = plan.fields.filter((field) => wasSent(field, valueOf(field.id)));
   const outputs = outputsLine(process, linkOutputs, developer);
   const notSent = notSentLine(plan, values);
-  // STYLE TRIAL: the updated Instrument offers the inputs sent, as JSON, to copy.
+  // STYLE TRIAL: the updated Instrument offers the inputs sent to copy, as an
+  // execute request (`{"inputs": …}`) that can be sent again as it is: the
+  // inputs alone are not one, and a server reads them as no inputs at all.
   const updated = useUpdated();
 
   return (
@@ -72,7 +74,7 @@ export function SentInputs(props: SentInputsProps) {
         {updated && sent.length > 0 && (
           <CopyButton
             name="Copy inputs"
-            text={() => JSON.stringify(toExecuteBody(plan, values).inputs, null, "\t")}
+            text={() => JSON.stringify({ inputs: toExecuteBody(plan, values).inputs }, null, "\t")}
           />
         )}
       </div>

@@ -170,7 +170,15 @@ for (const { style, updated } of VERSIONS) {
       await expect(page.getByRole("status").filter({ hasText: "Copied" })).toBeVisible();
       expect(await clipboard()).toBe('{\n\t"id": "echo",\n\t"value": "Hello Geonovum!"\n}');
       await copyInputs.click();
-      await expect.poll(clipboard).toBe('{\n\t"name": "Geonovum"\n}');
+      const request = '{\n\t"inputs": {\n\t\t"name": "Geonovum"\n\t}\n}';
+      await expect.poll(clipboard).toBe(request);
+      // What was copied is an execute request: sent as it is, the service runs it.
+      const again = await page.request.post(`${PYGEOAPI}/processes/hello-world/execution`, {
+        headers: { "content-type": "application/json" },
+        data: await clipboard(),
+      });
+      expect(again.status()).toBe(200);
+      expect(await again.json()).toEqual({ id: "echo", value: "Hello Geonovum!" });
     });
   });
 }
