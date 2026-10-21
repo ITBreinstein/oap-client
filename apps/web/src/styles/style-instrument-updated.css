@@ -19,7 +19,8 @@
  * address (`EndpointScreen.tsx`); JSON is laid out with tabs
  * (`app/json-text.ts`, in `FormFields`, `GeometryField`, `ComplexField`,
  * `MapPane`, `ResultsView`); inputs and outputs have Copy (`CopyButton.tsx`,
- * in `SentInputs`, `ResultsView`); the request log is in the developer
+ * in `SentInputs`, `ResultsView`; each input as its field shows it,
+ * `field-text.ts`); the request log is in the developer
  * section (`ProcessScreen`, `App.tsx`); My jobs has `structured` rows and
  * "Run again" (`JobsPanel.tsx`, `JobFacts`; the inputs, kept in memory for
  * the visit, in `App.tsx`). Keep each branch, or delete it.
@@ -454,6 +455,43 @@
 
 [data-variant="updated"] .sent-row dt {
   padding-top: 0;
+}
+
+/*
+ * Each input's Copy at the end of its row, where it has one: a third column,
+ * which a row without one gives to its value.
+ */
+[data-variant="updated"] .sent-list:has(.sent-copy) {
+  grid-template-columns: fit-content(40%) minmax(0, 1fr) auto;
+}
+
+[data-variant="updated"] .sent-list:has(.sent-copy) .sent-row > dd {
+  grid-column: 2 / -1;
+}
+
+[data-variant="updated"] .sent-list .sent-row:has(> .sent-copy) > dd {
+  grid-column: 2;
+}
+
+[data-variant="updated"] .sent-copy {
+  align-self: center;
+  margin-block: -6px;
+}
+
+/* Narrow: the label over its value, and Copy beside the value. */
+@media (max-width: 40rem) {
+  [data-variant="updated"] .sent-list:has(.sent-copy) {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  [data-variant="updated"] .sent-list:has(.sent-copy) .sent-row > dt,
+  [data-variant="updated"] .sent-list:has(.sent-copy) .sent-row > dd {
+    grid-column: 1 / -1;
+  }
+
+  [data-variant="updated"] .sent-list .sent-row:has(> .sent-copy) > dd {
+    grid-column: 1;
+  }
 }
 
 /*

@@ -9,11 +9,12 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { FieldView } from "../../src/app/FormFields.js";
 import { ResultsView } from "../../src/app/ResultsView.js";
+import { SentInputs } from "../../src/app/SentInputs.js";
 import { UpdatedContext } from "../../src/app/variant.js";
 import { JobsPanel } from "../../src/jobs/JobsPanel.js";
 import type { JobRow } from "../../src/relay/job-session.js";
 import type { RenderableResult } from "../../src/results/renderable.js";
-import { planFor } from "../forms/helpers.js";
+import { describeProcess, planFor } from "../forms/helpers.js";
 import { status } from "../relay/harness.js";
 
 let root: Root | undefined;
@@ -238,5 +239,68 @@ describe("Copy on a result, in the updated Instrument", () => {
       );
     });
     expect(copy?.hasAttribute("data-tip-hidden")).toBe(false);
+  });
+});
+
+describe("Copy in Inputs you sent, in the updated Instrument", () => {
+  const inputs = {
+    area: { title: "Area", schema: { format: "geojson-geometry" } },
+    flag: { title: "Flag", schema: { type: "boolean" } },
+  };
+  const POLYGON = '{\n\t"type": "Point",\n\t"coordinates": [4.3, 52.1]\n}';
+
+  it("copies each input as its field shows it, and the whole request as sent", async () => {
+    const copied: string[] = [];
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: (text: string) => {
+          copied.push(text);
+          return Promise.resolve();
+        },
+      },
+    });
+    const view = render(
+      <UpdatedContext value>
+        <SentInputs
+          headingId="sent"
+          plan={planFor(inputs)}
+          values={{ area: { geojson: POLYGON }, flag: true }}
+          process={describeProcess(inputs)}
+          linkOutputs={[]}
+          developer={false}
+          done
+          onMap={() => false}
+        />
+      </UpdatedContext>,
+    );
+    const button = (name: string) =>
+      view.querySelector<HTMLButtonElement>(`.copy-button[aria-label="${name}"]`);
+    // A yes/no has no text to paste back.
+    expect(
+      [...view.querySelectorAll(".copy-button")].map((copy) => copy.getAttribute("aria-label")),
+    ).toEqual(["Copy request", "Copy Area"]);
+
+    await act(async () => {
+      button("Copy Area")?.click();
+      await Promise.resolve();
+    });
+    expect(copied.at(-1)).toBe(POLYGON);
+
+    await act(async () => {
+      button("Copy request")?.click();
+      await Promise.resolve();
+    });
+    const request = JSON.parse(copied.at(-1) ?? "") as unknown;
+    expect(request).toEqual({
+      inputs: {
+        area: {
+          value: { type: "Point", coordinates: [4.3, 52.1] },
+          mediaType: "application/geo+json",
+        },
+        flag: true,
+      },
+    });
+    Reflect.deleteProperty(navigator, "clipboard");
   });
 });

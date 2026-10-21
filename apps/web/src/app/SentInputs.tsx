@@ -15,6 +15,7 @@ import type { FormValues } from "../forms/encode.js";
 import type { FormPlan } from "../forms/plan.js";
 import { toExecuteBody } from "../forms/encode.js";
 import { CopyButton } from "./CopyButton.js";
+import { fieldText } from "./field-text.js";
 import { notSentLine, outputsLine, summarise, wasSent, type Summary } from "./sent-inputs.js";
 import { useUpdated } from "./variant.js";
 
@@ -60,9 +61,9 @@ export function SentInputs(props: SentInputsProps) {
   const sent = plan.fields.filter((field) => wasSent(field, valueOf(field.id)));
   const outputs = outputsLine(process, linkOutputs, developer);
   const notSent = notSentLine(plan, values);
-  // STYLE TRIAL: the updated Instrument offers the inputs sent to copy, as an
-  // execute request (`{"inputs": …}`) that can be sent again as it is: the
-  // inputs alone are not one, and a server reads them as no inputs at all.
+  // STYLE TRIAL: the updated Instrument offers each input to copy as its
+  // field shows it, to paste back (`field-text.ts`), and the whole request
+  // (`{"inputs": …}`, as sent) to send again elsewhere as it is.
   const updated = useUpdated();
 
   return (
@@ -73,7 +74,7 @@ export function SentInputs(props: SentInputsProps) {
         </h3>
         {updated && sent.length > 0 && (
           <CopyButton
-            name="Copy inputs"
+            name="Copy request"
             text={() => JSON.stringify({ inputs: toExecuteBody(plan, values).inputs }, null, "\t")}
           />
         )}
@@ -86,6 +87,7 @@ export function SentInputs(props: SentInputsProps) {
         <dl className="sent-list">
           {sent.map((field) => {
             const value = valueOf(field.id);
+            const text = updated ? fieldText(field.control, value) : undefined;
             return (
               <div key={field.id} className="sent-row" data-input-id={field.id}>
                 <dt>{field.title}</dt>
@@ -94,6 +96,11 @@ export function SentInputs(props: SentInputsProps) {
                     summary={summarise(field, value, { onMap: onMap(field.id, value), done })}
                   />
                 </dd>
+                {text !== undefined && (
+                  <span className="sent-copy">
+                    <CopyButton name={`Copy ${field.title}`} text={() => text} />
+                  </span>
+                )}
               </div>
             );
           })}

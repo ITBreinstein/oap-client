@@ -159,10 +159,12 @@ for (const { style, updated } of VERSIONS) {
       await page.getByRole("button", { name: "Run", exact: true }).click();
       await page.getByRole("button", { name: "Change the inputs" }).waitFor();
       const copyOutput = page.getByRole("button", { name: "Copy result", exact: true });
-      const copyInputs = page.getByRole("button", { name: "Copy inputs", exact: true });
+      const copyInputs = page.getByRole("button", { name: "Copy request", exact: true });
+      const copyName = page.getByRole("button", { name: "Copy Name", exact: true });
       if (!updated) {
         await expect(copyOutput).toHaveCount(0);
         await expect(copyInputs).toHaveCount(0);
+        await expect(copyName).toHaveCount(0);
         return;
       }
       const clipboard = () => page.evaluate(() => navigator.clipboard.readText());
@@ -179,6 +181,15 @@ for (const { style, updated } of VERSIONS) {
       });
       expect(again.status()).toBe(200);
       expect(await again.json()).toEqual({ id: "echo", value: "Hello Geonovum!" });
+      // One input as its field shows it: pasted back into the field, the same value.
+      await copyName.click();
+      await expect.poll(clipboard).toBe("Geonovum");
+      await page.getByRole("button", { name: "Change the inputs" }).click();
+      const field = page.getByRole("textbox", { name: /Name/ });
+      await field.fill("");
+      await field.focus();
+      await page.keyboard.press("ControlOrMeta+V");
+      await expect(field).toHaveValue("Geonovum");
     });
   });
 }
@@ -280,7 +291,7 @@ test("instrument-updated: About as a box like Developer, the way back a button, 
     return [outer.width, outer.height, face?.width, face?.height];
   });
   expect(sizes).toEqual([44, 44, 32, 32]);
-  for (const name of ["Copy result", "Copy inputs"]) {
+  for (const name of ["Copy result", "Copy request", "Copy Name"]) {
     const button = page.getByRole("button", { name, exact: true });
     expect((await button.boundingBox())?.height).toBeGreaterThanOrEqual(44);
     // The tooltip says the name, on hover and on keyboard focus; Escape hides it.
