@@ -48,7 +48,11 @@ function fakeMap({ loaded }: { loaded: boolean }) {
     },
     /** A click at a pixel, as MapLibre fires it. */
     click(x: number, y: number) {
-      for (const handler of handlers.filter((entry) => entry.event === "click")) {
+      map.fire("click", x, y);
+    },
+    /** Any pointer event at a pixel. */
+    fire(event: string, x: number, y: number) {
+      for (const handler of handlers.filter((entry) => entry.event === event)) {
         handler.listener({ point: { x, y } });
       }
     },
@@ -194,6 +198,52 @@ describe("clicking a result", () => {
     expect(map.handlers.length).toBeGreaterThan(0);
     layers.stop();
     expect(map.handlers).toEqual([]);
+  });
+});
+
+describe("the pointer over a result", () => {
+  function hovered() {
+    const map = fakeMap({ loaded: true });
+    const layers = createMapLibreShapeLayers(map as never);
+    layers.onResultClick(() => undefined);
+    return { map, layers };
+  }
+
+  it("is the pointing hand wherever a click would show a result, the open hand elsewhere", () => {
+    const { map } = hovered();
+    map.rendered.push({ properties: { role: "result", index: 0 } });
+    map.fire("mousemove", 100, 50);
+    expect(map.canvas.style.cursor).toBe("pointer");
+    map.rendered.splice(0);
+    map.fire("mousemove", 10, 10);
+    expect(map.canvas.style.cursor).toBe("");
+  });
+
+  it("stays the pointing hand moving from a shape's outline onto its fill", () => {
+    const { map } = hovered();
+    // The outline, then the fill: two layers, one shape.
+    map.rendered.push({ properties: { role: "result", index: 0 } });
+    map.fire("mousemove", 100, 50);
+    map.rendered.splice(0, 1, { properties: { role: "result", index: 0 } });
+    map.fire("mousemove", 104, 50);
+    expect(map.canvas.style.cursor).toBe("pointer");
+  });
+
+  it("is the open hand again when the pointer leaves the map, or the layers stop", () => {
+    const { map, layers } = hovered();
+    map.rendered.push({ properties: { role: "result", index: 0 } });
+    map.fire("mousemove", 100, 50);
+    map.fire("mouseout", 0, 0);
+    expect(map.canvas.style.cursor).toBe("");
+    map.fire("mousemove", 100, 50);
+    layers.stop();
+    expect(map.canvas.style.cursor).toBe("");
+  });
+
+  it("is never the pointing hand over an input, which a click does not show", () => {
+    const { map } = hovered();
+    map.fire("mousemove", 100, 50);
+    expect(map.canvas.style.cursor).toBe("");
   });
 });
 

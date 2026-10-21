@@ -159,24 +159,38 @@ export const createMapLibreShapeLayers: CreateShapeLayers = (map) => {
   let ready: (() => void) | undefined;
   let clicked: ((index: number) => void) | undefined;
 
+  /** The result shape a click at `point` would show, if any. */
+  const shapeAt = ({ x, y }: { x: number; y: number }) =>
+    clickedIndex(
+      map.queryRenderedFeatures(
+        [
+          [x - CLICK_TOLERANCE, y - CLICK_TOLERANCE],
+          [x + CLICK_TOLERANCE, y + CLICK_TOLERANCE],
+        ],
+        { layers: RESULT_LAYERS },
+      ),
+    );
   const onClick = (event: MapMouseEvent) => {
     if (!added || clicked === undefined) return;
-    const { x, y } = event.point;
-    const hits = map.queryRenderedFeatures(
-      [
-        [x - CLICK_TOLERANCE, y - CLICK_TOLERANCE],
-        [x + CLICK_TOLERANCE, y + CLICK_TOLERANCE],
-      ],
-      { layers: RESULT_LAYERS },
-    );
-    const index = clickedIndex(hits);
+    const index = shapeAt(event.point);
     if (index !== undefined) clicked(index);
   };
-  const pointer = () => {
-    map.getCanvas().style.cursor = "pointer";
+  // The pointing hand over what a click would show, the open hand elsewhere,
+  // decided by the click's own query so the two always agree. Entering and
+  // leaving each layer did not: leaving a shape's outline for its own fill
+  // gave the open hand back while still over the shape, and the click's
+  // tolerance reached past where the pointer showed.
+  let over = false;
+  const showOver = (next: boolean) => {
+    if (next === over) return;
+    over = next;
+    map.getCanvas().style.cursor = next ? "pointer" : "";
   };
-  const plain = () => {
-    map.getCanvas().style.cursor = "";
+  const onMove = (event: MapMouseEvent) => {
+    showOver(added && clicked !== undefined && shapeAt(event.point) !== undefined);
+  };
+  const onOut = () => {
+    showOver(false);
   };
 
   const add = () => {
@@ -198,10 +212,8 @@ export const createMapLibreShapeLayers: CreateShapeLayers = (map) => {
     added = true;
     placeImage();
     map.on("click", onClick);
-    for (const layer of RESULT_LAYERS) {
-      map.on("mouseenter", layer, pointer);
-      map.on("mouseleave", layer, plain);
-    }
+    map.on("mousemove", onMove);
+    map.on("mouseout", onOut);
     ready?.();
   };
 
@@ -264,10 +276,9 @@ export const createMapLibreShapeLayers: CreateShapeLayers = (map) => {
       clicked = undefined;
       map.off("styledata", add);
       map.off("click", onClick);
-      for (const layer of RESULT_LAYERS) {
-        map.off("mouseenter", layer, pointer);
-        map.off("mouseleave", layer, plain);
-      }
+      map.off("mousemove", onMove);
+      map.off("mouseout", onOut);
+      showOver(false);
       try {
         removeAll();
       } catch {
