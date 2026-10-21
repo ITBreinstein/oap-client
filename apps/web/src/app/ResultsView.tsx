@@ -87,16 +87,20 @@ function ResultItem({
   result,
   processId,
   placed,
+  several,
 }: {
   readonly result: ValueResult;
   readonly processId: string;
   readonly placed: MapImage | undefined;
+  /** More than one result: each one's Copy names its output. */
+  readonly several: boolean;
 }) {
   const [blob] = useState(() => blobOf(result));
   const filename = filenameOf(result, processId);
   const { maxCoordinates } = useContext(MapLimitsContext);
   // STYLE TRIAL: the updated Instrument lays JSON out with tabs, and offers Copy.
   const updated = useUpdated();
+  const copyName = several ? `Copy ${result.outputId}` : "Copy result";
   const status = plotStatus(result, maxCoordinates);
   const plot = status.kind;
   const imageOnMap = placed?.outputId === result.outputId;
@@ -136,10 +140,7 @@ function ResultItem({
           {updated ? (
             <div className="code-box">
               <pre className="code">{JSON.stringify(result.value, null, "\t")}</pre>
-              <CopyButton
-                name={`Copy ${result.outputId}`}
-                text={() => JSON.stringify(result.value, null, "\t")}
-              />
+              <CopyButton name={copyName} text={() => JSON.stringify(result.value, null, "\t")} />
             </div>
           ) : (
             <pre className="code">{JSON.stringify(result.value, null, 2)}</pre>
@@ -154,7 +155,7 @@ function ResultItem({
           {updated ? (
             <div className="code-box">
               <pre className="code">{result.value}</pre>
-              <CopyButton name={`Copy ${result.outputId}`} text={() => result.value} />
+              <CopyButton name={copyName} text={() => result.value} />
             </div>
           ) : (
             <pre className="code">{result.value}</pre>
@@ -423,6 +424,7 @@ export function ResultsView({
             result={result}
             processId={processId}
             placed={placed}
+            several={results.length > 1}
           />
         ),
       )}

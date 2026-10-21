@@ -1,16 +1,18 @@
 /**
  * STYLE TRIAL: what the updated Instrument does that Instrument doesn't,
  * where it is behaviour rather than a look: JSON laid out with tabs when a
- * field is left, and a job's facts one to a line.
+ * field is left, a job's facts one to a line, Run again, and Copy's names.
  */
 
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { FieldView } from "../../src/app/FormFields.js";
+import { ResultsView } from "../../src/app/ResultsView.js";
 import { UpdatedContext } from "../../src/app/variant.js";
 import { JobsPanel } from "../../src/jobs/JobsPanel.js";
 import type { JobRow } from "../../src/relay/job-session.js";
+import type { RenderableResult } from "../../src/results/renderable.js";
 import { planFor } from "../forms/helpers.js";
 import { status } from "../relay/harness.js";
 
@@ -188,5 +190,53 @@ describe("Run again in My jobs, in the updated Instrument", () => {
       ...panelWith(true, true).view.querySelectorAll<HTMLButtonElement>(".actions button"),
     ].find((candidate) => candidate.textContent === "Run again");
     expect(button?.disabled).toBe(true);
+  });
+});
+
+describe("Copy on a result, in the updated Instrument", () => {
+  const echo: RenderableResult = { kind: "json", outputId: "echo", value: { a: 1 } };
+  const note: RenderableResult = {
+    kind: "text",
+    outputId: "note",
+    value: "hello",
+    mediaType: "text/plain",
+  };
+
+  function copyButtons(results: readonly RenderableResult[]) {
+    const view = render(
+      <UpdatedContext value>
+        <ResultsView results={results} processId="p" onLoad={() => Promise.resolve()} />
+      </UpdatedContext>,
+    );
+    return [...view.querySelectorAll<HTMLButtonElement>(".copy-button")];
+  }
+
+  it("is named for the result when there is one, and for each output when there are several", () => {
+    expect(copyButtons([echo]).map((button) => button.getAttribute("aria-label"))).toEqual([
+      "Copy result",
+    ]);
+    expect(copyButtons([echo, note]).map((button) => button.getAttribute("aria-label"))).toEqual([
+      "Copy echo",
+      "Copy note",
+    ]);
+  });
+
+  it("has a tooltip in the same words, which Escape hides until the pointer comes back", () => {
+    const [button] = copyButtons([echo]);
+    const copy = button?.closest(".copy");
+    const tip = copy?.querySelector(".copy-tip");
+    expect(tip?.textContent).toBe("Copy result");
+    // The name says it to a screen reader already.
+    expect(tip?.getAttribute("aria-hidden")).toBe("true");
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    });
+    expect(copy?.hasAttribute("data-tip-hidden")).toBe(true);
+    act(() => {
+      copy?.dispatchEvent(
+        new MouseEvent("mouseover", { bubbles: true, relatedTarget: document.body }),
+      );
+    });
+    expect(copy?.hasAttribute("data-tip-hidden")).toBe(false);
   });
 });

@@ -158,8 +158,8 @@ for (const { style, updated } of VERSIONS) {
       await page.getByRole("textbox", { name: /Name/ }).fill("Geonovum");
       await page.getByRole("button", { name: "Run", exact: true }).click();
       await page.getByRole("button", { name: "Change the inputs" }).waitFor();
-      const copyOutput = page.getByRole("button", { name: "Copy echo" });
-      const copyInputs = page.getByRole("button", { name: /^Copy the inputs you sent/ });
+      const copyOutput = page.getByRole("button", { name: "Copy result", exact: true });
+      const copyInputs = page.getByRole("button", { name: "Copy inputs", exact: true });
       if (!updated) {
         await expect(copyOutput).toHaveCount(0);
         await expect(copyInputs).toHaveCount(0);
@@ -252,22 +252,46 @@ test("instrument-updated: About as a box like Developer, the way back a button, 
   const back = page.getByRole("button", { name: "All processes" });
   expect(await back.evaluate((button) => getComputedStyle(button).borderTopStyle)).toBe("solid");
 
+  // A short page: the credit in the corner, 12px from the window's edges.
   const credit = await page.locator(".backdrop-credit").evaluate((chip) => {
     const box = chip.getBoundingClientRect();
-    return {
-      position: getComputedStyle(chip).position,
-      right: innerWidth - box.right,
-      bottom: innerHeight - box.bottom,
-    };
+    return { right: innerWidth - box.right, bottom: innerHeight - box.bottom };
   });
-  expect(credit).toEqual({ position: "fixed", right: 12, bottom: 12 });
+  expect(credit).toEqual({ right: 12, bottom: 12 });
 
   await page.getByRole("textbox", { name: /Name/ }).fill("hello");
   await page.getByRole("button", { name: "Run", exact: true }).click();
-  const copy = page.locator(".code-box").getByRole("button", { name: "Copy echo" });
+  const copy = page.locator(".code-box").getByRole("button", { name: "Copy result", exact: true });
   await expect(copy).toBeVisible();
   await expect(copy).toHaveText("");
   await expect(copy.locator("svg")).toHaveCount(1);
+  // 44px square to press, with a smaller face.
+  const sizes = await copy.evaluate((button) => {
+    const outer = button.getBoundingClientRect();
+    const face = button.querySelector(".copy-face")?.getBoundingClientRect();
+    return [outer.width, outer.height, face?.width, face?.height];
+  });
+  expect(sizes).toEqual([44, 44, 32, 32]);
+  for (const name of ["Copy result", "Copy inputs"]) {
+    const button = page.getByRole("button", { name, exact: true });
+    expect((await button.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+    // The tooltip says the name, on hover and on keyboard focus; Escape hides it.
+    const tip = page.locator(".copy", { has: button }).locator(".copy-tip");
+    await expect(tip).toBeHidden();
+    await button.hover();
+    await expect(tip).toBeVisible();
+    await expect(tip).toHaveText(name);
+    await page.keyboard.press("Escape");
+    await expect(tip).toBeHidden();
+    await page.mouse.move(0, 0);
+    await button.focus();
+    await page.keyboard.press("Shift+Tab");
+    await page.keyboard.press("Tab");
+    await expect(button).toBeFocused();
+    await expect(tip).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(tip).toBeHidden();
+  }
 
   // Beside the map, the draw tools are filled, not the panel's own colour.
   await page.getByRole("banner").getByRole("button", { name: "Processes", exact: true }).click();
@@ -284,3 +308,134 @@ test("instrument-updated: About as a box like Developer, the way back a button, 
     expect(filled).toBe(true);
   }
 });
+
+/** Where `chip` meets anything drawn over it, or an empty list (4px in, clear of its rounded corners). */
+async function covering(page: Page, selector: string): Promise<string[]> {
+  return page.locator(selector).evaluate((chip) => {
+    const box = chip.getBoundingClientRect();
+    const over: string[] = [];
+    for (const x of [box.left + 4, box.left + box.width / 2, box.right - 4]) {
+      for (const y of [box.top + 4, box.top + box.height / 2, box.bottom - 4]) {
+        const top = document.elementFromPoint(x, y);
+        if (top !== null && !chip.contains(top)) over.push(top.outerHTML.slice(0, 80));
+      }
+    }
+    return over;
+  });
+}
+
+/** Contrast of the credit's words on its wash, over pure white and over pure black. */
+async function creditContrast(page: Page): Promise<number[]> {
+  return page.locator(".backdrop-credit").evaluate((chip) => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 1;
+    canvas.height = 1;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (ctx === null) throw new Error("no canvas");
+    const paint = (...layers: string[]) => {
+      ctx.clearRect(0, 0, 1, 1);
+      for (const fill of layers) {
+        ctx.fillStyle = fill;
+        ctx.fillRect(0, 0, 1, 1);
+      }
+      return [...ctx.getImageData(0, 0, 1, 1).data.slice(0, 3)];
+    };
+    const luminance = (rgb: number[]) => {
+      const [r = 0, g = 0, b = 0] = rgb.map((value) => {
+        const c = value / 255;
+        return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+      });
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    };
+    const ratio = (a: number[], b: number[]) => {
+      const [high, low] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+      return ((high ?? 0) + 0.05) / ((low ?? 0) + 0.05);
+    };
+    const style = getComputedStyle(chip);
+    const words = paint("#000", style.color);
+    return ["#fff", "#000"].map((picture) => ratio(words, paint(picture, style.backgroundColor)));
+  });
+}
+
+for (const size of [
+  { width: 1440, height: 960 },
+  { width: 1280, height: 720 },
+  // Narrow beside the rail: the column reaches the corner.
+  { width: 960, height: 640 },
+  // A phone: the rail a bar at the foot, the credit ending the page.
+  { width: 390, height: 844 },
+]) {
+  test(`instrument-updated at ${String(size.width)}×${String(size.height)}: the credit is never under anything`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(size);
+    await open(page, "instrument-updated");
+    const pages = [
+      { name: "the start screen", go: () => Promise.resolve() },
+      { name: "the process list", go: () => connect(page) },
+      {
+        name: "a process",
+        go: () => page.getByRole("button", { name: "Hello World", exact: true }).click(),
+      },
+      {
+        name: "a result",
+        go: async () => {
+          await page.getByRole("textbox", { name: /Name/ }).fill("hello");
+          await page.getByRole("button", { name: "Run", exact: true }).click();
+          await page.getByRole("button", { name: "Change the inputs" }).waitFor();
+        },
+      },
+    ];
+    for (const { name, go } of pages) {
+      await go();
+      const chip = page.locator(".backdrop-credit");
+      await expect(chip, name).toBeVisible();
+      // At the end of the page, where it is: scrolled there again on each
+      // try, as the page may still be growing.
+      await expect
+        .poll(
+          async () => {
+            await chip.evaluate((credit) => {
+              for (let box = credit.parentElement; box !== null; box = box.parentElement) {
+                box.scrollTop = box.scrollHeight;
+              }
+              scrollTo(0, document.documentElement.scrollHeight);
+            });
+            return covering(page, ".backdrop-credit");
+          },
+          { message: name },
+        )
+        .toEqual([]);
+      // Nor does it lie over a card: every card ends above it.
+      const overlaps = await page.evaluate(() => {
+        const chip = document.querySelector(".backdrop-credit")?.getBoundingClientRect();
+        if (chip === undefined) return ["no credit"];
+        return [...document.querySelectorAll(".panel > :not(.backdrop-credit)")]
+          .filter((card) => {
+            const box = card.getBoundingClientRect();
+            return (
+              box.height > 0 &&
+              box.bottom > chip.top &&
+              box.top < chip.bottom &&
+              box.right > chip.left &&
+              box.left < chip.right
+            );
+          })
+          .map((card) => card.className);
+      });
+      expect(overlaps, name).toEqual([]);
+    }
+  });
+}
+
+for (const theme of ["light", "dark"] as const) {
+  test(`instrument-updated, ${theme}: the credit's words are ≥ 4.5:1 on its wash, whatever the picture`, async ({
+    page,
+  }) => {
+    await open(page, "instrument-updated");
+    await page.evaluate((value) => {
+      document.documentElement.dataset["theme"] = value;
+    }, theme);
+    for (const ratio of await creditContrast(page)) expect(ratio).toBeGreaterThanOrEqual(4.5);
+  });
+}

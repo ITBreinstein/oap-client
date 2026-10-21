@@ -270,8 +270,6 @@
 [data-variant="updated"] .layout-single .panel {
   display: flex;
   flex-direction: column;
-  /* Its own layer, so the credit can lie under its cards and over the picture. */
-  isolation: isolate;
   background: transparent;
 }
 
@@ -288,8 +286,9 @@
   box-shadow: var(--shadow-panel);
 }
 
+/* The developer box: the last card, 16px clear of the credit below it. */
 [data-variant="updated"] .layout-single .panel:not([data-stage="choose-endpoint"]) > .developer {
-  margin-top: 16px;
+  margin-block: 16px;
   padding: 12px 16px;
   background: var(--surface);
   border: 1px solid var(--line);
@@ -297,36 +296,46 @@
 }
 
 /*
- * The credit in the picture's lower right corner, quiet: small, muted, on a
- * thin wash. Under the cards, so where one reaches the corner it covers the
- * credit rather than the other way round. On a phone the picture runs the
- * page's length, and the credit ends the page, at its right.
+ * The credit in the picture's lower right corner, quiet: small and muted, on
+ * the page's surface at 85% so no word lies on the picture itself (≥ 4.5:1
+ * in both themes over pure white and pure black alike). Never under a card:
+ * it is in the panel's flow, last, pushed to the foot when the page is short
+ * and set below the cards when it is long, as on a phone, where the credit
+ * ends the page, at its right.
  */
 [data-variant="updated"] .panel > .backdrop-credit {
   order: 1;
   align-self: flex-end;
   width: fit-content;
   max-width: 100%;
-  margin: 16px 0 0;
+  margin: auto 0 0;
   padding: 2px 6px;
   font-size: 0.625rem;
   color: var(--muted);
-  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  background: color-mix(in srgb, var(--surface) 85%, transparent);
   border: none;
 }
 
-[data-variant="updated"] .panel[data-stage="choose-endpoint"] > .backdrop-credit {
-  margin-top: auto;
-}
-
+/*
+ * Beside the rail: into the corner, 12px from the window's edges. The
+ * negative margins undo the panel's padding: on the start screen 32px at the
+ * right (backdrop.css) and 16px below; elsewhere the column's centring
+ * (styles.css), measured on the page's width (`cqi`), and 2rem below.
+ */
 @media (min-width: 52rem) {
+  [data-variant="updated"] .layout-single {
+    container-type: inline-size;
+  }
+
   [data-variant="updated"] .panel > .backdrop-credit {
-    position: fixed;
-    z-index: -1;
-    right: 12px;
-    bottom: 12px;
     max-width: 240px;
-    margin: 0;
+    margin-right: calc(12px - max(1.25rem, (100cqi - var(--column, 40rem)) / 2));
+    margin-bottom: calc(12px - 2rem);
+  }
+
+  [data-variant="updated"] .panel[data-stage="choose-endpoint"] > .backdrop-credit {
+    margin-right: calc(12px - 32px);
+    margin-bottom: calc(12px - 16px);
   }
 }
 
@@ -447,22 +456,31 @@
   padding-top: 0;
 }
 
-/* Copy: an icon in the corner of what it copies. */
+/*
+ * Copy: an icon in the corner of what it copies. The button is 44px square
+ * to press; the 32px face inside it is what shows. Its tooltip, the button's
+ * name, shows at its left on hover and keyboard focus.
+ */
 [data-variant="updated"] .code-box {
   position: relative;
 }
 
 [data-variant="updated"] .code-box > pre {
-  padding-right: 48px;
+  padding-right: 52px;
 }
 
 [data-variant="updated"] .code-box > .copy {
   position: absolute;
-  top: 6px;
-  right: 6px;
+  top: 0;
+  right: 0;
+}
+
+[data-variant="updated"] .sent-head .copy {
+  margin: -6px -6px -6px 0;
 }
 
 [data-variant="updated"] .copy {
+  position: relative;
   display: inline-flex;
   flex-direction: row-reverse;
   align-items: center;
@@ -472,11 +490,25 @@
 [data-variant="updated"] .copy-button {
   display: inline-grid;
   place-items: center;
-  width: 32px;
-  min-height: 32px;
-  height: 32px;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
   padding: 0;
   color: var(--text-secondary);
+  background: transparent;
+  border: none;
+}
+
+[data-variant="updated"] .copy-button:focus-visible {
+  outline-offset: -4px;
+}
+
+[data-variant="updated"] .copy-face {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
   background: var(--surface);
   border: 1px solid var(--field-border);
   border-radius: var(--r-control);
@@ -484,18 +516,52 @@
 
 [data-variant="updated"] .copy-button:hover:not(:disabled) {
   color: var(--text-strong);
+  background: transparent;
+}
+
+[data-variant="updated"] .copy-button:hover:not(:disabled) .copy-face {
   background: var(--surface-hover);
   border-color: var(--accent-ink);
 }
 
-[data-variant="updated"] .copy-button[data-copied] {
+/* Copied: the tick and its edge green, under the pointer too. */
+[data-variant="updated"] .copy-button[data-copied]:not(:disabled) {
   color: var(--success);
+}
+
+[data-variant="updated"] .copy-button[data-copied]:not(:disabled) .copy-face {
   border-color: var(--success);
 }
 
 [data-variant="updated"] .copy-button .icon {
   width: 16px;
   height: 16px;
+}
+
+[data-variant="updated"] .copy-tip {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  right: 100%;
+  translate: 0 -50%;
+  display: none;
+  padding: 4px 8px;
+  font-size: var(--label-size);
+  line-height: 1.4;
+  white-space: nowrap;
+  color: var(--surface);
+  background: var(--text-strong);
+  border-radius: var(--r-control);
+}
+
+[data-variant="updated"] .copy:not([data-tip-hidden]) > .copy-button:focus-visible ~ .copy-tip {
+  display: block;
+}
+
+@media (hover: hover) {
+  [data-variant="updated"] .copy:not([data-tip-hidden]):hover > .copy-tip {
+    display: block;
+  }
 }
 
 [data-variant="updated"] .copy-status {
