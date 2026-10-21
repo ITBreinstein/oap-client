@@ -4,12 +4,14 @@
  *
  * "Where your requests go" is a privacy statement: it says only what the code
  * and the deployment files show (apps/relay/README.md "Logs",
- * deploy/static/Caddyfile.snippet, jobs/job-store.ts, app/appearance.ts).
+ * deploy/static/Caddyfile.snippet, jobs/job-store.ts, app/appearance.ts,
+ * map/basemap.ts).
  * Change it when they change.
  */
 
 import { VERSION } from "@breinstein/oap-client";
 import { FullLogo } from "./BrandMark.js";
+import { useUpdated } from "./variant.js";
 
 const REPOSITORY = "https://github.com/ITBreinstein/oap-client";
 const STANDARD = "https://docs.ogc.org/is/18-062r2/18-062r2.html";
@@ -22,6 +24,8 @@ export function versionLine(app: string, core: string): string {
 }
 
 export function AboutPanel() {
+  // STYLE TRIAL: the updated Instrument's map is OpenFreeMap's world.
+  const updated = useUpdated();
   return (
     <div className="about">
       <section className="about-section about-intro">
@@ -75,6 +79,11 @@ export function AboutPanel() {
           standard access log, which does include IP addresses.
         </p>
         <p>
+          {updated
+            ? "The map is loaded from OpenFreeMap (from PDOK when OpenFreeMap can’t be reached), which, like any site a page loads from, sees your IP address and the area you look at."
+            : "The map is loaded from PDOK, which, like any site a page loads from, sees your IP address and the area you look at."}
+        </p>
+        <p>
           Your background jobs and your Appearance setting are kept in this browser only.{" "}
           <strong>Remove from list</strong> in Jobs forgets a run.
         </p>
@@ -86,7 +95,11 @@ export function AboutPanel() {
         </h3>
         <dl className="about-facts">
           <dt>Basemap</dt>
-          <dd>BRT Achtergrondkaart © Kadaster, via PDOK (CC BY 4.0)</dd>
+          <dd>
+            {updated
+              ? "OpenFreeMap: © OpenMapTiles, map data © OpenStreetMap contributors (ODbL)"
+              : "BRT Achtergrondkaart © Kadaster, via PDOK (CC BY 4.0)"}
+          </dd>
           <dt>Map</dt>
           <dd>MapLibre GL JS (BSD-3-Clause)</dd>
           <dt>Start screen imagery</dt>

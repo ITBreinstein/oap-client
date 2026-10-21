@@ -96,9 +96,10 @@ more), which is why their licences are listed too.
 Not code, and not bundled: fetched by the browser while the app runs, and
 credited on screen as its licence requires.
 
-| What                                                | From                                                                                                        | Licence               | Credited as                                                            |
-| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | --------------------- | ---------------------------------------------------------------------- |
-| BRT-Achtergrondkaart, "standaard" (EPSG:3857 tiles) | PDOK, `https://service.pdok.nl/kadaster/brt-achtergrondkaart/wmts/v2_0/standaard/EPSG:3857/{z}/{x}/{y}.png` | CC BY 4.0, © Kadaster | "Kaartgegevens © Kadaster (BRT-Achtergrondkaart, CC BY 4.0), via PDOK" |
+| What                                                                                  | From                                                                                                        | Licence                                                                                                                              | Credited as                                                                        |
+| ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| BRT-Achtergrondkaart, "standaard" (EPSG:3857 tiles)                                   | PDOK, `https://service.pdok.nl/kadaster/brt-achtergrondkaart/wmts/v2_0/standaard/EPSG:3857/{z}/{x}/{y}.png` | CC BY 4.0, © Kadaster                                                                                                                | "Kaartgegevens © Kadaster (BRT-Achtergrondkaart, CC BY 4.0), via PDOK"             |
+| The world, "liberty" and "dark" styles (vector tiles), in "Instrument (updated)" only | OpenFreeMap, `https://tiles.openfreemap.org/styles/liberty` and `…/styles/dark` (checked 2026-10-21)        | Map data ODbL 1.0, © OpenStreetMap contributors; tile schema © OpenMapTiles (CC BY 4.0); shaded relief Natural Earth (public domain) | "OpenFreeMap © OpenMapTiles Data from OpenStreetMap", from the tiles' own metadata |
 
 ## 5. Trademarks
 

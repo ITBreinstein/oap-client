@@ -174,7 +174,12 @@ describe("MapView", () => {
   it("removes the map on unmount", () => {
     const remove = vi.fn();
     const createMap: CreateMap = () =>
-      ({ remove, getStyle: () => ({ version: 8, sources: {}, layers: [] }) }) as never;
+      ({
+        remove,
+        getCenter: () => ({ lng: 5, lat: 52 }),
+        getZoom: () => 7,
+        getStyle: () => ({ version: 8, sources: {}, layers: [] }),
+      }) as never;
     const onAvailable = vi.fn();
     render(
       <MapView
@@ -191,6 +196,33 @@ describe("MapView", () => {
     root = undefined;
     expect(remove).toHaveBeenCalledTimes(1);
     expect(onAvailable).toHaveBeenLastCalledWith(false);
+  });
+
+  it("opens another basemap (as the theme changes) where the last one was, and names it", () => {
+    const stand = (center: [number, number], zoom: number) => ({
+      remove: vi.fn(),
+      jumpTo: vi.fn(),
+      getCenter: () => ({ lng: center[0], lat: center[1] }),
+      getZoom: () => zoom,
+      getStyle: () => ({ version: 8, sources: {}, layers: [] }),
+    });
+    const light = stand([4.9, 52.4], 11);
+    const dark = stand([0, 0], 1);
+    const view = (createMap: CreateMap, label: string) => (
+      <MapView
+        createMap={createMap}
+        label={label}
+        draw={{ active: false, onChange: () => undefined }}
+      />
+    );
+    render(view(() => light as never, "Map of the world (OpenFreeMap)"));
+    expect(light.jumpTo).not.toHaveBeenCalled();
+    expect(host?.querySelector(".map-canvas")?.getAttribute("aria-label")).toBe(
+      "Map of the world (OpenFreeMap)",
+    );
+    render(view(() => dark as never, "Map of the world (OpenFreeMap)"));
+    expect(light.remove).toHaveBeenCalledTimes(1);
+    expect(dark.jumpTo).toHaveBeenCalledWith({ center: { lng: 4.9, lat: 52.4 }, zoom: 11 });
   });
 
   it("says so, and leaves typed coordinates as the way in, when the map cannot start", () => {

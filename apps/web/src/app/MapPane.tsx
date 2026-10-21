@@ -31,7 +31,7 @@ import {
 } from "../forms/geometry.js";
 import type { Bbox } from "../map/bbox.js";
 import type { MapShape, Tool } from "../map/geometry-engine.js";
-import { MapView } from "../map/MapView.js";
+import { MapView, type CreateMap } from "../map/MapView.js";
 import type { ShownShapes } from "../map/shape-layers.js";
 import {
   mapImage,
@@ -151,11 +151,14 @@ export function MapPane({
   draw,
   setValue,
   onAvailable,
+  basemap,
 }: {
   readonly state: Workflow;
   readonly draw: DrawTarget;
   readonly setValue: (id: string, value: unknown) => void;
   readonly onAvailable: (available: boolean) => void;
+  /** STYLE TRIAL: the updated Instrument's world map; PDOK's otherwise. */
+  readonly basemap?: { readonly create: CreateMap; readonly label: string } | undefined;
 }) {
   const field =
     state.stage === "process" && draw.fieldId !== undefined
@@ -234,6 +237,8 @@ export function MapPane({
   return (
     <aside className="map-pane" aria-label="Map">
       <MapView
+        createMap={basemap?.create}
+        label={basemap?.label}
         onAvailable={onAvailable}
         geometry={geometry}
         shown={shown}

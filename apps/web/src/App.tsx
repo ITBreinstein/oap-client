@@ -12,6 +12,7 @@ import { MapBoundary } from "./app/MapBoundary.js";
 import { MapLimitsContext, type MapLimits } from "./app/map-limits.js";
 import { mapNeeded } from "./app/map-need.js";
 import { MapPane } from "./app/MapPane.js";
+import { createWorldMap } from "./map/MapView.js";
 import { needsOfPlan, type Needs } from "./app/needs.js";
 import { ProcessListScreen } from "./app/ProcessListScreen.js";
 import { ProcessScreen, RequestLog } from "./app/ProcessScreen.js";
@@ -77,7 +78,7 @@ export interface AppProps {
 
 export function App({ config = STATIC_ONLY, configWarning, appearance: initial }: AppProps) {
   const { relayUrl } = config;
-  const { appearance, setStyle, setTheme } = useAppearance(initial);
+  const { appearance, resolvedTheme, setStyle, setTheme } = useAppearance(initial);
   // The local reference servers, in development only: `import.meta.env.DEV` is
   // `false` in a production build, and the list is dropped from the bundle.
   const presets = useMemo(
@@ -473,6 +474,15 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
                       draw={draw}
                       setValue={commands.setValue}
                       onAvailable={setMapAvailable}
+                      basemap={
+                        // STYLE TRIAL: the updated Instrument's map is the world, in the theme's colours.
+                        appearance.style === "instrument-updated"
+                          ? {
+                              create: createWorldMap[resolvedTheme],
+                              label: "Map of the world (OpenFreeMap)",
+                            }
+                          : undefined
+                      }
                     />
                   </MapBoundary>
                 )}

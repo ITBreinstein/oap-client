@@ -18,6 +18,18 @@ export const PDOK_BRT_MAX_ZOOM = 19;
 export const PDOK_BRT_ATTRIBUTION =
   'Kaartgegevens &copy; <a href="https://www.kadaster.nl">Kadaster</a> (BRT-Achtergrondkaart, CC BY 4.0), via <a href="https://www.pdok.nl">PDOK</a>';
 
+/**
+ * STYLE TRIAL (updated Instrument): the whole world, from OpenFreeMap:
+ * OpenStreetMap data as OpenMapTiles vector tiles, with no key and no usage
+ * limits, answering `Access-Control-Allow-Origin: *` (checked 2026-10-21). A
+ * style for each theme. The tiles credit themselves (OpenFreeMap,
+ * OpenMapTiles, OpenStreetMap), and the attribution control shows it.
+ */
+export const OPENFREEMAP_STYLES = {
+  light: "https://tiles.openfreemap.org/styles/liberty",
+  dark: "https://tiles.openfreemap.org/styles/dark",
+} as const;
+
 /** The Netherlands, west, south, east, north: where the demo starts. */
 export const INITIAL_BOUNDS = [3.2, 50.7, 7.3, 53.6] as const;
 

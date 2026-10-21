@@ -24,6 +24,7 @@ import { useId, useState } from "react";
 import { ErrorMessage } from "./ErrorMessage.js";
 import type { Needs } from "./needs.js";
 import { NeedsTag } from "./NeedsTag.js";
+import { useUpdated } from "./variant.js";
 import type { EndpointRef, WorkflowError } from "./workflow.js";
 
 export interface ProcessListScreenProps {
@@ -110,14 +111,22 @@ export function ProcessListScreen(props: ProcessListScreenProps) {
       ? `${String(listed)} ${noun}`
       : `${String(shown.length)} of ${String(listed)} ${noun}`;
   const nothingMatches = needle !== "" && shown.length === 0;
+  // STYLE TRIAL: in the updated Instrument "Change service" is in the top
+  // right corner (style-instrument-updated.css), so it comes first: a float
+  // after the words would drop below them on a narrow screen.
+  const updated = useUpdated();
+  const changeService = (
+    <button type="button" className="link" onClick={onDisconnect}>
+      Change service
+    </button>
+  );
 
   return (
     <section className="process-list-screen" aria-labelledby={`${base}-heading`}>
       <p className="breadcrumb">
-        Connected to <strong>{service.title ?? endpoint.baseUrl}</strong>{" "}
-        <button type="button" className="link" onClick={onDisconnect}>
-          Change service
-        </button>
+        {updated && changeService}
+        Connected to <strong>{service.title ?? endpoint.baseUrl}</strong>
+        {!updated && <> {changeService}</>}
       </p>
       <h2
         id={`${base}-heading`}

@@ -1,5 +1,6 @@
 /**
- * The map (S5): MapLibre over PDOK's BRT-Achtergrondkaart, and drawing when a
+ * The map (S5): MapLibre over PDOK's BRT-Achtergrondkaart (or, in the
+ * updated Instrument, OpenFreeMap's world), and drawing when a
  * form field asks for it — a bounding box, or shapes for a GeoJSON input. Once
  * a run is done, it shows the GeoJSON in the result beside the input it came
  * from.
@@ -16,6 +17,8 @@ import {
   Map as MapLibreMap,
   NavigationControl,
   setWorkerUrl,
+  type CameraOptions,
+  type StyleSpecification,
 } from "maplibre-gl";
 // MapLibre 6 looks for its worker next to its own module, which a bundle moves.
 // Vite bundles the worker as an ES module and hands its URL over instead.
@@ -23,6 +26,7 @@ import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   INITIAL_BOUNDS,
+  OPENFREEMAP_STYLES,
   PDOK_BRT_ATTRIBUTION,
   PDOK_BRT_MAX_ZOOM,
   PDOK_BRT_TILES,
@@ -70,23 +74,35 @@ const NO_GEOMETRY: GeometryDrawProps = {
 
 export type CreateMap = (container: HTMLElement, reducedMotion: boolean) => MapLibreMap;
 
-export const createPdokMap: CreateMap = (container, reducedMotion) => {
+const PDOK_STYLE: StyleSpecification = {
+  version: 8,
+  sources: {
+    brt: {
+      type: "raster",
+      tiles: [PDOK_BRT_TILES],
+      tileSize: 256,
+      maxzoom: PDOK_BRT_MAX_ZOOM,
+      attribution: PDOK_BRT_ATTRIBUTION,
+    },
+  },
+  layers: [{ id: "brt", type: "raster", source: "brt" }],
+};
+
+/**
+ * A map over `style`, starting on the Netherlands. A style given by address
+ * that can't be fetched falls back to `fallback`: the map still works, over
+ * the basemap the page has always had.
+ */
+function startMap(
+  container: HTMLElement,
+  reducedMotion: boolean,
+  style: StyleSpecification | string,
+  fallback?: StyleSpecification,
+): MapLibreMap {
   setWorkerUrl(workerUrl);
   const map = new MapLibreMap({
     container,
-    style: {
-      version: 8,
-      sources: {
-        brt: {
-          type: "raster",
-          tiles: [PDOK_BRT_TILES],
-          tileSize: 256,
-          maxzoom: PDOK_BRT_MAX_ZOOM,
-          attribution: PDOK_BRT_ATTRIBUTION,
-        },
-      },
-      layers: [{ id: "brt", type: "raster", source: "brt" }],
-    },
+    style,
     bounds: [
       [INITIAL_BOUNDS[0], INITIAL_BOUNDS[1]],
       [INITIAL_BOUNDS[2], INITIAL_BOUNDS[3]],
@@ -94,9 +110,39 @@ export const createPdokMap: CreateMap = (container, reducedMotion) => {
     attributionControl: false,
     fadeDuration: reducedMotion ? 0 : 300,
   });
+  if (fallback !== undefined && typeof style === "string") {
+    // Only the style document itself: a tile that fails is just a gap.
+    const onError = (event: { error?: unknown }) => {
+      const failed = event.error;
+      if (typeof failed !== "object" || failed === null || !("url" in failed)) return;
+      if (failed.url !== style) return;
+      map.off("error", onError);
+      map.setStyle(fallback);
+    };
+    map.on("error", onError);
+    map.once("load", () => {
+      map.off("error", onError);
+    });
+  }
   map.addControl(new AttributionControl({ compact: false }));
   map.addControl(new NavigationControl({ showCompass: false, visualizePitch: false }));
   return map;
+}
+
+export const createPdokMap: CreateMap = (container, reducedMotion) =>
+  startMap(container, reducedMotion, PDOK_STYLE);
+
+/**
+ * STYLE TRIAL (updated Instrument): the world, in the theme's colours, from
+ * OpenFreeMap; PDOK's map when OpenFreeMap can't be reached. One per theme,
+ * each the same function every time, so the map is only made afresh when the
+ * theme changes.
+ */
+export const createWorldMap: Readonly<Record<"light" | "dark", CreateMap>> = {
+  light: (container, reducedMotion) =>
+    startMap(container, reducedMotion, OPENFREEMAP_STYLES.light, PDOK_STYLE),
+  dark: (container, reducedMotion) =>
+    startMap(container, reducedMotion, OPENFREEMAP_STYLES.dark, PDOK_STYLE),
 };
 
 function prefersReducedMotion(): boolean {
@@ -121,6 +167,8 @@ export interface MapViewProps {
   /** Whether the map started, so the form can offer "Draw on the map" or not. */
   readonly onAvailable?: ((available: boolean) => void) | undefined;
   readonly createMap?: CreateMap | undefined;
+  /** What the map region is called, for a screen reader: the basemap's area and name. */
+  readonly label?: string | undefined;
   readonly createEngine?: CreateDrawEngine | undefined;
   readonly createGeometryEngine?: CreateGeometryEngine | undefined;
   readonly createShapeLayers?: CreateShapeLayers | undefined;
@@ -136,6 +184,7 @@ export function MapView({
   onResultClick,
   onAvailable,
   createMap = createPdokMap,
+  label = "Map of the Netherlands (BRT-Achtergrondkaart)",
   createEngine,
   createGeometryEngine,
   createShapeLayers,
@@ -149,7 +198,9 @@ export function MapView({
 
   // A ref callback with a cleanup (React 19): the map is created when its
   // container is attached and removed when it is detached — on unmount, and
-  // before a new one is made if `createMap` changes.
+  // before a new one is made if `createMap` changes. A new one for the same
+  // view (another basemap, as the theme changes) opens where the last one was.
+  const camera = useRef<CameraOptions | undefined>(undefined);
   const attach = useCallback(
     (element: HTMLDivElement | null) => {
       if (element === null) return;
@@ -161,9 +212,11 @@ export function MapView({
         available.current?.(false);
         return;
       }
+      if (camera.current !== undefined) created.jumpTo(camera.current);
       setMap(created);
       available.current?.(true);
       return () => {
+        camera.current = { center: created.getCenter(), zoom: created.getZoom() };
         available.current?.(false);
         setMap(undefined);
         created.remove();
@@ -227,7 +280,7 @@ export function MapView({
             ? "Map: drag a rectangle to set the bounding box"
             : geometry.active
               ? "Map: draw shapes for the input"
-              : "Map of the Netherlands (BRT-Achtergrondkaart)"
+              : label
         }
         data-drawing={draw.active || geometry.active ? "true" : "false"}
         data-result-shapes={resultShapes}

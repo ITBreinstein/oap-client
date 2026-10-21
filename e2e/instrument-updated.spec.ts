@@ -17,6 +17,13 @@ const VERSIONS = [
   { style: "instrument-updated", updated: true },
 ] as const;
 
+/** A map style with nothing to fetch, standing in for OpenFreeMap's. */
+const WORLD_STAND_IN = {
+  version: 8,
+  sources: {},
+  layers: [{ id: "land", type: "background", paint: { "background-color": "#f8f4f0" } }],
+};
+
 async function open(page: Page, style: string) {
   await page.route("**/config.json", (route) =>
     route.fulfill({
@@ -41,6 +48,11 @@ async function open(page: Page, style: string) {
     const response = await route.fetch({ url: route.request().url().replace(SERVICE, PYGEOAPI) });
     await route.fulfill({ response });
   });
+  // The updated Instrument's world map is OpenFreeMap's: a plain stand-in
+  // here, so this lane never waits on a third party.
+  await page.route("https://tiles.openfreemap.org/**", (route) =>
+    route.fulfill({ contentType: "application/json", body: JSON.stringify(WORLD_STAND_IN) }),
+  );
   await page.goto(`/?style=${style}&theme=light`);
   await expect(page.getByRole("heading", { level: 2, name: "Connect to a service" })).toBeVisible();
 }
@@ -683,3 +695,65 @@ test("instrument-updated: beside the map, Developer stays at the foot with Run; 
   expect(opened?.developerAtFoot).toBe(0);
   expect(opened?.developerHeight).toBe(Math.round(816 * 0.4));
 });
+
+for (const { style, updated } of VERSIONS) {
+  test(`${style}: the map is ${updated ? "the world, from OpenFreeMap, falling back to PDOK" : "PDOK's Netherlands"}`, async ({
+    page,
+  }) => {
+    await open(page, style);
+    let asked = 0;
+    if (updated) {
+      // OpenFreeMap can't be reached: the map falls back to PDOK's.
+      await page.route("https://tiles.openfreemap.org/**", (route) => {
+        asked += 1;
+        return route.fulfill({ status: 503, body: "" });
+      });
+    }
+    await connect(page);
+    await page
+      .getByRole("button", { name: "Rotate a polygon a quarter turn", exact: true })
+      .click();
+    await expect(page.locator(".map-canvas")).toHaveAttribute(
+      "aria-label",
+      updated ? "Map of the world (OpenFreeMap)" : "Map of the Netherlands (BRT-Achtergrondkaart)",
+    );
+    await expect(page.locator(".maplibregl-ctrl-attrib-inner")).toContainText("Kadaster");
+    expect(asked > 0).toBe(updated);
+    // Drawing still works over the fallback.
+    await page.getByRole("button", { name: "Draw on the map" }).click();
+    await expect(page.locator(".map-pane").getByRole("button", { name: "Add area" })).toBeVisible();
+  });
+}
+
+for (const size of [
+  { width: 1432, height: 816 },
+  { width: 390, height: 844 },
+]) {
+  test(`instrument-updated at ${String(size.width)}px: "Change service" is in the list's top right corner`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(size);
+    await open(page, "instrument-updated");
+    await connect(page);
+    const place = await page.getByRole("button", { name: "Change service" }).evaluate((button) => {
+      const own = button.getBoundingClientRect();
+      const screen = button.closest(".process-list-screen");
+      const heading = screen?.querySelector("h2")?.getBoundingClientRect();
+      const words = button.parentElement?.getBoundingClientRect();
+      if (screen === null || screen === undefined || heading === undefined || words === undefined) {
+        return undefined;
+      }
+      const box = screen.getBoundingClientRect();
+      const edge = getComputedStyle(screen);
+      // Inside the card's padding and its edge.
+      const padRight =
+        Number.parseFloat(edge.paddingRight) + Number.parseFloat(edge.borderRightWidth);
+      return {
+        right: Math.round(box.right - padRight - own.right),
+        aboveHeading: own.bottom <= heading.top,
+        firstLine: Math.round(own.top - words.top) <= 0,
+      };
+    });
+    expect(place).toEqual({ right: 0, aboveHeading: true, firstLine: true });
+  });
+}

@@ -531,6 +531,19 @@
   margin-bottom: 12px;
 }
 
+/* "Change service" in the list's top right corner, the service's name beside it. */
+[data-variant="updated"] .process-list-screen > .breadcrumb {
+  display: flow-root;
+  /* The words' first line centred on the 36px button. */
+  padding-top: 6px;
+  line-height: 24px;
+}
+
+[data-variant="updated"] .process-list-screen > .breadcrumb button.link {
+  float: right;
+  margin: -6px 0 0 12px;
+}
+
 /* "Inputs you sent": a panel of its own, edged like a field. */
 [data-variant="updated"] .sent-inputs {
   background: var(--surface-hover);
