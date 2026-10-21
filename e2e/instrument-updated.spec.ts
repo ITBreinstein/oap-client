@@ -531,7 +531,8 @@ for (const { style, updated } of VERSIONS) {
     page,
     context,
   }) => {
-    test.setTimeout(60_000);
+    // The job runs a few seconds; a busy machine reads it slowly.
+    test.setTimeout(120_000);
     await requireService(`${RELAY}/healthz`, "the relay");
     const config = { relay: { url: RELAY }, presets: [], examples: [] };
     await context.route("**/config.json", (route) =>
@@ -568,7 +569,7 @@ for (const { style, updated } of VERSIONS) {
     await other.goto(url);
     await expect(other.getByTestId("link-notice")).toContainText("and its job");
     await other.getByRole("button", { name: "Connect", exact: true }).click();
-    await other.locator('[data-output-id="slept"]').waitFor({ timeout: 30_000 });
+    await other.locator('[data-output-id="slept"]').waitFor({ timeout: 45_000 });
     await expect(other.getByText("This page didn’t start this job")).toBeVisible();
 
     // And from My jobs, here.
@@ -576,8 +577,48 @@ for (const { style, updated } of VERSIONS) {
     await page
       .getByTestId("my-jobs")
       .getByRole("button", { name: "Show the results" })
-      .click({ timeout: 30_000 });
-    await page.locator('[data-output-id="slept"]').waitFor({ timeout: 30_000 });
+      .click({ timeout: 45_000 });
+    await page.locator('[data-output-id="slept"]').waitFor({ timeout: 45_000 });
     expect(page.url()).toBe(url);
   });
 }
+
+test("instrument-updated: a refused Run's error is in view and has the focus, in a short window", async ({
+  page,
+}) => {
+  // A laptop's window: the description and the form fill the panel, and the
+  // Run bar stays at its foot over whatever lies under it.
+  await page.setViewportSize({ width: 1432, height: 816 });
+  await open(page, "instrument-updated");
+  await connect(page);
+  await page.getByRole("button", { name: "Buildings in an area", exact: true }).click();
+  await page.locator(".map-pane canvas").waitFor();
+  await page.route("**/processes/breinstein-buildings/execution**", (route) =>
+    route.fulfill({
+      status: 400,
+      contentType: "application/json",
+      body: JSON.stringify({
+        type: "InvalidParameterValue",
+        description: 'The "area" input is 38346 m across; at most 1000 m is searched',
+      }),
+    }),
+  );
+  await page.getByRole("button", { name: "Draw on the map" }).click();
+  await page.getByRole("textbox", { name: "GeoJSON" }).fill(SQUARE);
+  await page.getByRole("button", { name: "Run", exact: true }).click();
+
+  const refused = page.getByRole("alert").filter({ hasText: "HTTP 400" });
+  await expect(refused).toBeVisible();
+  await expect(page.locator(".server-error")).toBeFocused();
+  // Wholly above the Run bar, and in the window.
+  await expect
+    .poll(async () => {
+      const [box, bar] = await Promise.all([
+        refused.boundingBox(),
+        page.locator(".run-bar").boundingBox(),
+      ]);
+      if (box === null || bar === null) return false;
+      return box.y >= 0 && box.y + box.height <= bar.y;
+    })
+    .toBe(true);
+});

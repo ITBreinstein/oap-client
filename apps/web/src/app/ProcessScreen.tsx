@@ -457,15 +457,24 @@ export function ProcessScreen(props: ProcessScreenProps) {
       )
       ?.focus();
   }, [fieldErrors]);
-  // STYLE TRIAL: in the updated Instrument the server's answer is beside Run,
-  // and is scrolled into view when it comes, clear of the Run bar.
+  // STYLE TRIAL: in the updated Instrument the server's answer is beside Run.
+  // When it comes, the stage's focus lands on it rather than on the heading
+  // (App.tsx moves it), and it is then scrolled clear of the Run bar: after
+  // that move, which would otherwise scroll the panel back to its top.
+  const updated = useUpdated();
   const serverErrorBox = useRef<HTMLDivElement>(null);
   const shownError = state.stage === "process" ? state.error : undefined;
+  const errorTakesFocus = updated && shownError !== undefined;
   useEffect(() => {
-    if (shownError === undefined) return;
-    const box = serverErrorBox.current;
-    // Not in every DOM: jsdom, for one, has no scrolling.
-    if (box !== null && "scrollIntoView" in box) box.scrollIntoView({ block: "nearest" });
+    if (shownError === undefined) return undefined;
+    const frame = requestAnimationFrame(() => {
+      const box = serverErrorBox.current;
+      // Not in every DOM: jsdom, for one, has no scrolling.
+      if (box !== null && "scrollIntoView" in box) box.scrollIntoView({ block: "nearest" });
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+    };
   }, [shownError]);
   // A Run that went ahead leaves nothing to focus later.
   useEffect(() => {
@@ -480,7 +489,6 @@ export function ProcessScreen(props: ProcessScreenProps) {
       : undefined;
   const observations = props.observations ?? [];
   const endpointKey = redactUrl(state.endpoint.baseUrl);
-  const updated = useUpdated();
   // STYLE TRIAL: in the updated Instrument a background job with a link can be
   // left for another process; its link is on screen, and it goes on in My jobs.
   const place = placeOf(state);
@@ -517,7 +525,7 @@ export function ProcessScreen(props: ProcessScreenProps) {
       <h2
         id={`${base}-heading`}
         tabIndex={-1}
-        data-focus-on-stage={state.stage === "process" ? true : undefined}
+        data-focus-on-stage={state.stage === "process" && !errorTakesFocus ? true : undefined}
       >
         {process.title ?? process.id}
       </h2>
@@ -698,7 +706,7 @@ export function ProcessScreen(props: ProcessScreenProps) {
           )}
 
           {updated && shownError !== undefined && (
-            <div className="server-error" ref={serverErrorBox}>
+            <div className="server-error" ref={serverErrorBox} tabIndex={-1} data-focus-on-stage>
               {serverError}
             </div>
           )}
