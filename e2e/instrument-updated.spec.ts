@@ -24,7 +24,7 @@ const WORLD_STAND_IN = {
   layers: [{ id: "land", type: "background", paint: { "background-color": "#f8f4f0" } }],
 };
 
-async function open(page: Page, style: string) {
+async function open(page: Page, style: string, more = "") {
   await page.route("**/config.json", (route) =>
     route.fulfill({
       contentType: "application/json",
@@ -53,7 +53,7 @@ async function open(page: Page, style: string) {
   await page.route("https://tiles.openfreemap.org/**", (route) =>
     route.fulfill({ contentType: "application/json", body: JSON.stringify(WORLD_STAND_IN) }),
   );
-  await page.goto(`/?style=${style}&theme=light`);
+  await page.goto(`/?style=${style}&theme=light${more}`);
   await expect(page.getByRole("heading", { level: 2, name: "Connect to a service" })).toBeVisible();
 }
 
@@ -142,7 +142,8 @@ for (const { style, updated } of VERSIONS) {
     test(`the request log ${updated ? "stays in the column" : "lies over the map"}`, async ({
       page,
     }) => {
-      await open(page, style);
+      // The update's request log is in the Developer section: `?developer` (#38).
+      await open(page, style, updated ? "&developer" : "");
       await connect(page);
       await page.getByRole("button", { name: "Buildings in an area", exact: true }).click();
       await page.locator(".map-pane canvas").waitFor();
@@ -189,7 +190,8 @@ for (const { style, updated } of VERSIONS) {
       context,
     }) => {
       await context.grantPermissions(["clipboard-read", "clipboard-write"]);
-      await open(page, style);
+      // The update's Developer section is there with `?developer` only (#38).
+      await open(page, style, updated ? "&developer" : "");
       await connect(page);
       await page.getByRole("button", { name: "Hello World", exact: true }).click();
       await expect(page.locator(".process-screen .request-log")).toHaveCount(updated ? 0 : 1);
@@ -685,10 +687,13 @@ test("instrument-updated: beside the map, Developer stays at the foot with Run; 
   page,
 }) => {
   await page.setViewportSize({ width: 1432, height: 816 });
-  await open(page, "instrument-updated");
+  // Developer is there only with `?developer` (#38); it opens with it.
+  await open(page, "instrument-updated", "&developer");
   await connect(page);
   await page.getByRole("button", { name: "Buildings in an area", exact: true }).click();
   await page.locator(".map-pane canvas").waitFor();
+  await page.locator("details.developer > summary").click();
+  await expect(page.locator("details.developer")).not.toHaveAttribute("open");
 
   const about = await page.locator("details.about").evaluate((box) => {
     const style = getComputedStyle(box);

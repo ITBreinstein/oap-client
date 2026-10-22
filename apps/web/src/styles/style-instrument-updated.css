@@ -37,7 +37,8 @@
  * width can be changed (`App.tsx` `docked`, `app/PanelHandle.tsx`,
  * `app/panel-width.ts`; #36); on a narrow screen the map is right under the
  * result, which links to it (`App.tsx` `mapUnderResult`, `ProcessScreen`
- * `mapSlot`; #40); the map is OpenFreeMap's world, in the
+ * `mapSlot`; #40); the Developer section is there only with `?developer`
+ * (`App.tsx`, #38); the map is OpenFreeMap's world, in the
  * theme's colours (`App.tsx` `basemap`, `createWorldMap` in `map/MapView.tsx`),
  * and About credits it (`AboutPanel.tsx`); "Change service" comes first in
  * the process list, for the top right corner (`ProcessListScreen.tsx`); JSON is laid out with tabs
@@ -438,16 +439,19 @@
 
   [data-variant="updated"] .layout:not(.layout-single) .run-bar {
     margin-top: 0;
-    /* Just above the Developer bar, which holds the sheet's foot. */
-    bottom: var(--developer-bar);
+    /* Just above the Developer bar, which holds the sheet's foot; at the foot without it (#38). */
+    bottom: var(--developer-bar, 0px);
   }
 
   /*
    * The Developer section stays at the sheet's foot with Run, as one bar.
    * Opened, it keeps a fixed height and scrolls within, so it stays in the
-   * bar rather than move to the end of the sheet.
+   * bar rather than move to the end of the sheet. Without `?developer` there
+   * is none (#38), and Run has the foot to itself.
    */
-  [data-variant="updated"] .layout:not(.layout-single) .panel:has(> .process-screen) {
+  [data-variant="updated"]
+    .layout:not(.layout-single)
+    .panel:has(> .process-screen):has(> .developer) {
     --developer-bar: 45px;
   }
 

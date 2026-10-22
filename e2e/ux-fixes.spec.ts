@@ -121,7 +121,8 @@ for (const style of STYLES) {
   test(`#24 Stop waiting gives up on a long foreground run, back to the form (${style})`, async ({
     page,
   }) => {
-    await open(page, style);
+    // With the Developer section, where the record is read (#38).
+    await open(page, style, "&developer");
     await connectTyped(page);
     await openProcess(page, "Slow process");
     await field(page, "Seconds (optional)").fill("20");
@@ -191,7 +192,7 @@ for (const style of STYLES) {
 }
 
 test("#25 the technical reason is in the Developer section", async ({ page }) => {
-  await open(page, "instrument-updated");
+  await open(page, "instrument-updated", "&developer");
   await connectTyped(page);
   await openProcess(page, "Slow process");
   await page.getByRole("checkbox", { name: "Run in the background" }).check();
@@ -812,7 +813,8 @@ for (const style of STYLES) {
         }),
       }),
     );
-    await open(page, style);
+    // With the Developer section, which is there with `?developer` in the update (#38).
+    await open(page, style, "&developer");
     await connectTyped(page);
     await openProcess(page, "Buildings in an area");
     // Appearance, at the rail's foot, within reach: the rail scrolls to it.
@@ -959,3 +961,32 @@ test("#6 with the relay down from the start, one line says so", async ({ page })
   await expect(page.getByText("Some services are temporarily unavailable.")).toBeVisible();
   await expect(page.getByRole("radio", { name: /^pygeoapi[- ]cors /i })).toHaveCount(0);
 });
+
+for (const { style, more, shown } of [
+  { style: "instrument-updated", more: "", shown: false },
+  { style: "instrument-updated", more: "&developer", shown: true },
+  { style: "instrument", more: "", shown: true },
+]) {
+  test(`#38 the Developer section is ${shown ? "there" : "not there"}: ${style}${more}`, async ({
+    page,
+  }) => {
+    await open(page, style, more);
+    await expect(page.locator("details.developer")).toHaveCount(shown ? 1 : 0);
+    await connectTyped(page);
+    await expect(page.locator("details.developer")).toHaveCount(shown ? 1 : 0);
+    await openProcess(page, "Buildings in an area");
+    await page.locator(".map-pane canvas").waitFor();
+    await expect(page.locator("details.developer")).toHaveCount(shown ? 1 : 0);
+    if (style === "instrument-updated" && !shown) {
+      // Run has the sheet's foot to itself: no room is kept for a Developer bar.
+      const gap = await page.evaluate(() => {
+        const panel = document.querySelector("main.panel")?.getBoundingClientRect();
+        const run = document.querySelector(".run-bar")?.getBoundingClientRect();
+        return panel === undefined || run === undefined
+          ? undefined
+          : Math.round(panel.bottom - run.bottom);
+      });
+      expect(gap).toBe(0);
+    }
+  });
+}

@@ -661,27 +661,32 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
                         Imagery: NASA Blue Marble and Blue Marble clouds · NASA Earth at Night 2012
                       </p>
                     )}
-                    <DeveloperPanel
-                      observations={view.snapshot?.observations ?? []}
-                      dropped={view.snapshot?.droppedObservations ?? 0}
-                      relayUrl={relayUrl}
-                      open={developer}
-                      census={view.census}
-                      notes={developerNotes}
-                      onDescribeAll={
-                        state.stage === "choose-endpoint" ? undefined : commands.describeAll
-                      }
-                      first={
-                        // STYLE TRIAL: the updated Instrument keeps the request log here.
-                        appearance.style === "instrument-updated" &&
-                        state.stage !== "choose-endpoint" ? (
-                          <RequestLog
-                            entries={view.snapshot?.observations ?? []}
-                            endpoint={redactUrl(state.endpoint.baseUrl)}
-                          />
-                        ) : undefined
-                      }
-                    />
+                    {/* STYLE TRIAL (#38): the updated Instrument has the Developer
+                        section only with `?developer`. The session records
+                        what it observes all the same. */}
+                    {(!updatedStyle || developer) && (
+                      <DeveloperPanel
+                        observations={view.snapshot?.observations ?? []}
+                        dropped={view.snapshot?.droppedObservations ?? 0}
+                        relayUrl={relayUrl}
+                        open={developer}
+                        census={view.census}
+                        notes={developerNotes}
+                        onDescribeAll={
+                          state.stage === "choose-endpoint" ? undefined : commands.describeAll
+                        }
+                        first={
+                          // STYLE TRIAL: the updated Instrument keeps the request log here.
+                          appearance.style === "instrument-updated" &&
+                          state.stage !== "choose-endpoint" ? (
+                            <RequestLog
+                              entries={view.snapshot?.observations ?? []}
+                              endpoint={redactUrl(state.endpoint.baseUrl)}
+                            />
+                          ) : undefined
+                        }
+                      />
+                    )}
                   </main>
                   {showMap &&
                     // STYLE TRIAL (#40): under the result on a narrow screen.
