@@ -8,6 +8,7 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 import { PanelHandle } from "./app/PanelHandle.js";
 import { useWide } from "./app/useWide.js";
 import { PANEL_START } from "./app/panel-width.js";
@@ -360,6 +361,27 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
     };
   }, []);
 
+  // The map is on screen only while it has a job to do: an input it can draw,
+  // or a result it can show (`app/map-need.ts`). Otherwise the panel has the
+  // page to itself, and no basemap tile is fetched.
+  const showMap = mapNeeded(state, mapLimits.maxCoordinates);
+  // STYLE TRIAL (#36): in the updated Instrument a process keeps its form
+  // docked at the left, map or not; without a map the picture is on the right.
+  const updatedStyle = appearance.style === "instrument-updated";
+  const onProcess =
+    state.stage === "process" || state.stage === "running" || state.stage === "result";
+  // Beside, on a wide window: on a phone the form is a card on the picture.
+  const wide = useWide();
+  const docked = showMap || (updatedStyle && onProcess && wide);
+  const [panelWidth, setPanelWidth] = useState(PANEL_START);
+  // STYLE TRIAL (#40): on a narrow screen the updated Instrument puts the map
+  // right under the result, not at the foot of the page.
+  const mapUnderResult = updatedStyle && !wide && state.stage === "result" && showMap;
+  const [mapSlot, setMapSlot] = useState<HTMLElement | undefined>();
+  const giveMapSlot = useCallback((element: HTMLDivElement | null) => {
+    setMapSlot(element ?? undefined);
+  }, []);
+
   let screen: ReactNode;
   switch (state.stage) {
     case "choose-endpoint":
@@ -435,24 +457,11 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
           observations={view.snapshot?.observations}
           backgroundUnfindable={backgroundUnfindable}
           onRelayForBackground={switchToRelay}
+          mapSlot={mapUnderResult ? giveMapSlot : undefined}
         />
       );
       break;
   }
-
-  // The map is on screen only while it has a job to do: an input it can draw,
-  // or a result it can show (`app/map-need.ts`). Otherwise the panel has the
-  // page to itself, and no basemap tile is fetched.
-  const showMap = mapNeeded(state, mapLimits.maxCoordinates);
-  // STYLE TRIAL (#36): in the updated Instrument a process keeps its form
-  // docked at the left, map or not; without a map the picture is on the right.
-  const updatedStyle = appearance.style === "instrument-updated";
-  const onProcess =
-    state.stage === "process" || state.stage === "running" || state.stage === "result";
-  // Beside, on a wide window: on a phone the form is a card on the picture.
-  const wide = useWide();
-  const docked = showMap || (updatedStyle && onProcess && wide);
-  const [panelWidth, setPanelWidth] = useState(PANEL_START);
 
   // While the relay offer is open, everything else is inert: no keyboard or
   // pointer can reach Connect or the jobs behind the question (review W22).
@@ -505,6 +514,26 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
       : state.stage === "process" || state.stage === "result" || leaveJob
         ? commands.backToList
         : undefined;
+  const mapElement = (
+    <MapBoundary>
+      <MapPane
+        state={state}
+        draw={draw}
+        setValue={commands.setValue}
+        onAvailable={setMapAvailable}
+        onViewReader={readView}
+        basemap={
+          // STYLE TRIAL: the updated Instrument's map is the world, in the theme's colours.
+          appearance.style === "instrument-updated"
+            ? {
+                create: createWorldMap[resolvedTheme],
+                label: "Map of the world (OpenFreeMap)",
+              }
+            : undefined
+        }
+      />
+    </MapBoundary>
+  );
   return (
     <MapLimitsContext value={mapLimits}>
       <UpdatedContext value={appearance.style === "instrument-updated"}>
@@ -629,26 +658,11 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
                       }
                     />
                   </main>
-                  {showMap && (
-                    <MapBoundary>
-                      <MapPane
-                        state={state}
-                        draw={draw}
-                        setValue={commands.setValue}
-                        onAvailable={setMapAvailable}
-                        onViewReader={readView}
-                        basemap={
-                          // STYLE TRIAL: the updated Instrument's map is the world, in the theme's colours.
-                          appearance.style === "instrument-updated"
-                            ? {
-                                create: createWorldMap[resolvedTheme],
-                                label: "Map of the world (OpenFreeMap)",
-                              }
-                            : undefined
-                        }
-                      />
-                    </MapBoundary>
-                  )}
+                  {showMap &&
+                    // STYLE TRIAL (#40): under the result on a narrow screen.
+                    (mapUnderResult
+                      ? mapSlot !== undefined && createPortal(mapElement, mapSlot)
+                      : mapElement)}
                   {docked && !showMap && (
                     // STYLE TRIAL (#36): the picture where the map would be.
                     <aside className="backdrop-pane" aria-label="Picture of Europe">

@@ -35,7 +35,9 @@
  * took (`ResultsView`, `results/plain-value.ts`, `ProcessScreen` `ResultStrip`;
  * #27); a process keeps its form docked at the left, map or not, and its
  * width can be changed (`App.tsx` `docked`, `app/PanelHandle.tsx`,
- * `app/panel-width.ts`; #36); the map is OpenFreeMap's world, in the
+ * `app/panel-width.ts`; #36); on a narrow screen the map is right under the
+ * result, which links to it (`App.tsx` `mapUnderResult`, `ProcessScreen`
+ * `mapSlot`; #40); the map is OpenFreeMap's world, in the
  * theme's colours (`App.tsx` `basemap`, `createWorldMap` in `map/MapView.tsx`),
  * and About credits it (`AboutPanel.tsx`); "Change service" comes first in
  * the process list, for the top right corner (`ProcessListScreen.tsx`); JSON is laid out with tabs
@@ -1007,4 +1009,28 @@
   [data-variant="updated"] .panel-handle-region {
     display: none;
   }
+}
+
+/* ------------------------------------------------- the map under the result, narrow */
+
+/*
+ * On a narrow screen the map is right under the result (#40; App.tsx
+ * `mapUnderResult`), before what was sent and the developer section, and the
+ * result links to it.
+ */
+[data-variant="updated"] .map-slot {
+  margin: 16px 0 0;
+  scroll-margin-top: 8px;
+}
+
+[data-variant="updated"] .map-slot > .map-pane {
+  height: 60vh;
+  min-height: 20rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-card);
+  overflow: hidden;
+}
+
+[data-variant="updated"] .show-on-map {
+  margin: 8px 0 0;
 }

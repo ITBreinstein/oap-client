@@ -747,3 +747,42 @@ for (const style of STYLES) {
     await expect(page.getByRole("button", { name: "Draw on the map" })).toBeInViewport();
   });
 }
+
+for (const size of [
+  { width: 390, height: 844 },
+  { width: 768, height: 1024 },
+]) {
+  for (const style of STYLES) {
+    const updated = style === "instrument-updated";
+    test(`#40 at ${String(size.width)}×${String(size.height)}, the map ${updated ? "is right under the result" : "stays at the foot"} (${style})`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(size);
+      await open(page, style);
+      await connectTyped(page);
+      await openProcess(page, "Area of each feature");
+      await page.getByRole("textbox", { name: "Value (JSON)" }).fill(JSON.stringify(TWO_PLOTS));
+      await page.getByRole("button", { name: "Run", exact: true }).click();
+      await expect(page.locator('[data-output-id="table"]')).toBeVisible({ timeout: 30_000 });
+      const map = page.locator(".map-pane");
+      await expect(map).toHaveCount(1);
+      const showOnMap = page.getByRole("button", { name: "Show on the map" });
+      if (!updated) {
+        await expect(page.locator(".map-slot")).toHaveCount(0);
+        await expect(showOnMap).toHaveCount(0);
+        return;
+      }
+      // Under the result, before what was sent.
+      await expect(page.locator(".result-block + .map-slot > .map-pane")).toHaveCount(1);
+      const [mapBox, sentBox] = await Promise.all([
+        map.boundingBox(),
+        page.getByTestId("sent-inputs").boundingBox(),
+      ]);
+      expect((mapBox?.y ?? 0) < (sentBox?.y ?? 0)).toBe(true);
+      await showOnMap.click();
+      await expect(map).toBeInViewport({ ratio: 0.5 });
+      // Still the result: the button is no step in the page's history.
+      await expect(page.locator('[data-output-id="table"]')).toBeVisible();
+    });
+  }
+}
