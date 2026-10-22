@@ -333,6 +333,7 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
           presets={presets}
           connecting={state.connecting}
           error={state.error}
+          failed={state.failed}
           staticOnly={relayUrl === undefined}
           onConnect={address.connect}
           linked={address.linked}

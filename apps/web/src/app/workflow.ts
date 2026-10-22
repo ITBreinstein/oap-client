@@ -65,6 +65,12 @@ export interface WorkflowError {
    * the visitor's words (#25).
    */
   readonly technical?: string | undefined;
+  /**
+   * A direct connection failed the way a missing CORS header fails (or the
+   * server is down: a browser can't tell, W34). The relay may read a
+   * configured endpoint of the same address (#4).
+   */
+  readonly corsOrUnreachable?: true | undefined;
 }
 
 interface Connected {
@@ -126,6 +132,8 @@ export type Workflow =
       readonly offer?:
         { readonly endpoint: EndpointRef; readonly error: WorkflowError } | undefined;
       readonly error?: WorkflowError | undefined;
+      /** The endpoint `error` is about. */
+      readonly failed?: EndpointRef | undefined;
       /** An example was chosen: the process to open once connected. */
       readonly openAfter?: string | undefined;
     }
@@ -339,7 +347,7 @@ export function workflowReducer(state: Workflow, action: WorkflowAction): Workfl
 
     case "connect-failed":
       return state.stage === "choose-endpoint" && sameEndpoint(state.connecting, action.endpoint)
-        ? { stage: "choose-endpoint", error: action.error }
+        ? { stage: "choose-endpoint", error: action.error, failed: action.endpoint }
         : state;
 
     case "relay-offered":

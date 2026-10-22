@@ -81,7 +81,11 @@ describe("workflowReducer: the legal path", () => {
       { type: "connect", endpoint },
       { type: "connect-failed", endpoint, error: { title: "blocked" } },
     );
-    expect(failed).toEqual({ stage: "choose-endpoint", error: { title: "blocked" } });
+    expect(failed).toEqual({
+      stage: "choose-endpoint",
+      error: { title: "blocked" },
+      failed: endpoint,
+    });
   });
 
   it("opens a process with a fresh plan, its starting values, and the default mode", () => {
@@ -263,7 +267,7 @@ describe("workflowReducer: the relay offer", () => {
     ).toBe(confirmed);
     expect(
       reduce(confirmed, { type: "connect-failed", endpoint: zoo, error: { title: "relay down" } }),
-    ).toEqual({ stage: "choose-endpoint", error: { title: "relay down" } });
+    ).toEqual({ stage: "choose-endpoint", error: { title: "relay down" }, failed: zoo });
   });
 
   it("has no way to the relay route without an offer and a confirmation", () => {

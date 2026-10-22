@@ -41,6 +41,8 @@ export interface EndpointScreenProps {
   readonly examples?: ReactNode;
   /** A place the page was opened with a link to: filled in, waiting for Connect. */
   readonly linked?: Place | undefined;
+  /** The endpoint `error` is about. */
+  readonly failed?: EndpointRef | undefined;
 }
 
 /** The four stages of the workflow, in the words a first-time visitor needs. */
@@ -74,6 +76,19 @@ export function EndpointScreen(props: EndpointScreenProps) {
   // new object, and shows.
   const [dismissed, setDismissed] = useState<WorkflowError | undefined>();
   const shownError = error === dismissed ? undefined : error;
+  // A configured endpoint of the address that failed, which the relay may
+  // read once the user has agreed (#4). Not the endpoint that failed itself:
+  // its own question was already asked.
+  const failed = props.failed;
+  const relayRead =
+    shownError?.corsOrUnreachable === true && failed !== undefined
+      ? configured.find(
+          (entry) =>
+            entry.readRoute === "relay" &&
+            sameService(entry.baseUrl, failed.baseUrl) &&
+            !(failed.source === "configured" && failed.key === entry.key),
+        )
+      : undefined;
   // STYLE TRIAL: the updated Instrument fills in the address of a service picked from the list.
   const updated = useUpdated();
   const keys = [...configured.map((entry) => entry.key), ...presets.map((_, i) => presetKey(i))];
@@ -207,6 +222,22 @@ export function EndpointScreen(props: EndpointScreenProps) {
               </p>
             )}
             <ErrorMessage error={shownError} />
+            {/* The relay may read this address, as a configured endpoint: the
+                way there is its question, asked after a click (#4; ADR 0001). */}
+            {shownError !== undefined && relayRead !== undefined && (
+              <p className="actions relay-try">
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={() => {
+                    setDismissed(error);
+                    onConnect({ source: "configured", ...relayRead });
+                  }}
+                >
+                  Try through the relay
+                </button>
+              </p>
+            )}
           </div>
 
           {/* STYLE TRIAL: the updated Instrument offers the examples first,

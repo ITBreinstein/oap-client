@@ -207,6 +207,7 @@ function transportMessage(cause: unknown, endpoint: EndpointRef): WorkflowError 
           ? "Connect again to be offered the relay, which reaches the server without CORS and so tells the two apart, or choose another service."
           : "The relay is not set up to read this service for a web page, so it cannot help here. Check that the server is running. If it is, choose another service, or ask this server's operator to enable CORS.";
     return {
+      corsOrUnreachable: true,
       title:
         "This page could not read this server: it sends no CORS headers, or it could not be reached. The attempt has been recorded.",
       detail: `A browser gives a web page the same error for both. A page may only read another site's answers when that site sends Access-Control-Allow-Origin. ${next}`,

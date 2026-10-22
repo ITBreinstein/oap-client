@@ -273,7 +273,7 @@ describe("open-example: connect, then open the process", () => {
       { type: "open-example", endpoint, processId: "hello-world" },
       { type: "connect-failed", endpoint, error },
     );
-    expect(failed).toEqual({ stage: "choose-endpoint", error });
+    expect(failed).toEqual({ stage: "choose-endpoint", error, failed: endpoint });
     // A plain connect afterwards opens nothing.
     const plain = reduce(failed, { type: "connect", endpoint }, connected(listed));
     expect(plain.stage === "connected" && plain.opening).toBeUndefined();
