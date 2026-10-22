@@ -1,5 +1,5 @@
 import { redactUrl } from "@breinstein/oap-client";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Appearance } from "./app/appearance.js";
 import { AppearanceControl } from "./app/AppearanceControl.js";
 import { UpdatedContext } from "./app/variant.js";
@@ -135,9 +135,9 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
   const togglePanel = (which: Panel) => {
     setPanelOpen((current) => (current === which ? undefined : which));
   };
-  const closePanel = () => {
+  const closePanel = useCallback(() => {
     setPanelOpen(undefined);
-  };
+  }, []);
   // STYLE TRIAL: in the updated Instrument a background job with a link can
   // be left, from the rail too: it goes on in My jobs.
   const leaveJob =
@@ -284,6 +284,12 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
     const target = panel.current?.querySelector<HTMLElement>("[data-focus-on-stage]");
     target?.focus();
   }, [stageKey]);
+  // A new stage closes any side panel (#35): what it was over is gone.
+  const [panelStage, setPanelStage] = useState(stageKey);
+  if (panelStage !== stageKey) {
+    setPanelStage(stageKey);
+    if (panelOpen !== undefined) setPanelOpen(undefined);
+  }
 
   let screen: ReactNode;
   switch (state.stage) {
@@ -371,6 +377,9 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
   // While the relay offer is open, everything else is inert: no keyboard or
   // pointer can reach Connect or the jobs behind the question (review W22).
   const offerOpen = state.stage === "choose-endpoint" && state.offer !== undefined;
+  // While a side panel is open, so is everything but it (#35): it is a dialog.
+  const behindPanel = panelOpen !== undefined;
+  const behind = offerOpen || behindPanel;
 
   // Where the page is, and the ways back, for the frame's navigation. Never
   // mid-run: leaving would abandon a job the user has not been told the fate of.
@@ -401,11 +410,11 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
         <DrawContext.Provider value={draw}>
           <div className="app" data-relay-stream={view.snapshot?.relay}>
             {/* The first stop for a keyboard: past the rail, to the page itself. */}
-            <a className="skip-link" href="#content">
+            <a className="skip-link" href="#content" inert={behindPanel}>
               Skip to content
             </a>
             <AppFrame
-              inert={offerOpen}
+              inert={behind}
               appearance={
                 <AppearanceControl appearance={appearance} onStyle={setStyle} onTheme={setTheme} />
               }
@@ -455,12 +464,12 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
                   className="notice config-warning"
                   role="alert"
                   data-testid="config-warning"
-                  inert={offerOpen}
+                  inert={behind}
                 >
                   {configWarning}
                 </p>
               )}
-              <div className={showMap ? "layout" : "layout layout-single"} inert={offerOpen}>
+              <div className={showMap ? "layout" : "layout layout-single"} inert={behind}>
                 <main
                   id="content"
                   tabIndex={-1}
@@ -518,6 +527,11 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
                   </MapBoundary>
                 )}
               </div>
+              {/* What an open panel covers: a press on it closes the panel (#35).
+                  The panel's keyboard way out is Escape, or its Close button. */}
+              {behindPanel && (
+                <div className="panel-scrim" aria-hidden="true" onClick={closePanel} />
+              )}
               {examples.length > 0 && (
                 <SidePanel
                   id={PANEL_IDS.examples}

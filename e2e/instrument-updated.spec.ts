@@ -104,7 +104,7 @@ for (const { style, updated } of VERSIONS) {
       }
       await about.click();
       await expect(
-        page.getByRole("complementary", { name: "About" }).getByText("Where your requests go"),
+        page.getByRole("dialog", { name: "About" }).getByText("Where your requests go"),
       ).toBeVisible();
     });
 
@@ -113,7 +113,7 @@ for (const { style, updated } of VERSIONS) {
     }) => {
       await open(page, style);
       await rail(page, "Examples").click();
-      await expect(page.getByRole("complementary", { name: "Examples" })).toBeVisible();
+      await expect(page.getByRole("dialog", { name: "Examples" })).toBeVisible();
       const wash = await page.evaluate(
         () =>
           getComputedStyle(document.querySelector(".app-body") ?? document.body, "::after").content,

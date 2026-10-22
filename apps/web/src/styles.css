@@ -1547,7 +1547,7 @@ ol.steps li .help {
 }
 
 /*
- * Side panels (Examples, My jobs): not modal, over the content's edge. Closed,
+ * Side panels (Examples, My jobs, About): dialogs over the content's edge. Closed,
  * they slide out of sight and are inert. Each style says which edge; on a
  * narrow screen they are full-width sheets.
  */
@@ -1568,6 +1568,16 @@ ol.steps li .help {
   transition:
     transform 0.2s ease,
     visibility 0s;
+}
+
+/*
+ * What an open side panel covers (#35): a press on it closes the panel. Clear
+ * here; the updated Instrument dims it (style-instrument-updated.css).
+ */
+.panel-scrim {
+  position: absolute;
+  z-index: 11;
+  inset: 0;
 }
 
 .side-panel[data-open="false"] {

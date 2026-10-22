@@ -68,7 +68,7 @@ for (const theme of ["light", "dark"] as const) {
       await instrument(page, theme);
       const about = rail(page, "About");
       await about.click();
-      const panel = page.getByRole("complementary", { name: "About" });
+      const panel = page.getByRole("dialog", { name: "About" });
       await expect(panel.getByRole("heading", { level: 2, name: "About" })).toBeFocused();
       await expect(about).toHaveAttribute("aria-expanded", "true");
       // Nothing left of the designs' placeholders.
@@ -89,27 +89,32 @@ for (const theme of ["light", "dark"] as const) {
       await expect(page.locator("details.developer > summary")).toBeVisible();
     });
 
-    test("one panel at a time: About closes Examples and Jobs, and they close About", async ({
+    test("one panel at a time: while one is open the rail is out of reach, and closing it gives the rail back", async ({
       page,
     }) => {
       await instrument(page, theme);
-      const about = page.getByRole("complementary", { name: "About" });
-      const examples = page.getByRole("complementary", { name: "Examples" });
-      const jobs = page.getByRole("complementary", { name: "My jobs" });
+      const about = page.getByRole("dialog", { name: "About" });
+      const examples = page.getByRole("dialog", { name: "Examples" });
+      const jobs = page.getByRole("dialog", { name: "My jobs" });
+      const frame = page.locator("header.app-rail");
 
       await rail(page, "Examples").click();
       await expect(examples).toBeVisible();
+      // A dialog (#35): the rail behind it can't be reached.
+      await expect(frame).toHaveAttribute("inert", "");
+      await page.keyboard.press("Escape");
+      await expect(examples).toBeHidden();
+      await expect(frame).not.toHaveAttribute("inert", "");
+
       await rail(page, "About").click();
       await expect(about).toBeVisible();
       await expect(examples).toBeHidden();
+      await expect(jobs).toBeHidden();
+      await page.getByRole("button", { name: "Close About" }).click();
 
       await rail(page, "Jobs").click();
       await expect(jobs).toBeVisible();
       await expect(about).toBeHidden();
-
-      await rail(page, "About").click();
-      await expect(about).toBeVisible();
-      await expect(jobs).toBeHidden();
     });
   });
 }

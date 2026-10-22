@@ -83,7 +83,7 @@ test.describe("examples", () => {
     await page.goto("/");
     await page.getByRole("button", { name: /Browse all 2 examples/ }).click();
 
-    const panel = page.getByRole("complementary", { name: "Examples" });
+    const panel = page.getByRole("dialog", { name: "Examples" });
     await expect(panel.getByRole("heading", { name: "Examples" })).toBeFocused();
     await panel.getByRole("button", { name: "Draw an area" }).click();
     await expect(panel.getByRole("button", { name: "Buildings in an area" })).toBeVisible();

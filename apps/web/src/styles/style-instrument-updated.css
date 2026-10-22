@@ -95,8 +95,8 @@
 
 /*
  * An open panel (Examples, Jobs, About) dims what it covers, so its edge is
- * plain in both themes. Only a wash: the page behind it still works, as the
- * panel is not modal.
+ * plain in both themes. Only a wash: the press that closes the panel goes to
+ * `.panel-scrim` beneath it (#35).
  */
 [data-variant="updated"] .app-body:has(> .side-panel[data-open="true"])::after {
   content: "";

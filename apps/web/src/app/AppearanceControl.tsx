@@ -2,7 +2,8 @@
  * The Appearance control: a button, and a small popover with two groups of
  * radio buttons. A change applies at once; there is no Apply. Escape closes
  * the popover and puts focus back on the button, as does choosing the button
- * again; a click elsewhere closes it and leaves focus where it went.
+ * again; a click elsewhere, or focus moving out of it, closes it and leaves
+ * focus where it went.
  *
  * The "Style" group is a trial: once one is chosen, delete that fieldset
  * (and `STYLE_LABELS`), and keep "Night mode"
@@ -80,6 +81,21 @@ export function AppearanceControl(props: AppearanceControlProps) {
     button.current?.focus();
   };
 
+  // Escape closes it wherever focus is (#35), as it does a side panel.
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      event.preventDefault();
+      setOpen(false);
+      button.current?.focus();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
   return (
     <div
       className={`appearance${className === undefined ? "" : ` ${className}`}`}
@@ -88,6 +104,14 @@ export function AppearanceControl(props: AppearanceControlProps) {
           event.stopPropagation();
           close();
         }
+      }}
+      // Focus gone to something else, by Tab or otherwise: it closes, and
+      // leaves focus where it went (#35). Not when focus goes nowhere for a
+      // moment, as it does when a label is pressed: a press outside is the
+      // pointer handler's.
+      onBlur={(event) => {
+        const next = event.relatedTarget;
+        if (open && next instanceof Node && !event.currentTarget.contains(next)) setOpen(false);
       }}
     >
       <button

@@ -201,3 +201,112 @@ test("#25 the technical reason is in the Developer section", async ({ page }) =>
   });
   await expect(page.getByTestId("developer-note")).toContainText("finding 0039");
 });
+
+/** Where focus is: in the open panel, nowhere (the browser's own controls), or in the page behind. */
+async function focusIn(page: Page): Promise<"panel" | "nowhere" | "page"> {
+  return page.evaluate(() => {
+    const active = document.activeElement;
+    if (active === null || active === document.body) return "nowhere";
+    return active.closest(".side-panel[data-open='true']") === null ? "page" : "panel";
+  });
+}
+
+for (const style of STYLES) {
+  test(`#35 an open panel holds Tab, closes on Escape and on a press beside it (${style})`, async ({
+    page,
+  }) => {
+    await open(page, style);
+    await connectTyped(page);
+    const rail = page.getByRole("button", { name: "Jobs", exact: true });
+    const jobs = page.getByRole("dialog", { name: "My jobs" });
+
+    await rail.click();
+    await expect(jobs).toBeVisible();
+    for (let press = 0; press < 8; press += 1) {
+      await page.keyboard.press("Tab");
+      expect(await focusIn(page)).not.toBe("page");
+    }
+    for (let press = 0; press < 8; press += 1) {
+      await page.keyboard.press("Shift+Tab");
+      expect(await focusIn(page)).not.toBe("page");
+    }
+    // Escape from wherever focus is, and focus back on the rail's button.
+    await page.locator("body").focus();
+    await page.keyboard.press("Escape");
+    await expect(jobs).toBeHidden();
+    await expect(rail).toBeFocused();
+
+    // A press on what the panel covers closes it, and opens nothing.
+    await rail.click();
+    await expect(jobs).toBeVisible();
+    const behind = await page
+      .getByRole("button", { name: "Hello World", exact: true })
+      .boundingBox();
+    if (behind === null) throw new Error("no Hello World row");
+    await page.mouse.click(behind.x + 4, behind.y + behind.height / 2);
+    await expect(jobs).toBeHidden();
+    await expect(page.getByRole("heading", { level: 2, name: "Processes" })).toBeVisible();
+  });
+
+  test(`#35 Appearance closes when focus leaves it (${style})`, async ({ page }) => {
+    await open(page, style);
+    const button = page.getByRole("button", { name: "Appearance", exact: true });
+    await button.click();
+    const popover = page.getByRole("dialog", { name: "Appearance" });
+    await expect(popover).toBeVisible();
+    // Out of its last group, onwards: closed, focus where it went.
+    await page.getByRole("radio", { name: "Follow system" }).focus();
+    await page.keyboard.press("Shift+Tab");
+    await page.keyboard.press("Shift+Tab");
+    await page.keyboard.press("Shift+Tab");
+    await expect(popover).toBeHidden();
+    await expect(button).not.toBeFocused();
+  });
+}
+
+test("#35 a stage change closes a panel, and opening a process from one does", async ({ page }) => {
+  const SERVICE = "https://pygeoapi.example.test";
+  await page.route("**/config.json", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        relay: null,
+        presets: [{ title: "Reference pygeoapi", url: SERVICE }],
+        examples: [
+          {
+            service: SERVICE,
+            process: "hello-world",
+            title: "Hello World",
+            summary: "Type a name; the service greets it back.",
+            needs: "values",
+            featured: true,
+          },
+        ],
+      }),
+    }),
+  );
+  await page.route(`${SERVICE}/**`, async (route) => {
+    const response = await route.fetch({ url: route.request().url().replace(SERVICE, PYGEOAPI) });
+    await route.fulfill({ response });
+  });
+  await open(page, "instrument-updated");
+  await page.getByRole("radio", { name: /Reference pygeoapi/ }).check();
+  await page.getByRole("button", { name: "Connect", exact: true }).click();
+  await expect(page.getByRole("heading", { level: 2, name: "Processes" })).toBeVisible();
+
+  // Opening a process from the Examples panel: the panel closes.
+  const examples = page.getByRole("dialog", { name: "Examples" });
+  await page.getByRole("button", { name: "Examples", exact: true }).click();
+  await expect(examples).toBeVisible();
+  await examples.getByRole("button", { name: "Hello World" }).click();
+  await expect(page.getByRole("heading", { level: 2, name: "Hello World" })).toBeVisible();
+  await expect(examples).toBeHidden();
+
+  // Back to the list with the browser's Back while About is open: it closes.
+  const about = page.getByRole("dialog", { name: "About" });
+  await page.getByRole("button", { name: "About", exact: true }).click();
+  await expect(about).toBeVisible();
+  await page.goBack();
+  await expect(page.getByRole("heading", { level: 2, name: "Processes" })).toBeVisible();
+  await expect(about).toBeHidden();
+});

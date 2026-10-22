@@ -121,7 +121,7 @@ test.describe("styles", () => {
       await shot(page, `${tag}-2-browse-all`);
       await page.keyboard.press("Escape");
       // Out of sight once its slide is over: until then its buttons are on screen.
-      await expect(page.getByRole("complementary", { name: "Examples" })).toBeHidden();
+      await expect(page.getByRole("dialog", { name: "Examples" })).toBeHidden();
 
       await page.getByRole("radio", { name: /pygeoapi-cors/ }).check();
       await page.getByRole("button", { name: "Connect", exact: true }).click();
