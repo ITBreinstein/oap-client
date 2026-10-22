@@ -342,3 +342,64 @@ for (const { style, more, spared } of [
     ).toBeVisible();
   });
 }
+
+const TWO_PLOTS = {
+  type: "FeatureCollection",
+  features: [
+    {
+      type: "Feature",
+      properties: { name: "Plot, north" },
+      geometry: {
+        type: "Polygon",
+        coordinates: [
+          [
+            [5.38, 52.16],
+            [5.39, 52.16],
+            [5.39, 52.165],
+            [5.38, 52.165],
+            [5.38, 52.16],
+          ],
+        ],
+      },
+    },
+    {
+      type: "Feature",
+      properties: { name: "Plot, south" },
+      geometry: {
+        type: "Polygon",
+        coordinates: [
+          [
+            [5.38, 52.15],
+            [5.385, 52.15],
+            [5.385, 52.155],
+            [5.38, 52.155],
+            [5.38, 52.15],
+          ],
+        ],
+      },
+    },
+  ],
+};
+
+for (const style of STYLES) {
+  test(`#26 a CSV result is a table, and downloads as .csv (${style})`, async ({ page }) => {
+    await open(page, style);
+    await connectTyped(page);
+    await openProcess(page, "Area of each feature");
+    await page.getByRole("textbox", { name: "Value (JSON)" }).fill(JSON.stringify(TWO_PLOTS));
+    await page.getByRole("button", { name: "Run", exact: true }).click();
+
+    const table = page.locator('[data-output-id="table"]');
+    await expect(table.getByRole("region", { name: "Table “table”" })).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(table.getByRole("columnheader", { name: "area_m2" })).toBeVisible();
+    await expect(table.getByRole("cell", { name: "Plot, north" })).toBeVisible();
+
+    const [download] = await Promise.all([
+      page.waitForEvent("download"),
+      table.getByRole("button", { name: /^Download/ }).click(),
+    ]);
+    expect(download.suggestedFilename()).toBe("breinstein-feature-area-table.csv");
+  });
+}
