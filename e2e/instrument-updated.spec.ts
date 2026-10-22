@@ -512,7 +512,7 @@ for (const { style, updated } of VERSIONS) {
     await page.getByRole("button", { name: "Draw on the map" }).click();
     await page.getByRole("textbox", { name: "GeoJSON" }).fill(SQUARE);
     await page.getByRole("button", { name: "Run", exact: true }).click();
-    const refused = page.getByRole("alert").filter({ hasText: "HTTP 400" });
+    const refused = page.getByRole("alert").filter({ hasText: "The service reported an error." });
     await expect(refused).toBeVisible();
     await expect(page.locator("form .server-error + .run-bar")).toHaveCount(updated ? 1 : 0);
     if (updated) {
@@ -619,7 +619,7 @@ test("instrument-updated: a refused Run's error is in view and has the focus, in
   await page.getByRole("textbox", { name: "GeoJSON" }).fill(SQUARE);
   await page.getByRole("button", { name: "Run", exact: true }).click();
 
-  const refused = page.getByRole("alert").filter({ hasText: "HTTP 400" });
+  const refused = page.getByRole("alert").filter({ hasText: "The service reported an error." });
   await expect(refused).toBeVisible();
   await expect(page.locator(".server-error")).toBeFocused();
   // Wholly above the Run bar, and in the window.
