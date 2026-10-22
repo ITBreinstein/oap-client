@@ -5,7 +5,7 @@
  * opens its process.
  */
 
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 import type { Example } from "../config/runtime-config.js";
 import {
   featuredExamples,
@@ -16,6 +16,7 @@ import {
 } from "./examples.js";
 import { NEEDS, NEEDS_LABELS } from "./needs.js";
 import { NeedsTag } from "./NeedsTag.js";
+import { NoMatch } from "./NoMatch.js";
 
 function ExampleButton({
   example,
@@ -127,6 +128,7 @@ export function ExamplesBrowser({
 }) {
   const base = useId();
   const [query, setQuery] = useState("");
+  const searchField = useRef<HTMLInputElement>(null);
   const [needs, setNeeds] = useState<NeedsFilter>("all");
   const found = filterExamples(examples, query, needs);
   const groups = groupByService(found);
@@ -137,6 +139,7 @@ export function ExamplesBrowser({
         <p className="search-field">
           <label htmlFor={`${base}-search`}>Search examples</label>
           <input
+            ref={searchField}
             id={`${base}-search`}
             type="search"
             autoComplete="off"
@@ -176,6 +179,16 @@ export function ExamplesBrowser({
       <p className="muted examples-count" role="status">
         {found.length === 1 ? "1 example" : `${String(found.length)} examples`}
       </p>
+      {found.length === 0 && query.trim() !== "" && (
+        <NoMatch
+          noun="examples"
+          query={query}
+          field={searchField}
+          onClear={() => {
+            setQuery("");
+          }}
+        />
+      )}
       {groups.map((group) => (
         <section
           key={group.service}

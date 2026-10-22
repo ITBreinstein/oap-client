@@ -5,6 +5,7 @@
 
 import type { Example } from "../config/runtime-config.js";
 import type { Needs } from "./needs.js";
+import { matchesWords } from "./word-search.js";
 
 /** The start screen shows at most this many; the rest are under "Browse all". */
 export const MAX_FEATURED = 4;
@@ -17,23 +18,19 @@ export function featuredExamples(examples: readonly Example[]): Example[] {
 }
 
 /**
- * The examples a search and a filter leave. The search finds words in the
- * title, the summary or the process id, ignoring case; an example whose needs
- * are not stated is found under "all" only.
+ * The examples a search and a filter leave. The search finds every word
+ * typed, in any order, in the title, the summary or the process id, ignoring
+ * case (#9); an example whose needs are not stated is found under "all" only.
  */
 export function filterExamples(
   examples: readonly Example[],
   query: string,
   needs: NeedsFilter,
 ): Example[] {
-  const needle = query.trim().toLowerCase();
   return examples.filter(
     (example) =>
       (needs === "all" || example.needs === needs) &&
-      (needle === "" ||
-        example.title.toLowerCase().includes(needle) ||
-        example.summary.toLowerCase().includes(needle) ||
-        example.process.toLowerCase().includes(needle)),
+      matchesWords(query, [example.title, example.summary, example.process]),
   );
 }
 

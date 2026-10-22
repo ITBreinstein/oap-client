@@ -45,11 +45,16 @@ test("the count follows the search, and no match is said in words", async ({ pag
 
   await search.fill("no such process");
   await expect(count).toHaveText(`0 of ${String(listed)} processes.`);
-  await expect(page.locator(".list-empty")).toHaveText(
-    "No process has “no such process” in its title or identifier.",
-  );
+  await expect(page.locator(".list-empty")).toHaveText("No processes match “no such process”.");
   await expect(page.locator(".process-table")).toHaveCount(0);
 
-  await search.fill("");
+  // Every word, in any order (#9).
+  await search.fill("world HELLO");
+  await expect(count).toHaveText(`1 of ${String(listed)} processes.`);
+
+  await search.fill("no such process");
+  await page.getByRole("button", { name: "Clear search" }).click();
+  await expect(search).toHaveValue("");
+  await expect(search).toBeFocused();
   await expect(count).toHaveText(`${String(listed)} processes.`);
 });

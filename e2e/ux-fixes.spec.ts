@@ -876,3 +876,49 @@ test("#37 the tab's title says where the page is", async ({ page }) => {
   await toList(page);
   await expect(page).toHaveTitle(`Processes · ${serviceName}`);
 });
+
+const SEARCHED_EXAMPLES = [
+  {
+    service: "https://pygeoapi.example.test",
+    process: "hello-world",
+    title: "Hello World",
+    summary: "Type a name; the service greets it back.",
+    needs: "values",
+    featured: true,
+  },
+  {
+    service: "https://pygeoapi.example.test",
+    process: "breinstein-buildings",
+    title: "Buildings in an area",
+    summary: "Draw an area in Amsterdam; the service lists its buildings.",
+    needs: "area",
+  },
+];
+
+for (const style of STYLES) {
+  test(`#9 the examples search finds every word in any order, and says when nothing matches (${style})`, async ({
+    page,
+  }) => {
+    await page.route("**/config.json", (route) =>
+      route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({ relay: null, presets: [], examples: SEARCHED_EXAMPLES }),
+      }),
+    );
+    await open(page, style);
+    await page.getByRole("button", { name: "Examples", exact: true }).click();
+    const panel = page.getByRole("dialog", { name: "Examples" });
+    const search = panel.getByRole("searchbox", { name: "Search examples" });
+    await search.fill("amsterdam BUILDINGS");
+    await expect(panel.locator(".examples-count")).toHaveText("1 example");
+    await expect(panel.getByRole("button", { name: /^Buildings in an area/ })).toBeVisible();
+
+    await search.fill("amsterdam hello");
+    await expect(panel.locator(".examples-count")).toHaveText("0 examples");
+    await expect(panel.locator(".list-empty")).toHaveText("No examples match “amsterdam hello”.");
+    await panel.getByRole("button", { name: "Clear search" }).click();
+    await expect(search).toHaveValue("");
+    await expect(search).toBeFocused();
+    await expect(panel.locator(".examples-count")).toHaveText("2 examples");
+  });
+}

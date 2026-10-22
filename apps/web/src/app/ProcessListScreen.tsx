@@ -20,11 +20,13 @@ import type {
   ServiceCapabilities,
   ServiceDescription,
 } from "@breinstein/oap-client";
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { ErrorMessage } from "./ErrorMessage.js";
+import { NoMatch } from "./NoMatch.js";
 import type { Needs } from "./needs.js";
 import { NeedsTag } from "./NeedsTag.js";
 import { useUpdated } from "./variant.js";
+import { matchesWords } from "./word-search.js";
 import type { EndpointRef, WorkflowError } from "./workflow.js";
 
 export interface ProcessListScreenProps {
@@ -90,12 +92,11 @@ export function ProcessListScreen(props: ProcessListScreenProps) {
   const ran = props.ran ?? [];
   const base = useId();
   const [filter, setFilter] = useState("");
-  const needle = filter.trim().toLowerCase();
-  const shown = processes.processes.filter(
-    (process) =>
-      needle === "" ||
-      process.id.toLowerCase().includes(needle) ||
-      (process.title ?? "").toLowerCase().includes(needle),
+  const searchField = useRef<HTMLInputElement>(null);
+  const needle = filter.trim();
+  // Every word typed, in any order (#9).
+  const shown = processes.processes.filter((process) =>
+    matchesWords(filter, [process.title ?? "", process.id]),
   );
   const total = processes.numberTotal;
   // Where focus lands when this screen appears (App moves it): the process
@@ -167,6 +168,7 @@ export function ProcessListScreen(props: ProcessListScreenProps) {
           <p className="search-field">
             <label htmlFor={`${base}-filter`}>Search processes</label>
             <input
+              ref={searchField}
               id={`${base}-filter`}
               type="search"
               autoComplete="off"
@@ -197,7 +199,14 @@ export function ProcessListScreen(props: ProcessListScreenProps) {
         </p>
       )}
       {nothingMatches ? (
-        <p className="list-empty">No process has “{filter.trim()}” in its title or identifier.</p>
+        <NoMatch
+          noun="processes"
+          query={filter}
+          field={searchField}
+          onClear={() => {
+            setFilter("");
+          }}
+        />
       ) : (
         <div className="process-table">
           {/* The column heads, for sight only: each row names its own cells. */}

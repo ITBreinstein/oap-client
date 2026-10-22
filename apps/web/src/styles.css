@@ -1511,9 +1511,13 @@ ol.steps li .help {
   margin: 0 0 0.5rem;
 }
 
-/* A search that finds nothing says so, in place of an empty table. */
-.list-empty {
+/* A search that finds nothing says so, in place of an empty table, with the way back (#9). */
+.no-match {
   margin: 1rem 0;
+}
+
+.list-empty {
+  margin: 0 0 0.5rem;
   color: var(--muted);
 }
 

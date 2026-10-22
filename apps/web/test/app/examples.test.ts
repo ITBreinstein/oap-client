@@ -172,6 +172,13 @@ describe("featured examples, search and filter", () => {
     expect(filterExamples(list, "nothing like it", "all")).toEqual([]);
   });
 
+  it("finds every word typed, in any order (#9)", () => {
+    expect(filterExamples(list, "features upload", "all").map((each) => each.process)).toEqual([
+      "area",
+    ]);
+    expect(filterExamples(list, "upload hello", "all")).toEqual([]);
+  });
+
   it("filters by what an example needs; one with no stated need is under All only", () => {
     expect(filterExamples(list, "", "area").map((each) => each.process)).toEqual(["buildings"]);
     expect(filterExamples(list, "", "values").map((each) => each.process)).toEqual(["hello"]);
