@@ -47,8 +47,8 @@
  * and opens full size (`ResultImage.tsx`, #29); My jobs says once that jobs
  * from an earlier visit are checked now and then, and keeps "Run again" for
  * them, the form then saying why it is empty (`JobsPanel.tsx` `structured`,
- * `App.tsx` `unkept`; #33); the map is OpenFreeMap's world, in the
- * theme's colours (`App.tsx` `basemap`, `createWorldMap` in `map/MapView.tsx`),
+ * `App.tsx` `unkept`; #33); the map is OpenFreeMap's world, light in
+ * either theme (`App.tsx` `basemap`, `createWorldMap` in `map/MapView.tsx`),
  * and About credits it (`AboutPanel.tsx`); "Change service" comes first in
  * the process list, for the top right corner (`ProcessListScreen.tsx`); JSON is laid out with tabs
  * (`app/json-text.ts`, in `FormFields`, `GeometryField`, `ComplexField`,

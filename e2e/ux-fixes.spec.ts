@@ -1384,3 +1384,22 @@ for (const style of STYLES) {
     });
   }
 }
+
+test("the updated Instrument's map is the light one in the dark theme too", async ({ page }) => {
+  const styles: string[] = [];
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (url.host === "tiles.openfreemap.org" && url.pathname.startsWith("/styles/")) {
+      styles.push(url.pathname);
+    }
+  });
+  await page.route("https://tiles.openfreemap.org/**", (route) =>
+    route.fulfill({ contentType: "application/json", body: JSON.stringify(WORLD_STAND_IN) }),
+  );
+  await page.goto("/?style=instrument-updated&theme=dark");
+  await connectTyped(page);
+  await openProcess(page, "Buildings in an area");
+  await page.locator(".map-pane canvas").waitFor();
+  await expect.poll(() => styles).toContain("/styles/liberty");
+  expect(styles).not.toContain("/styles/dark");
+});

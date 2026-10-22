@@ -444,6 +444,16 @@ pre.code {
   box-shadow: var(--shadow-popover);
 }
 
+/*
+ * The attribution's own words, which MapLibre leaves to the page's colour:
+ * the light scheme's text colour on its light strip, as the map is light in
+ * either theme.
+ */
+.map-pane .maplibregl-ctrl-attrib {
+  color-scheme: light;
+  color: CanvasText;
+}
+
 /* The map's scale (#15), in the page's colours and type. */
 .maplibregl-ctrl-bottom-left .maplibregl-ctrl-scale {
   padding: 0 6px;

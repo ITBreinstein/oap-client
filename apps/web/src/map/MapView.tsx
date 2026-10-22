@@ -27,7 +27,7 @@ import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   INITIAL_BOUNDS,
-  OPENFREEMAP_STYLES,
+  OPENFREEMAP_STYLE,
   PDOK_BRT_ATTRIBUTION,
   PDOK_BRT_MAX_ZOOM,
   PDOK_BRT_TILES,
@@ -136,17 +136,12 @@ export const createPdokMap: CreateMap = (container, reducedMotion) =>
   startMap(container, reducedMotion, PDOK_STYLE);
 
 /**
- * STYLE TRIAL (updated Instrument): the world, in the theme's colours, from
- * OpenFreeMap; PDOK's map when OpenFreeMap can't be reached. One per theme,
- * each the same function every time, so the map is only made afresh when the
- * theme changes.
+ * STYLE TRIAL (updated Instrument): the world, from OpenFreeMap, light in
+ * either theme; PDOK's map when OpenFreeMap can't be reached. The same
+ * function every time, so a change of theme does not make the map afresh.
  */
-export const createWorldMap: Readonly<Record<"light" | "dark", CreateMap>> = {
-  light: (container, reducedMotion) =>
-    startMap(container, reducedMotion, OPENFREEMAP_STYLES.light, PDOK_STYLE),
-  dark: (container, reducedMotion) =>
-    startMap(container, reducedMotion, OPENFREEMAP_STYLES.dark, PDOK_STYLE),
-};
+export const createWorldMap: CreateMap = (container, reducedMotion) =>
+  startMap(container, reducedMotion, OPENFREEMAP_STYLE, PDOK_STYLE);
 
 function prefersReducedMotion(): boolean {
   try {

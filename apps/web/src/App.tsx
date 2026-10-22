@@ -106,7 +106,7 @@ export interface AppProps {
 
 export function App({ config = STATIC_ONLY, configWarning, appearance: initial }: AppProps) {
   const { relayUrl } = config;
-  const { appearance, resolvedTheme, setStyle, setTheme } = useAppearance(initial);
+  const { appearance, setStyle, setTheme } = useAppearance(initial);
   // The local reference servers, in development only: `import.meta.env.DEV` is
   // `false` in a production build, and the list is dropped from the bundle.
   const presets = useMemo(
@@ -563,10 +563,10 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
         onAvailable={setMapAvailable}
         onViewReader={readView}
         basemap={
-          // STYLE TRIAL: the updated Instrument's map is the world, in the theme's colours.
+          // STYLE TRIAL: the updated Instrument's map is the world, light in either theme.
           appearance.style === "instrument-updated"
             ? {
-                create: createWorldMap[resolvedTheme],
+                create: createWorldMap,
                 label: "Map of the world (OpenFreeMap)",
               }
             : undefined
