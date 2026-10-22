@@ -394,14 +394,12 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
   // or a result it can show (`app/map-need.ts`). Otherwise the panel has the
   // page to itself, and no basemap tile is fetched.
   const showMap = mapNeeded(state, mapLimits.maxCoordinates);
-  // STYLE TRIAL (#36): in the updated Instrument a process keeps its form
-  // docked at the left, map or not; without a map the picture is on the right.
+  // Docked at the left beside the map; without one, a card on the picture.
+  const docked = showMap;
+  // STYLE TRIAL (#36): in the updated Instrument the form beside the map can
+  // be made wider, on a wide window.
   const updatedStyle = appearance.style === "instrument-updated";
-  const onProcess =
-    state.stage === "process" || state.stage === "running" || state.stage === "result";
-  // Beside, on a wide window: on a phone the form is a card on the picture.
   const wide = useWide();
-  const docked = showMap || (updatedStyle && onProcess && wide);
   const [panelWidth, setPanelWidth] = useState(PANEL_START);
   // STYLE TRIAL (#40): on a narrow screen the updated Instrument puts the map
   // right under the result, not at the foot of the page.
@@ -653,11 +651,10 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
                 )}
                 <div
                   className={docked ? "layout" : "layout layout-single"}
-                  data-docked-without-map={docked && !showMap ? true : undefined}
                   inert={behind}
                   // STYLE TRIAL (#36): the form's width, as the visitor set it.
                   style={
-                    updatedStyle && onProcess
+                    updatedStyle && showMap
                       ? ({ "--panel-width": `${String(panelWidth)}px` } as CSSProperties)
                       : undefined
                   }
@@ -711,15 +708,7 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
                     (mapUnderResult
                       ? mapSlot !== undefined && createPortal(mapElement, mapSlot)
                       : mapElement)}
-                  {docked && !showMap && (
-                    // STYLE TRIAL (#36): the picture where the map would be.
-                    <aside className="backdrop-pane" aria-label="Picture of Europe">
-                      <p className="backdrop-credit">
-                        Imagery: NASA Blue Marble and Blue Marble clouds · NASA Earth at Night 2012
-                      </p>
-                    </aside>
-                  )}
-                  {updatedStyle && onProcess && wide && (
+                  {updatedStyle && showMap && wide && (
                     <PanelHandle width={panelWidth} onWidth={setPanelWidth} />
                   )}
                 </div>

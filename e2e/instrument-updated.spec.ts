@@ -172,17 +172,13 @@ for (const { style, updated } of VERSIONS) {
       await connect(page);
       await page.getByRole("button", { name: "Hello World", exact: true }).click();
       await expect(page.getByRole("heading", { level: 2, name: "Hello World" })).toBeVisible();
-      // In the update, the form docked at the left and the picture beside it (#36).
       const picture = await page
-        .locator(updated ? ".backdrop-pane" : ".layout-single")
+        .locator(".layout-single")
         .evaluate((layout) => getComputedStyle(layout).backgroundImage);
       expect(picture.includes("europe-")).toBe(updated);
       await expect(page.locator(".backdrop-credit")).toBeVisible({ visible: updated });
-      // Instrument as it is keeps its card, and nothing to resize.
-      await expect(page.locator(".layout-single")).toHaveCount(updated ? 0 : 1);
-      await expect(page.getByRole("separator", { name: "Width of the form" })).toHaveCount(
-        updated ? 1 : 0,
-      );
+      // A card, not docked: nothing to resize (#36 docks only beside a map).
+      await expect(page.getByRole("separator", { name: "Width of the form" })).toHaveCount(0);
     });
 
     test(`the requests are ${updated ? "in the developer section" : "under the form"}; inputs and outputs ${updated ? "copy" : "don't copy"}`, async ({
@@ -296,11 +292,12 @@ for (const { style, updated } of VERSIONS) {
   });
 }
 
-test("instrument-updated: About as beside a map, the way back a button, the credit in the corner, Copy an icon", async ({
+test("instrument-updated: About as a box like Developer, the way back a button, the credit in the corner, Copy an icon", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await open(page, "instrument-updated");
+  // With the Developer section, which is there with `?developer` only (#38).
+  await open(page, "instrument-updated", "&developer");
   await connect(page);
   await page.getByRole("button", { name: "Hello World", exact: true }).click();
 
@@ -309,13 +306,10 @@ test("instrument-updated: About as beside a map, the way back a button, the cred
       const style = getComputedStyle(element);
       return [style.borderTopStyle, style.borderTopWidth, style.paddingTop, style.borderRadius];
     });
-  // Docked at the left, map or not (#36): About as it is beside a map.
-  const withoutMap = await boxOf("details.about");
-  await page.getByRole("button", { name: "All processes" }).click();
-  await page.getByRole("button", { name: "Buildings in an area", exact: true }).click();
-  await page.locator(".map-pane canvas").waitFor();
-  expect(await boxOf("details.about")).toEqual(withoutMap);
-  await page.getByRole("button", { name: "All processes" }).click();
+  expect(await boxOf("details.about")).toEqual(await boxOf("details.developer"));
+  // The rest as a visitor sees it, without the Developer section.
+  await open(page, "instrument-updated");
+  await connect(page);
   await page.getByRole("button", { name: "Hello World", exact: true }).click();
 
   const back = page.getByRole("button", { name: "All processes" });

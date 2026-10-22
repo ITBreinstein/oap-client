@@ -739,10 +739,10 @@ test("#36 the form's width can be changed with the keys and by dragging, between
   await page.mouse.up();
   await expect.poll(width).toBeLessThan(560);
 
-  // Kept for the visit, from one process to the next.
+  // Kept for the visit, from one process with a map to the next.
   const kept = await width();
   await toList(page);
-  await openProcess(page, "Hello World");
+  await openProcess(page, "Rotate a polygon a quarter turn");
   await expect.poll(width).toBe(kept);
 });
 

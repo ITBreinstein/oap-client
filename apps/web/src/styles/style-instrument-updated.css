@@ -33,9 +33,8 @@
  * `StatusChanged`; `JobsPanel` `JobFacts`; #30); a result that is one plain
  * value is shown large, and the status line says "Finished" and how long it
  * took (`ResultsView`, `results/plain-value.ts`, `ProcessScreen` `ResultStrip`;
- * #27); a process keeps its form docked at the left, map or not, and its
- * width can be changed (`App.tsx` `docked`, `app/PanelHandle.tsx`,
- * `app/panel-width.ts`; #36); on a narrow screen the map is right under the
+ * #27); the form beside the map can be made wider (`App.tsx`,
+ * `app/PanelHandle.tsx`, `app/panel-width.ts`; #36); on a narrow screen the map is right under the
  * result, which links to it (`App.tsx` `mapUnderResult`, `ProcessScreen`
  * `mapSlot`; #40); the Developer section is there only with `?developer`
  * (`App.tsx`, #38); a form leaves out a line of limits its description
@@ -935,46 +934,11 @@
   overflow-wrap: anywhere;
 }
 
-/* ------------------------------------------------- the form, docked, any width */
+/* ------------------------------------------------- the form beside the map, any width */
 
-/*
- * A process keeps its form docked at the left whether or not it has a map
- * (#36; App.tsx `docked`): without one, the picture is where the map would be,
- * as behind the other pages, with its credit in the corner. On a phone, the
- * form alone.
- */
+/* A process with a map docks its form at the left (#36); without one, it is a card on the picture. */
 [data-variant="updated"] .layout {
   position: relative;
-}
-
-[data-variant="updated"] .backdrop-pane {
-  position: relative;
-  display: flex;
-  align-items: flex-end;
-  justify-content: flex-end;
-  padding: 12px;
-  background-size: cover;
-  background-position: 43.4% 62.7%;
-}
-
-[data-variant="updated"][data-theme="light"] .backdrop-pane {
-  background-image:
-    linear-gradient(var(--backdrop-scrim), var(--backdrop-scrim)),
-    url("../assets/backdrop/europe-day.webp");
-}
-
-[data-variant="updated"][data-theme="dark"] .backdrop-pane {
-  background-image:
-    linear-gradient(var(--backdrop-scrim), var(--backdrop-scrim)),
-    url("../assets/backdrop/europe-night.webp");
-}
-
-[data-variant="updated"] .backdrop-pane > .backdrop-credit {
-  margin: 0;
-  padding: 2px 6px;
-  font-size: 0.625rem;
-  color: var(--muted);
-  background: color-mix(in srgb, var(--surface) 85%, transparent);
 }
 
 /*
@@ -1018,7 +982,6 @@
 }
 
 @media (max-width: 52rem) {
-  [data-variant="updated"] .backdrop-pane,
   [data-variant="updated"] .panel-handle-region {
     display: none;
   }
