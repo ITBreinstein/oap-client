@@ -16,6 +16,7 @@ import {
   AttributionControl,
   Map as MapLibreMap,
   NavigationControl,
+  ScaleControl,
   setWorkerUrl,
   type CameraOptions,
   type StyleSpecification,
@@ -126,6 +127,8 @@ function startMap(
   }
   map.addControl(new AttributionControl({ compact: false }));
   map.addControl(new NavigationControl({ showCompass: false, visualizePitch: false }));
+  // A scale, so a shape's size can be judged on the map too (#15).
+  map.addControl(new ScaleControl({ unit: "metric" }), "bottom-left");
   return map;
 }
 

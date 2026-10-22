@@ -10,7 +10,7 @@
  * New rather than reading its metres as degrees.
  */
 
-import { useContext, useEffect, useId, useState } from "react";
+import { useContext, useEffect, useId, useMemo, useState } from "react";
 import { isGeoJsonText, type GeoJsonText } from "../forms/encode.js";
 import { describeLoad, readGeoJson } from "../forms/geojson.js";
 import { drawableTypes, holdsSeveral, toGeoJson } from "../forms/geometry.js";
@@ -21,6 +21,7 @@ import { tooManyToEditMessage, useTooManyToEdit } from "./map-limits.js";
 import type { ControlProps } from "./FormFields.js";
 import { CopyField } from "./CopyButton.js";
 import { formatJsonText } from "./json-text.js";
+import { sizeOfGeoJsonText } from "./shape-size.js";
 import { useUpdated } from "./variant.js";
 
 const SINGULAR = { Point: "point", LineString: "line", Polygon: "area" } as const;
@@ -57,6 +58,7 @@ export function GeometryField(props: ControlProps<GeometryControl>) {
   const drawing = inputId !== undefined && draw.fieldId === inputId;
   const canDraw = inputId !== undefined && draw.available && drawableTypes(control).length > 0;
   const tooMany = useTooManyToEdit(text);
+  const size = useMemo(() => sizeOfGeoJsonText(text), [text]);
   // A value too large to edit — loaded or pasted while drawing — ends drawing.
   useEffect(() => {
     if (drawing && tooMany !== undefined) draw.stop();
@@ -91,6 +93,12 @@ export function GeometryField(props: ControlProps<GeometryControl>) {
           />
         </CopyField>
       </p>
+      {/* How big it is, to check a process's limit against (#15): while drawing, and after. */}
+      {size !== undefined && (
+        <p className="help shape-size" data-testid="shape-size">
+          {size}
+        </p>
+      )}
       <p>
         <label htmlFor={`${base}-file`}>Or load a GeoJSON file</label>
         <input

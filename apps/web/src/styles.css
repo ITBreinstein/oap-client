@@ -318,6 +318,18 @@ pre.code {
   word-break: break-word;
 }
 
+/* The map's scale (#15), in the page's colours and type. */
+.maplibregl-ctrl-bottom-left .maplibregl-ctrl-scale {
+  padding: 0 6px;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  line-height: 1.6;
+  color: var(--text);
+  background: var(--surface);
+  border: 1.5px solid var(--text);
+  border-top: none;
+}
+
 /* Why Run in the background is off here, and the way round it (#25). */
 .background-help {
   margin-top: 12px;

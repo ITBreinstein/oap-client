@@ -12,6 +12,7 @@
 
 import { useContext, useId, useState } from "react";
 import { classifyCrs, drawableCrs, isDrawableCrs, typedBboxCrs } from "../forms/crs.js";
+import { extentOfBbox, metresAcross, sizeLabel } from "./shape-size.js";
 import { isRawJson, type BboxValue } from "../forms/encode.js";
 import type { BboxControl } from "../forms/plan.js";
 import { DrawContext } from "./draw.js";
@@ -100,6 +101,8 @@ export function BboxField(props: ControlProps<BboxControl>) {
         : PROJECTED_3D;
   const drawing = inputId !== undefined && draw.fieldId === inputId;
   const canDraw = inputId !== undefined && draw.available && mapCrs !== undefined && count === 4;
+  const extent = geographic && box !== undefined ? extentOfBbox(box.coordinates) : undefined;
+  const size = extent === undefined ? undefined : sizeLabel(metresAcross(extent));
 
   // The typed fields keep what was typed, "5." included; the value is derived
   // from them. A box drawn on the map arrives as a new value instead, and its
@@ -228,6 +231,13 @@ export function BboxField(props: ControlProps<BboxControl>) {
           </p>
         ))}
       </div>
+
+      {/* How big it is, to check a process's limit against (#15): in longitude and latitude only. */}
+      {size !== undefined && (
+        <p className="help shape-size" data-testid="shape-size">
+          {size}
+        </p>
+      )}
 
       {notice !== undefined && (
         <p className="hint" role="status">
