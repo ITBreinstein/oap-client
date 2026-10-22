@@ -19,11 +19,11 @@ const WORLD_STAND_IN = {
   layers: [{ id: "land", type: "background", paint: { "background-color": "#f8f4f0" } }],
 };
 
-async function open(page: Page, style: string) {
+async function open(page: Page, style: string, more = "") {
   await page.route("https://tiles.openfreemap.org/**", (route) =>
     route.fulfill({ contentType: "application/json", body: JSON.stringify(WORLD_STAND_IN) }),
   );
-  await page.goto(`/?style=${style}&theme=light`);
+  await page.goto(`/?style=${style}&theme=light${more}`);
   await expect(page.getByRole("heading", { level: 2, name: "Connect to a service" })).toBeVisible();
 }
 
@@ -310,3 +310,35 @@ test("#35 a stage change closes a panel, and opening a process from one does", a
   await expect(page.getByRole("heading", { level: 2, name: "Processes" })).toBeVisible();
   await expect(about).toBeHidden();
 });
+
+for (const { style, more, spared } of [
+  { style: "instrument-updated", more: "", spared: true },
+  { style: "instrument-updated", more: "&developer", spared: false },
+  { style: "instrument", more: "", spared: false },
+] as const) {
+  test(`#43 the technical words are ${spared ? "spared" : "shown"}: ${style}${more}`, async ({
+    page,
+  }) => {
+    await open(page, style, more);
+    const shown = async (locator: ReturnType<Page["locator"]>) => {
+      if (spared) await expect(locator).toBeHidden();
+      else await expect(locator).toBeVisible();
+    };
+    // The relay/direct tags on the start screen.
+    await shown(page.locator(".choice-access").first());
+
+    await connectTyped(page);
+    // The service's access, jobs and standard; its process count stays.
+    await shown(page.locator(".service-facts .fact-standard"));
+    await expect(page.locator(".service-facts .fact-processes")).toBeVisible();
+    // How each process runs.
+    await shown(page.locator(".cell-runs").first());
+
+    // The request header behind "Run in the background", and a box's CRS.
+    await openProcess(page, "Bounding box to feature");
+    await shown(page.locator(".run-hint"));
+    await expect(
+      page.getByText(spared ? "In longitude and latitude." : /^Coordinate reference system: /),
+    ).toBeVisible();
+  });
+}

@@ -143,19 +143,19 @@ export function ProcessListScreen(props: ProcessListScreenProps) {
           {service.description !== undefined && <p className="help">{service.description}</p>}
         </div>
         <dl className="service-facts">
-          <div>
+          <div className="fact-access">
             <dt className="label">Access</dt>
             <dd>{props.route === "relay" ? "through the relay" : "direct"}</dd>
           </div>
-          <div>
+          <div className="fact-jobs">
             <dt className="label">Jobs</dt>
             <dd className="mono">{jobsLabel(service.capabilities)}</dd>
           </div>
-          <div>
+          <div className="fact-processes">
             <dt className="label">Processes</dt>
             <dd className="mono">{String(total ?? processes.processes.length)}</dd>
           </div>
-          <div>
+          <div className="fact-standard">
             <dt className="label">Standard</dt>
             <dd className="mono">{standardLabel(service.capabilities)}</dd>
           </div>

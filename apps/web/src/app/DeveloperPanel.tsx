@@ -67,7 +67,7 @@ export function DeveloperPanel({
   census,
   onDescribeAll,
   first,
-  note,
+  notes = [],
 }: {
   readonly observations: readonly SessionObservation[];
   /** How many the session dropped to stay under its cap. */
@@ -79,8 +79,11 @@ export function DeveloperPanel({
   readonly onDescribeAll: (() => void) | undefined;
   /** What goes first in it: the updated Instrument's request log. */
   readonly first?: ReactNode;
-  /** The last error, as a developer is told it (#25): what the visitor's words leave out. */
-  readonly note?: string | undefined;
+  /**
+   * What the visitor's words leave out (#25, #43): the last error as a
+   * developer is told it, the job on screen by its id.
+   */
+  readonly notes?: readonly string[] | undefined;
 }) {
   const [expanded, setExpanded] = useState(open);
   const [endpoint, setEndpoint] = useState("");
@@ -103,11 +106,11 @@ export function DeveloperPanel({
       }}
     >
       <summary>Developer</summary>
-      {note !== undefined && (
-        <p className="developer-note" data-testid="developer-note">
+      {notes.map((note) => (
+        <p key={note} className="developer-note" data-testid="developer-note">
           {note}
         </p>
-      )}
+      ))}
       {first}
       <p>
         {observations.length} observations this session, {forms} from form generation.

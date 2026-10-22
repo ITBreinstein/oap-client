@@ -18,6 +18,7 @@ import { CopyButton } from "./CopyButton.js";
 import { MapLimitsContext } from "./map-limits.js";
 import { saveBlob } from "./save.js";
 import { useDataUrl } from "./useDataUrl.js";
+import { useSpared } from "./developer.js";
 import { useUpdated } from "./variant.js";
 import {
   isShownImage,
@@ -301,6 +302,7 @@ function LoadedOk({ loaded, host }: { readonly loaded: LoadedReference; readonly
 
 function LoadedLine({ loaded, href }: { readonly loaded: LoadedReference; readonly href: string }) {
   const host = hostOf(href) ?? "the server";
+  const spared = useSpared(useUpdated());
   switch (loaded.outcome) {
     case "ok":
       return <LoadedOk loaded={loaded} host={host} />;
@@ -308,7 +310,9 @@ function LoadedLine({ loaded, href }: { readonly loaded: LoadedReference; readon
       return (
         <p className="notice">
           This page could not read it: {host} sends no CORS headers for it, or could not be reached.
-          Open the link to see it in a new tab. The attempt has been recorded.
+          Open the link to see it in a new tab.
+          {/* STYLE TRIAL: spared in the updated Instrument, recorded all the same (#43). */}
+          {!spared && " The attempt has been recorded."}
         </p>
       );
     case "http-error":

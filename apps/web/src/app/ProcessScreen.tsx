@@ -27,6 +27,7 @@ import { FieldView } from "./FormFields.js";
 import { ResultsView } from "./ResultsView.js";
 import { SentInputs } from "./SentInputs.js";
 import { Versioned } from "./Versioned.js";
+import { useSpared } from "./developer.js";
 import { useUpdated } from "./variant.js";
 import { isUntouched } from "./form-memory.js";
 import { initialValues } from "../forms/defaults.js";
@@ -183,7 +184,20 @@ function OutputChoices({
   );
 }
 
-function JobStatusLine({ job }: { readonly job: JobRow | undefined }) {
+function JobStatusLine({
+  job,
+  processTitle,
+  spared,
+}: {
+  readonly job: JobRow | undefined;
+  readonly processTitle: string;
+  /**
+   * STYLE TRIAL (#43): the updated Instrument leads with the process and its
+   * status, "Slow process: running, 40%"; the job's id is the Developer
+   * section's.
+   */
+  readonly spared: boolean;
+}) {
   if (job === undefined) return <>Starting the job…</>;
   if (job.status === undefined) {
     return (
@@ -195,7 +209,13 @@ function JobStatusLine({ job }: { readonly job: JobRow | undefined }) {
   }
   return (
     <>
-      Job <code>{job.status.jobId}</code>:{" "}
+      {spared ? (
+        <>{processTitle}: </>
+      ) : (
+        <>
+          Job <code>{job.status.jobId}</code>:{" "}
+        </>
+      )}
       <strong data-job-status={job.status.status}>{job.status.rawStatus}</strong>
       {job.status.progress !== undefined && (
         <>
@@ -529,6 +549,7 @@ export function ProcessScreen(props: ProcessScreenProps) {
   // (App.tsx moves it), and it is then scrolled clear of the Run bar: after
   // that move, which would otherwise scroll the panel back to its top.
   const updated = useUpdated();
+  const spared = useSpared(updated);
   const serverErrorBox = useRef<HTMLDivElement>(null);
   const shownError = state.stage === "process" ? state.error : undefined;
   const errorTakesFocus = updated && shownError !== undefined;
@@ -634,7 +655,11 @@ export function ProcessScreen(props: ProcessScreenProps) {
           ) : (
             <>
               <p>
-                <JobStatusLine job={job} />
+                <JobStatusLine
+                  job={job}
+                  processTitle={process.title ?? process.id}
+                  spared={spared}
+                />
               </p>
               {updated && jobLink !== undefined && (
                 <div className="job-link">

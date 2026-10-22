@@ -54,6 +54,12 @@ export interface JobsPanelProps {
         readonly follow?: ((job: JobRow) => void) | undefined;
       }
     | undefined;
+  /**
+   * STYLE TRIAL (updated Instrument, #43): a job's process and service by
+   * the names a visitor knows them by, not by id and host.
+   */
+  readonly names?:
+    ((job: JobRow) => { readonly process: string; readonly service: string }) | undefined;
 }
 
 function hostOf(url: string): string {
@@ -122,10 +128,12 @@ function JobFacts({
   job,
   titleId,
   title,
+  service,
 }: {
   readonly job: JobRow;
   readonly titleId: string;
   readonly title: string;
+  readonly service: string;
 }) {
   const { status } = job;
   const state = job.gone ? "gone" : (status?.status ?? "checking");
@@ -147,7 +155,7 @@ function JobFacts({
       <dl className="job-facts">
         <div>
           <dt>Service</dt>
-          <dd>{hostOf(job.endpoint)}</dd>
+          <dd>{service}</dd>
         </div>
         {job.startedAt !== undefined && (
           <div>
@@ -198,8 +206,10 @@ function JobItem({
   rerunBusy,
   onRemove,
   onDismiss,
+  names,
 }: {
   readonly structured: boolean;
+  readonly names: JobsPanelProps["names"];
   readonly onRerun: (() => void) | undefined;
   readonly onFollow: (() => void) | undefined;
   readonly rerunFilled: boolean;
@@ -215,7 +225,8 @@ function JobItem({
   const base = useId();
   const results = resultsHref(job);
   const canDismiss = advertisedBy !== "nothing" && !job.gone && job.status?.status !== "dismissed";
-  const title = job.processId ?? job.status?.jobId ?? job.statusUrl;
+  const named = names?.(job);
+  const title = named?.process ?? job.processId ?? job.status?.jobId ?? job.statusUrl;
   // Shown on the page: a job under way, or one with results, not the one on screen.
   const followable =
     !active &&
@@ -231,7 +242,12 @@ function JobItem({
       aria-labelledby={`${base}-title`}
     >
       {structured ? (
-        <JobFacts job={job} titleId={`${base}-title`} title={title} />
+        <JobFacts
+          job={job}
+          titleId={`${base}-title`}
+          title={title}
+          service={named?.service ?? hostOf(job.endpoint)}
+        />
       ) : (
         <>
           {/* One cell each, so a style can lay a row out as a table's. */}
@@ -380,6 +396,7 @@ export function JobsPanel(props: JobsPanelProps) {
             advertisedBy={dismissAdvertisedFor(job)}
             message={messages.get(job.statusUrl)}
             structured={props.structured === true}
+            names={props.names}
             onRerun={
               props.rerun === undefined || job.processId === undefined
                 ? undefined

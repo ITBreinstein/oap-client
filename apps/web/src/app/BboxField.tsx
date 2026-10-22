@@ -12,7 +12,9 @@
 
 import { useContext, useId, useState } from "react";
 import { classifyCrs, drawableCrs, isDrawableCrs, typedBboxCrs } from "../forms/crs.js";
+import { useSpared } from "./developer.js";
 import { extentOfBbox, metresAcross, sizeLabel } from "./shape-size.js";
+import { useUpdated } from "./variant.js";
 import { isRawJson, type BboxValue } from "../forms/encode.js";
 import type { BboxControl } from "../forms/plan.js";
 import { DrawContext } from "./draw.js";
@@ -85,6 +87,7 @@ export function BboxField(props: ControlProps<BboxControl>) {
   const { control, value, onChange, describedBy, inputId } = props;
   const draw = useContext(DrawContext);
   const base = useId();
+  const spared = useSpared(useUpdated());
   const box = isBboxValue(value) ? value : undefined;
   const mapCrs = control.dimensions.includes(4) ? drawableCrs(control.crs) : undefined;
   const crs = box?.crs ?? typedBboxCrs(control);
@@ -202,7 +205,14 @@ export function BboxField(props: ControlProps<BboxControl>) {
           </select>
         </p>
       ) : (
-        <p className="help">Coordinate reference system: {crsLabel(crs)}</p>
+        <p className="help">
+          {/* STYLE TRIAL: the updated Instrument spares a visitor the CRS's address (#43). */}
+          {spared && geographic
+            ? kind === "crs84h"
+              ? "In longitude and latitude, with heights."
+              : "In longitude and latitude."
+            : `Coordinate reference system: ${crsLabel(crs)}`}
+        </p>
       )}
 
       {mapCrs === undefined && (

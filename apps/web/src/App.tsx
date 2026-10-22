@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import type { Appearance } from "./app/appearance.js";
 import { AppearanceControl } from "./app/AppearanceControl.js";
 import { UpdatedContext } from "./app/variant.js";
+import { DeveloperContext } from "./app/developer.js";
 import { sameService, useAddress, wouldLoseWork } from "./app/address.js";
 import { AppFrame, RailItem, type FramePlace } from "./app/AppFrame.js";
 import { DeveloperPanel } from "./app/DeveloperPanel.js";
@@ -22,6 +23,7 @@ import { exampleNeeds } from "./app/examples.js";
 import { ExamplesBrowser, FeaturedExamples } from "./app/ExamplesView.js";
 import { typedEndpoint } from "./app/run.js";
 import { SidePanel } from "./app/SidePanel.js";
+import { learnTitles, NO_TITLES, processTitle, serviceTitle, type Titles } from "./app/titles.js";
 import type { EndpointRef } from "./app/workflow.js";
 import type { FormValues } from "./forms/encode.js";
 import type { JobRow } from "./relay/job-session.js";
@@ -130,6 +132,26 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
         .map(([key, needs]): [string, Needs] => [key.slice(prefix.length), needs]),
     ]);
   }, [described, examples, state]);
+
+  // The names this visit has read, for My jobs (#43): learned while
+  // rendering, as `described` is, from the service and process on screen.
+  const [titles, setTitles] = useState<Titles>(NO_TITLES);
+  const learned =
+    state.stage === "choose-endpoint"
+      ? titles
+      : learnTitles(titles, state.endpoint.baseUrl, state.service.title, [
+          ...state.processes.processes,
+          ...(state.stage === "connected" ? [] : [state.process]),
+        ]);
+  if (learned !== titles) setTitles(learned);
+  // STYLE TRIAL (updated Instrument, #43): My jobs names a job's process and service.
+  const jobNames = (job: JobRow) => ({
+    process:
+      job.processId === undefined
+        ? (job.status?.jobId ?? job.statusUrl)
+        : processTitle(titles, examples, job.endpoint, job.processId),
+    service: serviceTitle(titles, presets, job.endpoint),
+  });
 
   const [panelOpen, setPanelOpen] = useState<Panel | undefined>();
   const togglePanel = (which: Panel) => {
@@ -392,6 +414,23 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
   const focusStage = () => {
     panel.current?.querySelector<HTMLElement>("[data-focus-on-stage]")?.focus();
   };
+  // What the visitor's words leave out, for the Developer section (#25, #43).
+  const shownJobRef =
+    state.stage === "running" && state.run.mode === "async"
+      ? state.run.jobRef
+      : state.stage === "result"
+        ? state.jobRef
+        : undefined;
+  const shownJobId =
+    shownJobRef === undefined
+      ? undefined
+      : jobs.find((job) => job.statusUrl === shownJobRef)?.status?.jobId;
+  const developerNotes = [
+    ...(state.stage === "process" && state.error?.technical !== undefined
+      ? [state.error.technical]
+      : []),
+    ...(shownJobId === undefined ? [] : [`Job ${shownJobId}`]),
+  ];
   const onConnect =
     state.stage === "choose-endpoint"
       ? focusStage
@@ -407,207 +446,221 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
   return (
     <MapLimitsContext value={mapLimits}>
       <UpdatedContext value={appearance.style === "instrument-updated"}>
-        <DrawContext.Provider value={draw}>
-          <div className="app" data-relay-stream={view.snapshot?.relay}>
-            {/* The first stop for a keyboard: past the rail, to the page itself. */}
-            <a className="skip-link" href="#content" inert={behindPanel}>
-              Skip to content
-            </a>
-            <AppFrame
-              inert={behind}
-              appearance={
-                <AppearanceControl appearance={appearance} onStyle={setStyle} onTheme={setTheme} />
-              }
-              place={place}
-              onConnect={onConnect}
-              onProcesses={onProcesses}
-              railItems={
-                examples.length > 0 && (
+        <DeveloperContext value={developer}>
+          <DrawContext.Provider value={draw}>
+            <div
+              className="app"
+              data-relay-stream={view.snapshot?.relay}
+              data-developer={developer ? true : undefined}
+            >
+              {/* The first stop for a keyboard: past the rail, to the page itself. */}
+              <a className="skip-link" href="#content" inert={behindPanel}>
+                Skip to content
+              </a>
+              <AppFrame
+                inert={behind}
+                appearance={
+                  <AppearanceControl
+                    appearance={appearance}
+                    onStyle={setStyle}
+                    onTheme={setTheme}
+                  />
+                }
+                place={place}
+                onConnect={onConnect}
+                onProcesses={onProcesses}
+                railItems={
+                  examples.length > 0 && (
+                    <RailItem
+                      icon="examples"
+                      label="Examples"
+                      pressed={panelOpen === "examples"}
+                      controls={PANEL_IDS.examples}
+                      onClick={() => {
+                        togglePanel("examples");
+                      }}
+                    />
+                  )
+                }
+                aboutItem={
                   <RailItem
-                    icon="examples"
-                    label="Examples"
-                    pressed={panelOpen === "examples"}
-                    controls={PANEL_IDS.examples}
+                    icon="about"
+                    label="About"
+                    pressed={panelOpen === "about"}
+                    controls={PANEL_IDS.about}
                     onClick={() => {
-                      togglePanel("examples");
+                      togglePanel("about");
                     }}
                   />
-                )
-              }
-              aboutItem={
-                <RailItem
-                  icon="about"
-                  label="About"
-                  pressed={panelOpen === "about"}
-                  controls={PANEL_IDS.about}
-                  onClick={() => {
-                    togglePanel("about");
-                  }}
-                />
-              }
-              jobsItem={
-                <RailItem
-                  icon="jobs"
-                  label="Jobs"
-                  pressed={panelOpen === "jobs"}
-                  controls={PANEL_IDS.jobs}
-                  badge={jobsBadge}
-                  onClick={() => {
-                    togglePanel("jobs");
-                  }}
-                />
-              }
-            />
-            <div className="app-body">
-              {configWarning !== undefined && (
-                <p
-                  className="notice config-warning"
-                  role="alert"
-                  data-testid="config-warning"
-                  inert={behind}
-                >
-                  {configWarning}
-                </p>
-              )}
-              <div className={showMap ? "layout" : "layout layout-single"} inert={behind}>
-                <main
-                  id="content"
-                  tabIndex={-1}
-                  className="panel"
-                  ref={panel}
-                  data-stage={state.stage}
-                >
-                  {state.stage !== "choose-endpoint" && state.route === "relay" && <RelayBanner />}
-                  {screen}
-                  {/* The credit for the picture behind the page without a map (backdrop.css). */}
-                  {!showMap && (
-                    <p className="backdrop-credit">
-                      Imagery: NASA Blue Marble and Blue Marble clouds · NASA Earth at Night 2012
-                    </p>
-                  )}
-                  <DeveloperPanel
-                    observations={view.snapshot?.observations ?? []}
-                    dropped={view.snapshot?.droppedObservations ?? 0}
-                    relayUrl={relayUrl}
-                    open={developer}
-                    census={view.census}
-                    note={state.stage === "process" ? state.error?.technical : undefined}
-                    onDescribeAll={
-                      state.stage === "choose-endpoint" ? undefined : commands.describeAll
-                    }
-                    first={
-                      // STYLE TRIAL: the updated Instrument keeps the request log here.
-                      appearance.style === "instrument-updated" &&
-                      state.stage !== "choose-endpoint" ? (
-                        <RequestLog
-                          entries={view.snapshot?.observations ?? []}
-                          endpoint={redactUrl(state.endpoint.baseUrl)}
-                        />
-                      ) : undefined
-                    }
+                }
+                jobsItem={
+                  <RailItem
+                    icon="jobs"
+                    label="Jobs"
+                    pressed={panelOpen === "jobs"}
+                    controls={PANEL_IDS.jobs}
+                    badge={jobsBadge}
+                    onClick={() => {
+                      togglePanel("jobs");
+                    }}
                   />
-                </main>
-                {showMap && (
-                  <MapBoundary>
-                    <MapPane
-                      state={state}
-                      draw={draw}
-                      setValue={commands.setValue}
-                      onAvailable={setMapAvailable}
-                      basemap={
-                        // STYLE TRIAL: the updated Instrument's map is the world, in the theme's colours.
-                        appearance.style === "instrument-updated"
-                          ? {
-                              create: createWorldMap[resolvedTheme],
-                              label: "Map of the world (OpenFreeMap)",
-                            }
-                          : undefined
+                }
+              />
+              <div className="app-body">
+                {configWarning !== undefined && (
+                  <p
+                    className="notice config-warning"
+                    role="alert"
+                    data-testid="config-warning"
+                    inert={behind}
+                  >
+                    {configWarning}
+                  </p>
+                )}
+                <div className={showMap ? "layout" : "layout layout-single"} inert={behind}>
+                  <main
+                    id="content"
+                    tabIndex={-1}
+                    className="panel"
+                    ref={panel}
+                    data-stage={state.stage}
+                  >
+                    {state.stage !== "choose-endpoint" && state.route === "relay" && (
+                      <RelayBanner />
+                    )}
+                    {screen}
+                    {/* The credit for the picture behind the page without a map (backdrop.css). */}
+                    {!showMap && (
+                      <p className="backdrop-credit">
+                        Imagery: NASA Blue Marble and Blue Marble clouds · NASA Earth at Night 2012
+                      </p>
+                    )}
+                    <DeveloperPanel
+                      observations={view.snapshot?.observations ?? []}
+                      dropped={view.snapshot?.droppedObservations ?? 0}
+                      relayUrl={relayUrl}
+                      open={developer}
+                      census={view.census}
+                      notes={developerNotes}
+                      onDescribeAll={
+                        state.stage === "choose-endpoint" ? undefined : commands.describeAll
+                      }
+                      first={
+                        // STYLE TRIAL: the updated Instrument keeps the request log here.
+                        appearance.style === "instrument-updated" &&
+                        state.stage !== "choose-endpoint" ? (
+                          <RequestLog
+                            entries={view.snapshot?.observations ?? []}
+                            endpoint={redactUrl(state.endpoint.baseUrl)}
+                          />
+                        ) : undefined
                       }
                     />
-                  </MapBoundary>
-                )}
-              </div>
-              {/* What an open panel covers: a press on it closes the panel (#35).
+                  </main>
+                  {showMap && (
+                    <MapBoundary>
+                      <MapPane
+                        state={state}
+                        draw={draw}
+                        setValue={commands.setValue}
+                        onAvailable={setMapAvailable}
+                        basemap={
+                          // STYLE TRIAL: the updated Instrument's map is the world, in the theme's colours.
+                          appearance.style === "instrument-updated"
+                            ? {
+                                create: createWorldMap[resolvedTheme],
+                                label: "Map of the world (OpenFreeMap)",
+                              }
+                            : undefined
+                        }
+                      />
+                    </MapBoundary>
+                  )}
+                </div>
+                {/* What an open panel covers: a press on it closes the panel (#35).
                   The panel's keyboard way out is Escape, or its Close button. */}
-              {behindPanel && (
-                <div className="panel-scrim" aria-hidden="true" onClick={closePanel} />
-              )}
-              {examples.length > 0 && (
+                {behindPanel && (
+                  <div className="panel-scrim" aria-hidden="true" onClick={closePanel} />
+                )}
+                {examples.length > 0 && (
+                  <SidePanel
+                    id={PANEL_IDS.examples}
+                    title="Examples"
+                    open={panelOpen === "examples"}
+                    inert={offerOpen}
+                    onClose={closePanel}
+                    className="examples-panel"
+                  >
+                    <ExamplesBrowser examples={examples} busy={busy} onOpen={openExample} />
+                  </SidePanel>
+                )}
                 <SidePanel
-                  id={PANEL_IDS.examples}
-                  title="Examples"
-                  open={panelOpen === "examples"}
+                  id={PANEL_IDS.jobs}
+                  title="My jobs"
+                  open={panelOpen === "jobs"}
                   inert={offerOpen}
                   onClose={closePanel}
-                  className="examples-panel"
+                  className="my-jobs-panel"
                 >
-                  <ExamplesBrowser examples={examples} busy={busy} onOpen={openExample} />
+                  {jobs.length === 0 && (
+                    <div className="jobs-empty">
+                      <p>No background jobs yet.</p>
+                      <p className="help">
+                        A process you run in the background is listed here, with its status, until
+                        you remove it from the list. It stays listed when you reload the page.
+                      </p>
+                      <p className="help">
+                        Some services do not let a web page find a job it started, so the job runs
+                        but cannot be listed. The relay can find it: choose a service the relay
+                        offers.
+                      </p>
+                    </div>
+                  )}
+                  <JobsPanel
+                    heading={false}
+                    structured={appearance.style === "instrument-updated"}
+                    names={appearance.style === "instrument-updated" ? jobNames : undefined}
+                    rerun={
+                      appearance.style === "instrument-updated"
+                        ? {
+                            start: rerun,
+                            filled: (job) => sentFor.current.has(job.statusUrl),
+                            follow: followJob,
+                            // A run that can't be left: a background job with a link can.
+                            busy: wouldLoseWork(state) && state.stage === "running",
+                          }
+                        : undefined
+                    }
+                    jobs={view.snapshot?.jobs ?? []}
+                    activeJob={
+                      state.stage === "running" && state.run.mode === "async"
+                        ? state.run.jobRef
+                        : undefined
+                    }
+                    dismissAdvertisedFor={view.dismissAdvertisedFor}
+                    messages={view.jobMessages}
+                    onRemove={commands.removeJob}
+                    onDismiss={commands.dismissJob}
+                  />
                 </SidePanel>
+                <SidePanel
+                  id={PANEL_IDS.about}
+                  title="About"
+                  open={panelOpen === "about"}
+                  inert={offerOpen}
+                  onClose={closePanel}
+                  className="about-panel"
+                  footer={<AboutFooter />}
+                >
+                  <AboutPanel />
+                </SidePanel>
+              </div>
+              {offerOpen && (
+                <RelayOffer onConfirm={commands.confirmRelay} onDecline={commands.declineRelay} />
               )}
-              <SidePanel
-                id={PANEL_IDS.jobs}
-                title="My jobs"
-                open={panelOpen === "jobs"}
-                inert={offerOpen}
-                onClose={closePanel}
-                className="my-jobs-panel"
-              >
-                {jobs.length === 0 && (
-                  <div className="jobs-empty">
-                    <p>No background jobs yet.</p>
-                    <p className="help">
-                      A process you run in the background is listed here, with its status, until you
-                      remove it from the list. It stays listed when you reload the page.
-                    </p>
-                    <p className="help">
-                      Some services do not let a web page find a job it started, so the job runs but
-                      cannot be listed. The relay can find it: choose a service the relay offers.
-                    </p>
-                  </div>
-                )}
-                <JobsPanel
-                  heading={false}
-                  structured={appearance.style === "instrument-updated"}
-                  rerun={
-                    appearance.style === "instrument-updated"
-                      ? {
-                          start: rerun,
-                          filled: (job) => sentFor.current.has(job.statusUrl),
-                          follow: followJob,
-                          // A run that can't be left: a background job with a link can.
-                          busy: wouldLoseWork(state) && state.stage === "running",
-                        }
-                      : undefined
-                  }
-                  jobs={view.snapshot?.jobs ?? []}
-                  activeJob={
-                    state.stage === "running" && state.run.mode === "async"
-                      ? state.run.jobRef
-                      : undefined
-                  }
-                  dismissAdvertisedFor={view.dismissAdvertisedFor}
-                  messages={view.jobMessages}
-                  onRemove={commands.removeJob}
-                  onDismiss={commands.dismissJob}
-                />
-              </SidePanel>
-              <SidePanel
-                id={PANEL_IDS.about}
-                title="About"
-                open={panelOpen === "about"}
-                inert={offerOpen}
-                onClose={closePanel}
-                className="about-panel"
-                footer={<AboutFooter />}
-              >
-                <AboutPanel />
-              </SidePanel>
             </div>
-            {offerOpen && (
-              <RelayOffer onConfirm={commands.confirmRelay} onDecline={commands.declineRelay} />
-            )}
-          </div>
-        </DrawContext.Provider>
+          </DrawContext.Provider>
+        </DeveloperContext>
       </UpdatedContext>
     </MapLimitsContext>
   );

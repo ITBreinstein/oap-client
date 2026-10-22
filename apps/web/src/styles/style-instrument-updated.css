@@ -19,7 +19,13 @@
  * user (`EndpointScreen.tsx`, `unpicked`), fills in a picked service's
  * address, and shows the featured examples right under the address row
  * (`EndpointScreen.tsx`, #2); a need is shown in a word beside its mark,
- * and nothing where it is not known yet (`NeedsTag.tsx`, `NEEDS_SHORT`, #8); the map is OpenFreeMap's world, in the
+ * and nothing where it is not known yet (`NeedsTag.tsx`, `NEEDS_SHORT`, #8);
+ * without `?developer`, a visitor is spared a box's CRS (`BboxField`), "The
+ * attempt has been recorded." (`ErrorMessage`, `ResultsView`) and a running
+ * job's id (`ProcessScreen`, `JobStatusLine`), all through `useSpared`
+ * (`app/developer.ts`), and My jobs names a job's process and service by
+ * their titles (`app/titles.ts`, `App.tsx` `jobNames`, `JobsPanel` `names`;
+ * #43); the map is OpenFreeMap's world, in the
  * theme's colours (`App.tsx` `basemap`, `createWorldMap` in `map/MapView.tsx`),
  * and About credits it (`AboutPanel.tsx`); "Change service" comes first in
  * the process list, for the top right corner (`ProcessListScreen.tsx`); JSON is laid out with tabs
@@ -165,29 +171,49 @@
   display: none;
 }
 
+/*
+ * Each column as wide as it is, after the process's: one that is left out
+ * (Needs, This visit, and Runs for a visitor, #43) takes no room, and the
+ * heads stay over their cells.
+ */
 @media (min-width: 52rem) {
-  [data-variant="updated"] .process-table:not(:has(.cell-needs[data-known="true"])) .process-head,
-  [data-variant="updated"]
-    .process-table:not(:has(.cell-needs[data-known="true"]))
-    .process-list
-    li {
-    grid-template-columns: minmax(0, 1fr) 6.5rem 5.5rem;
+  [data-variant="updated"] .process-table :is(.process-head, .process-list li) {
+    grid-template-columns: minmax(0, 1fr);
+    grid-auto-columns: max-content;
+    grid-auto-flow: column;
   }
 
-  [data-variant="updated"] .process-table:not(:has(.cell-ran .tag)) .process-head,
-  [data-variant="updated"] .process-table:not(:has(.cell-ran .tag)) .process-list li {
-    grid-template-columns: minmax(0, 1fr) 7rem 6.5rem;
+  [data-variant="updated"] :is(.cell-needs, .process-head .label:nth-child(2)) {
+    width: 7rem;
   }
 
-  [data-variant="updated"]
-    .process-table:not(:has(.cell-needs[data-known="true"])):not(:has(.cell-ran .tag))
-    .process-head,
-  [data-variant="updated"]
-    .process-table:not(:has(.cell-needs[data-known="true"])):not(:has(.cell-ran .tag))
-    .process-list
-    li {
-    grid-template-columns: minmax(0, 1fr) 6.5rem;
+  [data-variant="updated"] :is(.cell-runs, .process-head .label:nth-child(3)) {
+    width: 6.5rem;
   }
+
+  [data-variant="updated"] :is(.cell-ran, .process-head .label:nth-child(4)) {
+    width: 5.5rem;
+  }
+}
+
+/* ------------------------------------------------- the technical words, for developers */
+
+/*
+ * What a visitor does not need to read (#43), shown again with `?developer`
+ * (`.app[data-developer]`): the request header behind "Run in the
+ * background", the relay/direct tags on the start screen, the service's
+ * access, jobs and standard (its process count stays), and how each process
+ * runs. In code (`useSpared`, `app/developer.ts`): a box's CRS, "The attempt
+ * has been recorded.", a job's id, and My jobs' titles.
+ */
+[data-variant="updated"] .app:not([data-developer]) .run-hint,
+[data-variant="updated"] .app:not([data-developer]) .choice-access,
+[data-variant="updated"] .app:not([data-developer]) .service-facts .fact-access,
+[data-variant="updated"] .app:not([data-developer]) .service-facts .fact-jobs,
+[data-variant="updated"] .app:not([data-developer]) .service-facts .fact-standard,
+[data-variant="updated"] .app:not([data-developer]) .cell-runs,
+[data-variant="updated"] .app:not([data-developer]) .process-head .label:nth-child(3) {
+  display: none;
 }
 
 /*
