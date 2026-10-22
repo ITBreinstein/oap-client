@@ -106,3 +106,32 @@ describe("a CSV result", () => {
     );
   });
 });
+
+describe("a CSV result's Copy", () => {
+  it("copies the CSV as the service sent it, in the updated Instrument", async () => {
+    const copied: string[] = [];
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: (text: string) => {
+          copied.push(text);
+          return Promise.resolve();
+        },
+      },
+    });
+    const text = csv(2);
+    const page = view(text, "text/csv", true);
+    const button = page.querySelector<HTMLButtonElement>(".code-box .copy-button");
+    expect(button?.getAttribute("aria-label")).toBe("Copy result");
+    await act(async () => {
+      button?.click();
+      await Promise.resolve();
+    });
+    expect(copied).toEqual([text]);
+    Reflect.deleteProperty(navigator, "clipboard");
+  });
+
+  it("is not there in Instrument as it is", () => {
+    expect(view(csv(2)).querySelector(".copy-button")).toBeNull();
+  });
+});

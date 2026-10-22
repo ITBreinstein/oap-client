@@ -216,7 +216,15 @@ function ResultItem({
             <strong>{result.outputId}</strong> <span className="muted">{result.mediaType}</span>
           </summary>
           {csvRows !== undefined ? (
-            <CsvTable rows={csvRows} outputId={result.outputId} />
+            updated ? (
+              // STYLE TRIAL: Copy copies the CSV as the service sent it.
+              <div className="code-box">
+                <CsvTable rows={csvRows} outputId={result.outputId} />
+                <CopyButton name={copyName} text={() => result.value} />
+              </div>
+            ) : (
+              <CsvTable rows={csvRows} outputId={result.outputId} />
+            )
           ) : updated ? (
             <div className="code-box">
               <pre className="code">{result.value}</pre>

@@ -633,6 +633,11 @@
   padding-right: 52px;
 }
 
+/* A CSV's table stops short of its Copy, as text does. */
+[data-variant="updated"] .code-box > .csv-table {
+  margin-right: 52px;
+}
+
 [data-variant="updated"] .code-box > .copy {
   position: absolute;
   top: 0;
