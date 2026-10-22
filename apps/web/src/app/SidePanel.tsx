@@ -31,7 +31,7 @@ export interface SidePanelProps {
 export function SidePanel(props: SidePanelProps) {
   const { id, title, open, onClose, className, children, footer } = props;
   const base = useId();
-  const root = useRef<HTMLElement>(null);
+  const root = useRef<HTMLDivElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   /** What had focus when the panel opened: focus goes back there on closing. */
   const opener = useRef<HTMLElement | undefined>(undefined);
@@ -78,7 +78,8 @@ export function SidePanel(props: SidePanelProps) {
   }, [open, props.inert, onClose]);
 
   return (
-    <aside
+    // A div, not an aside: an aside may not be a dialog.
+    <div
       ref={root}
       id={id}
       className={`side-panel${className === undefined ? "" : ` ${className}`}`}
@@ -105,6 +106,6 @@ export function SidePanel(props: SidePanelProps) {
       </div>
       <div className="side-panel-body">{children}</div>
       {footer !== undefined && <footer className="side-panel-foot">{footer}</footer>}
-    </aside>
+    </div>
   );
 }
