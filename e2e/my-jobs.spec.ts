@@ -68,6 +68,9 @@ test.describe("My jobs", () => {
     const reread = page.waitForRequest((request) => request.url().startsWith(statusUrl));
     await page.reload();
     await reread;
+    // The reload goes back to where it was, the job's results: once it is
+    // there, open My jobs. A new stage closes a side panel (#35).
+    await expect(page.locator('[data-output-id="slept"]')).toBeVisible({ timeout: 30_000 });
     await page.getByRole("banner").getByRole("button", { name: /^Jobs/ }).click();
     const restored = page.getByTestId("my-jobs").locator("[data-job-row]");
     await expect(restored).toHaveAttribute("data-restored", "true");
