@@ -4,7 +4,15 @@
  */
 
 import { redactUrl } from "@breinstein/oap-client";
-import { useContext, useEffect, useId, useMemo, useRef, type SyntheticEvent } from "react";
+import {
+  useContext,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type SyntheticEvent,
+} from "react";
 import { schemaWarnings } from "../forms/schema-warnings.js";
 import type { FieldErrors } from "../forms/validate.js";
 import type { SessionObservation } from "../observations.js";
@@ -424,6 +432,52 @@ export interface ProcessScreenProps {
   readonly observations?: readonly SessionObservation[] | undefined;
 }
 
+/** After this long, a foreground run that may go in the background says so. */
+export const BACKGROUND_HINT_SECONDS = 10;
+
+/**
+ * A foreground run under way (#24): how long it has waited, counted each
+ * second, and a way out. Mounted when the run starts, so its first render is
+ * the run's start. The count is not read out every second: the live region
+ * around it announces the hint once, and nothing else.
+ */
+export function WaitingForAnswer({
+  canRunInBackground,
+  onStop,
+}: {
+  readonly canRunInBackground: boolean;
+  readonly onStop: () => void;
+}) {
+  const [startedAt] = useState(() => Date.now());
+  const [now, setNow] = useState(startedAt);
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+    return () => {
+      clearInterval(timer);
+    };
+  }, []);
+  const seconds = Math.floor((now - startedAt) / 1000);
+  return (
+    <>
+      <p aria-live="off" data-testid="waited">
+        Waiting for the service: {seconds} s
+      </p>
+      {canRunInBackground && seconds >= BACKGROUND_HINT_SECONDS && (
+        <p className="hint">
+          Long runs can go in the background: tick Run in the background next time.
+        </p>
+      )}
+      <p className="actions">
+        <button type="button" className="secondary" onClick={onStop}>
+          Stop waiting
+        </button>
+      </p>
+    </>
+  );
+}
+
 export function ProcessScreen(props: ProcessScreenProps) {
   const { state, commands, fieldErrors, jobs, jobNotice, dismissAdvertisedBy } = props;
   const developer = props.developer === true;
@@ -562,7 +616,10 @@ export function ProcessScreen(props: ProcessScreenProps) {
           {/* Movement only: the words below say what is happening. */}
           <div className="progress-line" aria-hidden="true" />
           {state.run.mode === "sync" ? (
-            <p>Running… waiting for the server’s answer.</p>
+            <WaitingForAnswer
+              canRunInBackground={process.execution.async}
+              onStop={commands.stopWaiting}
+            />
           ) : (
             <>
               <p>

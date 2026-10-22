@@ -115,5 +115,41 @@ for (const style of STYLES) {
   });
 }
 
+/** The observations the page recorded, as the developer section lists them. */
+async function observations(page: Page): Promise<Record<string, unknown>[]> {
+  const texts = await page.locator(".observation-list pre").allTextContents();
+  return texts.map((text): Record<string, unknown> => {
+    const parsed: unknown = JSON.parse(text);
+    return typeof parsed === "object" && parsed !== null ? { ...parsed } : {};
+  });
+}
+
+for (const style of STYLES) {
+  test(`#24 Stop waiting gives up on a long foreground run, back to the form (${style})`, async ({
+    page,
+  }) => {
+    await open(page, style);
+    await connectTyped(page);
+    await openProcess(page, "Slow process");
+    await field(page, "Seconds (optional)").fill("20");
+    await page.getByRole("button", { name: "Run", exact: true }).click();
+
+    await expect(page.getByTestId("waited")).toHaveText(/^Waiting for the service: \d+ s$/);
+    await expect(page.getByTestId("waited")).toHaveText("Waiting for the service: 2 s", {
+      timeout: 5_000,
+    });
+    await page.getByRole("button", { name: "Stop waiting" }).click();
+
+    await expect(
+      page.getByText("Stopped waiting. The service may still finish the run;"),
+    ).toBeVisible();
+    await expect(field(page, "Seconds (optional)")).toHaveValue("20");
+    await expect(page.getByRole("button", { name: "Run", exact: true })).toBeEnabled();
+    // Recorded as the core records any request that ended without an answer.
+    const executions = (await observations(page)).filter((entry) => entry["kind"] === "execution");
+    expect(executions.at(-1)?.["outcome"]).toBe("transport-failure");
+  });
+}
+
 // The relay, for the tests that run in the background.
 export { RELAY, connectConfigured };

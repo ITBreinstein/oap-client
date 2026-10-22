@@ -95,6 +95,11 @@ export interface WorkflowCommands {
   readonly setTransmission: (outputId: string, transmission: "value" | "reference") => void;
   readonly run: () => void;
   /**
+   * "Stop waiting" on a foreground run (#24): abort the request and go back
+   * to the form, its values as they were. The service may still finish.
+   */
+  readonly stopWaiting: () => void;
+  /**
    * Follow a job already on the server, from the open process: the job a
    * link names, or one in My jobs. Its status, then its results, as a run's.
    */
@@ -292,6 +297,10 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
       }
     | undefined
   >(undefined);
+  /** The foreground run being waited for, and how to stop waiting for it (#24). */
+  const waiting = useRef<{ readonly runId: string; readonly stop: AbortController } | undefined>(
+    undefined,
+  );
   /** Each process's form as it was left this visit, in memory only (#10). */
   const forms = useRef<FormMemory>(new Map());
   /** Connections made so far; each successful one takes the next number. */
@@ -629,6 +638,10 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
 
     const outputIds = Object.keys(request.outputs);
     const relayEndpoint = relayEndpointFor(connection.endpoint);
+    // A foreground run can be given up on (#24). The core records the abort
+    // as it records any request that ended without an answer.
+    const stop = mode === "sync" ? new AbortController() : undefined;
+    if (stop !== undefined) waiting.current = { runId, stop };
     void (async () => {
       try {
         const execution =
@@ -638,6 +651,7 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
                 outputs: request.outputs,
                 mode: "sync",
                 description: process,
+                signal: stop?.signal,
               })
             : await active.run(
                 relayEndpoint,
@@ -678,9 +692,29 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
           });
           return;
         }
+        // Stopped by the user: the screen has already gone back to the form.
+        if (stop?.signal.aborted === true) return;
         dispatch({ type: "run-failed", runId, error: runError(cause, plan) });
+      } finally {
+        if (waiting.current?.runId === runId) waiting.current = undefined;
       }
     })();
+  };
+
+  const stopWaiting = () => {
+    const run = waiting.current;
+    if (state.stage !== "running" || run === undefined || run.runId !== state.runId) return;
+    waiting.current = undefined;
+    run.stop.abort();
+    dispatch({
+      type: "run-failed",
+      runId: run.runId,
+      error: {
+        title:
+          "Stopped waiting. The service may still finish the run; nothing will be shown for it.",
+        notice: true,
+      },
+    });
   };
 
   const watchJob = (statusUrl: string) => {
@@ -1018,6 +1052,7 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
       dispatch({ type: "set-transmission", outputId, transmission });
     },
     run,
+    stopWaiting,
     watchJob,
     cancelJob,
     edit: () => {
