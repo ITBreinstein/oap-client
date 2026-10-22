@@ -41,7 +41,14 @@ import { exampleNeeds } from "./app/examples.js";
 import { ExamplesBrowser, FeaturedExamples } from "./app/ExamplesView.js";
 import { typedEndpoint } from "./app/run.js";
 import { SidePanel } from "./app/SidePanel.js";
-import { learnTitles, NO_TITLES, processTitle, serviceTitle, type Titles } from "./app/titles.js";
+import {
+  learnTitles,
+  NO_TITLES,
+  pageTitle,
+  processTitle,
+  serviceTitle,
+  type Titles,
+} from "./app/titles.js";
 import type { EndpointRef } from "./app/workflow.js";
 import type { FormValues } from "./forms/encode.js";
 import type { JobRow } from "./relay/job-session.js";
@@ -163,6 +170,22 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
           ...(state.stage === "connected" ? [] : [state.process]),
         ]);
   if (learned !== titles) setTitles(learned);
+
+  // The browser tab says where the page is (#37), and changes with it.
+  const tabTitle = pageTitle(
+    state.stage === "choose-endpoint"
+      ? state
+      : state.stage === "connected"
+        ? { stage: state.stage, service: serviceTitle(learned, presets, state.endpoint.baseUrl) }
+        : {
+            stage: state.stage,
+            service: serviceTitle(learned, presets, state.endpoint.baseUrl),
+            process: state.process.title ?? state.process.id,
+          },
+  );
+  useEffect(() => {
+    document.title = tabTitle;
+  }, [tabTitle]);
   // STYLE TRIAL (updated Instrument, #43): My jobs names a job's process and service.
   const jobNames = (job: JobRow) => ({
     process:

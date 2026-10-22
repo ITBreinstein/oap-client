@@ -110,3 +110,31 @@ export function processTitle(
     processId
   );
 }
+
+/** Where the page is, for its tab's title (#37). */
+export type TitledPlace =
+  | { readonly stage: "choose-endpoint" }
+  | { readonly stage: "connected"; readonly service: string }
+  | {
+      readonly stage: "process" | "running" | "result";
+      readonly service: string;
+      readonly process: string;
+    };
+
+/**
+ * The browser tab's title for a place (#37): what is on screen first, so a
+ * row of tabs tells them apart, and the service last.
+ */
+export function pageTitle(place: TitledPlace): string {
+  switch (place.stage) {
+    case "choose-endpoint":
+      return "Connect · Breinstein";
+    case "connected":
+      return `Processes · ${place.service}`;
+    case "process":
+    case "running":
+      return `${place.process} · ${place.service}`;
+    case "result":
+      return `${place.process}: result · ${place.service}`;
+  }
+}

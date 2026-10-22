@@ -831,3 +831,21 @@ for (const style of STYLES) {
     expect(position).not.toBe("sticky");
   });
 }
+
+// Phase 3.
+
+test("#37 the tab's title says where the page is", async ({ page }) => {
+  await open(page, "instrument");
+  await expect(page).toHaveTitle("Connect · Breinstein");
+  await connectTyped(page);
+  await expect(page).toHaveTitle(/^Processes · \S/);
+  const serviceName = (await page.title()).replace(/^Processes · /, "");
+  await openProcess(page, "Hello World");
+  await expect(page).toHaveTitle(`Hello World · ${serviceName}`);
+  await field(page, "Name (required)").fill("Barcelona");
+  await page.getByRole("button", { name: "Run", exact: true }).click();
+  await expect(page.locator('[data-output-id="echo"]')).toBeVisible({ timeout: 15_000 });
+  await expect(page).toHaveTitle(`Hello World: result · ${serviceName}`);
+  await toList(page);
+  await expect(page).toHaveTitle(`Processes · ${serviceName}`);
+});
