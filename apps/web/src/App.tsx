@@ -306,12 +306,20 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
     const target = panel.current?.querySelector<HTMLElement>("[data-focus-on-stage]");
     target?.focus();
   }, [stageKey]);
-  // A new stage closes any side panel (#35): what it was over is gone.
-  const [panelStage, setPanelStage] = useState(stageKey);
-  if (panelStage !== stageKey) {
-    setPanelStage(stageKey);
-    if (panelOpen !== undefined) setPanelOpen(undefined);
-  }
+  // The user's own way somewhere else closes any side panel (#35). From
+  // inside a panel, its actions close it themselves (an example, Run again,
+  // a job followed); from outside, with the page inert behind it, the only
+  // way is the browser's Back or Forward. Not the page's own moves: a
+  // followed job finishing, or a reload going back to where it was.
+  useEffect(() => {
+    const onPop = () => {
+      setPanelOpen(undefined);
+    };
+    globalThis.addEventListener("popstate", onPop);
+    return () => {
+      globalThis.removeEventListener("popstate", onPop);
+    };
+  }, []);
 
   let screen: ReactNode;
   switch (state.stage) {

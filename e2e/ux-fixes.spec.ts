@@ -243,7 +243,10 @@ for (const style of STYLES) {
       .getByRole("button", { name: "Hello World", exact: true })
       .boundingBox();
     if (behind === null) throw new Error("no Hello World row");
-    await page.mouse.click(behind.x + 4, behind.y + behind.height / 2);
+    // Its row reaches past the panel's edge: pressed there, on what the panel dims.
+    const row = await page.locator(".process-list li").first().boundingBox();
+    if (row === null) throw new Error("no row");
+    await page.mouse.click(row.x + row.width - 12, behind.y + behind.height / 2);
     await expect(jobs).toBeHidden();
     await expect(page.getByRole("heading", { level: 2, name: "Processes" })).toBeVisible();
   });
@@ -264,7 +267,7 @@ for (const style of STYLES) {
   });
 }
 
-test("#35 a stage change closes a panel, and opening a process from one does", async ({ page }) => {
+test("#35 opening a process from a panel closes it, and so does Back", async ({ page }) => {
   const SERVICE = "https://pygeoapi.example.test";
   await page.route("**/config.json", (route) =>
     route.fulfill({
@@ -403,3 +406,25 @@ for (const style of STYLES) {
     expect(download.suggestedFilename()).toBe("breinstein-feature-area-table.csv");
   });
 }
+
+test("#35 My jobs stays open while a followed job finishes", async ({ page }) => {
+  await requireService(`${RELAY}/healthz`, "the relay");
+  await open(page, "instrument-updated");
+  await page.getByRole("radio", { name: /^pygeoapi-cors / }).check();
+  await page.getByRole("button", { name: "Connect", exact: true }).click();
+  await openProcess(page, "Slow process");
+  await field(page, "Seconds (optional)").fill("3");
+  await page.getByRole("checkbox", { name: "Run in the background" }).check();
+  await page.getByRole("button", { name: "Run", exact: true }).click();
+  await expect(page.locator("[data-job-ref]")).toHaveAttribute("data-job-ref", /\/jobs\//, {
+    timeout: 15_000,
+  });
+
+  const jobs = page.getByRole("dialog", { name: "My jobs" });
+  await page.getByRole("button", { name: "Jobs", exact: true }).click();
+  await expect(jobs).toBeVisible();
+  // The job finishes behind the panel: its results arrive, the panel stays.
+  await expect(page.locator('[data-output-id="slept"]')).toBeAttached({ timeout: 30_000 });
+  await expect(jobs).toBeVisible();
+  await expect(jobs.locator("[data-job-status]")).toHaveAttribute("data-job-status", "successful");
+});

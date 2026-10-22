@@ -50,7 +50,7 @@ export function SidePanel(props: SidePanelProps) {
     }
     if (!wasOpen.current) return;
     wasOpen.current = false;
-    // Closed, however: its button, Escape, a click beside it, a stage change.
+    // Closed, however: its button, Escape, a click beside it, Back or Forward.
     // Focus was in the panel, which is inert now and has let go of it. Back
     // to the opener, now the page is no longer inert; unless something else
     // took focus meanwhile (a new stage's heading, which comes after this).
