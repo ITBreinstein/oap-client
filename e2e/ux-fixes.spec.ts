@@ -465,3 +465,43 @@ for (const style of STYLES) {
     await expect(area).not.toHaveAttribute("aria-invalid", "true");
   });
 }
+
+test("#12 a date-time is made from a date, a time and an offset, and typed ones are checked", async ({
+  page,
+}) => {
+  await open(page, "instrument");
+  await connectTyped(page);
+  await openProcess(page, "Dates and times");
+  await page.getByRole("textbox", { name: "Day (required)" }).fill("2026-11-03");
+  await page.getByLabel("Time", { exact: true }).fill("09:00");
+  await page.getByRole("textbox", { name: "Moment (optional) Date" }).fill("2026-11-03");
+  await page.getByLabel("Offset from UTC").selectOption("+01:00");
+  const request = page.waitForRequest(
+    (candidate) => candidate.method() === "POST" && candidate.url().includes("/breinstein-dates/"),
+  );
+  await page.getByRole("button", { name: "Run", exact: true }).click();
+  expect(((await request).postDataJSON() as { inputs: unknown }).inputs).toEqual({
+    day: "2026-11-03",
+    moment: "2026-11-03T09:00:00+01:00",
+  });
+  await expect(page.locator('[data-output-id="understood"]')).toContainText(
+    '"utc": "2026-11-03T08:00:00Z"',
+  );
+
+  // Typed, it is checked before anything is sent.
+  await page.getByRole("button", { name: "Change the inputs" }).click();
+  await page.getByRole("button", { name: "Type it instead" }).click();
+  const typed = page.getByRole("textbox", { name: "Moment (optional)" });
+  await typed.fill("21-10-2026 14:30");
+  let sent = false;
+  page.on("request", (candidate) => {
+    if (candidate.method() === "POST" && candidate.url().includes("/breinstein-dates/"))
+      sent = true;
+  });
+  await page.getByRole("button", { name: "Run", exact: true }).click();
+  await expect(page.locator(".field.has-error")).toContainText(
+    "Give a date and time with its offset from UTC, such as 2026-10-21T14:30:00+02:00",
+  );
+  await expect(typed).toBeFocused();
+  expect(sent).toBe(false);
+});

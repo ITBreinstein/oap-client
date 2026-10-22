@@ -330,6 +330,29 @@ pre.code {
   border-top: none;
 }
 
+/* A date-time: a date, a time and an offset, side by side, each labelled (#12). */
+.date-time-parts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+}
+
+.date-time-parts p {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin: 0;
+}
+
+.date-time-label {
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+.date-time .actions {
+  margin-top: 0.5rem;
+}
+
 /* Why Run in the background is off here, and the way round it (#25). */
 .background-help {
   margin-top: 12px;

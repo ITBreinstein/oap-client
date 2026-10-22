@@ -9,6 +9,11 @@
  * that refuses what the server would accept is worse than one that lets the
  * server say no.
  *
+ * One exception, asked for by the UX review (#12): a `format: date-time` input
+ * typed as text is checked against RFC 3339, the standard's own format for
+ * it, so "21-10-2026 14:30" is put right here rather than refused by the
+ * service after a wait.
+ *
  * Z5 is why these matter at all: neither reference server validates an input
  * against its own schema. pygeoapi accepts a wrong type, an out-of-range
  * number, an unknown enum value, an over-long string, a missing required input
@@ -20,6 +25,7 @@
  */
 
 import { classifyCrs } from "./crs.js";
+import { isRfc3339 } from "./date-time.js";
 import { isAbsentFor, isGeoJsonText, isRawJson, type FormValues } from "./encode.js";
 import { inexactNumbers, isJsonNumber } from "./exact-json.js";
 import { shapesOfText } from "./geometry.js";
@@ -111,6 +117,9 @@ function checkControl(control: Control, value: unknown): string | undefined {
         ? undefined
         : "Choose one of the listed values.";
     case "text": {
+      if (control.format === "date-time" && !isRfc3339(String(value))) {
+        return "Give a date and time with its offset from UTC, such as 2026-10-21T14:30:00+02:00, or use the date and time fields.";
+      }
       // Code points, which is what JSON Schema counts for `maxLength`.
       const length = Array.from(String(value)).length;
       return control.maxLength !== undefined && length > control.maxLength

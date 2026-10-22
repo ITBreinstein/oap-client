@@ -28,6 +28,7 @@ import { BboxField } from "./BboxField.js";
 import { ComplexField } from "./ComplexField.js";
 import { GeometryField } from "./GeometryField.js";
 import { CopyField } from "./CopyButton.js";
+import { DateTimeField } from "./DateTimeField.js";
 import { formatJsonText } from "./json-text.js";
 import { useUpdated } from "./variant.js";
 
@@ -52,7 +53,15 @@ function asText(value: unknown): string {
   return "";
 }
 
-function TextInput({
+function TextInput(props: ControlProps<TextControl>) {
+  // A date-time is a date, a time and an offset (#12).
+  if (props.control.format === "date-time" && props.control.multiline !== true) {
+    return <DateTimeField {...props} />;
+  }
+  return <PlainTextInput {...props} />;
+}
+
+function PlainTextInput({
   id,
   control,
   value,

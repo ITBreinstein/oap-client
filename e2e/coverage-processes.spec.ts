@@ -117,6 +117,8 @@ test.describe("the coverage processes", () => {
     await openProcess(page, "Dates and times");
 
     await page.getByRole("textbox", { name: "Day (required)" }).fill("2026-11-03");
+    // A date-time has its own fields (#12); "Type it instead" is the text box.
+    await page.getByRole("button", { name: "Type it instead" }).click();
     await page
       .getByRole("textbox", { name: "Moment (optional)" })
       .fill("2026-11-03T09:00:00+01:00");

@@ -160,6 +160,10 @@ for (const style of ["instrument", "instrument-updated"] as const) {
       await noViolations(page, "a form the page refused");
 
       await toList(page);
+      await openProcess(page, "Dates and times");
+      await noViolations(page, "a date and a date-time");
+
+      await toList(page);
       await openProcess(page, "Buildings in an area");
       await page.locator(".map-pane canvas").waitFor();
       await page.getByRole("button", { name: "Draw on the map" }).click();
