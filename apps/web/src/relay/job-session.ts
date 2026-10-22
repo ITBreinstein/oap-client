@@ -51,6 +51,8 @@ export interface JobRow extends TrackedJob {
   readonly startedAt: string | undefined;
   /** Found in storage after a reload, rather than started on this page. */
   readonly restored: boolean;
+  /** Followed from its link, not started by this browser (#32). */
+  readonly followed: boolean;
 }
 
 /**
@@ -98,8 +100,17 @@ export interface JobSession {
     description?: ProcessDescription,
     reads?: Reads,
   ): Promise<Execution>;
-  /** Start reconciling a job the caller found some other way — a sync run the server made async. */
-  track(endpoint: RelayEndpoint, statusUrl: string, reads?: Reads, processId?: string): void;
+  /**
+   * Start reconciling a job the caller found some other way: a sync run the
+   * server made async, or (`followed`) a job opened from its link (#32).
+   */
+  track(
+    endpoint: RelayEndpoint,
+    statusUrl: string,
+    reads?: Reads,
+    processId?: string,
+    followed?: boolean,
+  ): void;
   /** Take a job off this browser's list, and out of storage. The server is not told. */
   remove(statusUrl: string): void;
   /**
@@ -203,6 +214,7 @@ export function createJobSession(
       processId: string | undefined;
       startedAt: string | undefined;
       restored: boolean;
+      followed: boolean;
     }
   >();
 
@@ -238,6 +250,7 @@ export function createJobSession(
         statusUrl,
         processId: job.processId,
         startedAt: job.startedAt,
+        ...(job.followed ? { followed: true } : {}),
       });
     }
     store.save([...kept.values()]);
@@ -255,6 +268,7 @@ export function createJobSession(
       processId: meta.get(job.statusUrl)?.processId,
       startedAt: meta.get(job.statusUrl)?.startedAt,
       restored: meta.get(job.statusUrl)?.restored ?? false,
+      followed: meta.get(job.statusUrl)?.followed ?? false,
     })),
     observations,
     droppedObservations: dropped,
@@ -371,6 +385,7 @@ export function createJobSession(
       processId: stored.processId,
       startedAt: stored.startedAt,
       restored: true,
+      followed: stored.followed === true,
     });
     reconciler.track(stored.statusUrl);
   };
@@ -457,7 +472,7 @@ export function createJobSession(
       return routedClient(endpoint, readFetch(endpoint, reads));
     },
 
-    track(endpoint, statusUrl, reads = "direct", processId) {
+    track(endpoint, statusUrl, reads = "direct", processId, followed = false) {
       const read = readFetch(endpoint, reads);
       meta.set(statusUrl, {
         endpointKey: endpoint.key,
@@ -467,6 +482,7 @@ export function createJobSession(
         processId,
         startedAt: now().toISOString(),
         restored: false,
+        followed,
       });
       persist();
       reconciler.track(statusUrl);
@@ -524,6 +540,7 @@ export function createJobSession(
           processId,
           startedAt,
           restored: false,
+          followed: false,
         });
         persist();
         reconciler.track(statusUrl, refs.get(statusUrl));

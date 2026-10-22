@@ -578,3 +578,39 @@ for (const style of STYLES) {
     await expect(row).not.toContainText("No longer");
   });
 }
+
+test("#32 a job followed by its link can't be cancelled, and is listed apart", async ({
+  page,
+  browser,
+}) => {
+  await requireService(`${RELAY}/healthz`, "the relay");
+  await open(page, "instrument-updated");
+  await page.getByRole("radio", { name: /^pygeoapi[- ]cors /i }).check();
+  await page.getByRole("button", { name: "Connect", exact: true }).click();
+  await openProcess(page, "Slow process");
+  await field(page, "Seconds (optional)").fill("60");
+  await page.getByRole("checkbox", { name: "Run in the background" }).check();
+  await page.getByRole("button", { name: "Run", exact: true }).click();
+  const link = await page.getByRole("textbox", { name: "The job’s link" }).inputValue();
+
+  // Someone else, in another browser, opens the link.
+  const other = await browser.newContext();
+  const elsewhere = await other.newPage();
+  await elsewhere.route("https://tiles.openfreemap.org/**", (route) =>
+    route.fulfill({ contentType: "application/json", body: JSON.stringify(WORLD_STAND_IN) }),
+  );
+  await elsewhere.goto(link);
+  await elsewhere.getByRole("button", { name: "Connect", exact: true }).click();
+  await expect(elsewhere.locator("[data-job-ref]")).toHaveAttribute("data-job-ref", /\/jobs\//, {
+    timeout: 15_000,
+  });
+  await expect(elsewhere.getByRole("button", { name: "Cancel job" })).toHaveCount(0);
+  await elsewhere.getByRole("button", { name: /^Jobs/ }).click();
+  const panel = elsewhere.getByRole("dialog", { name: "My jobs" });
+  await expect(panel.getByRole("heading", { name: "Jobs you followed by link" })).toBeVisible();
+  await expect(panel.getByRole("button", { name: /^Run again|^Open the process/ })).toHaveCount(0);
+  await other.close();
+
+  // The browser that started it can still cancel it.
+  await expect(page.getByRole("button", { name: "Cancel job" })).toBeVisible();
+});

@@ -55,6 +55,7 @@ function row(change: Partial<JobRow> = {}): JobRow {
     processId: "slow",
     startedAt: "2026-09-30T10:00:00.000Z",
     restored: false,
+    followed: false,
     ...change,
   };
 }
@@ -153,5 +154,47 @@ describe("My jobs", () => {
     ]);
     expect(view.textContent).toContain("From an earlier visit: its status is polled");
     expect(view.textContent).toContain("No longer on the server: dismissed, or expired.");
+  });
+});
+
+describe("jobs followed by their link (#32)", () => {
+  const FOLLOWED = "http://localhost:5080/jobs/followed";
+
+  it("are listed apart, under their own heading, without Run again or Dismiss", () => {
+    const rerun = { start: vi.fn(), filled: () => true, busy: false };
+    const view = render(
+      <JobsPanel
+        jobs={[row({}), row({ statusUrl: FOLLOWED, followed: true })]}
+        activeJob={undefined}
+        dismissAdvertisedFor={() => "process"}
+        messages={new Map()}
+        onRemove={vi.fn()}
+        onDismiss={vi.fn()}
+        rerun={rerun}
+        structured
+      />,
+    );
+    const heading = [...view.querySelectorAll("h3")].find(
+      (h) => h.textContent === "Jobs you followed by link",
+    );
+    expect(heading).toBeDefined();
+    const followedList = view.querySelector(`ul[aria-labelledby="${heading?.id ?? ""}"]`);
+    const followedRow = followedList?.querySelector(`[data-job-row="${FOLLOWED}"]`);
+    expect(followedRow).not.toBeNull();
+    const names = [...(followedRow?.querySelectorAll("button") ?? [])].map((b) => b.textContent);
+    expect(names.some((name) => name.startsWith("Run again"))).toBe(false);
+    expect(names).not.toContain("Dismiss…");
+    // The job started here keeps both.
+    const startedRow = view.querySelector(`[data-job-row="${JOB}"]`);
+    const startedNames = [...(startedRow?.querySelectorAll("button") ?? [])].map(
+      (b) => b.textContent,
+    );
+    expect(startedNames).toContain("Dismiss…");
+    expect(startedNames.some((name) => name.startsWith("Run again"))).toBe(true);
+  });
+
+  it("has no heading when none was followed", () => {
+    const { view } = panel([row({})]);
+    expect(view.querySelector("h3")).toBeNull();
   });
 });

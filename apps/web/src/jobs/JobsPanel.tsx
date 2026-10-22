@@ -266,7 +266,9 @@ function JobItem({
   const [confirming, setConfirming] = useState(false);
   const base = useId();
   const results = resultsHref(job);
-  const canDismiss = advertisedBy !== "nothing" && !job.gone && job.status?.status !== "dismissed";
+  // Not a job this browser only follows: it isn't this browser's to cancel (#32).
+  const canDismiss =
+    advertisedBy !== "nothing" && !job.gone && job.status?.status !== "dismissed" && !job.followed;
   const named = names?.(job);
   const cancelledAt = cancelled?.get(job.statusUrl);
   const title = named?.process ?? job.processId ?? job.status?.jobId ?? job.statusUrl;
@@ -419,6 +421,43 @@ export function JobsPanel(props: JobsPanelProps) {
   const base = useId();
   if (jobs.length === 0) return null;
   const heading = props.heading !== false;
+  const newestFirst = [...jobs].reverse();
+  const started = newestFirst.filter((job) => !job.followed);
+  const followed = newestFirst.filter((job) => job.followed);
+  const item = (job: JobRow) => (
+    <JobItem
+      key={job.statusUrl}
+      job={job}
+      active={job.statusUrl === activeJob}
+      advertisedBy={dismissAdvertisedFor(job)}
+      message={messages.get(job.statusUrl)}
+      structured={props.structured === true}
+      names={props.names}
+      cancelled={props.cancelled}
+      onRerun={
+        props.rerun === undefined || job.processId === undefined || job.followed
+          ? undefined
+          : () => {
+              props.rerun?.start(job);
+            }
+      }
+      onFollow={
+        props.rerun?.follow === undefined
+          ? undefined
+          : () => {
+              props.rerun?.follow?.(job);
+            }
+      }
+      rerunFilled={props.rerun?.filled(job) === true}
+      rerunBusy={props.rerun?.busy === true}
+      onRemove={() => {
+        onRemove(job.statusUrl);
+      }}
+      onDismiss={() => {
+        onDismiss(job.statusUrl);
+      }}
+    />
+  );
   return (
     <section
       className="jobs-panel"
@@ -431,42 +470,16 @@ export function JobsPanel(props: JobsPanelProps) {
         Background jobs started from this browser. Removing one from the list does not stop it on
         the server.
       </p>
-      <ul>
-        {[...jobs].reverse().map((job) => (
-          <JobItem
-            key={job.statusUrl}
-            job={job}
-            active={job.statusUrl === activeJob}
-            advertisedBy={dismissAdvertisedFor(job)}
-            message={messages.get(job.statusUrl)}
-            structured={props.structured === true}
-            names={props.names}
-            cancelled={props.cancelled}
-            onRerun={
-              props.rerun === undefined || job.processId === undefined
-                ? undefined
-                : () => {
-                    props.rerun?.start(job);
-                  }
-            }
-            onFollow={
-              props.rerun?.follow === undefined
-                ? undefined
-                : () => {
-                    props.rerun?.follow?.(job);
-                  }
-            }
-            rerunFilled={props.rerun?.filled(job) === true}
-            rerunBusy={props.rerun?.busy === true}
-            onRemove={() => {
-              onRemove(job.statusUrl);
-            }}
-            onDismiss={() => {
-              onDismiss(job.statusUrl);
-            }}
-          />
-        ))}
-      </ul>
+      {started.length > 0 && <ul>{started.map(item)}</ul>}
+      {followed.length > 0 && (
+        <>
+          {/* Jobs this browser didn't start (#32): no Run again, no inputs of its own. */}
+          <h3 className="jobs-followed-heading" id={`${base}-followed`}>
+            Jobs you followed by link
+          </h3>
+          <ul aria-labelledby={`${base}-followed`}>{followed.map(item)}</ul>
+        </>
+      )}
     </section>
   );
 }

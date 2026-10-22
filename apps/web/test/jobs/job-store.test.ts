@@ -172,3 +172,38 @@ describe("hearing another tab (review W12)", () => {
     }).not.toThrow();
   });
 });
+
+describe("a job followed from its link (#32)", () => {
+  it("keeps its flag across a reload, and nothing else more", () => {
+    const storage = memoryStorage();
+    createJobStore(() => storage).save([{ ...JOB, followed: true }]);
+    const [stored] = JSON.parse(storage.items.get(STORAGE_KEY) ?? "[]") as Record<
+      string,
+      unknown
+    >[];
+    expect(Object.keys(stored ?? {}).sort()).toEqual([
+      "endpoint",
+      "followed",
+      "processId",
+      "startedAt",
+      "statusUrl",
+    ]);
+    expect(createJobStore(() => storage).load()).toEqual([{ ...JOB, followed: true }]);
+  });
+
+  it("stores a job started here with four fields, no flag", () => {
+    const storage = memoryStorage();
+    createJobStore(() => storage).save([{ ...JOB, followed: undefined }]);
+    const [stored] = JSON.parse(storage.items.get(STORAGE_KEY) ?? "[]") as Record<
+      string,
+      unknown
+    >[];
+    expect(Object.keys(stored ?? {})).toHaveLength(4);
+  });
+
+  it("reads a flag that isn't true as no flag", () => {
+    const storage = memoryStorage();
+    storage.items.set(STORAGE_KEY, JSON.stringify([{ ...JOB, followed: "yes" }]));
+    expect(createJobStore(() => storage).load()).toEqual([JOB]);
+  });
+});

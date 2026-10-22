@@ -353,6 +353,12 @@ pre.code {
   margin-top: 0.5rem;
 }
 
+/* My jobs: the jobs followed by their link, under their own heading (#32). */
+.jobs-followed-heading {
+  margin: 1.5rem 0 0.5rem;
+  font-size: 1rem;
+}
+
 /* Why Run in the background is off here, and the way round it (#25). */
 .background-help {
   margin-top: 12px;

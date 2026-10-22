@@ -97,6 +97,7 @@ function row(change: Partial<JobRow>): JobRow {
     processId: "breinstein-inputs",
     startedAt: "2026-09-30T10:00:00.000Z",
     restored: false,
+    followed: false,
     ...change,
   };
 }

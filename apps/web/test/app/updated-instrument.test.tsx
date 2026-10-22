@@ -99,6 +99,7 @@ describe("a job in My jobs, in the updated Instrument", () => {
     processId: "slow",
     startedAt: "2026-09-30T10:00:00.000Z",
     restored: false,
+    followed: false,
   };
 
   it("has its title and status as a badge, then one labelled line per fact", () => {
@@ -148,6 +149,7 @@ describe("Run again in My jobs, in the updated Instrument", () => {
     processId: "slow",
     startedAt: "2026-09-30T10:00:00.000Z",
     restored: true,
+    followed: false,
   };
 
   function panelWith(filled: boolean, busy: boolean) {

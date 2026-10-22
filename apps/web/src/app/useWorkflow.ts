@@ -773,7 +773,14 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
     setJobNotice(undefined);
     // A job My jobs already follows keeps its record (when it started, how).
     if (snapshot?.jobs.some((row) => row.statusUrl === statusUrl) !== true) {
-      active.track(relayEndpointFor(connection.endpoint), statusUrl, connection.reads, process.id);
+      // Followed, not started here (#32): My jobs lists it apart.
+      active.track(
+        relayEndpointFor(connection.endpoint),
+        statusUrl,
+        connection.reads,
+        process.id,
+        true,
+      );
     }
     dispatch({ type: "watch-job", runId, jobRef: statusUrl });
   };
