@@ -1156,3 +1156,32 @@
   justify-content: flex-end;
   margin: 12px 0 0;
 }
+
+/*
+ * With the rail a bar at the foot (#14b): the picture reaches down to the
+ * bar however short the page, rather than stopping above it on a grey band.
+ */
+@media (max-width: 52rem) {
+  [data-variant="updated"] .layout-single {
+    min-height: calc(100vh - 64px);
+    min-height: calc(100dvh - 64px);
+  }
+}
+
+/*
+ * Drawing on a phone (#14d): the map fills the window above the bar at the
+ * foot, so its lower edge (the scale, the attribution) is never under the
+ * bar, and the page can bring its top, with Done and Clear, to the window's
+ * top. The zoom buttons step down below Done and Clear.
+ */
+@media (max-width: 52rem) {
+  [data-variant="updated"] .map-pane[data-drawing-here="true"] {
+    min-height: 0;
+    height: calc(100vh - 64px);
+    height: calc(100dvh - 64px);
+  }
+
+  [data-variant="updated"] .map-pane[data-drawing-here="true"] .maplibregl-ctrl-top-right {
+    margin-top: 3.75rem;
+  }
+}

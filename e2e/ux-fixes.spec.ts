@@ -1258,3 +1258,56 @@ for (const style of STYLES) {
     await expect(field(page, "Seconds (optional)")).toHaveValue("");
   });
 }
+
+for (const style of STYLES) {
+  const updated = style === "instrument-updated";
+  test(`#14b on a phone the picture ${updated ? "reaches the bar at the foot" : "is as it was"} (${style})`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await open(page, style);
+    await connectTyped(page);
+    await openProcess(page, "Hello World");
+    const gap = await page.evaluate(() => {
+      const layout = document.querySelector(".layout")?.getBoundingClientRect();
+      const bar = document.querySelector("header.app-rail")?.getBoundingClientRect();
+      return layout === undefined || bar === undefined ? undefined : bar.top - layout.bottom;
+    });
+    if (updated) expect(gap ?? 99).toBeLessThanOrEqual(0.5);
+    else
+      expect(
+        await page.locator(".layout").evaluate((layout) => getComputedStyle(layout).minHeight),
+      ).not.toMatch(/^[1-9]/);
+  });
+
+  test(`#14d on a short phone, drawing ${updated ? "keeps Done, Clear and the map's foot clear of the bar" : "is as it was"} (${style})`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 600 });
+    await open(page, style);
+    await connectTyped(page);
+    await openProcess(page, "Rotate a polygon a quarter turn");
+    await page.locator(".map-pane canvas").waitFor();
+    await page.getByRole("button", { name: "Draw on the map" }).click();
+    const done = page.getByRole("group", { name: "Drawing “Polygon”" }).getByRole("button", {
+      name: "Done",
+    });
+    await expect(done).toBeInViewport({ ratio: 1 });
+    const boxes = await page.evaluate(() => {
+      const box = (selector: string) => document.querySelector(selector)?.getBoundingClientRect();
+      return {
+        bar: box(".draw-bar")?.bottom ?? 0,
+        mapFoot: box(".map-pane")?.bottom ?? 0,
+        rail: box("header.app-rail")?.top ?? 0,
+        zoom: box(".maplibregl-ctrl-top-right")?.top ?? 0,
+      };
+    });
+    if (updated) {
+      expect(boxes.mapFoot).toBeLessThanOrEqual(boxes.rail + 1);
+      expect(boxes.zoom).toBeGreaterThanOrEqual(boxes.bar);
+    } else {
+      // The zoom buttons under Done and Clear, as before.
+      expect(boxes.zoom).toBeLessThan(boxes.bar);
+    }
+  });
+}
