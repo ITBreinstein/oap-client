@@ -636,6 +636,7 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
                     heading={false}
                     structured={appearance.style === "instrument-updated"}
                     names={appearance.style === "instrument-updated" ? jobNames : undefined}
+                    cancelled={view.cancelled}
                     rerun={
                       appearance.style === "instrument-updated"
                         ? {

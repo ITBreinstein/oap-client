@@ -606,6 +606,19 @@ export function ProcessScreen(props: ProcessScreenProps) {
     submitted.current = false;
   }, [state.stage]);
 
+  // Cancel job asks first (#31); the question goes with the run.
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
+  const keepJob = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (confirmingCancel) keepJob.current?.focus();
+  }, [confirmingCancel]);
+  const runKey = state.stage === "running" ? state.runId : undefined;
+  const [askedFor, setAskedFor] = useState(runKey);
+  if (askedFor !== runKey) {
+    setAskedFor(runKey);
+    setConfirmingCancel(false);
+  }
+
   const run = state.stage === "running" ? state.run : undefined;
   const job = run?.mode === "async" ? jobs.find((row) => row.statusUrl === run.jobRef) : undefined;
   const resultJob =
@@ -721,17 +734,56 @@ export function ProcessScreen(props: ProcessScreenProps) {
                   </CopyField>
                 </div>
               )}
-              {state.run.jobRef !== undefined && (
+              {state.run.jobRef !== undefined && confirmingCancel && !watched && (
+                // As My jobs' Dismiss asks (#31): the safe answer has the focus.
+                <div className="job-confirm" role="group" aria-label="Confirm cancelling">
+                  <p>
+                    Cancel this job on the server? The server stops it if it is still running, and
+                    may delete its results. This cannot be undone.
+                  </p>
+                  <p className="actions">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setConfirmingCancel(false);
+                        commands.cancelJob();
+                      }}
+                    >
+                      Cancel job
+                    </button>{" "}
+                    <button
+                      type="button"
+                      className="secondary"
+                      ref={keepJob}
+                      onClick={() => {
+                        setConfirmingCancel(false);
+                      }}
+                    >
+                      Keep job
+                    </button>
+                  </p>
+                </div>
+              )}
+              {state.run.jobRef !== undefined && !(confirmingCancel && !watched) && (
                 <p className="actions">
                   {updated && jobLink !== undefined && (
                     <button type="button" onClick={commands.backToList}>
                       Start another process
                     </button>
                   )}
-                  <button type="button" className="secondary" onClick={commands.cancelJob}>
-                    Cancel job
-                  </button>
-                  {dismissAdvertisedBy === "nothing" && (
+                  {/* Not for a job this page only follows (#32): it isn't this browser's to cancel. */}
+                  {!watched && (
+                    <button
+                      type="button"
+                      className="secondary"
+                      onClick={() => {
+                        setConfirmingCancel(true);
+                      }}
+                    >
+                      Cancel job
+                    </button>
+                  )}
+                  {!watched && dismissAdvertisedBy === "nothing" && (
                     <span className="muted">
                       {" "}
                       <Versioned

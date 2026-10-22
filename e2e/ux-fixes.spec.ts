@@ -538,3 +538,43 @@ test("#30 the Jobs badge leaves out a finished job the page is still confirming"
   // Done, and still being confirmed: not counted as running.
   await expect(page.getByRole("button", { name: /^Jobs/ }).locator(".badge")).toHaveCount(0);
 });
+
+for (const style of STYLES) {
+  test(`#31 Cancel job asks first, and the job then says it was cancelled by you (${style})`, async ({
+    page,
+  }) => {
+    await requireService(`${RELAY}/healthz`, "the relay");
+    await open(page, style);
+    await page.getByRole("radio", { name: /^pygeoapi[- ]cors /i }).check();
+    await page.getByRole("button", { name: "Connect", exact: true }).click();
+    await openProcess(page, "Slow process");
+    await field(page, "Seconds (optional)").fill("60");
+    await page.getByRole("checkbox", { name: "Run in the background" }).check();
+    await page.getByRole("button", { name: "Run", exact: true }).click();
+    const running = page.locator("[data-job-ref]");
+    await expect(running).toHaveAttribute("data-job-ref", /\/jobs\//, { timeout: 15_000 });
+
+    // Asked, and kept: nothing sent.
+    let deletes = 0;
+    page.on("request", (request) => {
+      if (request.method() === "DELETE") deletes += 1;
+    });
+    await page.getByRole("button", { name: "Cancel job" }).click();
+    const question = page.getByRole("group", { name: "Confirm cancelling" });
+    await expect(question).toContainText("Cancel this job on the server?");
+    await expect(question.getByRole("button", { name: "Keep job" })).toBeFocused();
+    await question.getByRole("button", { name: "Keep job" }).click();
+    await expect(question).toBeHidden();
+    expect(deletes).toBe(0);
+
+    // Asked, and answered: cancelled.
+    await page.getByRole("button", { name: "Cancel job" }).click();
+    await question.getByRole("button", { name: "Cancel job" }).click();
+    await expect(page.getByText("Job cancelled. The server has dismissed it.")).toBeVisible();
+    await page.getByRole("button", { name: /^Jobs/ }).click();
+    const row = page.getByTestId("my-jobs").locator("[data-job-row]");
+    await expect(row.locator('[data-job-status="cancelled-by-you"]')).toBeVisible();
+    await expect(row).not.toContainText("gone");
+    await expect(row).not.toContainText("No longer");
+  });
+}

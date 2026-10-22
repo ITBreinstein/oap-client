@@ -61,6 +61,8 @@ export interface JobsPanelProps {
    */
   readonly names?:
     ((job: JobRow) => { readonly process: string; readonly service: string }) | undefined;
+  /** When this page had the server cancel a job, by its status URL (#31). */
+  readonly cancelled?: ReadonlyMap<string, string> | undefined;
 }
 
 function hostOf(url: string): string {
@@ -91,7 +93,25 @@ function resultsHref(job: JobRow): string | undefined {
   }
 }
 
-function StatusText({ job }: { readonly job: JobRow }) {
+/** "Cancelled by you" and when, for a job this page had the server cancel (#31). */
+function CancelledByYou({ at }: { readonly at: string }) {
+  return (
+    <>
+      <strong data-job-status="cancelled-by-you">Cancelled by you</strong>,{" "}
+      <time dateTime={at}>{startedLabel(at)}</time>
+    </>
+  );
+}
+
+function StatusText({
+  job,
+  cancelledAt,
+}: {
+  readonly job: JobRow;
+  readonly cancelledAt: string | undefined;
+}) {
+  // Not "gone", nor its last progress and message: this page cancelled it.
+  if (cancelledAt !== undefined) return <CancelledByYou at={cancelledAt} />;
   if (job.gone) return <>No longer on the server: dismissed, or expired.</>;
   if (job.status === undefined) {
     return (
@@ -130,14 +150,18 @@ function JobFacts({
   titleId,
   title,
   service,
+  cancelledAt,
 }: {
   readonly job: JobRow;
   readonly titleId: string;
   readonly title: string;
   readonly service: string;
+  readonly cancelledAt: string | undefined;
 }) {
-  const { status } = job;
-  const state = job.gone ? "gone" : (status?.status ?? "checking");
+  // A job this page had the server cancel (#31): no stale progress or message.
+  const cancelled = cancelledAt !== undefined;
+  const status = cancelled ? undefined : job.status;
+  const state = cancelled ? "cancelled" : job.gone ? "gone" : (status?.status ?? "checking");
   // JobFacts is the updated Instrument's: a visitor is spared the technical.
   const spared = useSpared(true);
   return (
@@ -147,9 +171,13 @@ function JobFacts({
           {title}
         </strong>
         <span className="job-badge" role="status" data-job-state={state}>
-          <strong data-job-status={status?.status}>
-            {job.gone ? "gone" : (status?.rawStatus ?? "checking…")}
-          </strong>
+          {cancelled ? (
+            <strong data-job-status="cancelled-by-you">cancelled by you</strong>
+          ) : (
+            <strong data-job-status={status?.status}>
+              {job.gone ? "gone" : (status?.rawStatus ?? "checking…")}
+            </strong>
+          )}
           {/* STYLE TRIAL (#30): for developers; the job is done. */}
           {job.confirmation?.state === "pending" && !spared && (
             <span data-not-yet-confirmed="true"> · not yet confirmed</span>
@@ -181,7 +209,15 @@ function JobFacts({
             <dd>{withoutExceptionCode(status.message)}</dd>
           </div>
         )}
-        {job.gone && (
+        {cancelledAt !== undefined && (
+          <div>
+            <dt>Cancelled</dt>
+            <dd>
+              <time dateTime={cancelledAt}>{startedLabel(cancelledAt)}</time>
+            </dd>
+          </div>
+        )}
+        {job.gone && !cancelled && (
           <div>
             <dt>Server</dt>
             <dd>No longer there: dismissed, or expired.</dd>
@@ -211,9 +247,11 @@ function JobItem({
   onRemove,
   onDismiss,
   names,
+  cancelled,
 }: {
   readonly structured: boolean;
   readonly names: JobsPanelProps["names"];
+  readonly cancelled: JobsPanelProps["cancelled"];
   readonly onRerun: (() => void) | undefined;
   readonly onFollow: (() => void) | undefined;
   readonly rerunFilled: boolean;
@@ -230,6 +268,7 @@ function JobItem({
   const results = resultsHref(job);
   const canDismiss = advertisedBy !== "nothing" && !job.gone && job.status?.status !== "dismissed";
   const named = names?.(job);
+  const cancelledAt = cancelled?.get(job.statusUrl);
   const title = named?.process ?? job.processId ?? job.status?.jobId ?? job.statusUrl;
   // Shown on the page: a job under way, or one with results, not the one on screen.
   const followable =
@@ -251,6 +290,7 @@ function JobItem({
           titleId={`${base}-title`}
           title={title}
           service={named?.service ?? hostOf(job.endpoint)}
+          cancelledAt={cancelledAt}
         />
       ) : (
         <>
@@ -268,7 +308,7 @@ function JobItem({
             )}
           </p>
           <p role="status" className="job-status">
-            <StatusText job={job} />
+            <StatusText job={job} cancelledAt={cancelledAt} />
           </p>
         </>
       )}
@@ -401,6 +441,7 @@ export function JobsPanel(props: JobsPanelProps) {
             message={messages.get(job.statusUrl)}
             structured={props.structured === true}
             names={props.names}
+            cancelled={props.cancelled}
             onRerun={
               props.rerun === undefined || job.processId === undefined
                 ? undefined

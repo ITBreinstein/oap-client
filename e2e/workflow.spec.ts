@@ -774,6 +774,11 @@ test.describe("the workflow in a browser", () => {
     await expect(running).toHaveAttribute("data-job-ref", /\/jobs\//, { timeout: 15_000 });
     const jobUrl = (await running.getAttribute("data-job-ref")) ?? "";
     await page.getByRole("button", { name: "Cancel job" }).click();
+    // It asks first (#31).
+    await page
+      .getByRole("group", { name: "Confirm cancelling" })
+      .getByRole("button", { name: "Cancel job" })
+      .click();
     await expect(page.getByText("Job cancelled. The server has dismissed it.")).toBeVisible();
 
     // Dismissed on the server: pygeoapi deletes a dismissed job (finding 0035).

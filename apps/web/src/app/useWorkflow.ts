@@ -161,6 +161,8 @@ export interface WorkflowView {
    * on `endpoint` the way it reaches it (#25): the server hides `Location`.
    */
   readonly backgroundUnfindable: (endpoint: EndpointRef) => boolean;
+  /** When this page had the server cancel a job, by its status URL (#31). */
+  readonly cancelled: ReadonlyMap<string, string>;
 }
 
 /** Which way an endpoint's background runs go, and where: what #25 is remembered by. */
@@ -317,6 +319,15 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
    * visit (#25), by {@link backgroundKey}: Run in the background is off there.
    */
   const [unfindable, setUnfindable] = useState<ReadonlySet<string>>(() => new Set());
+  /**
+   * The jobs this page had the server cancel this visit, and when (#31): My
+   * jobs says so, rather than "gone". In memory only: the stored record of a
+   * job keeps its four fields.
+   */
+  const [cancelled, setCancelled] = useState<ReadonlyMap<string, string>>(() => new Map());
+  const markCancelled = (statusUrl: string) => {
+    setCancelled((known) => new Map(known).set(statusUrl, new Date().toISOString()));
+  };
   /** Each process's form as it was left this visit, in memory only (#10). */
   const forms = useRef<FormMemory>(new Map());
   /** Connections made so far; each successful one takes the next number. */
@@ -904,6 +915,7 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
           setDismissWorked((seen) => new Set([...seen, job.endpoint]));
           active.record(job.endpoint, { ...base, outcome: "dismissed" });
           setJobMessage(statusUrl, "Dismissed on the server.");
+          markCancelled(statusUrl);
         } else {
           active.record(job.endpoint, { ...base, outcome: "unsupported" });
           setJobMessage(
@@ -946,6 +958,7 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
           setDismissWorked((seen) => new Set([...seen, endpointUrl]));
           active.record(endpointUrl, { ...base, outcome: "dismissed" });
           setJobNotice(undefined);
+          markCancelled(jobRef);
           dispatch({
             type: "run-failed",
             runId,
@@ -1103,6 +1116,7 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
     dismissAdvertisedFor,
     jobMessages,
     census,
+    cancelled,
     backgroundUnfindable: (endpoint) => unfindable.has(backgroundKey(relayEndpointFor(endpoint))),
   };
 }
