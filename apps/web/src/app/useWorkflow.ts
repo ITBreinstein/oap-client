@@ -296,6 +296,15 @@ function formObservationsOf(
   ];
 }
 
+/** The jobs this browser had cancelled, and when, by status URL. */
+function cancelledOf(jobs: readonly JobRow[] | undefined): ReadonlyMap<string, string> {
+  const cancelled = new Map<string, string>();
+  for (const job of jobs ?? []) {
+    if (job.cancelledAt !== undefined) cancelled.set(job.statusUrl, job.cancelledAt);
+  }
+  return cancelled;
+}
+
 export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: number): WorkflowView {
   const [state, dispatch] = useReducer(workflowReducer, INITIAL_WORKFLOW);
   const [snapshot, setSnapshot] = useState<JobSessionSnapshot | undefined>();
@@ -330,13 +339,12 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
    */
   const [unfindable, setUnfindable] = useState<ReadonlySet<string>>(() => new Set());
   /**
-   * The jobs this page had the server cancel this visit, and when (#31): My
-   * jobs says so, rather than "gone". In memory only: the stored record of a
-   * job keeps its four fields.
+   * A job this page had the server cancel, and when (#31): My jobs says so,
+   * rather than "gone". Kept with the job, so it says so after a reload too
+   * (#14e).
    */
-  const [cancelled, setCancelled] = useState<ReadonlyMap<string, string>>(() => new Map());
   const markCancelled = (statusUrl: string) => {
-    setCancelled((known) => new Map(known).set(statusUrl, new Date().toISOString()));
+    session.current?.markCancelled(statusUrl, new Date().toISOString());
   };
   /** Each process's form as it was left this visit, in memory only (#10). */
   const forms = useRef<FormMemory>(new Map());
@@ -1148,7 +1156,7 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
     dismissAdvertisedFor,
     jobMessages,
     census,
-    cancelled,
+    cancelled: cancelledOf(snapshot?.jobs),
     backgroundUnfindable: (endpoint) => unfindable.has(backgroundKey(relayEndpointFor(endpoint))),
   };
 }

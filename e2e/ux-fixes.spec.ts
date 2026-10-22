@@ -577,6 +577,14 @@ for (const style of STYLES) {
     await expect(row.locator('[data-job-status="cancelled-by-you"]')).toBeVisible();
     await expect(row).not.toContainText("gone");
     await expect(row).not.toContainText("No longer");
+
+    // And after a reload, still (#14e): it is kept with the job.
+    await page.reload();
+    await page.getByRole("button", { name: /^Jobs/ }).click();
+    await expect(row.locator('[data-job-status="cancelled-by-you"]')).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(row).not.toContainText("gone");
   });
 }
 

@@ -207,3 +207,37 @@ describe("a job followed from its link (#32)", () => {
     expect(createJobStore(() => storage).load()).toEqual([JOB]);
   });
 });
+
+describe("a job this browser had cancelled (#14e)", () => {
+  const AT = "2026-10-22T10:15:00.000Z";
+
+  it("keeps when it was cancelled across a reload", () => {
+    const storage = memoryStorage();
+    createJobStore(() => storage).save([{ ...JOB, cancelledAt: AT }]);
+    const [stored] = JSON.parse(storage.items.get(STORAGE_KEY) ?? "[]") as Record<
+      string,
+      unknown
+    >[];
+    expect(Object.keys(stored ?? {}).sort()).toEqual([
+      "cancelledAt",
+      "endpoint",
+      "processId",
+      "startedAt",
+      "statusUrl",
+    ]);
+    expect(createJobStore(() => storage).load()).toEqual([{ ...JOB, cancelledAt: AT }]);
+  });
+
+  it("drops a cancel time that is no time, and keeps the job", () => {
+    const JOB2 = { ...JOB, statusUrl: "http://localhost:5080/jobs/2" };
+    const storage = memoryStorage();
+    storage.items.set(
+      STORAGE_KEY,
+      JSON.stringify([
+        { ...JOB, cancelledAt: "yesterday-ish" },
+        { ...JOB2, cancelledAt: 3 },
+      ]),
+    );
+    expect(createJobStore(() => storage).load()).toEqual([JOB, JOB2]);
+  });
+});

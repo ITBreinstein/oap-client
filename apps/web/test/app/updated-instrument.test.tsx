@@ -100,6 +100,7 @@ describe("a job in My jobs, in the updated Instrument", () => {
     startedAt: "2026-09-30T10:00:00.000Z",
     restored: false,
     followed: false,
+    cancelledAt: undefined,
   };
 
   it("has its title and status as a badge, then one labelled line per fact", () => {
@@ -150,6 +151,7 @@ describe("Run again in My jobs, in the updated Instrument", () => {
     startedAt: "2026-09-30T10:00:00.000Z",
     restored: true,
     followed: false,
+    cancelledAt: undefined,
   };
 
   function panelWith(filled: boolean, busy: boolean) {

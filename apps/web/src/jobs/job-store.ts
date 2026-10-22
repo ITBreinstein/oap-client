@@ -4,7 +4,8 @@
  *
  * A stored job is four strings — the endpoint, the job's status URL, the
  * process and when it started — and, for a job this browser only follows
- * from its link, a flag saying so (#32). Never an input value, a result, a relay
+ * from its link, a flag saying so (#32); for one this browser had the server
+ * cancel, when it did (#14e). Never an input value, a result, a relay
  * session token or a callback token: storage outlives the page and is
  * readable by any script on this origin, and none of those is needed to read
  * a job's status. So after a reload a job has no doorbell; it is polled.
@@ -36,6 +37,8 @@ export interface StoredJob {
   readonly startedAt: string;
   /** Followed from its link, not started here (#32). Absent for a job started here. */
   readonly followed?: true | undefined;
+  /** ISO 8601: when this browser had the server cancel it (#31, #14e). Absent otherwise. */
+  readonly cancelledAt?: string | undefined;
 }
 
 export interface JobStore {
@@ -73,7 +76,7 @@ function isHttpUrl(value: string): boolean {
 /** One stored entry, or undefined when it is not one. */
 export function readStoredJob(value: unknown): StoredJob | undefined {
   if (!isRecord(value)) return undefined;
-  const { endpoint, statusUrl, processId, startedAt, followed } = value;
+  const { endpoint, statusUrl, processId, startedAt, followed, cancelledAt } = value;
   if (
     typeof endpoint !== "string" ||
     typeof statusUrl !== "string" ||
@@ -86,10 +89,18 @@ export function readStoredJob(value: unknown): StoredJob | undefined {
   ) {
     return undefined;
   }
-  // Rebuilt from the four fields (and the flag), so nothing else stored alongside survives.
-  return followed === true
-    ? { endpoint, statusUrl, processId, startedAt, followed: true }
-    : { endpoint, statusUrl, processId, startedAt };
+  // Rebuilt from the four fields (and the flag and the time of a cancel), so
+  // nothing else stored alongside survives. A cancel time that is no time is dropped.
+  return {
+    endpoint,
+    statusUrl,
+    processId,
+    startedAt,
+    ...(followed === true ? { followed: true } : {}),
+    ...(typeof cancelledAt === "string" && !Number.isNaN(Date.parse(cancelledAt))
+      ? { cancelledAt }
+      : {}),
+  };
 }
 
 /** `window.localStorage`, or undefined where reading it throws or there is none. */
@@ -138,15 +149,16 @@ export function createJobStore(
     },
 
     save(jobs) {
-      // Only the four fields (and the flag), whatever the caller's objects carry.
+      // Only the four fields (and the flag and a cancel's time), whatever the caller's objects carry.
       const kept = jobs
         .slice(-MAX_STORED_JOBS)
-        .map(({ endpoint, statusUrl, processId, startedAt, followed }) => ({
+        .map(({ endpoint, statusUrl, processId, startedAt, followed, cancelledAt }) => ({
           endpoint,
           statusUrl,
           processId,
           startedAt,
           ...(followed === true ? { followed: true } : {}),
+          ...(cancelledAt === undefined ? {} : { cancelledAt }),
         }));
       try {
         const target = storage();

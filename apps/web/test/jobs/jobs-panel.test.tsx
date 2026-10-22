@@ -56,6 +56,7 @@ function row(change: Partial<JobRow> = {}): JobRow {
     startedAt: "2026-09-30T10:00:00.000Z",
     restored: false,
     followed: false,
+    cancelledAt: undefined,
     ...change,
   };
 }

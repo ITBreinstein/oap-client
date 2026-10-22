@@ -53,6 +53,8 @@ export interface JobRow extends TrackedJob {
   readonly restored: boolean;
   /** Followed from its link, not started by this browser (#32). */
   readonly followed: boolean;
+  /** ISO 8601: when this browser had the server cancel it (#31), kept across a reload (#14e). */
+  readonly cancelledAt: string | undefined;
 }
 
 /**
@@ -113,6 +115,8 @@ export interface JobSession {
   ): void;
   /** Take a job off this browser's list, and out of storage. The server is not told. */
   remove(statusUrl: string): void;
+  /** Note that this browser had the server cancel a job, and when: stored with it (#14e). */
+  markCancelled(statusUrl: string, at: string): void;
   /**
    * Ask the server to dismiss a job (`DELETE`), through the route its reads
    * take, then read it again. The core records the attempt.
@@ -215,6 +219,7 @@ export function createJobSession(
       startedAt: string | undefined;
       restored: boolean;
       followed: boolean;
+      cancelledAt: string | undefined;
     }
   >();
 
@@ -251,6 +256,7 @@ export function createJobSession(
         processId: job.processId,
         startedAt: job.startedAt,
         ...(job.followed ? { followed: true } : {}),
+        ...(job.cancelledAt === undefined ? {} : { cancelledAt: job.cancelledAt }),
       });
     }
     store.save([...kept.values()]);
@@ -269,6 +275,7 @@ export function createJobSession(
       startedAt: meta.get(job.statusUrl)?.startedAt,
       restored: meta.get(job.statusUrl)?.restored ?? false,
       followed: meta.get(job.statusUrl)?.followed ?? false,
+      cancelledAt: meta.get(job.statusUrl)?.cancelledAt,
     })),
     observations,
     droppedObservations: dropped,
@@ -386,6 +393,7 @@ export function createJobSession(
       startedAt: stored.startedAt,
       restored: true,
       followed: stored.followed === true,
+      cancelledAt: stored.cancelledAt,
     });
     reconciler.track(stored.statusUrl);
   };
@@ -483,6 +491,7 @@ export function createJobSession(
         startedAt: now().toISOString(),
         restored: false,
         followed,
+        cancelledAt: undefined,
       });
       persist();
       reconciler.track(statusUrl);
@@ -493,6 +502,14 @@ export function createJobSession(
       reconciler.untrack(statusUrl);
       meta.delete(statusUrl);
       removedHere.add(statusUrl);
+      persist();
+      publish();
+    },
+
+    markCancelled(statusUrl, at) {
+      const job = meta.get(statusUrl);
+      if (job === undefined) return;
+      meta.set(statusUrl, { ...job, cancelledAt: at });
       persist();
       publish();
     },
@@ -541,6 +558,7 @@ export function createJobSession(
           startedAt,
           restored: false,
           followed: false,
+          cancelledAt: undefined,
         });
         persist();
         reconciler.track(statusUrl, refs.get(statusUrl));

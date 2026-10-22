@@ -162,3 +162,32 @@ describe("the jobs this browser started", () => {
     expect(storage.setItem).not.toHaveBeenCalled();
   });
 });
+
+describe("a job this browser had cancelled (#14e)", () => {
+  it("is stored with when it was cancelled, and says so after a reload", () => {
+    server();
+    const store = memoryStore([STORED]);
+    session = createJobSession(undefined, { store });
+    session.markCancelled(STORED.statusUrl, "2026-10-22T10:15:00.000Z");
+    expect(store.load()).toEqual([{ ...STORED, cancelledAt: "2026-10-22T10:15:00.000Z" }]);
+    session.dispose();
+
+    // A reload: a new session from the same store.
+    session = createJobSession(undefined, { store });
+    let rows: readonly { statusUrl: string; cancelledAt: string | undefined }[] = [];
+    session.subscribe((snapshot) => {
+      rows = snapshot.jobs;
+    });
+    expect(rows.map((row) => [row.statusUrl, row.cancelledAt])).toEqual([
+      [STORED.statusUrl, "2026-10-22T10:15:00.000Z"],
+    ]);
+  });
+
+  it("is nothing for a job not on the list", () => {
+    server();
+    const store = memoryStore();
+    session = createJobSession(undefined, { store });
+    session.markCancelled(`${BASE}/jobs/elsewhere`, "2026-10-22T10:15:00.000Z");
+    expect(store.saved).toEqual([]);
+  });
+});
