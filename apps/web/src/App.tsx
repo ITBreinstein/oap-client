@@ -334,18 +334,12 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
   const openForm = state.stage === "process" ? state.plan : undefined;
   const drawField = activeDrawField(drawFor, openForm);
 
-  // The drawing tools' place in the form (#18), and the map's view, read on
-  // demand: the map sits beside the form, so both are handed over here.
-  const [toolsSlot, setToolsSlot] = useState<HTMLElement | undefined>();
+  // The map's view, read on demand (#18): the map sits beside the form, so
+  // it is handed over here.
   const drawPresses = useRef(0);
   const viewReader = useRef<(() => MapExtent | undefined) | undefined>(undefined);
   const readView = useCallback((read: (() => MapExtent | undefined) | undefined) => {
     viewReader.current = read;
-  }, []);
-  // Stable, as a ref callback must be: a new one each render would be called
-  // with null and the element again, and set state each time.
-  const giveToolsSlot = useCallback((element: HTMLElement | null) => {
-    setToolsSlot(element ?? undefined);
   }, []);
   const draw = useMemo<DrawTarget>(
     () => ({
@@ -360,12 +354,10 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
       stop: () => {
         setDrawFor(undefined);
       },
-      toolsSlot,
-      setToolsSlot: giveToolsSlot,
       focusToken: drawFor?.press,
       currentView: () => viewReader.current?.(),
     }),
-    [drawField, mapAvailable, openForm, toolsSlot, giveToolsSlot, drawFor?.press],
+    [drawField, mapAvailable, openForm, drawFor?.press],
   );
 
   // Each stage moves focus to its heading, so a keyboard user lands where the

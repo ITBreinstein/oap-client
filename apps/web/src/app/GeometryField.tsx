@@ -10,7 +10,7 @@
  * New rather than reading its metres as degrees.
  */
 
-import { useCallback, useContext, useEffect, useId, useMemo, useState } from "react";
+import { useContext, useEffect, useId, useMemo, useState } from "react";
 import { isGeoJsonText, type GeoJsonText } from "../forms/encode.js";
 import { describeLoad, readGeoJson } from "../forms/geojson.js";
 import { drawableTypes, holdsSeveral, toGeoJson } from "../forms/geometry.js";
@@ -59,13 +59,6 @@ export function GeometryField(props: ControlProps<GeometryControl>) {
   const drawing = inputId !== undefined && draw.fieldId === inputId;
   const canDraw = inputId !== undefined && draw.available && drawableTypes(control).length > 0;
   // An area input can take the map's view as its area (#18).
-  const giveSlot = draw.setToolsSlot;
-  const toolsSlot = useCallback(
-    (element: HTMLDivElement | null) => {
-      giveSlot?.(element);
-    },
-    [giveSlot],
-  );
   const canView =
     inputId !== undefined && draw.available && drawableTypes(control).includes("Polygon");
   const tooMany = useTooManyToEdit(text);
@@ -213,7 +206,6 @@ export function GeometryField(props: ControlProps<GeometryControl>) {
         </button>
       </p>
       {/* The drawing tools, right after the Draw button in the tab order (#18). */}
-      {drawing && <div className="map-tools-slot" ref={toolsSlot} />}
       {canDraw && (
         <p className="help draw-hint">
           Drawing needs a mouse or touch. You can also paste GeoJSON or use the current map view.

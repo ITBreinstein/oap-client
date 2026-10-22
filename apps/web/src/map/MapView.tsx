@@ -25,7 +25,6 @@ import {
 // Vite bundles the worker as an ES module and hands its URL over instead.
 import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import {
   INITIAL_BOUNDS,
   OPENFREEMAP_STYLES,
@@ -182,11 +181,6 @@ export interface MapViewProps {
   readonly onViewReader?:
     | ((read: (() => readonly [number, number, number, number] | undefined) | undefined) => void)
     | undefined;
-  /**
-   * Where the drawing tools go (#18): beside the field drawing, so they come
-   * next in the tab order. Over the map when there is none.
-   */
-  readonly toolsSlot?: HTMLElement | undefined;
   /** Each new token: the tools take the focus once, as Draw was just pressed (#18). */
   readonly focusToken?: number | undefined;
   /**
@@ -241,7 +235,6 @@ export function MapView({
   selected,
   onAvailable,
   onViewReader,
-  toolsSlot,
   focusToken,
   goTo,
   createMap = createPdokMap,
@@ -360,22 +353,17 @@ export function MapView({
     selected,
   );
   const drawingShapes = geometry.active && map !== undefined;
-  // Drawing starts with the focus on the first tool (#18), once for each
-  // press of Draw: not when drawing comes back by itself. Once the tools are
-  // beside the field, which makes them anew.
+  // Drawing starts with the focus on the first tool, over the map (#18),
+  // once for each press of Draw: not when drawing comes back by itself.
   const firstTool = useRef<HTMLButtonElement>(null);
   const focusedFor = useRef<number | undefined>(undefined);
   useEffect(() => {
     if (!drawingShapes || focusToken === undefined || focusedFor.current === focusToken) return;
-    if (toolsSlot === undefined && firstTool.current === null) return;
     const tool = firstTool.current;
-    if (toolsSlot !== undefined) focusedFor.current = focusToken;
-    tool?.focus({ preventScroll: true });
-    // In view, beside the field: not when the tools are over the map.
-    if (toolsSlot !== undefined && tool !== null && "scrollIntoView" in tool) {
-      tool.scrollIntoView({ block: "nearest" });
-    }
-  }, [drawingShapes, toolsSlot, focusToken]);
+    if (tool === null) return;
+    focusedFor.current = focusToken;
+    tool.focus({ preventScroll: true });
+  }, [drawingShapes, focusToken]);
 
   const toolbar = drawingShapes && (
     <div className="map-tools" role="toolbar" aria-label="Drawing tools">
@@ -414,8 +402,7 @@ export function MapView({
 
   return (
     <div className="map-view">
-      {/* Beside the field drawing, when it gave a place for them (#18). */}
-      {toolsSlot === undefined ? toolbar : toolbar !== false && createPortal(toolbar, toolsSlot)}
+      {toolbar}
       <div
         ref={attach}
         className="map-canvas"

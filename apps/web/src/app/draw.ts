@@ -21,13 +21,6 @@ export interface DrawTarget {
   start(fieldId: string): void;
   stop(): void;
   /**
-   * Where the drawing tools go (#18): an element right after the Draw button,
-   * so they come next in the tab order. Undefined: over the map, as before.
-   */
-  readonly toolsSlot?: HTMLElement | undefined;
-  /** The field drawing gives the element its tools go in, or takes it back. */
-  readonly setToolsSlot?: ((element: HTMLElement | null) => void) | undefined;
-  /**
    * Changes each time Draw is pressed (#18): the tools take the focus once for
    * it, and not when drawing comes back by itself after a run.
    */

@@ -350,8 +350,6 @@ export function MapPane({
         label={basemap?.label}
         onAvailable={onAvailable}
         onViewReader={onViewReader}
-        // On a phone the tools stay over the map, where the drawing is (#39).
-        toolsSlot={wide ? draw.toolsSlot : undefined}
         focusToken={draw.focusToken}
         geometry={geometry}
         shown={shown}

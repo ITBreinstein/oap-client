@@ -241,21 +241,6 @@ legend,
   flex-basis: 100%;
 }
 
-/* In the form, right after the Draw button (#18): in its flow, not over the map. */
-.map-tools-slot .map-tools {
-  position: static;
-  margin: 0.5rem 0 0;
-}
-
-/* Scrolled to clear of the Run bar that stays at the foot of the form. */
-.map-tools-slot button {
-  scroll-margin-bottom: 7rem;
-}
-
-.map-tools-slot:empty {
-  display: none;
-}
-
 /* The map's own colours (map/basemap.ts): the same on a light and a dark page. */
 .map-legend .swatch {
   display: inline-block;

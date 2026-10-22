@@ -669,7 +669,7 @@ for (const style of STYLES) {
 }
 
 for (const style of STYLES) {
-  test(`#18 the drawing tools come right after Draw, and the map's view can be the input (${style})`, async ({
+  test(`#18 drawing starts on the first tool, over the map, and the map's view can be the input (${style})`, async ({
     page,
   }) => {
     await open(page, style);
@@ -678,9 +678,13 @@ for (const style of STYLES) {
     await page.locator(".map-pane canvas").waitFor();
     await expect(page.getByText("Drawing needs a mouse or touch.")).toBeVisible();
 
-    // Draw: the first tool has the focus, the next Tab is the next tool.
+    // Draw: the tools are on the map, the first has the focus, the next Tab
+    // is the next tool.
     await page.getByRole("button", { name: "Draw on the map" }).click();
     const tools = page.getByRole("toolbar", { name: "Drawing tools" });
+    await expect(
+      page.locator(".map-pane").getByRole("toolbar", { name: "Drawing tools" }),
+    ).toBeVisible();
     await expect(tools.getByRole("button", { name: "Add area" })).toBeFocused();
     await expect(tools.getByRole("button", { name: "Add area" })).toHaveAttribute(
       "aria-pressed",
