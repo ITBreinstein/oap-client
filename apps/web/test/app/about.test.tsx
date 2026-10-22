@@ -57,6 +57,19 @@ describe("About", () => {
     expect(npm?.getAttribute("href")).toBe("https://www.npmjs.com/package/@breinstein/oap-client");
   });
 
+  it("says when the relay is used, and that a typed address never is (#44)", () => {
+    const container = render(<AboutPanel />);
+    const text = container.textContent.replace(/\s+/g, " ");
+    expect(text).toContain(
+      "Requests go straight to the service. For some listed services, background runs go through Breinstein’s relay so this page can follow them. If a listed service can’t be read directly, the page asks before using the relay. An address you type is always reached directly.",
+    );
+    expect(text).not.toContain("no CORS");
+    // The log sentences stay as they were.
+    expect(text).toContain(
+      "The relay keeps a short log of each request: the service, the path, the status, the size and the time. Never your IP address or what you sent.",
+    );
+  });
+
   it("names the logo, and links the standard and the source", () => {
     const container = render(<AboutPanel />);
     expect(container.querySelector('svg[role="img"] title')?.textContent).toBe(

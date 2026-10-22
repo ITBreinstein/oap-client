@@ -69,10 +69,11 @@ export function AboutPanel() {
           Where your requests go
         </h3>
         <p>
-          Requests go from this browser straight to the service you connect. When a service doesn’t
-          allow that (no CORS), they go through Breinstein’s relay, which passes them on. The relay
-          keeps a short log of each request: the service, the path, the status, the size and the
-          time. Never your IP address or what you sent.
+          Requests go straight to the service. For some listed services, background runs go through
+          Breinstein’s relay so this page can follow them. If a listed service can’t be read
+          directly, the page asks before using the relay. An address you type is always reached
+          directly. The relay keeps a short log of each request: the service, the path, the status,
+          the size and the time. Never your IP address or what you sent.
         </p>
         <p>
           The web server that serves this page, and passes requests on to the relay, keeps a
