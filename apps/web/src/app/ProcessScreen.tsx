@@ -430,6 +430,16 @@ export interface ProcessScreenProps {
   readonly developer?: boolean | undefined;
   /** The session's observations: the request log and the result's timing are read off them. */
   readonly observations?: readonly SessionObservation[] | undefined;
+  /**
+   * This page has seen that it can't find a background job started on this
+   * service the way it reaches it (#25): Run in the background is off.
+   */
+  readonly backgroundUnfindable?: boolean | undefined;
+  /**
+   * The relay lists this service, and its background runs go through it:
+   * reconnect that way, to this process, the form as it is (#25).
+   */
+  readonly onRelayForBackground?: (() => void) | undefined;
 }
 
 /** After this long, a foreground run that may go in the background says so. */
@@ -484,6 +494,7 @@ export function ProcessScreen(props: ProcessScreenProps) {
   const { process, plan, values, warnings, mode } = state;
   const base = useId();
   const both = process.execution.sync && process.execution.async;
+  const unfindable = props.backgroundUnfindable === true;
   const onlyAsync = process.execution.async && !process.execution.sync;
   const editable = state.stage === "process";
   const { maxCoordinates } = useContext(MapLimitsContext);
@@ -775,12 +786,29 @@ export function ProcessScreen(props: ProcessScreenProps) {
             </div>
           )}
 
+          {unfindable && (both || onlyAsync) && (
+            <div className="background-help">
+              <p id={`${base}-no-background`} className="hint">
+                This service can’t tell a web page where its background jobs are.
+              </p>
+              {props.onRelayForBackground !== undefined && (
+                <p className="actions">
+                  <button type="button" className="secondary" onClick={props.onRelayForBackground}>
+                    Use the relay for background runs
+                  </button>
+                </p>
+              )}
+            </div>
+          )}
+
           <div className="run-bar">
             {both && (
               <label className="choice">
                 <input
                   type="checkbox"
-                  checked={mode === "async"}
+                  checked={mode === "async" && !unfindable}
+                  disabled={unfindable}
+                  aria-describedby={unfindable ? `${base}-no-background` : undefined}
                   onChange={(event) => {
                     commands.setMode(event.target.checked ? "async" : "sync");
                   }}

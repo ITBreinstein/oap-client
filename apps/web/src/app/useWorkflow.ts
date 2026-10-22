@@ -156,6 +156,16 @@ export interface WorkflowView {
   /** What the last Dismiss of a job ended in, by status URL. */
   readonly jobMessages: ReadonlyMap<string, string>;
   readonly census: CensusProgress | undefined;
+  /**
+   * Whether this page has seen that it cannot find a background job started
+   * on `endpoint` the way it reaches it (#25): the server hides `Location`.
+   */
+  readonly backgroundUnfindable: (endpoint: EndpointRef) => boolean;
+}
+
+/** Which way an endpoint's background runs go, and where: what #25 is remembered by. */
+function backgroundKey(endpoint: RelayEndpoint): string {
+  return `${endpoint.executeRoute}\n${endpoint.baseUrl.replace(/\/+$/, "")}`;
 }
 
 const NO_ERRORS: FieldErrors = new Map();
@@ -301,6 +311,11 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
   const waiting = useRef<{ readonly runId: string; readonly stop: AbortController } | undefined>(
     undefined,
   );
+  /**
+   * The endpoints whose background runs this page cannot find, seen this
+   * visit (#25), by {@link backgroundKey}: Run in the background is off there.
+   */
+  const [unfindable, setUnfindable] = useState<ReadonlySet<string>>(() => new Set());
   /** Each process's form as it was left this visit, in memory only (#10). */
   const forms = useRef<FormMemory>(new Map());
   /** Connections made so far; each successful one takes the next number. */
@@ -599,7 +614,15 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
     setFieldErrors(errors);
     if (errors.size > 0) return;
 
-    const { process, plan, mode, linkOutputs } = state;
+    const { process, plan, linkOutputs } = state;
+    // Never a background run this page has seen it can't find (#25), when
+    // the process can run in the foreground.
+    const mode =
+      state.mode === "async" &&
+      process.execution.sync &&
+      unfindable.has(backgroundKey(relayEndpointFor(connection.endpoint)))
+        ? "sync"
+        : state.mode;
     const request = runRequest(process, plan, state.values, linkOutputs);
     // Package 6: the schema warnings were on screen and do not stop the run;
     // an input whose value could not be checked is recorded, once.
@@ -680,16 +703,20 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
         dispatch({ type: "results", runId, results });
       } catch (cause) {
         if (cause instanceof AmbiguousExecutionResponseError) {
+          // Every background run here would end the same way: not again
+          // this visit (#25). The execution observation has the evidence.
+          setUnfindable((known) => new Set(known).add(backgroundKey(relayEndpoint)));
           dispatch({
             type: "run-failed",
             runId,
             error: {
               title:
-                "The server started a job but did not tell this page where to find it. Run it in the foreground, or use an endpoint that runs through the relay.",
-              detail:
-                "The server does not expose the Location header to web pages (finding 0039). The job may still be running on the server.",
+                "The service started the run in the background, but can’t tell this page where to find it. The job may still be running on the service.",
+              technical:
+                "The server answered the asynchronous execute without exposing the Location header to web pages (finding 0039), so the page cannot name the job.",
             },
           });
+          dispatch({ type: "set-mode", mode: "sync" });
           return;
         }
         // Stopped by the user: the screen has already gone back to the form.
@@ -1076,5 +1103,6 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
     dismissAdvertisedFor,
     jobMessages,
     census,
+    backgroundUnfindable: (endpoint) => unfindable.has(backgroundKey(relayEndpointFor(endpoint))),
   };
 }

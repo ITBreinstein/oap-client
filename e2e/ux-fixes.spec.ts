@@ -36,13 +36,6 @@ async function connectTyped(page: Page) {
   await expect(page.getByRole("heading", { level: 2, name: "Processes" })).toBeVisible();
 }
 
-/** Connect through the relay's configured endpoint, which background runs need. */
-async function connectConfigured(page: Page) {
-  await page.getByRole("radio", { name: /^pygeoapi-cors / }).check();
-  await page.getByRole("button", { name: "Connect", exact: true }).click();
-  await expect(page.getByRole("heading", { level: 2, name: "Processes" })).toBeVisible();
-}
-
 async function openProcess(page: Page, title: string) {
   await page.getByRole("button", { name: title, exact: true }).click();
   await expect(page.getByRole("heading", { level: 2, name: title })).toBeVisible();
@@ -151,5 +144,60 @@ for (const style of STYLES) {
   });
 }
 
-// The relay, for the tests that run in the background.
-export { RELAY, connectConfigured };
+for (const style of STYLES) {
+  test(`#25 a direct background run that can't be found turns the option off, and offers the relay (${style})`, async ({
+    page,
+  }) => {
+    await requireService(`${RELAY}/healthz`, "the relay");
+    await open(page, style);
+    await connectTyped(page);
+    await openProcess(page, "Slow process");
+    await field(page, "Seconds (optional)").fill("1");
+    const background = page.getByRole("checkbox", { name: "Run in the background" });
+    await background.check();
+    await page.getByRole("button", { name: "Run", exact: true }).click();
+
+    const alert = page.getByRole("alert");
+    await expect(alert).toContainText("can’t tell this page where to find it", {
+      timeout: 15_000,
+    });
+    await expect(alert).toContainText("The job may still be running on the service.");
+    await expect(alert).not.toContainText("Location");
+    await expect(alert).not.toContainText("0039");
+    // Off, and stays off for this service this visit, saying why.
+    await expect(background).not.toBeChecked();
+    await expect(background).toBeDisabled();
+    await expect(background).toHaveAccessibleDescription(
+      "This service can’t tell a web page where its background jobs are.",
+    );
+    await toList(page);
+    await openProcess(page, "Slow process");
+    await expect(background).toBeDisabled();
+    // The technical reason is for developers.
+    await expect(page.getByTestId("developer-note")).toHaveCount(0);
+
+    // Through the relay, which lists the same service: same process, same
+    // form, Run in the background ticked.
+    await page.getByRole("button", { name: "Use the relay for background runs" }).click();
+    await expect(page.getByRole("heading", { level: 2, name: "Slow process" })).toBeVisible();
+    await expect(field(page, "Seconds (optional)")).toHaveValue("1");
+    await expect(background).toBeEnabled();
+    await expect(background).toBeChecked();
+    await page.getByRole("button", { name: "Run", exact: true }).click();
+    await expect(page.locator("[data-job-ref]")).toHaveAttribute("data-job-ref", /\/jobs\//, {
+      timeout: 15_000,
+    });
+  });
+}
+
+test("#25 the technical reason is in the Developer section", async ({ page }) => {
+  await open(page, "instrument-updated");
+  await connectTyped(page);
+  await openProcess(page, "Slow process");
+  await page.getByRole("checkbox", { name: "Run in the background" }).check();
+  await page.getByRole("button", { name: "Run", exact: true }).click();
+  await expect(page.getByTestId("developer-note")).toContainText("Location header", {
+    timeout: 15_000,
+  });
+  await expect(page.getByTestId("developer-note")).toContainText("finding 0039");
+});

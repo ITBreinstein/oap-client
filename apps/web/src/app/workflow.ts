@@ -60,6 +60,11 @@ export interface WorkflowError {
   readonly inputId?: string | undefined;
   /** Not a failure: something the user asked for, reported on the same line. */
   readonly notice?: true | undefined;
+  /**
+   * What a developer is told about it, in the Developer section: never in
+   * the visitor's words (#25).
+   */
+  readonly technical?: string | undefined;
 }
 
 interface Connected {

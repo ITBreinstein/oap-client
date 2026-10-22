@@ -173,7 +173,12 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
       sentFor.current.set(state.jobRef, state.values);
     }
   }, [state]);
-  const pendingRerun = useRef<{ processId: string; values?: FormValues | undefined }>(undefined);
+  const pendingRerun = useRef<{
+    processId: string;
+    values?: FormValues | undefined;
+    /** Tick Run in the background once it is open (#25). */
+    background?: true | undefined;
+  }>(undefined);
   useEffect(() => {
     const pending = pendingRerun.current;
     if (
@@ -184,8 +189,8 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
       return;
     }
     pendingRerun.current = undefined;
-    if (pending.values === undefined) return;
-    for (const [id, value] of Object.entries(pending.values)) commands.setValue(id, value);
+    if (pending.values === undefined && pending.background !== true) return;
+    for (const [id, value] of Object.entries(pending.values ?? {})) commands.setValue(id, value);
     commands.setMode("async");
   }, [state, commands]);
   /** The service a listed job ran on, reached the way this page reaches it. */
@@ -212,6 +217,29 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
     setPanelOpen(undefined);
     address.followJob(endpoint, job.processId, job.statusUrl);
   };
+
+  // #25: a direct service that hides where its background jobs are, which
+  // the relay also lists with its background runs through it. One click
+  // reconnects that way, to the same process: the form comes back as it is
+  // (it is kept by service), with Run in the background ticked.
+  const backgroundUnfindable =
+    state.stage !== "choose-endpoint" && view.backgroundUnfindable(state.endpoint);
+  const relayForBackground =
+    state.stage === "choose-endpoint" || !view.backgroundUnfindable(state.endpoint)
+      ? undefined
+      : view.configured.find(
+          (entry) =>
+            entry.executeRoute === "relay" &&
+            sameService(entry.baseUrl, state.endpoint.baseUrl) &&
+            !view.backgroundUnfindable({ source: "configured", ...entry }),
+        );
+  const switchToRelay =
+    relayForBackground === undefined || state.stage !== "process"
+      ? undefined
+      : () => {
+          pendingRerun.current = { processId: state.process.id, background: true };
+          commands.openExample({ source: "configured", ...relayForBackground }, state.process.id);
+        };
 
   const openExample = (example: Example) => {
     const endpoint = exampleEndpoint(example, view.configured);
@@ -328,6 +356,8 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
           dismissAdvertisedBy={view.dismissAdvertisedBy}
           developer={developer}
           observations={view.snapshot?.observations}
+          backgroundUnfindable={backgroundUnfindable}
+          onRelayForBackground={switchToRelay}
         />
       );
       break;
@@ -452,6 +482,7 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
                     relayUrl={relayUrl}
                     open={developer}
                     census={view.census}
+                    note={state.stage === "process" ? state.error?.technical : undefined}
                     onDescribeAll={
                       state.stage === "choose-endpoint" ? undefined : commands.describeAll
                     }

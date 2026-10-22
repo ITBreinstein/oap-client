@@ -318,6 +318,15 @@ pre.code {
   word-break: break-word;
 }
 
+/* Why Run in the background is off here, and the way round it (#25). */
+.background-help {
+  margin-top: 12px;
+}
+
+.background-help p {
+  margin: 0 0 8px;
+}
+
 /*
  * A text result keeps its lines, but never breaks inside a word to fit
  * (#26): a long word, an address or a number, scrolls instead.
