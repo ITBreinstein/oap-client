@@ -29,6 +29,7 @@ import {
 } from "../results/plottable.js";
 import { isOpenable, isTruncated, originOf, type LoadedReference } from "../results/reference.js";
 import { parseCsv } from "../results/csv.js";
+import { plainValue } from "../results/plain-value.js";
 import {
   defaultFilename,
   isCsv,
@@ -164,6 +165,7 @@ function ResultItem({
   // STYLE TRIAL: the updated Instrument lays JSON out with tabs, and offers Copy.
   const updated = useUpdated();
   const copyName = several ? `Copy ${result.outputId}` : "Copy result";
+  const plain = updated && result.kind === "json" ? plainValue(result.value) : undefined;
   const status = plotStatus(result, maxCoordinates);
   const plot = status.kind;
   const imageOnMap = placed?.outputId === result.outputId;
@@ -193,10 +195,17 @@ function ResultItem({
           Download it to open it elsewhere.
         </p>
       )}
+      {/* STYLE TRIAL (#27): one plain value is the answer itself, shown large. */}
+      {plain !== undefined && (
+        <p className="result-value" data-plain-value="true">
+          {String(plain)}
+        </p>
+      )}
       {result.kind === "json" && (
         // Folded when the map shows it: the shape is the answer there, and
-        // pages of coordinates would push the next steps off screen.
-        <details open={plot !== "plotted"}>
+        // pages of coordinates would push the next steps off screen. Folded
+        // too beneath a plain value (#27).
+        <details open={plot !== "plotted" && plain === undefined}>
           <summary>
             <strong>{result.outputId}</strong> <span className="muted">JSON</span>
           </summary>

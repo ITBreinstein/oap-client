@@ -30,7 +30,10 @@
  * directly" is said of a typed address only (`EndpointScreen.tsx`,
  * `app/service-list.ts`, #3); a finished job being confirmed says nothing, and
  * a changed status is said in one line (`ProcessScreen` `NotYetConfirmed`,
- * `StatusChanged`; `JobsPanel` `JobFacts`; #30); the map is OpenFreeMap's world, in the
+ * `StatusChanged`; `JobsPanel` `JobFacts`; #30); a result that is one plain
+ * value is shown large, and the status line says "Finished" and how long it
+ * took (`ResultsView`, `results/plain-value.ts`, `ProcessScreen` `ResultStrip`;
+ * #27); the map is OpenFreeMap's world, in the
  * theme's colours (`App.tsx` `basemap`, `createWorldMap` in `map/MapView.tsx`),
  * and About credits it (`AboutPanel.tsx`); "Change service" comes first in
  * the process list, for the top right corner (`ProcessListScreen.tsx`); JSON is laid out with tabs
@@ -897,4 +900,16 @@
   [data-variant="updated"] .start .example-card .example-id {
     display: none;
   }
+}
+
+/* ------------------------------------------------- a plain value, large */
+
+/* A result that is one string, number or boolean is the answer itself (#27). */
+[data-variant="updated"] .result-value {
+  margin: 4px 0 12px;
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--text-strong);
+  overflow-wrap: anywhere;
 }

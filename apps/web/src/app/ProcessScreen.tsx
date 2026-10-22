@@ -353,16 +353,49 @@ const REASONS: Readonly<Record<number, string>> = { 200: "OK", 201: "Created", 2
  * for a run in the foreground, how long the server took. Only what the page
  * has: a cell it does not know is left out, never guessed.
  */
+/** How long a background job ran, by the server's own clock, when it says. */
+function jobTook(job: JobRow | undefined): number | undefined {
+  const started = Date.parse(job?.status?.started ?? "");
+  const finished = Date.parse(job?.status?.finished ?? "");
+  return Number.isNaN(started) || Number.isNaN(finished) || finished < started
+    ? undefined
+    : finished - started;
+}
+
 function ResultStrip({
   state,
   job,
   execution,
+  spared,
 }: {
   readonly state: Extract<Workflow, { stage: "result" }>;
   readonly job: JobRow | undefined;
   readonly execution: ReturnType<typeof lastExecution>;
+  /**
+   * STYLE TRIAL (#27): the updated Instrument says "Finished" and how long it
+   * took, the same for a run in the foreground and one in the background;
+   * the HTTP status and the media types are for developers.
+   */
+  readonly spared: boolean;
 }) {
   const background = state.jobRef !== undefined;
+  if (spared) {
+    const took = background ? jobTook(job) : execution?.elapsedMs;
+    return (
+      <dl className="result-strip">
+        <div>
+          <dt className="label">Status</dt>
+          <dd data-ok="true">Finished</dd>
+        </div>
+        {took !== undefined && (
+          <div>
+            <dt className="label">Took</dt>
+            <dd className="mono">{seconds(took)}</dd>
+          </div>
+        )}
+      </dl>
+    );
+  }
   const code = execution?.status;
   const status = background
     ? job?.status?.rawStatus
@@ -822,6 +855,7 @@ export function ProcessScreen(props: ProcessScreenProps) {
             state={state}
             job={resultJob}
             execution={lastExecution(observations, endpointKey, process.id)}
+            spared={spared}
           />
         </div>
       )}
