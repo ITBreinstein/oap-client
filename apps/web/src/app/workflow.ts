@@ -425,6 +425,12 @@ export function workflowReducer(state: Workflow, action: WorkflowAction): Workfl
       return state.stage === "process"
         ? {
             ...state,
+            // A changed input is no longer the one the service's error named:
+            // its mark goes, as the form's own does (#11). The words stay.
+            error:
+              state.error?.inputId === action.id
+                ? { ...state.error, inputId: undefined }
+                : state.error,
             // A Map would be safer for ids like "__proto__"; `fromEntries`
             // defines own properties, which is what the encoder reads (N5).
             values: Object.fromEntries([

@@ -141,6 +141,7 @@ export function ComplexField(props: ControlProps<ComplexControl>) {
             <input
               id={`${base}-href`}
               type="url"
+              aria-invalid={props.invalid === true ? true : undefined}
               inputMode="url"
               autoComplete="off"
               spellCheck={false}
@@ -162,6 +163,7 @@ export function ComplexField(props: ControlProps<ComplexControl>) {
               <textarea
                 id={`${base}-value`}
                 className="code"
+                aria-invalid={props.invalid === true ? true : undefined}
                 rows={5}
                 spellCheck={false}
                 value={current.value ?? ""}

@@ -161,6 +161,16 @@ export function serviceError(words: string | undefined, plan: FormPlan): Workflo
 }
 
 /**
+ * The input a service's error names, as the form marks one of its own
+ * (#11): that input in error, with the service's words under it. Nothing
+ * when it names none.
+ */
+export function namedFieldError(error: WorkflowError | undefined): ReadonlyMap<string, string> {
+  if (error?.inputId === undefined) return new Map();
+  return new Map([[error.inputId, error.detail ?? "The service named this input in its error."]]);
+}
+
+/**
  * A server's refusal, as the form shows it (T5): its own `detail`, and the
  * input it names when its words name one we know. The relay's rate limit
  * first: then the server never saw the request.

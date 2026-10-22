@@ -78,6 +78,7 @@ export function GeometryField(props: ControlProps<GeometryControl>) {
           <textarea
             id={`${base}-geojson`}
             className="code"
+            aria-invalid={props.invalid === true ? true : undefined}
             rows={5}
             spellCheck={false}
             value={text}

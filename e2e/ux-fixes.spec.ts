@@ -428,3 +428,40 @@ test("#35 My jobs stays open while a followed job finishes", async ({ page }) =>
   await expect(jobs).toBeVisible();
   await expect(jobs.locator("[data-job-status]")).toHaveAttribute("data-job-status", "successful");
 });
+
+for (const style of STYLES) {
+  test(`#11 the input the service's error names is marked, and has the focus (${style})`, async ({
+    page,
+  }) => {
+    await open(page, style);
+    await connectTyped(page);
+    await openProcess(page, "Buildings in an area");
+    await page.route("**/processes/breinstein-buildings/execution**", (route) =>
+      route.fulfill({
+        status: 400,
+        contentType: "application/json",
+        body: JSON.stringify({
+          type: "InvalidParameterValue",
+          description: 'The "area" input is 3738 m across; at most 1000 m is searched',
+        }),
+      }),
+    );
+    const area = page.getByRole("textbox", { name: "GeoJSON", exact: true });
+    await area.fill(
+      '{"type":"Polygon","coordinates":[[[4.885,52.36],[4.94,52.36],[4.94,52.38],[4.885,52.38],[4.885,52.36]]]}',
+    );
+    await page.getByRole("button", { name: "Run", exact: true }).click();
+
+    await expect(page.getByRole("alert").first()).toContainText(
+      "The service reported an error. Check the input “Area” and run again.",
+    );
+    await expect(area).toHaveAttribute("aria-invalid", "true");
+    await expect(area).toBeFocused();
+    await expect(page.locator(".field.has-error")).toContainText(
+      'The "area" input is 3738 m across; at most 1000 m is searched',
+    );
+    // Changed, it is no longer the input in error.
+    await area.fill("");
+    await expect(area).not.toHaveAttribute("aria-invalid", "true");
+  });
+}

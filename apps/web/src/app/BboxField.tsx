@@ -154,6 +154,7 @@ export function BboxField(props: ControlProps<BboxControl>) {
         <textarea
           id={`${base}-json`}
           className="code"
+          aria-invalid={props.invalid === true ? true : undefined}
           rows={4}
           spellCheck={false}
           value={value.rawJson}
@@ -230,6 +231,7 @@ export function BboxField(props: ControlProps<BboxControl>) {
             <input
               id={`${base}-c${String(index)}`}
               type="text"
+              aria-invalid={props.invalid === true ? true : undefined}
               inputMode="decimal"
               value={texts[index] ?? ""}
               onChange={(event) => {

@@ -33,7 +33,7 @@ import { isUntouched } from "./form-memory.js";
 import { initialValues } from "../forms/defaults.js";
 import { shownOnMap } from "./input-shapes.js";
 import { MapLimitsContext } from "./map-limits.js";
-import { offersLink } from "./run.js";
+import { offersLink, namedFieldError } from "./run.js";
 import type { WorkflowCommands, WorkflowView } from "./useWorkflow.js";
 import type { Workflow } from "./workflow.js";
 
@@ -552,9 +552,21 @@ export function ProcessScreen(props: ProcessScreenProps) {
   const spared = useSpared(updated);
   const serverErrorBox = useRef<HTMLDivElement>(null);
   const shownError = state.stage === "process" ? state.error : undefined;
-  const errorTakesFocus = updated && shownError !== undefined;
+  // The service's words name an input, which is marked as the form's own
+  // checks mark one (#11): focus goes to it, not to the heading or the error.
+  const namedInput = shownError?.inputId;
+  const serviceNamed = namedFieldError(shownError);
+  const errorTakesFocus = updated && shownError !== undefined && namedInput === undefined;
   useEffect(() => {
-    if (shownError === undefined) return undefined;
+    if (namedInput === undefined) return;
+    form.current
+      ?.querySelector<HTMLElement>(
+        ".field.has-error :is(input:not([type='hidden']), select, textarea, button)",
+      )
+      ?.focus();
+  }, [shownError, namedInput]);
+  useEffect(() => {
+    if (shownError === undefined || namedInput !== undefined) return undefined;
     const frame = requestAnimationFrame(() => {
       const box = serverErrorBox.current;
       // Not in every DOM: jsdom, for one, has no scrolling.
@@ -563,7 +575,7 @@ export function ProcessScreen(props: ProcessScreenProps) {
     return () => {
       cancelAnimationFrame(frame);
     };
-  }, [shownError]);
+  }, [shownError, namedInput]);
   // A Run that went ahead leaves nothing to focus later.
   useEffect(() => {
     submitted.current = false;
@@ -609,7 +621,11 @@ export function ProcessScreen(props: ProcessScreenProps) {
       <h2
         id={`${base}-heading`}
         tabIndex={-1}
-        data-focus-on-stage={state.stage === "process" && !errorTakesFocus ? true : undefined}
+        data-focus-on-stage={
+          state.stage === "process" && !errorTakesFocus && namedInput === undefined
+            ? true
+            : undefined
+        }
       >
         {process.title ?? process.id}
       </h2>
@@ -780,7 +796,7 @@ export function ProcessScreen(props: ProcessScreenProps) {
                 field={field}
                 index={index}
                 values={values}
-                error={fieldErrors.get(field.id)}
+                error={fieldErrors.get(field.id) ?? serviceNamed.get(field.id)}
                 warnings={schemaNotes?.get(field.id)}
                 onChange={commands.setValue}
               />
@@ -806,7 +822,12 @@ export function ProcessScreen(props: ProcessScreenProps) {
           )}
 
           {updated && shownError !== undefined && (
-            <div className="server-error" ref={serverErrorBox} tabIndex={-1} data-focus-on-stage>
+            <div
+              className="server-error"
+              ref={serverErrorBox}
+              tabIndex={-1}
+              data-focus-on-stage={namedInput === undefined ? true : undefined}
+            >
               {serverError}
             </div>
           )}

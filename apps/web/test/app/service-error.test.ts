@@ -4,7 +4,8 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { namedInput, serviceError, serviceErrorTitle } from "../../src/app/run.js";
+import { namedFieldError, namedInput, serviceError, serviceErrorTitle } from "../../src/app/run.js";
+import { workflowReducer, type Workflow } from "../../src/app/workflow.js";
 import type { FieldPlan, FormPlan } from "../../src/forms/plan.js";
 import { withoutExceptionCode } from "../../src/jobs/job-message.js";
 
@@ -102,5 +103,34 @@ describe("withoutExceptionCode", () => {
     expect(withoutExceptionCode("Job accepted and ready for execution")).toBe(
       "Job accepted and ready for execution",
     );
+  });
+});
+
+describe("namedFieldError (#11)", () => {
+  it("marks the input the service's words name, with those words", () => {
+    const error = serviceError('The "moment" input is not a date-time', plan);
+    expect([...namedFieldError(error)]).toEqual([
+      ["moment", 'The "moment" input is not a date-time'],
+    ]);
+  });
+
+  it("marks nothing when the words name no input, or there is no error", () => {
+    expect(namedFieldError(serviceError("Failed on purpose", plan)).size).toBe(0);
+    expect(namedFieldError(undefined).size).toBe(0);
+  });
+
+  it("goes once that input is changed; the words stay", () => {
+    const state = {
+      stage: "process",
+      values: {},
+      error: serviceError('The "area" input is 3738 m across', plan),
+    } as unknown as Workflow;
+    const other = workflowReducer(state, { type: "set-value", id: "moment", value: "x" });
+    expect(other.stage === "process" ? other.error?.inputId : undefined).toBe("area");
+    const changed = workflowReducer(state, { type: "set-value", id: "area", value: undefined });
+    expect(changed.stage === "process" ? changed.error : undefined).toMatchObject({
+      title: "The service reported an error. Check the input “Area” and run again.",
+      inputId: undefined,
+    });
   });
 });

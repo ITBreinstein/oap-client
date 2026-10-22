@@ -805,13 +805,12 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
     // shows both, and the results the server handed out.
     const decided = job.confirmation?.state === "changed" ? job.confirmation.first : status;
     if (decided.status !== "successful") {
+      const failure =
+        status.status === "dismissed" ? undefined : serviceError(status.message, state.plan);
       dispatch({
         type: "run-failed",
         runId,
-        error:
-          status.status === "dismissed"
-            ? { title: "The job was cancelled.", detail: status.message }
-            : serviceError(status.message, state.plan),
+        error: failure ?? { title: "The job was cancelled.", detail: status.message },
       });
       return;
     }
