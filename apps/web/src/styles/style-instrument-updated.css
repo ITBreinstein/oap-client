@@ -204,6 +204,31 @@
     grid-auto-flow: column;
   }
 
+  /* What a process needs first, then the process, as in the examples. */
+  [data-variant="updated"]
+    .process-table:has(.cell-needs[data-known="true"])
+    :is(.process-head, .process-list li) {
+    grid-template-columns: 7rem minmax(0, 1fr);
+  }
+
+  [data-variant="updated"] .process-table:has(.cell-needs[data-known="true"]) .cell-needs,
+  [data-variant="updated"]
+    .process-table:has(.cell-needs[data-known="true"])
+    .process-head
+    .label:nth-child(2) {
+    grid-row: 1;
+    grid-column: 1;
+  }
+
+  [data-variant="updated"] .process-table:has(.cell-needs[data-known="true"]) .cell-process,
+  [data-variant="updated"]
+    .process-table:has(.cell-needs[data-known="true"])
+    .process-head
+    .label:nth-child(1) {
+    grid-row: 1;
+    grid-column: 2;
+  }
+
   [data-variant="updated"] :is(.cell-needs, .process-head .label:nth-child(2)) {
     width: 7rem;
   }
@@ -253,26 +278,26 @@
 }
 
 /*
- * In an example's row the need has a column of its own, last and of one
- * width, as in the process list: every row's need starts at the same place,
- * whatever the length of its process id before it.
+ * In an example's row the need comes first, in a column of one width, as in
+ * the process list: every row's need, and every title after it, starts at
+ * the same place. The process id at the row's end.
  */
 [data-variant="updated"] :is(.example-row, .example-card) {
-  grid-template-columns: minmax(0, 1fr) auto 5.5rem;
+  grid-template-columns: 5.5rem minmax(0, 1fr) auto;
 }
 
 [data-variant="updated"] :is(.example-row, .example-card) .needs {
-  grid-column: 3;
+  grid-column: 1;
 }
 
 [data-variant="updated"] :is(.example-row, .example-card) .example-id {
-  grid-column: 2;
+  grid-column: 3;
   text-align: right;
 }
 
 [data-variant="updated"] :is(.example-row, .example-card) .example-title,
 [data-variant="updated"] :is(.example-row, .example-card) .example-service {
-  grid-column: 1;
+  grid-column: 2;
 }
 
 /* ------------------------------------------------- the map, uncovered */
@@ -916,11 +941,7 @@
   }
 
   [data-variant="updated"] .start :is(.example-row, .example-card) {
-    grid-template-columns: minmax(0, 1fr) 5.5rem;
-  }
-
-  [data-variant="updated"] .start :is(.example-row, .example-card) .needs {
-    grid-column: 2;
+    grid-template-columns: 5.5rem minmax(0, 1fr);
   }
 
   /* One line each: the title, and what it needs. */
