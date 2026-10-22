@@ -16,8 +16,9 @@
  *
  * What the update does in code, where `useUpdated()` (`app/variant.ts`) or
  * `appearance.style` is read: the start screen picks no service for the
- * user (`EndpointScreen.tsx`, `unpicked`) and fills in a picked service's
- * address (`EndpointScreen.tsx`); the map is OpenFreeMap's world, in the
+ * user (`EndpointScreen.tsx`, `unpicked`), fills in a picked service's
+ * address, and shows the featured examples right under the address row
+ * (`EndpointScreen.tsx`, #2); the map is OpenFreeMap's world, in the
  * theme's colours (`App.tsx` `basemap`, `createWorldMap` in `map/MapView.tsx`),
  * and About credits it (`AboutPanel.tsx`); "Change service" comes first in
  * the process list, for the top right corner (`ProcessListScreen.tsx`); JSON is laid out with tabs
@@ -802,4 +803,28 @@
   flex-wrap: wrap;
   gap: 8px;
   margin: 0;
+}
+
+/* ------------------------------------------------- the start screen's examples */
+
+/*
+ * The featured examples come first, right under the address row (#2;
+ * EndpointScreen), on a phone too: compact rows in the card, above the
+ * services, where Instrument as it is hides them below 52rem.
+ */
+[data-variant="updated"] .start-card .featured-examples {
+  margin: 4px 0 8px;
+}
+
+@media (max-width: 52rem) {
+  [data-variant="updated"] .start .featured-examples {
+    display: flex;
+  }
+
+  /* One line each: the title, and what it needs. */
+  [data-variant="updated"] .start .example-card .example-summary,
+  [data-variant="updated"] .start .example-card .example-service,
+  [data-variant="updated"] .start .example-card .example-id {
+    display: none;
+  }
 }

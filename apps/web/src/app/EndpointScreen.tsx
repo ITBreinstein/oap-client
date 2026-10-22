@@ -8,7 +8,8 @@
  * what happens after Connect, and which services can work from a web page.
  * The address field and its Connect button sit on one line, like a search
  * box. The known services, when there are any, are listed under it, and
- * Connect then says which one it will open. The examples follow the card, and
+ * Connect then says which one it will open. The examples follow the card (in
+ * the updated Instrument, they come between the address and the list), and
  * how it works and which services work are disclosures after them, so a first
  * screen shows the card and the examples.
  */
@@ -208,6 +209,10 @@ export function EndpointScreen(props: EndpointScreenProps) {
             <ErrorMessage error={shownError} />
           </div>
 
+          {/* STYLE TRIAL: the updated Instrument offers the examples first,
+              right under the address row, on a phone too (#2). */}
+          {updated && props.examples}
+
           {hasChoices && (
             <fieldset className="service-choices">
               <legend>Known services</legend>
@@ -287,7 +292,7 @@ export function EndpointScreen(props: EndpointScreenProps) {
         </form>
       </div>
 
-      {props.examples}
+      {!updated && props.examples}
 
       <details className="how-it-works">
         <summary>How it works</summary>
