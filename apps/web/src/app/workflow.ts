@@ -194,6 +194,8 @@ export type WorkflowAction =
     }
   | { readonly type: "back-to-list" }
   | { readonly type: "set-value"; readonly id: string; readonly value: unknown }
+  /** "Clear the form" (#10): every input back to what it started with. */
+  | { readonly type: "reset-form"; readonly values: FormValues }
   | { readonly type: "set-mode"; readonly mode: ExecutionMode }
   | {
       readonly type: "set-transmission";
@@ -378,8 +380,9 @@ export function workflowReducer(state: Workflow, action: WorkflowAction): Workfl
         : state;
 
     case "process-loaded":
-      // A fresh plan and fresh values, always: nothing of the previous
-      // process's form survives into this one. Reduction test (c).
+      // A fresh plan, and the values this process's form was left with this
+      // visit, or its starting values (#10; `form-memory.ts`): never another
+      // process's. Reduction test (c).
       return state.stage === "connected" &&
         state.connection === action.connection &&
         state.opening === action.process.id
@@ -416,6 +419,12 @@ export function workflowReducer(state: Workflow, action: WorkflowAction): Workfl
               [action.id, action.value],
             ]),
           }
+        : state;
+
+    case "reset-form":
+      // The last run's error was about the values that are gone.
+      return state.stage === "process"
+        ? { ...state, values: action.values, error: undefined }
         : state;
 
     case "set-mode":

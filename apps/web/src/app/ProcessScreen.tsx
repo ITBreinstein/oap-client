@@ -20,6 +20,8 @@ import { ResultsView } from "./ResultsView.js";
 import { SentInputs } from "./SentInputs.js";
 import { Versioned } from "./Versioned.js";
 import { useUpdated } from "./variant.js";
+import { isUntouched } from "./form-memory.js";
+import { initialValues } from "../forms/defaults.js";
 import { shownOnMap } from "./input-shapes.js";
 import { MapLimitsContext } from "./map-limits.js";
 import { offersLink } from "./run.js";
@@ -691,6 +693,15 @@ export function ProcessScreen(props: ProcessScreenProps) {
               />
             ))}
           </fieldset>
+
+          {/* The form comes back as it was left (#10): this is the way to start over. */}
+          {!isUntouched(values, initialValues(plan)) && (
+            <p className="actions clear-form">
+              <button type="button" className="secondary" onClick={commands.clearForm}>
+                Clear the form
+              </button>
+            </p>
+          )}
 
           <OutputChoices state={state} developer={developer} onChange={commands.setTransmission} />
 

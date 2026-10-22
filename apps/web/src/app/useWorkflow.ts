@@ -21,6 +21,7 @@ import {
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { drawableCrs } from "../forms/crs.js";
 import { initialValues } from "../forms/defaults.js";
+import { formKey, remember, restoredValues, type FormMemory } from "./form-memory.js";
 import type { BboxControl, Control, FormPlan } from "../forms/plan.js";
 import { resolveFormPlan } from "../forms/resolve.js";
 import { schemaWarnings } from "../forms/schema-warnings.js";
@@ -87,6 +88,8 @@ export interface WorkflowCommands {
   readonly openProcess: (summary: ProcessSummary) => void;
   readonly backToList: () => void;
   readonly setValue: (id: string, value: unknown) => void;
+  /** "Clear the form" (#10): every input back to what it started with, and forgotten. */
+  readonly clearForm: () => void;
   readonly setMode: (mode: ExecutionMode) => void;
   /** Task 8, T2: ask for one output as a value (as the server prefers) or a link. */
   readonly setTransmission: (outputId: string, transmission: "value" | "reference") => void;
@@ -289,6 +292,8 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
       }
     | undefined
   >(undefined);
+  /** Each process's form as it was left this visit, in memory only (#10). */
+  const forms = useRef<FormMemory>(new Map());
   /** Connections made so far; each successful one takes the next number. */
   const connections = useRef(0);
   /** The direct attempt behind an open offer, for the record its answer completes. */
@@ -382,7 +387,11 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
             connection: connection.id,
             process,
             plan,
-            values: initialValues(plan),
+            values: restoredValues(
+              plan,
+              initialValues(plan),
+              forms.current.get(formKey(connection.endpoint.baseUrl, process.id)),
+            ),
             warnings,
           });
         } catch (cause) {
@@ -696,6 +705,18 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
     dispatch({ type: "watch-job", runId, jobRef: statusUrl });
   };
 
+  // Each process's form, kept as it is left (#10): on every change, so
+  // whichever way the page moves on, it comes back as it was.
+  useEffect(() => {
+    if (state.stage !== "process") return;
+    forms.current = remember(
+      forms.current,
+      formKey(state.endpoint.baseUrl, state.process.id),
+      state.values,
+      initialValues(state.plan),
+    );
+  }, [state]);
+
   // An asynchronous run ends when the reconciler says the job did: read its
   // results once it succeeded, or say why there are none.
   useEffect(() => {
@@ -984,6 +1005,11 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
         return next;
       });
       dispatch({ type: "set-value", id, value });
+    },
+    clearForm: () => {
+      if (state.stage !== "process") return;
+      setFieldErrors(NO_ERRORS);
+      dispatch({ type: "reset-form", values: initialValues(state.plan) });
     },
     setMode: (mode) => {
       dispatch({ type: "set-mode", mode });
