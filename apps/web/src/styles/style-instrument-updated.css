@@ -406,8 +406,8 @@
 
 /*
  * The credit in the picture's lower right corner, quiet: small and muted, on
- * the page's surface at 85% so no word lies on the picture itself (≥ 4.5:1
- * in both themes over pure white and pure black alike). Never under a card.
+ * the page's surface at 80% so no word lies on the picture itself (≥ 4.5:1
+ * in both themes over pure white and pure black alike; 75% falls short). Never under a card.
  * On a wide window it stays in the corner; otherwise it is in the panel's
  * flow, last, pushed to the foot when the page is short and set below the
  * cards when it is long, as on a phone, where it ends the page, at its right.
@@ -418,10 +418,11 @@
   width: fit-content;
   max-width: 100%;
   margin: auto 0 0;
-  padding: 2px 6px;
-  font-size: 0.625rem;
+  padding: 1px 5px;
+  font-size: 0.5625rem;
+  line-height: 1.35;
   color: var(--muted);
-  background: color-mix(in srgb, var(--surface) 85%, transparent);
+  background: color-mix(in srgb, var(--surface) 80%, transparent);
   border: none;
 }
 
