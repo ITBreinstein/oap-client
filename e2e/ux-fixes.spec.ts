@@ -1400,6 +1400,8 @@ test("the updated Instrument's map is the light one in the dark theme too", asyn
   await connectTyped(page);
   await openProcess(page, "Buildings in an area");
   await page.locator(".map-pane canvas").waitFor();
-  await expect.poll(() => styles).toContain("/styles/liberty");
+  // "Bright": the light map without 3D buildings.
+  await expect.poll(() => styles).toContain("/styles/bright");
   expect(styles).not.toContain("/styles/dark");
+  expect(styles).not.toContain("/styles/liberty");
 });

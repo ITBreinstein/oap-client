@@ -23,10 +23,11 @@ export const PDOK_BRT_ATTRIBUTION =
  * OpenStreetMap data as OpenMapTiles vector tiles, with no key and no usage
  * limits, answering `Access-Control-Allow-Origin: *` (checked 2026-10-21). Its
  * light style in either theme: the dark one was too dark to read the map by.
- * The tiles credit themselves (OpenFreeMap, OpenMapTiles, OpenStreetMap), and
- * the attribution control shows it.
+ * "Bright" rather than "Liberty": the same map without 3D buildings, which
+ * were slow to draw. The tiles credit themselves (OpenFreeMap, OpenMapTiles,
+ * OpenStreetMap), and the attribution control shows it.
  */
-export const OPENFREEMAP_STYLE = "https://tiles.openfreemap.org/styles/liberty";
+export const OPENFREEMAP_STYLE = "https://tiles.openfreemap.org/styles/bright";
 
 /** The Netherlands, west, south, east, north: where the demo starts. */
 export const INITIAL_BOUNDS = [3.2, 50.7, 7.3, 53.6] as const;
