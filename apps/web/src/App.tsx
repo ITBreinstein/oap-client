@@ -28,6 +28,7 @@ import type { EndpointRef } from "./app/workflow.js";
 import type { FormValues } from "./forms/encode.js";
 import type { JobRow } from "./relay/job-session.js";
 import { JobsPanel } from "./jobs/JobsPanel.js";
+import { isUnderWay } from "./jobs/under-way.js";
 import { RelayBanner, RelayOffer } from "./app/RelayRoute.js";
 import { useAppearance } from "./app/useAppearance.js";
 import { useWorkflow } from "./app/useWorkflow.js";
@@ -168,8 +169,9 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
     (state.stage === "running" && !leaveJob) ||
     (state.stage === "choose-endpoint" && state.connecting !== undefined);
   const jobs = view.snapshot?.jobs ?? [];
-  // Running only: a finished job needs nothing from anyone.
-  const runningJobs = jobs.filter((job) => !job.settled && !job.gone).length;
+  // Under way only: a finished job needs nothing from anyone, even while the
+  // page confirms it (#30).
+  const runningJobs = jobs.filter(isUnderWay).length;
   const jobsBadge =
     runningJobs === 0 ? undefined : (
       <span className="badge">
@@ -440,6 +442,10 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
       ? [state.error.technical]
       : []),
     ...(shownJobId === undefined ? [] : [`Job ${shownJobId}`]),
+    ...(state.stage === "result" &&
+    jobs.find((job) => job.statusUrl === shownJobRef)?.confirmation?.state === "pending"
+      ? ["Not yet confirmed: the page reads the job's status again, quietly, for a while."]
+      : []),
   ];
   const onConnect =
     state.stage === "choose-endpoint"

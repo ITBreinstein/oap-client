@@ -505,3 +505,36 @@ test("#12 a date-time is made from a date, a time and an offset, and typed ones 
   await expect(typed).toBeFocused();
   expect(sent).toBe(false);
 });
+
+test("#30 the Jobs badge leaves out a finished job the page is still confirming", async ({
+  page,
+}) => {
+  await requireService(`${RELAY}/healthz`, "the relay");
+  // The page reads "successful" while the job really runs on: no success
+  // callback can have been delivered yet, so the page goes on confirming it.
+  await page.route(
+    (url) => url.origin === PYGEOAPI && /^\/jobs\/[^/]+$/.test(url.pathname),
+    async (route) => {
+      const response = await route.fetch();
+      const body: unknown = await response.json();
+      const job = typeof body === "object" && body !== null ? body : {};
+      await route.fulfill({ response, json: { ...job, status: "successful", progress: 100 } });
+    },
+  );
+  await open(page, "instrument");
+  await page.getByRole("radio", { name: /^pygeoapi[- ]cors /i }).check();
+  await page.getByRole("button", { name: "Connect", exact: true }).click();
+  await openProcess(page, "Slow process");
+  await field(page, "Seconds (optional)").fill("20");
+  await page.getByRole("checkbox", { name: "Run in the background" }).check();
+  await page.getByRole("button", { name: "Run", exact: true }).click();
+
+  await page.getByRole("button", { name: /^Jobs/ }).click();
+  const row = page.getByTestId("my-jobs").locator("[data-job-row]");
+  await expect(row.locator("[data-job-status]")).toHaveAttribute("data-job-status", "successful", {
+    timeout: 15_000,
+  });
+  await expect(row.locator("[data-not-yet-confirmed]")).toBeVisible();
+  // Done, and still being confirmed: not counted as running.
+  await expect(page.getByRole("button", { name: /^Jobs/ }).locator(".badge")).toHaveCount(0);
+});

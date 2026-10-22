@@ -241,10 +241,25 @@ function JobStatusLine({
  * 0047). Both are shown, and the results read after the first stay on screen:
  * they are what the server handed out.
  */
-function StatusChanged({ job }: { readonly job: JobRow | undefined }) {
+function StatusChanged({
+  job,
+  updated,
+}: {
+  readonly job: JobRow | undefined;
+  /** STYLE TRIAL (#30): the updated Instrument says it in one line. */
+  readonly updated: boolean;
+}) {
   if (job?.confirmation?.state !== "changed" || job.status === undefined) return null;
   const { first } = job.confirmation;
   const now = job.status;
+  if (updated) {
+    return (
+      <p className="notice" role="status" data-status-changed={`${first.status}->${now.status}`}>
+        The service later reported this job as {now.rawStatus}.
+        {now.message !== undefined && <span className="muted"> {now.message}</span>}
+      </p>
+    );
+  }
   return (
     <div className="notice" role="status" data-status-changed={`${first.status}->${now.status}`}>
       <p>
@@ -265,8 +280,18 @@ function StatusChanged({ job }: { readonly job: JobRow | undefined }) {
  * a server can rewrite it as `failed` when it cannot deliver the success
  * callback (finding 0047, review W14). Information, not a warning.
  */
-function NotYetConfirmed({ job }: { readonly job: JobRow | undefined }) {
-  if (job?.confirmation?.state !== "pending") return null;
+function NotYetConfirmed({
+  job,
+  updated,
+}: {
+  readonly job: JobRow | undefined;
+  /**
+   * STYLE TRIAL (#30): the updated Instrument shows the result as done and
+   * reads on quietly; the Developer section says it is not yet confirmed.
+   */
+  readonly updated: boolean;
+}) {
+  if (updated || job?.confirmation?.state !== "pending") return null;
   const minutes = Math.round(CONFIRM_WINDOW_MS / 60_000);
   return (
     <p className="hint" data-not-yet-confirmed="true">
@@ -734,8 +759,8 @@ export function ProcessScreen(props: ProcessScreenProps) {
           data-callbacks={callbacksOf(resultJob)}
           data-confirmation={resultJob?.confirmation?.state}
         >
-          <StatusChanged job={resultJob} />
-          <NotYetConfirmed job={resultJob} />
+          <StatusChanged job={resultJob} updated={updated} />
+          <NotYetConfirmed job={resultJob} updated={updated} />
           <ResultsView
             results={state.results}
             processId={process.id}

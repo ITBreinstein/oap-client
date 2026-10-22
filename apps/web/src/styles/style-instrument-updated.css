@@ -28,7 +28,9 @@
  * #43); the relay question asks in a visitor's words (`RelayRoute.tsx`, #5);
  * the known services are listed once each, by name, and "Always reached
  * directly" is said of a typed address only (`EndpointScreen.tsx`,
- * `app/service-list.ts`, #3); the map is OpenFreeMap's world, in the
+ * `app/service-list.ts`, #3); a finished job being confirmed says nothing, and
+ * a changed status is said in one line (`ProcessScreen` `NotYetConfirmed`,
+ * `StatusChanged`; `JobsPanel` `JobFacts`; #30); the map is OpenFreeMap's world, in the
  * theme's colours (`App.tsx` `basemap`, `createWorldMap` in `map/MapView.tsx`),
  * and About credits it (`AboutPanel.tsx`); "Change service" comes first in
  * the process list, for the top right corner (`ProcessListScreen.tsx`); JSON is laid out with tabs

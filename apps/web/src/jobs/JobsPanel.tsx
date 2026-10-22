@@ -20,6 +20,7 @@ import { resolveResultsUrl } from "@breinstein/oap-client";
 import { useId, useState } from "react";
 import type { DismissAdvertisedBy, JobRow } from "../relay/job-session.js";
 import { withoutExceptionCode } from "./job-message.js";
+import { useSpared } from "../app/developer.js";
 
 export interface JobsPanelProps {
   readonly jobs: readonly JobRow[];
@@ -137,6 +138,8 @@ function JobFacts({
 }) {
   const { status } = job;
   const state = job.gone ? "gone" : (status?.status ?? "checking");
+  // JobFacts is the updated Instrument's: a visitor is spared the technical.
+  const spared = useSpared(true);
   return (
     <>
       <p className="job-top">
@@ -147,7 +150,8 @@ function JobFacts({
           <strong data-job-status={status?.status}>
             {job.gone ? "gone" : (status?.rawStatus ?? "checking…")}
           </strong>
-          {job.confirmation?.state === "pending" && (
+          {/* STYLE TRIAL (#30): for developers; the job is done. */}
+          {job.confirmation?.state === "pending" && !spared && (
             <span data-not-yet-confirmed="true"> · not yet confirmed</span>
           )}
         </span>
