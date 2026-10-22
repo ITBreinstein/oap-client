@@ -28,6 +28,11 @@ export interface GeometryDrawProps {
   readonly several: boolean;
   readonly value: readonly MapShape[];
   readonly onChange: (shapes: readonly MapShape[]) => void;
+  /**
+   * The tool to start placing with, when there is nothing drawn yet: an
+   * input of one area starts on "Add area", so the first clicks draw (#17).
+   */
+  readonly startWith?: Tool | undefined;
 }
 
 export interface GeometryDrawControls extends GeometryDrawState {
@@ -46,13 +51,13 @@ export function useGeometryDraw(
   props: GeometryDrawProps,
   createEngine: CreateGeometryEngine = createTerraDrawGeometryEngine,
 ): GeometryDrawControls {
-  const { active, tools, several, value, onChange } = props;
+  const { active, tools, several, value, onChange, startWith } = props;
   const engine = useRef<GeometryEngine | undefined>(undefined);
   /** What the map shows now, so a value the map itself produced is not redrawn. */
   const shown = useRef("");
-  const latest = useRef({ onChange, value });
+  const latest = useRef({ onChange, value, startWith });
   useEffect(() => {
-    latest.current = { onChange, value };
+    latest.current = { onChange, value, startWith };
   });
   const [state, setState] = useState<GeometryDrawState>(IDLE);
 
@@ -79,6 +84,9 @@ export function useGeometryDraw(
       shown.current = keyOf(initial);
       made.show(initial);
       moveTo(map, initial);
+      if (initial.length === 0 && latest.current.startWith !== undefined) {
+        made.place(latest.current.startWith);
+      }
     };
     const cancel = whenStyleLoaded(map, start);
     return () => {

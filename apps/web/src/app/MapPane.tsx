@@ -193,6 +193,13 @@ export function MapPane({
           active: true,
           tools: toolsFor(shapes.target),
           several: holdsSeveral(shapes.target),
+          // One area: drawing starts on "Add area" (#17); "Add box" stays a click away.
+          startWith:
+            !holdsSeveral(shapes.target) &&
+            drawableTypes(shapes.target).length === 1 &&
+            drawableTypes(shapes.target)[0] === "Polygon"
+              ? "Polygon"
+              : undefined,
           value: shapesOfText(shapes.text),
           onChange: (drawn: readonly MapShape[]) => {
             const { geojson } = toGeoJson(shapes.target, drawn);
