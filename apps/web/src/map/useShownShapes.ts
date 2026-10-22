@@ -15,6 +15,7 @@ import { boundsOf, moveTo } from "./fit.js";
 import type { MapShape } from "./geometry-engine.js";
 import {
   createMapLibreShapeLayers,
+  type ClickPlace,
   type CreateShapeLayers,
   type ShapeLayers,
   type ShownImage,
@@ -72,7 +73,9 @@ export function useShownShapes(
   sets: readonly ShownShapes[],
   image: ShownImage | undefined,
   createLayers: CreateShapeLayers = createMapLibreShapeLayers,
-  onResultClick?: (index: number) => void,
+  onResultClick?: (index: number, at: ClickPlace) => void,
+  /** The result shape to outline, by its index in its set (#20). */
+  selected?: number,
 ): {
   readonly resultShapes: number;
   readonly resultImage: boolean;
@@ -104,8 +107,8 @@ export function useShownShapes(
       setReady(true);
     });
     // Through the ref, so a new handler each render does not rebuild the layers.
-    created.onResultClick((index) => {
-      latest.current.onResultClick?.(index);
+    created.onResultClick((index, at) => {
+      latest.current.onResultClick?.(index, at);
     });
     return () => {
       created.stop();
@@ -133,6 +136,11 @@ export function useShownShapes(
       clearTimeout(timer);
     };
   }, [inputKey, map]);
+
+  // The clicked shape, outlined while its properties are shown (#20).
+  useEffect(() => {
+    layers.current?.select(selected);
+  }, [selected, map]);
 
   const key = JSON.stringify({ sets, image });
   useEffect(() => {

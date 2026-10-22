@@ -389,6 +389,17 @@ pre.code {
 }
 
 /*
+ * A clicked shape's properties on the side away from the click (#20), so
+ * they do not cover the shape. On the right, under the zoom buttons.
+ */
+.map-pane .feature-properties[data-side="right"] {
+  top: 6.5rem;
+  right: 0.75rem;
+  left: auto;
+  max-height: calc(100% - 9rem);
+}
+
+/*
  * Drawing on a phone (#39): the map is brought into view with Done and
  * Clear pinned over its top edge, and the tools under them; "Find a place"
  * steps aside meanwhile.

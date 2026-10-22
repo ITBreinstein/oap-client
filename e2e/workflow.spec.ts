@@ -308,8 +308,10 @@ test.describe("the workflow in a browser", () => {
     const terms = await panel.locator("dt").allTextContents();
     expect(terms).toEqual(["bbox", "crs"]);
     const values = await panel.locator("dd").allTextContents();
-    expect(JSON.parse(values[0] ?? "null")).toEqual(box);
-    expect(values[1]).toMatch(/CRS84$/);
+    // A short list in words, its numbers the Dutch way (#20).
+    expect(values[0]).toBe("5,1; 52,05; 5,2; 52,12");
+    // An http address, as a link (#20).
+    await expect(panel.locator("dd").nth(1).getByRole("link")).toHaveAttribute("href", /CRS84$/);
 
     await panel.getByRole("button", { name: "Close" }).click();
     await expect(panel).toHaveCount(0);

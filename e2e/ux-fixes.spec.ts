@@ -1079,3 +1079,67 @@ for (const { style, more } of [
     else await expect(error).toContainText("The parser says: Expected ',' or '}'");
   });
 }
+
+for (const style of STYLES) {
+  test(`#20 a clicked shape's properties open on the side away from the click (${style})`, async ({
+    page,
+  }) => {
+    await open(page, style);
+    await connectTyped(page);
+    await openProcess(page, "Bounding box to feature");
+    const box = [5.1, 52.05, 5.2, 52.12];
+    for (const [name, value] of [
+      ["West (minimum longitude)", box[0]],
+      ["South (minimum latitude)", box[1]],
+      ["East (maximum longitude)", box[2]],
+      ["North (maximum latitude)", box[3]],
+    ] as const) {
+      await page.getByRole("textbox", { name }).fill(String(value));
+    }
+    await page.getByRole("button", { name: "Run", exact: true }).click();
+    await expect(page.getByTestId("feature-hint")).toBeVisible({ timeout: 15_000 });
+    const canvas = page.locator(".map-canvas canvas").first();
+    await page.waitForTimeout(800);
+    const area = await canvas.boundingBox();
+    if (area === null) throw new Error("the map has no size");
+    const panel = page.getByTestId("feature-properties");
+
+    // Left of the middle: the properties on the right, and the other way round.
+    await page.mouse.click(area.x + area.width * 0.42, area.y + area.height / 2);
+    await expect(panel).toHaveAttribute("data-side", "right");
+    const right = await panel.boundingBox();
+    expect((right?.x ?? 0) > area.x + area.width / 2).toBe(true);
+    await panel.getByRole("button", { name: "Close" }).click();
+    await page.mouse.click(area.x + area.width * 0.58, area.y + area.height / 2);
+    await expect(panel).toHaveAttribute("data-side", "left");
+    const left = await panel.boundingBox();
+    expect((left?.x ?? 0) + (left?.width ?? 0) < area.x + area.width / 2).toBe(true);
+    // A short list, its numbers the Dutch way.
+    await expect(panel.locator("dd").first()).toHaveText("5,1; 52,05; 5,2; 52,12");
+  });
+
+  test(`#21 the map invites a click only when a shape has properties (${style})`, async ({
+    page,
+  }) => {
+    await open(page, style);
+    await connectTyped(page);
+    await openProcess(page, "Rotate a polygon a quarter turn");
+    await page.getByRole("textbox", { name: "GeoJSON", exact: true }).fill(
+      JSON.stringify({
+        type: "Polygon",
+        coordinates: [
+          [
+            [5.1, 52.05],
+            [5.2, 52.05],
+            [5.2, 52.12],
+            [5.1, 52.05],
+          ],
+        ],
+      }),
+    );
+    await page.getByRole("button", { name: "Run", exact: true }).click();
+    await expect(page.getByTestId("map-legend")).toContainText("The result", { timeout: 15_000 });
+    // A bare geometry: nothing to show for a click.
+    await expect(page.getByTestId("feature-hint")).toHaveCount(0);
+  });
+}

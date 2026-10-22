@@ -43,6 +43,7 @@ import {
 } from "../results/plottable.js";
 import type { RenderableResult } from "../results/renderable.js";
 import { FeatureProperties } from "./FeatureProperties.js";
+import { hasProperties } from "./property-value.js";
 import { PlaceSearch } from "./PlaceSearch.js";
 import { useWide } from "./useWide.js";
 import { shapeBinding } from "./input-shapes.js";
@@ -264,13 +265,19 @@ export function MapPane({
   // order `shownFor` shows them in. Held with the results it was made on, so
   // a new run, or leaving the result, drops it without anything noticing.
   const [picked, setPicked] = useState<
-    { readonly results: readonly RenderableResult[]; readonly index: number } | undefined
+    | {
+        readonly results: readonly RenderableResult[];
+        readonly index: number;
+        /** Where the properties go: the side of the map away from the click (#20). */
+        readonly side: "left" | "right";
+      }
+    | undefined
   >();
   const results = state.stage === "result" ? state.results : undefined;
-  const selected =
-    results !== undefined && picked?.results === results
-      ? plottedFeatures(results, maxCoordinates)[picked.index]
-      : undefined;
+  const features = results === undefined ? [] : plottedFeatures(results, maxCoordinates);
+  const selected = picked?.results === results ? features[picked?.index ?? -1] : undefined;
+  // Something to show when a shape is clicked: only then does the map invite a click (#21).
+  const clickable = features.some((feature) => hasProperties(feature.origin));
   // On a phone the map is below the form (#39): drawing brings it into view,
   // with Done and Clear pinned over it, and Done goes back to the field.
   const wide = useWide();
@@ -345,9 +352,11 @@ export function MapPane({
         geometry={geometry}
         shown={shown}
         image={image}
-        onResultClick={(index) => {
-          if (results !== undefined) setPicked({ results, index });
+        onResultClick={(index, at) => {
+          if (results === undefined) return;
+          setPicked({ results, index, side: at.x < at.width / 2 ? "right" : "left" });
         }}
+        selected={selected === undefined ? undefined : picked?.index}
         draw={{
           active: field !== undefined && control !== undefined,
           value: toBbox(current),
@@ -411,7 +420,8 @@ export function MapPane({
       )}
       {selected === undefined ? (
         plotted &&
-        image === undefined && (
+        image === undefined &&
+        clickable && (
           <p className="map-overlay" data-testid="feature-hint">
             Click a result shape to see its properties.
           </p>
@@ -419,6 +429,7 @@ export function MapPane({
       ) : (
         <FeatureProperties
           feature={selected}
+          side={picked?.side}
           onClose={() => {
             setPicked(undefined);
           }}

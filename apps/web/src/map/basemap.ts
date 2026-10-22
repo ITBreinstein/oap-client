@@ -72,3 +72,12 @@ export const RESULT_STYLE = {
   outline: "#1d4ed8",
   outlineWidth: 3,
 } as const;
+
+/**
+ * A clicked result shape (#20): outlined dark and thicker, on a white casing,
+ * so it stands out by its outline's weight and not by colour alone.
+ */
+export const SELECTED_STYLE = {
+  outline: "#0f172a",
+  outlineWidth: 4,
+} as const;

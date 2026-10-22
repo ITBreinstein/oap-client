@@ -35,7 +35,7 @@ import {
 } from "./basemap.js";
 import type { CreateDrawEngine } from "./draw-engine.js";
 import type { CreateGeometryEngine, Tool } from "./geometry-engine.js";
-import type { CreateShapeLayers, ShownImage, ShownShapes } from "./shape-layers.js";
+import type { ClickPlace, CreateShapeLayers, ShownImage, ShownShapes } from "./shape-layers.js";
 import { useBoundingBoxDraw, type BboxDrawProps } from "./useBoundingBoxDraw.js";
 import { useGeometryDraw, type GeometryDrawProps } from "./useGeometryDraw.js";
 import { useShownShapes } from "./useShownShapes.js";
@@ -166,8 +166,13 @@ export interface MapViewProps {
   readonly shown?: readonly ShownShapes[] | undefined;
   /** An image result, over the area it covers. */
   readonly image?: ShownImage | undefined;
-  /** A result shape was clicked: its index in the `result` set of {@link shown}. */
-  readonly onResultClick?: ((index: number) => void) | undefined;
+  /**
+   * A result shape was clicked: its index in the `result` set of {@link shown},
+   * and where across the map the click was.
+   */
+  readonly onResultClick?: ((index: number, at: ClickPlace) => void) | undefined;
+  /** The result shape to outline, by that same index (#20). */
+  readonly selected?: number | undefined;
   /** Whether the map started, so the form can offer "Draw on the map" or not. */
   readonly onAvailable?: ((available: boolean) => void) | undefined;
   /**
@@ -233,6 +238,7 @@ export function MapView({
   shown = NOTHING_SHOWN,
   image,
   onResultClick,
+  selected,
   onAvailable,
   onViewReader,
   toolsSlot,
@@ -351,6 +357,7 @@ export function MapView({
     image,
     createShapeLayers,
     onResultClick,
+    selected,
   );
   const drawingShapes = geometry.active && map !== undefined;
   // Drawing starts with the focus on the first tool (#18), once for each
