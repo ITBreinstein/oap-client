@@ -14,6 +14,9 @@ services:
     volumes:
       - ../.conf/main-5090.cfg:/usr/lib/cgi-bin/main.cfg
       - ../.conf/oas-5090.cfg:/usr/lib/cgi-bin/oas.cfg
+      # Job results in a volume, not the checkout's docker/com, so a run no
+      # longer dirties the pinned checkout. Seeded from the image on first use.
+      - zoo-data:/usr/com/zoo-project
     # So `up --wait` returns once the kernel answers (review T3).
     healthcheck:
       test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://localhost/"]
@@ -27,3 +30,7 @@ services:
     volumes:
       - ../.conf/main-5090.cfg:/usr/lib/cgi-bin/main.cfg
       - ../.conf/oas-5090.cfg:/usr/lib/cgi-bin/oas.cfg
+      - zoo-data:/usr/com/zoo-project
+
+volumes:
+  zoo-data:

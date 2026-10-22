@@ -13,6 +13,11 @@ docker compose -f infra/compose/pygeoapi.yml up -d --wait
 ./infra/zoo/zoo.sh up
 ```
 
+ZOO keeps its job results in a Docker volume, `zoo-data` (`compose/zoo.yml`),
+not in the pinned checkout, so they do not survive `./infra/zoo/zoo.sh down`,
+which removes the volume. Evidence a finding relies on must be copied into the
+findings repository when the finding is written.
+
 ZOO has its own README — [zoo/README.md](zoo/README.md) — covering the fork, the
 pinning and why it is not in the contract lane. The rest of this file is about
 pygeoapi.
