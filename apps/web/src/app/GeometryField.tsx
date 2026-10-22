@@ -10,7 +10,7 @@
  * New rather than reading its metres as degrees.
  */
 
-import { useContext, useEffect, useId, useMemo, useState } from "react";
+import { useCallback, useContext, useEffect, useId, useMemo, useState } from "react";
 import { isGeoJsonText, type GeoJsonText } from "../forms/encode.js";
 import { describeLoad, readGeoJson } from "../forms/geojson.js";
 import { drawableTypes, holdsSeveral, toGeoJson } from "../forms/geometry.js";
@@ -57,6 +57,16 @@ export function GeometryField(props: ControlProps<GeometryControl>) {
   const text = isGeoJsonText(value) ? value.geojson : "";
   const drawing = inputId !== undefined && draw.fieldId === inputId;
   const canDraw = inputId !== undefined && draw.available && drawableTypes(control).length > 0;
+  // An area input can take the map's view as its area (#18).
+  const giveSlot = draw.setToolsSlot;
+  const toolsSlot = useCallback(
+    (element: HTMLDivElement | null) => {
+      giveSlot?.(element);
+    },
+    [giveSlot],
+  );
+  const canView =
+    inputId !== undefined && draw.available && drawableTypes(control).includes("Polygon");
   const tooMany = useTooManyToEdit(text);
   const size = useMemo(() => sizeOfGeoJsonText(text), [text]);
   // A value too large to edit — loaded or pasted while drawing — ends drawing.
@@ -169,6 +179,23 @@ export function GeometryField(props: ControlProps<GeometryControl>) {
             {drawing ? "Stop drawing" : "Draw on the map"}
           </button>
         )}
+        {canView && (
+          <button
+            type="button"
+            className="secondary"
+            onClick={() => {
+              const view = draw.currentView?.();
+              if (view === undefined) return;
+              const shaped = toGeoJson(control, [extentPolygon(view)]);
+              setMessage(undefined);
+              if (shaped.geojson !== undefined) {
+                set(JSON.stringify(shaped.geojson, null, updated ? "\t" : undefined));
+              }
+            }}
+          >
+            Use the current map view
+          </button>
+        )}
         <button
           type="button"
           className="secondary"
@@ -180,6 +207,29 @@ export function GeometryField(props: ControlProps<GeometryControl>) {
           Clear
         </button>
       </p>
+      {/* The drawing tools, right after the Draw button in the tab order (#18). */}
+      {drawing && <div className="map-tools-slot" ref={toolsSlot} />}
+      {canDraw && (
+        <p className="help draw-hint">
+          Drawing needs a mouse or touch. You can also paste GeoJSON or use the current map view.
+        </p>
+      )}
     </div>
   );
+}
+
+/** A view, west, south, east, north, as the area it covers. */
+function extentPolygon([west, south, east, north]: readonly [number, number, number, number]) {
+  return {
+    type: "Polygon" as const,
+    coordinates: [
+      [
+        [west, south],
+        [east, south],
+        [east, north],
+        [west, north],
+        [west, south],
+      ],
+    ],
+  };
 }

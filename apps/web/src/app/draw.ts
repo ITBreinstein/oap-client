@@ -10,6 +10,9 @@
 
 import { createContext } from "react";
 
+/** West, south, east, north, in longitude and latitude: what the map shows. */
+export type MapExtent = readonly [number, number, number, number];
+
 export interface DrawTarget {
   /** The field being drawn for, or undefined when the map is only a map. */
   readonly fieldId: string | undefined;
@@ -17,6 +20,15 @@ export interface DrawTarget {
   readonly available: boolean;
   start(fieldId: string): void;
   stop(): void;
+  /**
+   * Where the drawing tools go (#18): an element right after the Draw button,
+   * so they come next in the tab order. Undefined: over the map, as before.
+   */
+  readonly toolsSlot?: HTMLElement | undefined;
+  /** The field drawing gives the element its tools go in, or takes it back. */
+  readonly setToolsSlot?: ((element: HTMLElement | null) => void) | undefined;
+  /** What the map shows now (#18), for "Use the current map view"; undefined without a map. */
+  readonly currentView?: (() => MapExtent | undefined) | undefined;
 }
 
 export const DrawContext = createContext<DrawTarget>({

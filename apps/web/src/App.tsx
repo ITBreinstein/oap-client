@@ -7,7 +7,13 @@ import { DeveloperContext } from "./app/developer.js";
 import { sameService, useAddress, wouldLoseWork } from "./app/address.js";
 import { AppFrame, RailItem, type FramePlace } from "./app/AppFrame.js";
 import { DeveloperPanel } from "./app/DeveloperPanel.js";
-import { activeDrawField, DrawContext, type DrawRequest, type DrawTarget } from "./app/draw.js";
+import {
+  activeDrawField,
+  DrawContext,
+  type DrawRequest,
+  type DrawTarget,
+  type MapExtent,
+} from "./app/draw.js";
 import { EndpointScreen } from "./app/EndpointScreen.js";
 import { MapBoundary } from "./app/MapBoundary.js";
 import { MapLimitsContext, type MapLimits } from "./app/map-limits.js";
@@ -280,6 +286,18 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
   const openForm = state.stage === "process" ? state.plan : undefined;
   const drawField = activeDrawField(drawFor, openForm);
 
+  // The drawing tools' place in the form (#18), and the map's view, read on
+  // demand: the map sits beside the form, so both are handed over here.
+  const [toolsSlot, setToolsSlot] = useState<HTMLElement | undefined>();
+  const viewReader = useRef<(() => MapExtent | undefined) | undefined>(undefined);
+  const readView = useCallback((read: (() => MapExtent | undefined) | undefined) => {
+    viewReader.current = read;
+  }, []);
+  // Stable, as a ref callback must be: a new one each render would be called
+  // with null and the element again, and set state each time.
+  const giveToolsSlot = useCallback((element: HTMLElement | null) => {
+    setToolsSlot(element ?? undefined);
+  }, []);
   const draw = useMemo<DrawTarget>(
     () => ({
       fieldId: drawField,
@@ -290,8 +308,11 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
       stop: () => {
         setDrawFor(undefined);
       },
+      toolsSlot,
+      setToolsSlot: giveToolsSlot,
+      currentView: () => viewReader.current?.(),
     }),
-    [drawField, mapAvailable, openForm],
+    [drawField, mapAvailable, openForm, toolsSlot, giveToolsSlot],
   );
 
   // Each stage moves focus to its heading, so a keyboard user lands where the
@@ -580,6 +601,7 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
                         draw={draw}
                         setValue={commands.setValue}
                         onAvailable={setMapAvailable}
+                        onViewReader={readView}
                         basemap={
                           // STYLE TRIAL: the updated Instrument's map is the world, in the theme's colours.
                           appearance.style === "instrument-updated"

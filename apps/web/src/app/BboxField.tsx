@@ -288,6 +288,22 @@ export function BboxField(props: ControlProps<BboxControl>) {
             {drawing ? "Stop drawing" : "Draw on the map"}
           </button>
         )}
+        {canDraw && (
+          <button
+            type="button"
+            className="secondary"
+            onClick={() => {
+              // The map's view as the box (#18), in the CRS the map draws in.
+              const view = draw.currentView?.();
+              if (view === undefined) return;
+              setNotice(undefined);
+              const value: BboxValue = { coordinates: [...view], crs: mapCrs };
+              onChange(value);
+            }}
+          >
+            Use the current map view
+          </button>
+        )}
         <button
           type="button"
           className="secondary"
@@ -310,6 +326,12 @@ export function BboxField(props: ControlProps<BboxControl>) {
           </button>
         )}
       </p>
+      {canDraw && (
+        <p className="help draw-hint">
+          Drawing needs a mouse or touch. You can also type the coordinates or use the current map
+          view.
+        </p>
+      )}
     </div>
   );
 }

@@ -965,7 +965,8 @@
   }
 
   /* A box's and an area's: one look, drawing or not (#17). */
-  [data-style="instrument"] :is(.geometry, .bbox) .actions button {
+  [data-style="instrument"] :is(.geometry, .bbox) .actions button,
+  [data-style="instrument"] .map-tools-slot .map-tools button {
     min-height: 36px;
     padding: 0 12px;
     font-size: 0.8125rem;
@@ -975,7 +976,8 @@
   }
 
   /* Drawing is on: the key is pressed, not a second primary. */
-  [data-style="instrument"] :is(.geometry, .bbox) .actions button:not(.secondary) {
+  [data-style="instrument"] :is(.geometry, .bbox) .actions button:not(.secondary),
+  [data-style="instrument"] .map-tools-slot .map-tools button:not(.secondary) {
     color: var(--text);
     background: var(--selected-bg);
     border-color: var(--selected-line);

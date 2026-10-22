@@ -184,12 +184,17 @@ export function MapPane({
   draw,
   setValue,
   onAvailable,
+  onViewReader,
   basemap,
 }: {
   readonly state: Workflow;
   readonly draw: DrawTarget;
   readonly setValue: (id: string, value: unknown) => void;
   readonly onAvailable: (available: boolean) => void;
+  /** How to read what the map shows, for "Use the current map view" (#18). */
+  readonly onViewReader?:
+    | ((read: (() => readonly [number, number, number, number] | undefined) | undefined) => void)
+    | undefined;
   /** STYLE TRIAL: the updated Instrument's world map; PDOK's otherwise. */
   readonly basemap?: { readonly create: CreateMap; readonly label: string } | undefined;
 }) {
@@ -280,6 +285,8 @@ export function MapPane({
         createMap={basemap?.create}
         label={basemap?.label}
         onAvailable={onAvailable}
+        onViewReader={onViewReader}
+        toolsSlot={draw.toolsSlot}
         geometry={geometry}
         shown={shown}
         image={image}

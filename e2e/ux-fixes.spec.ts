@@ -640,3 +640,43 @@ for (const style of STYLES) {
       .toBeCloseTo(2.17, 1);
   });
 }
+
+for (const style of STYLES) {
+  test(`#18 the drawing tools come right after Draw, and the map's view can be the input (${style})`, async ({
+    page,
+  }) => {
+    await open(page, style);
+    await connectTyped(page);
+    await openProcess(page, "Rotate a polygon a quarter turn");
+    await page.locator(".map-pane canvas").waitFor();
+    await expect(page.getByText("Drawing needs a mouse or touch.")).toBeVisible();
+
+    // Draw: the first tool has the focus, the next Tab is the next tool.
+    await page.getByRole("button", { name: "Draw on the map" }).click();
+    const tools = page.getByRole("toolbar", { name: "Drawing tools" });
+    await expect(tools.getByRole("button", { name: "Add area" })).toBeFocused();
+    await expect(tools.getByRole("button", { name: "Add area" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await page.keyboard.press("Tab");
+    await expect(tools.getByRole("button", { name: "Add box" })).toBeFocused();
+    await page.getByRole("button", { name: "Stop drawing" }).click();
+
+    // The map's view, as the area.
+    await page.getByRole("button", { name: "Use the current map view" }).click();
+    const geojson = page.getByRole("textbox", { name: "GeoJSON", exact: true });
+    await expect(geojson).toHaveValue(/"Polygon"/);
+    const value: unknown = JSON.parse(await geojson.inputValue());
+    expect(value).toMatchObject({ type: "Polygon" });
+    await expect(page.getByTestId("shape-size")).toContainText("km across");
+
+    // And as a box.
+    await toList(page);
+    await openProcess(page, "Bounding box to feature");
+    await page.locator(".map-pane canvas").waitFor();
+    await page.getByRole("button", { name: "Use the current map view" }).click();
+    await expect(page.getByRole("textbox", { name: /^West/ })).not.toHaveValue("");
+    await expect(page.getByTestId("shape-size")).toContainText("km across");
+  });
+}

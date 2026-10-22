@@ -25,6 +25,7 @@ import {
 // Vite bundles the worker as an ES module and hands its URL over instead.
 import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   INITIAL_BOUNDS,
   OPENFREEMAP_STYLES,
@@ -169,6 +170,18 @@ export interface MapViewProps {
   readonly onResultClick?: ((index: number) => void) | undefined;
   /** Whether the map started, so the form can offer "Draw on the map" or not. */
   readonly onAvailable?: ((available: boolean) => void) | undefined;
+  /**
+   * How to read what the map shows now, west, south, east, north in
+   * longitude and latitude (#18); handed back as undefined when the map goes.
+   */
+  readonly onViewReader?:
+    | ((read: (() => readonly [number, number, number, number] | undefined) | undefined) => void)
+    | undefined;
+  /**
+   * Where the drawing tools go (#18): beside the field drawing, so they come
+   * next in the tab order. Over the map when there is none.
+   */
+  readonly toolsSlot?: HTMLElement | undefined;
   readonly createMap?: CreateMap | undefined;
   /** What the map region is called, for a screen reader: the basemap's area and name. */
   readonly label?: string | undefined;
@@ -179,6 +192,33 @@ export interface MapViewProps {
 
 const NOTHING_SHOWN: readonly ShownShapes[] = [];
 
+/** Six decimals: about 10 cm, more than any view needs. */
+function round(value: number): number {
+  return Math.round(value * 1e6) / 1e6;
+}
+
+/**
+ * What a map shows, west, south, east, north, kept to longitude's and
+ * latitude's ranges (a map zoomed out shows more than one world). Undefined
+ * when the map can't say.
+ */
+export function viewOf(
+  map: Pick<MapLibreMap, "getBounds">,
+): readonly [number, number, number, number] | undefined {
+  try {
+    const bounds = map.getBounds();
+    const west = Math.max(-180, bounds.getWest());
+    const east = Math.min(180, bounds.getEast());
+    const south = Math.max(-90, bounds.getSouth());
+    const north = Math.min(90, bounds.getNorth());
+    return west < east && south < north
+      ? [round(west), round(south), round(east), round(north)]
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function MapView({
   draw,
   geometry = NO_GEOMETRY,
@@ -186,6 +226,8 @@ export function MapView({
   image,
   onResultClick,
   onAvailable,
+  onViewReader,
+  toolsSlot,
   createMap = createPdokMap,
   label = "Map of the Netherlands (BRT-Achtergrondkaart)",
   createEngine,
@@ -257,6 +299,14 @@ export function MapView({
     };
   }, [map]);
 
+  useEffect(() => {
+    if (map === undefined || onViewReader === undefined) return undefined;
+    onViewReader(() => viewOf(map));
+    return () => {
+      onViewReader(undefined);
+    };
+  }, [map, onViewReader]);
+
   useBoundingBoxDraw(map, draw, createEngine);
   const shapes = useGeometryDraw(map, geometry, createGeometryEngine);
   const { resultShapes, resultImage } = useShownShapes(
@@ -267,42 +317,58 @@ export function MapView({
     onResultClick,
   );
   const drawingShapes = geometry.active && map !== undefined;
+  // Drawing starts with the focus on the first tool (#18): again once the
+  // tools have moved beside the field, which makes them anew.
+  const firstTool = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!drawingShapes) return;
+    const tool = firstTool.current;
+    tool?.focus({ preventScroll: true });
+    // In view, beside the field: not when the tools are over the map.
+    if (toolsSlot !== undefined && tool !== null && "scrollIntoView" in tool) {
+      tool.scrollIntoView({ block: "nearest" });
+    }
+  }, [drawingShapes, toolsSlot]);
+
+  const toolbar = drawingShapes && (
+    <div className="map-tools" role="toolbar" aria-label="Drawing tools">
+      {geometry.tools.map((tool, index) => (
+        <button
+          key={tool}
+          ref={index === 0 ? firstTool : undefined}
+          type="button"
+          className={shapes.placing === tool ? "" : "secondary"}
+          aria-pressed={shapes.placing === tool}
+          onClick={() => {
+            shapes.place(tool);
+          }}
+        >
+          {TOOL_LABELS[tool]}
+        </button>
+      ))}
+      <button
+        type="button"
+        className="secondary"
+        disabled={!shapes.hasSelection}
+        onClick={() => {
+          shapes.deleteSelected();
+        }}
+      >
+        Delete selected
+      </button>
+      <p className="map-hint" role="status">
+        {shapes.placing === undefined
+          ? "Choose a tool to add a shape. Click a shape to select it; drag it or its corners to adjust."
+          : TOOL_HINTS[shapes.placing]}
+        {shapes.notShown > 0 && ` ${notShownHint(shapes.notShown)}`}
+      </p>
+    </div>
+  );
 
   return (
     <div className="map-view">
-      {drawingShapes && (
-        <div className="map-tools" role="toolbar" aria-label="Drawing tools">
-          {geometry.tools.map((tool) => (
-            <button
-              key={tool}
-              type="button"
-              className={shapes.placing === tool ? "" : "secondary"}
-              aria-pressed={shapes.placing === tool}
-              onClick={() => {
-                shapes.place(tool);
-              }}
-            >
-              {TOOL_LABELS[tool]}
-            </button>
-          ))}
-          <button
-            type="button"
-            className="secondary"
-            disabled={!shapes.hasSelection}
-            onClick={() => {
-              shapes.deleteSelected();
-            }}
-          >
-            Delete selected
-          </button>
-          <p className="map-hint" role="status">
-            {shapes.placing === undefined
-              ? "Choose a tool to add a shape. Click a shape to select it; drag it or its corners to adjust."
-              : TOOL_HINTS[shapes.placing]}
-            {shapes.notShown > 0 && ` ${notShownHint(shapes.notShown)}`}
-          </p>
-        </div>
-      )}
+      {/* Beside the field drawing, when it gave a place for them (#18). */}
+      {toolsSlot === undefined ? toolbar : toolbar !== false && createPortal(toolbar, toolsSlot)}
       <div
         ref={attach}
         className="map-canvas"
