@@ -23,6 +23,7 @@ import { tooManyToEditMessage, useTooManyToEdit } from "./map-limits.js";
 import type { ControlProps } from "./FormFields.js";
 import { CopyField } from "./CopyButton.js";
 import { formatJsonText } from "./json-text.js";
+import { JsonTroubleNote } from "./JsonTroubleNote.js";
 import { useUpdated } from "./variant.js";
 
 function asComplex(value: unknown): ComplexValue {
@@ -171,6 +172,7 @@ export function ComplexField(props: ControlProps<ComplexControl>) {
                 id={`${base}-value`}
                 className="code"
                 aria-invalid={props.invalid === true ? true : undefined}
+                aria-describedby={props.boxTrouble === undefined ? undefined : `${props.id}-error`}
                 rows={5}
                 spellCheck={false}
                 value={current.value ?? ""}
@@ -188,6 +190,9 @@ export function ComplexField(props: ControlProps<ComplexControl>) {
               />
             </CopyField>
           </p>
+          {props.boxTrouble !== undefined && (
+            <JsonTroubleNote id={`${props.id}-error`} trouble={props.boxTrouble} />
+          )}
           <p>
             <label htmlFor={`${base}-file`}>Or read the value from a file</label>
             <input

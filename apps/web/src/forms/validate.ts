@@ -106,6 +106,24 @@ function inexactError(text: string): string | undefined {
   return `This browser would send ${first.written} as ${first.sent}.${also} Open the page in a current browser, or write the number as a string if the process accepts one.`;
 }
 
+/**
+ * The text of a box this check reads as JSON, for this input and value: a
+ * value typed as JSON, a complex input's object value, a GeoJSON geometry.
+ * Nothing for any other. The updated Instrument says what is wrong with it
+ * under the box itself (#13).
+ */
+export function jsonBoxText(control: Control, value: unknown): string | undefined {
+  if (isRawJson(value)) return value.rawJson;
+  if (control.kind === "complex" && isJsonObject(value)) {
+    const format = control.formats[typeof value["format"] === "number" ? value["format"] : 0];
+    const href = typeof value["href"] === "string" ? value["href"].trim() : "";
+    const text = typeof value["value"] === "string" ? value["value"] : "";
+    return href === "" && format?.object === true ? text : undefined;
+  }
+  if (control.kind === "geometry" && isGeoJsonText(value)) return value.geojson;
+  return undefined;
+}
+
 function checkControl(control: Control, value: unknown): string | undefined {
   if (isRawJson(value)) return jsonError(value.rawJson) ?? inexactError(value.rawJson);
 
@@ -152,13 +170,8 @@ function checkControl(control: Control, value: unknown): string | undefined {
       return undefined;
     }
     case "complex": {
-      if (!isJsonObject(value)) return undefined;
-      const format = control.formats[typeof value["format"] === "number" ? value["format"] : 0];
-      const href = typeof value["href"] === "string" ? value["href"].trim() : "";
-      const text = typeof value["value"] === "string" ? value["value"] : "";
-      return href === "" && format?.object === true
-        ? (jsonError(text) ?? inexactError(text))
-        : undefined;
+      const text = jsonBoxText(control, value);
+      return text === undefined ? undefined : (jsonError(text) ?? inexactError(text));
     }
     case "list": {
       const items = (isJsonArray(value) ? value : [value]).filter(

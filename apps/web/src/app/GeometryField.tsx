@@ -21,6 +21,7 @@ import { tooManyToEditMessage, useTooManyToEdit } from "./map-limits.js";
 import type { ControlProps } from "./FormFields.js";
 import { CopyField } from "./CopyButton.js";
 import { formatJsonText } from "./json-text.js";
+import { JsonTroubleNote } from "./JsonTroubleNote.js";
 import { sizeOfGeoJsonText } from "./shape-size.js";
 import { useUpdated } from "./variant.js";
 
@@ -89,6 +90,7 @@ export function GeometryField(props: ControlProps<GeometryControl>) {
             id={`${base}-geojson`}
             className="code"
             aria-invalid={props.invalid === true ? true : undefined}
+            aria-describedby={props.boxTrouble === undefined ? undefined : `${props.id}-error`}
             rows={5}
             spellCheck={false}
             value={text}
@@ -104,6 +106,9 @@ export function GeometryField(props: ControlProps<GeometryControl>) {
           />
         </CopyField>
       </p>
+      {props.boxTrouble !== undefined && (
+        <JsonTroubleNote id={`${props.id}-error`} trouble={props.boxTrouble} />
+      )}
       {/* How big it is, to check a process's limit against (#15): while drawing, and after. */}
       {size !== undefined && (
         <p className="help shape-size" data-testid="shape-size">

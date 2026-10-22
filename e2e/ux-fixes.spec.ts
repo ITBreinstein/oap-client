@@ -1045,3 +1045,37 @@ for (const style of STYLES) {
     expect(new Set(heights).size === 1).toBe(updated);
   });
 }
+
+for (const { style, more } of [
+  { style: "instrument", more: "" },
+  { style: "instrument-updated", more: "" },
+  { style: "instrument-updated", more: "&developer" },
+]) {
+  const updated = style === "instrument-updated";
+  test(`#13 JSON that doesn't parse is said ${updated ? "under its box, in plain words" : "as it was"} (${style}${more})`, async ({
+    page,
+  }) => {
+    await open(page, style, more);
+    await connectTyped(page);
+    await openProcess(page, "Area of each feature");
+    const box = page.getByRole("textbox", { name: "Value (JSON)" });
+    await box.fill('{\n\t"type": "FeatureCollection"\n\t"features": []\n}');
+    await page.getByRole("button", { name: "Run", exact: true }).click();
+    const field = page.locator('[data-input-id="features"]');
+    const error = field.locator(".field-error");
+    await expect(error).toHaveCount(1);
+    if (!updated) {
+      await expect(error).toContainText("This is not valid JSON (");
+      return;
+    }
+    await expect(error).toContainText(
+      "This isn’t valid JSON: check the quotes and brackets near line 3.",
+    );
+    // Right under the box, before anything else in the field.
+    await expect(field.locator("p:has(textarea) + .json-trouble")).toHaveCount(1);
+    await expect(box).toHaveAccessibleDescription(/This isn’t valid JSON/);
+    // The parser's own words, for developers only.
+    if (more === "") await expect(error).not.toContainText("The parser says:");
+    else await expect(error).toContainText("The parser says: Expected ',' or '}'");
+  });
+}

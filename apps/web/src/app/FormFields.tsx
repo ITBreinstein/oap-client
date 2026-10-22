@@ -14,7 +14,9 @@
 import { useId, type ReactNode } from "react";
 import { initialValue } from "../forms/defaults.js";
 import { bareObjectHint, isRawJson, type FormValues } from "../forms/encode.js";
+import { jsonTrouble, type JsonTrouble } from "../forms/json-trouble.js";
 import { limitsStated } from "../forms/limits-stated.js";
+import { jsonBoxText } from "../forms/validate.js";
 import type {
   CheckboxControl,
   Control,
@@ -31,6 +33,7 @@ import { GeometryField } from "./GeometryField.js";
 import { CopyField } from "./CopyButton.js";
 import { DateTimeField } from "./DateTimeField.js";
 import { formatJsonText } from "./json-text.js";
+import { JsonTroubleNote } from "./JsonTroubleNote.js";
 import { useUpdated } from "./variant.js";
 
 export interface ControlProps<C extends Control = Control> {
@@ -53,6 +56,11 @@ export interface ControlProps<C extends Control = Control> {
   readonly labelId?: string | undefined;
   /** STYLE TRIAL (#14): the description already says the limits; the page does not repeat them. */
   readonly limitsSaid?: boolean | undefined;
+  /**
+   * STYLE TRIAL (#13): the field's error is that its box holds no valid
+   * JSON. Said under the box, as the field's error (`${id}-error`).
+   */
+  readonly boxTrouble?: JsonTrouble | undefined;
 }
 
 function asText(value: unknown): string {
@@ -238,6 +246,7 @@ function JsonInput({
   invalid,
   onChange,
   label,
+  boxTrouble,
 }: ControlProps<JsonControl>) {
   // STYLE TRIAL: the updated Instrument lays JSON out with tabs.
   const updated = useUpdated();
@@ -271,6 +280,7 @@ function JsonInput({
           }}
         />
       </CopyField>
+      {boxTrouble !== undefined && <JsonTroubleNote id={`${id}-error`} trouble={boxTrouble} />}
       {bare !== undefined && (
         <p id={`${id}-bare`} className="hint" data-bare-object-hint="true">
           {bare}
@@ -442,6 +452,11 @@ export function FieldView({ field, index, values, error, warnings, onChange }: F
   const limitsSaid = updated && limitsStated(help, limitsOf(field.control));
   const yesBeside = updated && field.control.kind === "checkbox" && field.required;
   const extra = hint(field, limitsSaid);
+  const value = Object.hasOwn(values, field.id) ? values[field.id] : undefined;
+  // STYLE TRIAL (updated Instrument, #13): a box that holds no valid JSON is
+  // said to be so under the box, not at the foot of the field.
+  const boxText = updated && error !== undefined ? jsonBoxText(field.control, value) : undefined;
+  const boxTrouble = boxText === undefined ? undefined : jsonTrouble(boxText);
   const warned = error === undefined && warnings !== undefined && warnings.length > 0;
   const describedBy =
     [
@@ -452,7 +467,6 @@ export function FieldView({ field, index, values, error, warnings, onChange }: F
     ]
       .filter((part): part is string => typeof part === "string" && part !== "")
       .join(" ") || undefined;
-  const value = Object.hasOwn(values, field.id) ? values[field.id] : undefined;
   const group = isGroup(field.control, field.required);
   const title = (
     <>
@@ -477,6 +491,7 @@ export function FieldView({ field, index, values, error, warnings, onChange }: F
       inputId={field.id}
       labelId={yesBeside ? `${id}-label` : undefined}
       limitsSaid={limitsSaid}
+      boxTrouble={boxTrouble}
       onChange={(next) => {
         onChange(field.id, next);
       }}
@@ -520,7 +535,7 @@ export function FieldView({ field, index, values, error, warnings, onChange }: F
           {control}
         </>
       )}
-      {error !== undefined && (
+      {error !== undefined && boxTrouble === undefined && (
         <p id={`${id}-error`} className="field-error">
           {error}
         </p>
