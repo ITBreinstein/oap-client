@@ -388,6 +388,39 @@ pre.code {
   top: 4rem;
 }
 
+/*
+ * Drawing on a phone (#39): the map is brought into view with Done and
+ * Clear pinned over its top edge, and the tools under them; "Find a place"
+ * steps aside meanwhile.
+ */
+.draw-bar {
+  position: absolute;
+  z-index: 4;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line-strong);
+  box-shadow: var(--shadow-popover);
+}
+
+.draw-bar-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.map-pane[data-drawing-here="true"] .place-search {
+  display: none;
+}
+
 /* Back to the result, once the map has moved off it (#16): above the scale. */
 .map-show-result {
   position: absolute;

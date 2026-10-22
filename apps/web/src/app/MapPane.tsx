@@ -19,7 +19,7 @@
  * beside it gives (`results/plottable.ts`).
  */
 
-import { useContext, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { classifyCrs, drawableCrs, isDrawableCrs } from "../forms/crs.js";
 import { extentOfBbox } from "./shape-size.js";
 import type { BboxValue } from "../forms/encode.js";
@@ -44,6 +44,7 @@ import {
 import type { RenderableResult } from "../results/renderable.js";
 import { FeatureProperties } from "./FeatureProperties.js";
 import { PlaceSearch } from "./PlaceSearch.js";
+import { useWide } from "./useWide.js";
 import { shapeBinding } from "./input-shapes.js";
 import type { GeometryDrawProps } from "../map/useGeometryDraw.js";
 import type { DrawTarget } from "./draw.js";
@@ -270,6 +271,36 @@ export function MapPane({
     results !== undefined && picked?.results === results
       ? plottedFeatures(results, maxCoordinates)[picked.index]
       : undefined;
+  // On a phone the map is below the form (#39): drawing brings it into view,
+  // with Done and Clear pinned over it, and Done goes back to the field.
+  const wide = useWide();
+  const pane = useRef<HTMLElement>(null);
+  const drawingHere = field !== undefined && !wide;
+  useEffect(() => {
+    if (!drawingHere) return;
+    const element = pane.current;
+    if (element !== null && "scrollIntoView" in element) {
+      element.scrollIntoView({ block: "start", behavior: "auto" });
+    }
+  }, [drawingHere]);
+  const done = () => {
+    const id = field?.id;
+    draw.stop();
+    if (id === undefined) return;
+    requestAnimationFrame(() => {
+      const back = document.querySelector<HTMLElement>(`[data-input-id="${CSS.escape(id)}"]`);
+      if (back !== null && "scrollIntoView" in back) back.scrollIntoView({ block: "center" });
+      back?.querySelector<HTMLElement>("button[aria-pressed]")?.focus({ preventScroll: true });
+    });
+  };
+  const clearDrawn = () => {
+    if (field === undefined) return;
+    setValue(
+      field.id,
+      control === undefined && shapes !== undefined ? shapes.write("") : undefined,
+    );
+  };
+
   // A place chosen in "Find a place" (#16): the map moves to it once.
   const [goTo, setGoTo] = useState<
     { readonly id: number; readonly extent: readonly [number, number, number, number] } | undefined
@@ -285,7 +316,18 @@ export function MapPane({
     image !== undefined || shown.some((set) => set.role === "result" && set.shapes.length > 0);
 
   return (
-    <aside className="map-pane" aria-label="Map">
+    <aside className="map-pane" aria-label="Map" ref={pane} data-drawing-here={drawingHere}>
+      {drawingHere && (
+        <div className="draw-bar" role="group" aria-label={`Drawing “${field.title}”`}>
+          <span className="draw-bar-title">Drawing “{field.title}”</span>
+          <button type="button" className="secondary" onClick={clearDrawn}>
+            Clear
+          </button>
+          <button type="button" onClick={done}>
+            Done
+          </button>
+        </div>
+      )}
       <PlaceSearch
         onPlace={(place) => {
           setGoTo((last) => ({ id: (last?.id ?? 0) + 1, extent: place.extent }));
@@ -297,7 +339,8 @@ export function MapPane({
         label={basemap?.label}
         onAvailable={onAvailable}
         onViewReader={onViewReader}
-        toolsSlot={draw.toolsSlot}
+        // On a phone the tools stay over the map, where the drawing is (#39).
+        toolsSlot={wide ? draw.toolsSlot : undefined}
         focusToken={draw.focusToken}
         geometry={geometry}
         shown={shown}

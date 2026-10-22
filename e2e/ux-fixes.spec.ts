@@ -714,3 +714,36 @@ test("#36 the form's width can be changed with the keys and by dragging, between
   await openProcess(page, "Hello World");
   await expect.poll(width).toBe(kept);
 });
+
+for (const style of STYLES) {
+  test(`#39 on a phone, drawing brings the map into view with Done and Clear (${style})`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await open(page, style);
+    await connectTyped(page);
+    await openProcess(page, "Rotate a polygon a quarter turn");
+    await page.locator(".map-pane canvas").waitFor();
+    const geojson = page.getByRole("textbox", { name: "GeoJSON", exact: true });
+    await geojson.fill(
+      '{"type":"Polygon","coordinates":[[[5.1,52.1],[5.2,52.1],[5.2,52.2],[5.1,52.1]]]}',
+    );
+    await page.getByRole("button", { name: "Draw on the map" }).click();
+
+    const bar = page.getByRole("group", { name: "Drawing “Polygon”" });
+    await expect(bar).toBeInViewport();
+    await expect(page.locator(".map-pane canvas")).toBeInViewport({ ratio: 0.3 });
+    // The tools are over the map, where the drawing is.
+    await expect(
+      page.locator(".map-pane").getByRole("toolbar", { name: "Drawing tools" }),
+    ).toBeVisible();
+
+    // Clear empties the field; Done goes back to it.
+    await bar.getByRole("button", { name: "Clear" }).click();
+    await expect(geojson).toHaveValue("");
+    await bar.getByRole("button", { name: "Done" }).click();
+    await expect(bar).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Draw on the map" })).toBeFocused();
+    await expect(page.getByRole("button", { name: "Draw on the map" })).toBeInViewport();
+  });
+}
