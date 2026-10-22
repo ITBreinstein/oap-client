@@ -318,6 +318,45 @@ pre.code {
   word-break: break-word;
 }
 
+/*
+ * A text result keeps its lines, but never breaks inside a word to fit
+ * (#26): a long word, an address or a number, scrolls instead.
+ */
+.result[data-kind="text"] pre.code {
+  word-break: normal;
+  overflow-wrap: normal;
+}
+
+/* A CSV result as a table (#26): scrolls both ways inside its box. */
+.csv-table {
+  overflow: auto;
+  max-height: 24rem;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-control);
+}
+
+.csv-table table {
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+}
+
+.csv-table th,
+.csv-table td {
+  padding: 0.375rem 0.75rem;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.csv-table th {
+  position: sticky;
+  top: 0;
+  background: var(--surface-2);
+  font-weight: 700;
+}
+
 .muted,
 .help,
 .hint {

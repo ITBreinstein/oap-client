@@ -787,7 +787,9 @@
   color: var(--result-fg);
 }
 
-[data-style="instrument"] .result pre.code {
+[data-style="instrument"] .result pre.code,
+[data-style="instrument"] .result .csv-table,
+[data-style="instrument"] .result .csv-table th {
   background: var(--field);
 }
 

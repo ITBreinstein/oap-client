@@ -27,7 +27,13 @@ import {
   type MapImage,
 } from "../results/plottable.js";
 import { isOpenable, isTruncated, originOf, type LoadedReference } from "../results/reference.js";
-import { defaultFilename, type RenderableResult } from "../results/renderable.js";
+import { parseCsv } from "../results/csv.js";
+import {
+  defaultFilename,
+  isCsv,
+  textFilename,
+  type RenderableResult,
+} from "../results/renderable.js";
 
 type ValueResult = Exclude<RenderableResult, { kind: "reference" }>;
 type ReferenceResult = Extract<RenderableResult, { kind: "reference" }>;
@@ -70,10 +76,60 @@ function filenameOf(result: ValueResult, processId: string): string {
     case "json":
       return `${processId}-${result.outputId}.json`;
     case "text":
-      return `${processId}-${result.outputId}.txt`;
+      return textFilename(processId, result.outputId, result.mediaType);
     case "download":
       return result.filename ?? `${processId}-${result.outputId}`;
   }
+}
+
+/** How many of a CSV's rows are shown; the download has them all. */
+export const CSV_ROWS_SHOWN = 50;
+
+/**
+ * A CSV result as a table (#26): its first row as the heading, then the
+ * first {@link CSV_ROWS_SHOWN} rows, and how many more the download holds.
+ */
+function CsvTable({
+  rows,
+  outputId,
+}: {
+  readonly rows: readonly (readonly string[])[];
+  readonly outputId: string;
+}) {
+  const [head = [], ...body] = rows;
+  const shown = body.slice(0, CSV_ROWS_SHOWN);
+  const more = body.length - shown.length;
+  return (
+    <>
+      <div className="csv-table" tabIndex={0} role="region" aria-label={`Table “${outputId}”`}>
+        <table>
+          <thead>
+            <tr>
+              {head.map((cell, index) => (
+                <th key={index} scope="col">
+                  {cell}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {shown.map((row, index) => (
+              <tr key={index}>
+                {row.map((cell, column) => (
+                  <td key={column}>{cell}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {more > 0 && (
+        <p className="muted" data-testid="csv-more">
+          and {more.toLocaleString("en")} more {more === 1 ? "row" : "rows"}; download for all.
+        </p>
+      )}
+    </>
+  );
 }
 
 function ImagePreview({ blob, outputId }: { readonly blob: Blob; readonly outputId: string }) {
@@ -97,6 +153,12 @@ function ResultItem({
 }) {
   const [blob] = useState(() => blobOf(result));
   const filename = filenameOf(result, processId);
+  // A CSV this page can read is a table; any other text, or a CSV it can't, is text.
+  const [csvRows] = useState(() => {
+    if (result.kind !== "text" || !isCsv(result.mediaType)) return undefined;
+    const rows = parseCsv(result.value);
+    return rows === undefined || rows.length === 0 ? undefined : rows;
+  });
   const { maxCoordinates } = useContext(MapLimitsContext);
   // STYLE TRIAL: the updated Instrument lays JSON out with tabs, and offers Copy.
   const updated = useUpdated();
@@ -152,7 +214,9 @@ function ResultItem({
           <summary>
             <strong>{result.outputId}</strong> <span className="muted">{result.mediaType}</span>
           </summary>
-          {updated ? (
+          {csvRows !== undefined ? (
+            <CsvTable rows={csvRows} outputId={result.outputId} />
+          ) : updated ? (
             <div className="code-box">
               <pre className="code">{result.value}</pre>
               <CopyButton name={copyName} text={() => result.value} />
