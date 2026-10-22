@@ -44,6 +44,7 @@ import {
 import type { RenderableResult } from "../results/renderable.js";
 import { FeatureProperties } from "./FeatureProperties.js";
 import { hasProperties } from "./property-value.js";
+import { legendKind, legendNoun, shapeKinds } from "./shape-words.js";
 import { PlaceSearch } from "./PlaceSearch.js";
 import { useWide } from "./useWide.js";
 import { shapeBinding } from "./input-shapes.js";
@@ -319,6 +320,9 @@ export function MapPane({
       ? undefined
       : { url: imageUrl, bounds: placed.bounds };
   const drawnInput = shown.some((set) => set.role === "input" && set.shapes.length > 0);
+  const inputKinds = shapeKinds(
+    shown.filter((set) => set.role === "input").flatMap((set) => set.shapes),
+  );
   const plotted =
     image !== undefined || shown.some((set) => set.role === "result" && set.shapes.length > 0);
 
@@ -397,12 +401,17 @@ export function MapPane({
           {plotted && drawnInput && " beside "}
           {drawnInput && (
             <span>
-              <span className="swatch swatch-input" aria-hidden="true" />{" "}
+              {/* Named, and drawn, by what it holds: a point, a line, an area (#22). */}
+              <span
+                className="swatch swatch-input"
+                data-kind={legendKind(inputKinds)}
+                aria-hidden="true"
+              />{" "}
               {state.stage === "process"
-                ? "The input, not yet sent"
+                ? `The ${legendNoun(inputKinds)}, not yet sent`
                 : plotted
-                  ? "the input you sent"
-                  : "The input you sent"}
+                  ? `the ${legendNoun(inputKinds)} you sent`
+                  : `The ${legendNoun(inputKinds)} you sent`}
             </span>
           )}
           .

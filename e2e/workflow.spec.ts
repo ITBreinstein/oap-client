@@ -463,7 +463,7 @@ test.describe("the workflow in a browser", () => {
 
     // Not drawing: the loaded shape is on the map as the input, not yet sent.
     await stop.click();
-    await expect(page.getByTestId("map-legend")).toHaveText("The input, not yet sent.");
+    await expect(page.getByTestId("map-legend")).toHaveText("The area, not yet sent.");
 
     // The file first, then drawing.
     await draw.click();
@@ -535,9 +535,7 @@ test.describe("the workflow in a browser", () => {
       "true",
     );
     await expect(page.locator(".map-canvas")).toHaveAttribute("data-result-shapes", "1");
-    await expect(page.getByTestId("map-legend")).toHaveText(
-      "The result beside the input you sent.",
-    );
+    await expect(page.getByTestId("map-legend")).toHaveText("The result beside the area you sent.");
   });
 
   test(
@@ -588,7 +586,7 @@ test.describe("the workflow in a browser", () => {
 
       await expect(page.locator(".map-canvas")).toHaveAttribute("data-result-image", "true");
       await expect(page.getByTestId("map-legend")).toHaveText(
-        "The result’s image beside the input you sent.",
+        "The result’s image beside the area you sent.",
       );
     },
   );
@@ -963,7 +961,7 @@ test.describe("the workflow in a browser", () => {
     await expect(polygon.getByTestId("too-many-to-edit")).toContainText(
       "This input has 5 coordinates, more than the 4 the map edits at once",
     );
-    await expect(page.getByTestId("map-legend")).toHaveText("The input, not yet sent.");
+    await expect(page.getByTestId("map-legend")).toHaveText("The area, not yet sent.");
     expect(JSON.parse(await geojson.inputValue())).toEqual(square);
 
     const exchange = page.waitForResponse(

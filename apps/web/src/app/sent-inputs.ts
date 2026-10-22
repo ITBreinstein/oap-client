@@ -13,8 +13,10 @@ import type { ProcessDescription } from "@breinstein/oap-client";
 import { classifyCrs } from "../forms/crs.js";
 import { isAbsentFor, isGeoJsonText, isRawJson } from "../forms/encode.js";
 import { isJsonArray, isJsonObject } from "../forms/json.js";
+import { shapesOfText } from "../forms/geometry.js";
 import type { Control, FieldPlan, FormPlan } from "../forms/plan.js";
 import { offersLink } from "./run.js";
+import { onMapSentence, shapeKinds } from "./shape-words.js";
 
 export interface SummaryPart {
   readonly text: string;
@@ -29,7 +31,7 @@ export interface Summary {
 }
 
 export interface SummaryContext {
-  /** The map draws this value, as the input's dashed outline. */
+  /** The map draws this value: as the input's points, dashed lines or outlines. */
   readonly onMap?: boolean | undefined;
   /** The run has finished: a linked value has been fetched, not "is being". */
   readonly done?: boolean | undefined;
@@ -41,7 +43,10 @@ export const LIST_SHOWN = 5;
 /** Longer than this, or on more than one line, a text value also folds out whole. */
 const ONE_LINE = 80;
 
-const ON_MAP = "Shown on the map as the dashed outline.";
+/** What the map shows of this GeoJSON, by what it holds: a point, a line, an area (#22). */
+function onMap(text: string): string {
+  return onMapSentence(shapeKinds(shapesOfText(text)));
+}
 
 const plain = (text: string): SummaryPart => ({ text });
 const mono = (text: string): SummaryPart => ({ text, mono: true });
@@ -263,7 +268,10 @@ function summariseControl(control: Control, value: unknown, context: SummaryCont
       const text = isGeoJsonText(value) ? value.geojson : asText(value);
       const words = describeGeoJson(text) ?? `GeoJSON, ${sizeInWords(utf8Bytes(text))}`;
       return {
-        parts: [plain(words), ...(context.onMap === true ? [plain(`. ${ON_MAP}`)] : [plain(".")])],
+        parts: [
+          plain(words),
+          ...(context.onMap === true ? [plain(`. ${onMap(text)}`)] : [plain(".")]),
+        ],
         full: text,
       };
     }
@@ -295,7 +303,7 @@ function summariseControl(control: Control, value: unknown, context: SummaryCont
           ...how,
           ...(geojson === undefined ? [] : [plain(`: ${geojson}`)]),
           plain("."),
-          ...(context.onMap === true ? [plain(` ${ON_MAP}`)] : []),
+          ...(context.onMap === true ? [plain(` ${onMap(text)}`)] : []),
         ],
         ...(base64 || !isLong(text) ? {} : { full: text }),
       };

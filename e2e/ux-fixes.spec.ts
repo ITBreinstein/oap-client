@@ -1143,3 +1143,31 @@ for (const style of STYLES) {
     await expect(page.getByTestId("feature-hint")).toHaveCount(0);
   });
 }
+
+for (const style of STYLES) {
+  test(`#22 a point input is called a point on the map, not an outline (${style})`, async ({
+    page,
+  }) => {
+    await open(page, style);
+    await connectTyped(page);
+    await openProcess(page, "Every input kind");
+    const area = page.locator('[data-input-id="area"]');
+    await area
+      .getByRole("textbox", { name: "GeoJSON", exact: true })
+      .fill(JSON.stringify({ type: "Point", coordinates: [5.12, 52.09] }));
+    const legend = page.getByTestId("map-legend");
+    await expect(legend).toHaveText("The point, not yet sent.");
+    await expect(legend.locator(".swatch-input")).toHaveAttribute("data-kind", "point");
+    await area.getByRole("textbox", { name: "GeoJSON", exact: true }).fill(
+      JSON.stringify({
+        type: "LineString",
+        coordinates: [
+          [5.12, 52.09],
+          [5.13, 52.1],
+        ],
+      }),
+    );
+    await expect(legend).toHaveText("The line, not yet sent.");
+    await expect(legend.locator(".swatch-input")).toHaveAttribute("data-kind", "line");
+  });
+}

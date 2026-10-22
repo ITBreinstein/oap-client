@@ -128,6 +128,24 @@ describe("summarise, by control kind", () => {
     expect(text(summarise(field(control), { geojson }))).toBe("Polygon, 5 points.");
   });
 
+  it("geometry: a point or a line is named as the map draws it, not as an outline (#22)", () => {
+    const control: Control = { kind: "geometry", wrapper: "geometry", geometryTypes: [] };
+    const point = JSON.stringify({ type: "Point", coordinates: [5.1, 52.1] });
+    expect(text(summarise(field(control), { geojson: point }, { onMap: true }))).toMatch(
+      /Shown on the map as the amber point\.$/,
+    );
+    const line = JSON.stringify({
+      type: "LineString",
+      coordinates: [
+        [5.1, 52.1],
+        [5.2, 52.2],
+      ],
+    });
+    expect(text(summarise(field(control), { geojson: line }, { onMap: true }))).toMatch(
+      /Shown on the map as the dashed line\.$/,
+    );
+  });
+
   it("complex, inline: how and in what format, and its size", () => {
     const control: Control = {
       kind: "complex",
@@ -140,7 +158,7 @@ describe("summarise, by control kind", () => {
     const value = JSON.stringify(collection(6));
     const object = summarise(field(control), { format: 0, value }, { onMap: true });
     expect(text(object)).toBe(
-      `Inline, as a JSON object (${sizeInWords(value.length)}): FeatureCollection, 6 features (polygons). Shown on the map as the dashed outline.`,
+      `Inline, as a JSON object (${sizeInWords(value.length)}): FeatureCollection, 6 features (polygons). Shown on the map as the dashed outlines.`,
     );
     expect(object.full).toBe(value);
     expect(text(summarise(field(control), { format: 1, value: "<gml:Polygon/>" }))).toBe(

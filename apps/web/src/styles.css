@@ -276,6 +276,24 @@ legend,
   border: 2px dashed #b45309;
 }
 
+/* As the map draws it (#22): a point as an amber dot, a line as a dashed stroke. */
+.map-legend .swatch-input[data-kind="point"] {
+  width: 0.75rem;
+  height: 0.75rem;
+  background: #d97706;
+  border: 2px solid #b45309;
+  border-radius: 50%;
+}
+
+.map-legend .swatch-input[data-kind="line"] {
+  height: 0;
+  vertical-align: 0.25rem;
+  background: none;
+  border: none;
+  border-top: 2px dashed #b45309;
+  border-radius: 0;
+}
+
 @media (max-width: 52rem) {
   .app {
     height: auto;
