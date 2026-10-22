@@ -1311,3 +1311,22 @@ for (const style of STYLES) {
     }
   });
 }
+
+test("#28 once a linked image is shown, a plain line takes the place of the error (instrument-updated)", async ({
+  page,
+}) => {
+  await requireService("http://localhost:5081/?f=json", "pygeoapi :5081");
+  await open(page, "instrument-updated");
+  await connectTyped(page);
+  await openProcess(page, "A link to a file on another server");
+  await page.getByRole("button", { name: "Run", exact: true }).click();
+  const file = page.locator('[data-output-id="file"]');
+  await file.getByRole("button", { name: "Load" }).click();
+  await expect(file).toHaveAttribute("data-reference-outcome", "cors-blocked");
+  await expect(file.getByRole("img", { name: "The image result “file”" })).toBeVisible();
+  // The visitor is spared the record sentence (#43); it is recorded all the same.
+  await expect(file.getByTestId("shown-as-image")).toHaveText(
+    "Shown as an image. This page can’t read the file itself, so it can’t be checked or drawn on the map.",
+  );
+  await expect(file.locator(".notice")).toHaveCount(0);
+});

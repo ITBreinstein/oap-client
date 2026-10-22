@@ -123,15 +123,17 @@ test.describe("outputs given by reference", () => {
 
     await file.getByRole("button", { name: "Load" }).click();
     await expect(file).toHaveAttribute("data-reference-outcome", "cors-blocked");
-    await expect(file).toContainText(
-      "localhost:5081 sends no CORS headers for it, or could not be reached",
-    );
     const link = file.getByRole("link", { name: "Open the link" });
     await expect(link).toHaveAttribute("href", `${NOCORS}/static/img/logo.png`);
     await expect(link).toHaveAttribute("rel", "noopener noreferrer");
     // Read once, and refused; then shown as an image, which a browser loads
     // from anywhere (#28).
     await expect(file.getByRole("img", { name: "The image result “file”" })).toBeVisible();
+    // Shown, the block is no longer an error: a plain line says what it means (§12).
+    await expect(file.getByTestId("shown-as-image")).toHaveText(
+      "Shown as an image. This page can’t read the file itself, so it can’t be checked or drawn on the map. The attempt has been recorded.",
+    );
+    await expect(file).not.toContainText("sends no CORS headers");
     await expect
       .poll(() => toNocors)
       .toEqual([`fetch ${NOCORS}/static/img/logo.png`, `image ${NOCORS}/static/img/logo.png`]);

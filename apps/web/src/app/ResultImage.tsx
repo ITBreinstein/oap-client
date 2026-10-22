@@ -62,11 +62,14 @@ export function ResultImage({
   outputId,
   referrerPolicy,
   onError,
+  onShown,
 }: {
   readonly src: string;
   readonly outputId: string;
   readonly referrerPolicy?: "no-referrer" | undefined;
   readonly onError?: (() => void) | undefined;
+  /** The browser has shown it. */
+  readonly onShown?: (() => void) | undefined;
 }) {
   const updated = useUpdated();
   const [natural, setNatural] = useState<{ width: number; height: number } | undefined>();
@@ -85,6 +88,7 @@ export function ResultImage({
       onLoad={(event) => {
         const { naturalWidth, naturalHeight } = event.currentTarget;
         setNatural({ width: naturalWidth, height: naturalHeight });
+        onShown?.();
       }}
       onError={onError}
     />

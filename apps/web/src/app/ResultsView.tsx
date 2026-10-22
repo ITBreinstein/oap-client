@@ -328,7 +328,15 @@ function LoadedOk({ loaded, host }: { readonly loaded: LoadedReference; readonly
  * from its host directly, never read by this page. What it can't show is
  * said, with the way on: the link.
  */
-function LinkedImage({ href, outputId }: { readonly href: string; readonly outputId: string }) {
+function LinkedImage({
+  href,
+  outputId,
+  onShown,
+}: {
+  readonly href: string;
+  readonly outputId: string;
+  readonly onShown?: (() => void) | undefined;
+}) {
   const [failed, setFailed] = useState(false);
   return failed ? (
     <p className="notice">
@@ -342,6 +350,7 @@ function LinkedImage({ href, outputId }: { readonly href: string; readonly outpu
       onError={() => {
         setFailed(true);
       }}
+      onShown={onShown}
     />
   );
 }
@@ -357,6 +366,20 @@ function LoadedLine({
 }) {
   const host = hostOf(href) ?? "the server";
   const spared = useSpared(useUpdated());
+  // Once the browser shows it as an image (#28), what could not be read is no
+  // longer an error: a plain line says what that means instead.
+  const [shown, setShown] = useState(false);
+  const shownAsImage = (
+    <p className="hint shown-as-image" data-testid="shown-as-image">
+      Shown as an image. This page can’t read the file itself, so it can’t be checked or drawn on
+      the map.
+      {/* STYLE TRIAL: spared in the updated Instrument, recorded all the same (#43). */}
+      {!spared && " The attempt has been recorded."}
+    </p>
+  );
+  const onShown = () => {
+    setShown(true);
+  };
   switch (loaded.outcome) {
     case "ok":
       return <LoadedOk loaded={loaded} host={host} />;
@@ -365,14 +388,17 @@ function LoadedLine({
       // anywhere, though the page itself may not read it.
       return loaded.image === true ? (
         <>
-          {!spared && (
+          {shown ? (
+            shownAsImage
+          ) : (
             <p className="notice">
               This page could not read it: {host} sends no CORS headers for it, or could not be
-              reached. The browser shows it below as an image all the same. The attempt has been
-              recorded.
+              reached.
+              {/* STYLE TRIAL: spared in the updated Instrument, recorded all the same (#43). */}
+              {!spared && " The attempt has been recorded."}
             </p>
           )}
-          <LinkedImage href={href} outputId={outputId} />
+          <LinkedImage href={href} outputId={outputId} onShown={onShown} />
         </>
       ) : (
         <p className="notice">
@@ -412,7 +438,10 @@ function LoadedLine({
       );
     case "failed":
       return loaded.image === true ? (
-        <LinkedImage href={href} outputId={outputId} />
+        <>
+          {shown && shownAsImage}
+          <LinkedImage href={href} outputId={outputId} onShown={onShown} />
+        </>
       ) : (
         <p className="notice">
           It could not be read{loaded.detail === undefined ? "" : ` (${loaded.detail})`}.
