@@ -680,3 +680,37 @@ for (const style of STYLES) {
     await expect(page.getByTestId("shape-size")).toContainText("km across");
   });
 }
+
+test("#36 the form's width can be changed with the keys and by dragging, between 400 and 640px", async ({
+  page,
+}) => {
+  await open(page, "instrument-updated");
+  await connectTyped(page);
+  await openProcess(page, "Buildings in an area");
+  const handle = page.getByRole("separator", { name: "Width of the form" });
+  const panel = page.locator("main.panel");
+  const width = async () => Math.round((await panel.boundingBox())?.width ?? 0);
+  expect(await width()).toBe(400);
+
+  await handle.focus();
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("ArrowRight");
+  await expect(handle).toHaveAttribute("aria-valuenow", "432");
+  await expect.poll(width).toBe(432);
+  await page.keyboard.press("End");
+  await expect.poll(width).toBe(640);
+
+  const box = await handle.boundingBox();
+  if (box === null) throw new Error("no handle");
+  await page.mouse.move(box.x + box.width / 2, box.y + 200);
+  await page.mouse.down();
+  await page.mouse.move(box.x - 150, box.y + 200, { steps: 5 });
+  await page.mouse.up();
+  await expect.poll(width).toBeLessThan(560);
+
+  // Kept for the visit, from one process to the next.
+  const kept = await width();
+  await toList(page);
+  await openProcess(page, "Hello World");
+  await expect.poll(width).toBe(kept);
+});

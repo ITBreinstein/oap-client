@@ -1,5 +1,16 @@
 import { redactUrl } from "@breinstein/oap-client";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
+import { PanelHandle } from "./app/PanelHandle.js";
+import { useWide } from "./app/useWide.js";
+import { PANEL_START } from "./app/panel-width.js";
 import type { Appearance } from "./app/appearance.js";
 import { AppearanceControl } from "./app/AppearanceControl.js";
 import { UpdatedContext } from "./app/variant.js";
@@ -433,6 +444,15 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
   // or a result it can show (`app/map-need.ts`). Otherwise the panel has the
   // page to itself, and no basemap tile is fetched.
   const showMap = mapNeeded(state, mapLimits.maxCoordinates);
+  // STYLE TRIAL (#36): in the updated Instrument a process keeps its form
+  // docked at the left, map or not; without a map the picture is on the right.
+  const updatedStyle = appearance.style === "instrument-updated";
+  const onProcess =
+    state.stage === "process" || state.stage === "running" || state.stage === "result";
+  // Beside, on a wide window: on a phone the form is a card on the picture.
+  const wide = useWide();
+  const docked = showMap || (updatedStyle && onProcess && wide);
+  const [panelWidth, setPanelWidth] = useState(PANEL_START);
 
   // While the relay offer is open, everything else is inert: no keyboard or
   // pointer can reach Connect or the jobs behind the question (review W22).
@@ -559,7 +579,17 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
                     {configWarning}
                   </p>
                 )}
-                <div className={showMap ? "layout" : "layout layout-single"} inert={behind}>
+                <div
+                  className={docked ? "layout" : "layout layout-single"}
+                  data-docked-without-map={docked && !showMap ? true : undefined}
+                  inert={behind}
+                  // STYLE TRIAL (#36): the form's width, as the visitor set it.
+                  style={
+                    updatedStyle && onProcess
+                      ? ({ "--panel-width": `${String(panelWidth)}px` } as CSSProperties)
+                      : undefined
+                  }
+                >
                   <main
                     id="content"
                     tabIndex={-1}
@@ -572,7 +602,7 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
                     )}
                     {screen}
                     {/* The credit for the picture behind the page without a map (backdrop.css). */}
-                    {!showMap && (
+                    {!docked && (
                       <p className="backdrop-credit">
                         Imagery: NASA Blue Marble and Blue Marble clouds · NASA Earth at Night 2012
                       </p>
@@ -618,6 +648,17 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
                         }
                       />
                     </MapBoundary>
+                  )}
+                  {docked && !showMap && (
+                    // STYLE TRIAL (#36): the picture where the map would be.
+                    <aside className="backdrop-pane" aria-label="Picture of Europe">
+                      <p className="backdrop-credit">
+                        Imagery: NASA Blue Marble and Blue Marble clouds · NASA Earth at Night 2012
+                      </p>
+                    </aside>
+                  )}
+                  {updatedStyle && onProcess && wide && (
+                    <PanelHandle width={panelWidth} onWidth={setPanelWidth} />
                   )}
                 </div>
                 {/* What an open panel covers: a press on it closes the panel (#35).

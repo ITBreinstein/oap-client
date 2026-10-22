@@ -33,7 +33,9 @@
  * `StatusChanged`; `JobsPanel` `JobFacts`; #30); a result that is one plain
  * value is shown large, and the status line says "Finished" and how long it
  * took (`ResultsView`, `results/plain-value.ts`, `ProcessScreen` `ResultStrip`;
- * #27); the map is OpenFreeMap's world, in the
+ * #27); a process keeps its form docked at the left, map or not, and its
+ * width can be changed (`App.tsx` `docked`, `app/PanelHandle.tsx`,
+ * `app/panel-width.ts`; #36); the map is OpenFreeMap's world, in the
  * theme's colours (`App.tsx` `basemap`, `createWorldMap` in `map/MapView.tsx`),
  * and About credits it (`AboutPanel.tsx`); "Change service" comes first in
  * the process list, for the top right corner (`ProcessListScreen.tsx`); JSON is laid out with tabs
@@ -916,4 +918,93 @@
   line-height: 1.25;
   color: var(--text-strong);
   overflow-wrap: anywhere;
+}
+
+/* ------------------------------------------------- the form, docked, any width */
+
+/*
+ * A process keeps its form docked at the left whether or not it has a map
+ * (#36; App.tsx `docked`): without one, the picture is where the map would be,
+ * as behind the other pages, with its credit in the corner. On a phone, the
+ * form alone.
+ */
+[data-variant="updated"] .layout {
+  position: relative;
+}
+
+[data-variant="updated"] .backdrop-pane {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 12px;
+  background-size: cover;
+  background-position: 43.4% 62.7%;
+}
+
+[data-variant="updated"][data-theme="light"] .backdrop-pane {
+  background-image:
+    linear-gradient(var(--backdrop-scrim), var(--backdrop-scrim)),
+    url("../assets/backdrop/europe-day.webp");
+}
+
+[data-variant="updated"][data-theme="dark"] .backdrop-pane {
+  background-image:
+    linear-gradient(var(--backdrop-scrim), var(--backdrop-scrim)),
+    url("../assets/backdrop/europe-night.webp");
+}
+
+[data-variant="updated"] .backdrop-pane > .backdrop-credit {
+  margin: 0;
+  padding: 2px 6px;
+  font-size: 0.625rem;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--surface) 85%, transparent);
+}
+
+/*
+ * The edge between the form and the map, to drag or move with the arrow keys
+ * (#36; PanelHandle.tsx): 400 to 640px. A thin line, a wider target.
+ */
+[data-variant="updated"] .panel-handle-region {
+  position: absolute;
+  z-index: 4;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--panel-width) - 5px);
+  width: 10px;
+}
+
+[data-variant="updated"] .panel-handle {
+  position: absolute;
+  inset: 0;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+[data-variant="updated"] .panel-handle::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 4px;
+  width: 2px;
+  background: transparent;
+}
+
+[data-variant="updated"] .panel-handle:hover::after,
+[data-variant="updated"] .panel-handle:focus-visible::after {
+  background: var(--focus);
+}
+
+[data-variant="updated"] .panel-handle:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+@media (max-width: 52rem) {
+  [data-variant="updated"] .backdrop-pane,
+  [data-variant="updated"] .panel-handle-region {
+    display: none;
+  }
 }
