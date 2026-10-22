@@ -68,6 +68,11 @@ export function EndpointScreen(props: EndpointScreenProps) {
   const [choice, setChoice] = useState<string | undefined>();
   const [address, setAddress] = useState(linked?.service ?? "");
   const [addressError, setAddressError] = useState<string | undefined>();
+  // The last connection error put aside (#1): by typing another address,
+  // choosing another service, or pressing Connect again. A new error is a
+  // new object, and shows.
+  const [dismissed, setDismissed] = useState<WorkflowError | undefined>();
+  const shownError = error === dismissed ? undefined : error;
   // STYLE TRIAL: the updated Instrument fills in the address of a service picked from the list.
   const updated = useUpdated();
   const keys = [...configured.map((entry) => entry.key), ...presets.map((_, i) => presetKey(i))];
@@ -103,6 +108,7 @@ export function EndpointScreen(props: EndpointScreenProps) {
   const onSubmit = (event: SyntheticEvent) => {
     event.preventDefault();
     setAddressError(undefined);
+    setDismissed(error);
     if (selectedEntry !== undefined) {
       onConnect({ source: "configured", ...selectedEntry });
       return;
@@ -142,6 +148,7 @@ export function EndpointScreen(props: EndpointScreenProps) {
       onChange={(event) => {
         setAddress(event.target.value);
         setChoice(TYPED);
+        setDismissed(error);
       }}
     />
   );
@@ -192,6 +199,13 @@ export function EndpointScreen(props: EndpointScreenProps) {
                 {addressError}
               </p>
             )}
+            {/* Under the field it is about, not under the list (#1). */}
+            {connecting !== undefined && (
+              <p role="status" className="status">
+                Connecting to {connecting.baseUrl}…
+              </p>
+            )}
+            <ErrorMessage error={shownError} />
           </div>
 
           {hasChoices && (
@@ -212,6 +226,7 @@ export function EndpointScreen(props: EndpointScreenProps) {
                     checked={selected === entry.key}
                     onChange={() => {
                       setChoice(entry.key);
+                      setDismissed(error);
                       if (updated) setAddress(entry.baseUrl);
                     }}
                   />{" "}
@@ -236,6 +251,7 @@ export function EndpointScreen(props: EndpointScreenProps) {
                     checked={selected === presetKey(index)}
                     onChange={() => {
                       setChoice(presetKey(index));
+                      setDismissed(error);
                       if (updated) setAddress(preset.url);
                     }}
                   />{" "}
@@ -256,6 +272,7 @@ export function EndpointScreen(props: EndpointScreenProps) {
                   checked={selected === TYPED}
                   onChange={() => {
                     setChoice(TYPED);
+                    setDismissed(error);
                   }}
                 />{" "}
                 <span className="choice-body">
@@ -268,13 +285,6 @@ export function EndpointScreen(props: EndpointScreenProps) {
 
           {configuredError !== undefined && <p className="notice">{configuredError}</p>}
         </form>
-
-        {connecting !== undefined && (
-          <p role="status" className="status">
-            Connecting to {connecting.baseUrl}…
-          </p>
-        )}
-        <ErrorMessage error={error} />
       </div>
 
       {props.examples}
