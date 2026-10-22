@@ -25,7 +25,7 @@
  * job's id (`ProcessScreen`, `JobStatusLine`), all through `useSpared`
  * (`app/developer.ts`), and My jobs names a job's process and service by
  * their titles (`app/titles.ts`, `App.tsx` `jobNames`, `JobsPanel` `names`;
- * #43); the map is OpenFreeMap's world, in the
+ * #43); the relay question asks in a visitor's words (`RelayRoute.tsx`, #5); the map is OpenFreeMap's world, in the
  * theme's colours (`App.tsx` `basemap`, `createWorldMap` in `map/MapView.tsx`),
  * and About credits it (`AboutPanel.tsx`); "Change service" comes first in
  * the process list, for the top right corner (`ProcessListScreen.tsx`); JSON is laid out with tabs
