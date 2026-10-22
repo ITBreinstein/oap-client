@@ -105,7 +105,9 @@ test.describe("outputs given by reference", () => {
     await requireService(`${NOCORS}/?f=json`, "pygeoapi :5081");
     const toNocors: string[] = [];
     page.on("request", (request) => {
-      if (request.url().startsWith(`${NOCORS}/`)) toNocors.push(request.url());
+      if (request.url().startsWith(`${NOCORS}/`)) {
+        toNocors.push(`${request.resourceType()} ${request.url()}`);
+      }
     });
 
     await connectTyped(page, CORS);
@@ -127,7 +129,12 @@ test.describe("outputs given by reference", () => {
     const link = file.getByRole("link", { name: "Open the link" });
     await expect(link).toHaveAttribute("href", `${NOCORS}/static/img/logo.png`);
     await expect(link).toHaveAttribute("rel", "noopener noreferrer");
-    expect(toNocors).toEqual([`${NOCORS}/static/img/logo.png`]);
+    // Read once, and refused; then shown as an image, which a browser loads
+    // from anywhere (#28).
+    await expect(file.getByRole("img", { name: "The image result “file”" })).toBeVisible();
+    await expect
+      .poll(() => toNocors)
+      .toEqual([`fetch ${NOCORS}/static/img/logo.png`, `image ${NOCORS}/static/img/logo.png`]);
 
     const records = await exportedResults(page);
     expect(records).toHaveLength(2);
@@ -143,6 +150,7 @@ test.describe("outputs given by reference", () => {
       runId: records[0]?.["runId"],
       referenceRoute: "direct",
       referenceOutcome: "cors-blocked",
+      shownAsImage: true,
     });
     expect(JSON.stringify(records)).not.toContain("logo.png");
   });

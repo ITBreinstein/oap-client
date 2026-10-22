@@ -317,14 +317,59 @@ function LoadedOk({ loaded, host }: { readonly loaded: LoadedReference; readonly
   }
 }
 
-function LoadedLine({ loaded, href }: { readonly loaded: LoadedReference; readonly href: string }) {
+/**
+ * An image given by reference, shown as the browser shows any image (#28):
+ * from its host directly, never read by this page. What it can't show is
+ * said, with the way on: the link.
+ */
+function LinkedImage({ href, outputId }: { readonly href: string; readonly outputId: string }) {
+  const [failed, setFailed] = useState(false);
+  return failed ? (
+    <p className="notice">
+      The browser could not show it as an image. Open the link to see it in a new tab.
+    </p>
+  ) : (
+    <img
+      className="result-image"
+      src={href}
+      alt={`The image result “${outputId}”`}
+      referrerPolicy="no-referrer"
+      onError={() => {
+        setFailed(true);
+      }}
+    />
+  );
+}
+
+function LoadedLine({
+  loaded,
+  href,
+  outputId,
+}: {
+  readonly loaded: LoadedReference;
+  readonly href: string;
+  readonly outputId: string;
+}) {
   const host = hostOf(href) ?? "the server";
   const spared = useSpared(useUpdated());
   switch (loaded.outcome) {
     case "ok":
       return <LoadedOk loaded={loaded} host={host} />;
     case "cors-blocked":
-      return (
+      // An image is shown all the same (#28): a browser shows an image from
+      // anywhere, though the page itself may not read it.
+      return loaded.image === true ? (
+        <>
+          {!spared && (
+            <p className="notice">
+              This page could not read it: {host} sends no CORS headers for it, or could not be
+              reached. The browser shows it below as an image all the same. The attempt has been
+              recorded.
+            </p>
+          )}
+          <LinkedImage href={href} outputId={outputId} />
+        </>
+      ) : (
         <p className="notice">
           This page could not read it: {host} sends no CORS headers for it, or could not be reached.
           Open the link to see it in a new tab.
@@ -361,7 +406,9 @@ function LoadedLine({ loaded, href }: { readonly loaded: LoadedReference; readon
         <p className="notice">Not an http or https address, so it is not fetched or opened.</p>
       );
     case "failed":
-      return (
+      return loaded.image === true ? (
+        <LinkedImage href={href} outputId={outputId} />
+      ) : (
         <p className="notice">
           It could not be read{loaded.detail === undefined ? "" : ` (${loaded.detail})`}.
         </p>
@@ -419,7 +466,9 @@ function ReferenceItem({
         </p>
       )}
       <div role="status" aria-live="polite">
-        {loaded !== undefined && <LoadedLine loaded={loaded} href={result.href} />}
+        {loaded !== undefined && (
+          <LoadedLine loaded={loaded} href={result.href} outputId={result.outputId} />
+        )}
       </div>
       {plot === "plotted" && <p className="muted">GeoJSON: shown on the map in blue.</p>}
       {plot === "plotted" && loaded?.axes === "swapped" && (

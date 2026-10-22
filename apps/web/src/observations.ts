@@ -155,6 +155,12 @@ export interface ResultObservation {
   /** The header's URI, when one was sent. */
   readonly contentCrs: string | undefined;
   readonly axisSwapped: boolean | undefined;
+  /**
+   * Second record (#28): the href, an image this page could not read, was
+   * shown with an `<img>` instead, which a browser loads from anywhere.
+   * What the page could read of it is `referenceOutcome`, as ever.
+   */
+  readonly shownAsImage?: true | undefined;
 }
 
 /**
@@ -247,6 +253,9 @@ export function loadedObservation(
     truncated: loaded.page === undefined ? undefined : isTruncated(loaded.page),
     contentCrs: loaded.contentCrs,
     axisSwapped: loaded.axes === undefined ? undefined : loaded.axes === "swapped",
+    ...(loaded.image === true && (loaded.outcome === "cors-blocked" || loaded.outcome === "failed")
+      ? { shownAsImage: true }
+      : {}),
   };
 }
 
