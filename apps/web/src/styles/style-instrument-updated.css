@@ -650,8 +650,9 @@
   margin: -6px 0 0 12px;
 }
 
-/* "Inputs you sent": a panel of its own, edged like a field. */
+/* "Inputs you sent": a panel of its own, edged like a field, with room below it. */
 [data-variant="updated"] .sent-inputs {
+  margin-bottom: 24px;
   background: var(--surface-hover);
   border-color: var(--field-border);
 }
