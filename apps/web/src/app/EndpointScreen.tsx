@@ -24,6 +24,7 @@ import { useUpdated } from "./variant.js";
 import { typedEndpoint } from "./run.js";
 import type { EndpointRef, WorkflowError } from "./workflow.js";
 import { ErrorMessage } from "./ErrorMessage.js";
+import { endpointName, presetsMerged } from "./service-list.js";
 
 const TYPED = "typed";
 const presetKey = (index: number): string => `preset:${String(index)}`;
@@ -43,6 +44,8 @@ export interface EndpointScreenProps {
   readonly linked?: Place | undefined;
   /** The endpoint `error` is about. */
   readonly failed?: EndpointRef | undefined;
+  /** A service's title, when this visit has read its landing page (#3). */
+  readonly titleOf?: ((baseUrl: string) => string | undefined) | undefined;
 }
 
 /** The four stages of the workflow, in the words a first-time visitor needs. */
@@ -91,7 +94,26 @@ export function EndpointScreen(props: EndpointScreenProps) {
       : undefined;
   // STYLE TRIAL: the updated Instrument fills in the address of a service picked from the list.
   const updated = useUpdated();
-  const keys = [...configured.map((entry) => entry.key), ...presets.map((_, i) => presetKey(i))];
+  // STYLE TRIAL (#3): in the updated Instrument a preset and a relay endpoint
+  // of the same address are one row, the relay's; each endpoint is named in
+  // words (`service-list.ts`).
+  const merged = updated ? presetsMerged(presets, configured) : new Map<number, string>();
+  const listedPresets = presets
+    .map((preset, index) => ({ preset, index }))
+    .filter(({ index }) => !merged.has(index));
+  const nameOf = (entry: RelayEndpoint): string => {
+    if (!updated) return entry.key;
+    const preset = [...merged].find(([, key]) => key === entry.key)?.[0];
+    return endpointName(
+      entry,
+      props.titleOf?.(entry.baseUrl),
+      preset === undefined ? undefined : presets[preset]?.title,
+    );
+  };
+  const keys = [
+    ...configured.map((entry) => entry.key),
+    ...listedPresets.map(({ index }) => presetKey(index)),
+  ];
   const hasChoices = keys.length > 0;
   // A linked service is picked for the user: its entry when it is a listed
   // one, else the address it fills in.
@@ -115,7 +137,7 @@ export function EndpointScreen(props: EndpointScreenProps) {
   const selectedEntry = configured.find((entry) => entry.key === selected);
   const selectedPreset = presets.find((_, index) => presetKey(index) === selected);
   const target =
-    selectedEntry?.key ??
+    (selectedEntry === undefined ? undefined : nameOf(selectedEntry)) ??
     selectedPreset?.title ??
     // Only an address that is one: a half-typed word is not where Connect goes.
     (typedEndpoint(address) === undefined ? "the address you type" : address.trim());
@@ -208,7 +230,10 @@ export function EndpointScreen(props: EndpointScreenProps) {
               {connectButton}
             </div>
             <p id={`${base}-address-help`} className="help">
-              Its landing page, often ending in <code>/ogcapi</code>. Always reached directly.
+              Its landing page, often ending in <code>/ogcapi</code>.
+              {/* STYLE TRIAL (#3): the updated Instrument says so of a typed address only. */}
+              {(!updated || (selected === TYPED && address.trim() !== "")) &&
+                " Always reached directly."}
             </p>
             {addressError !== undefined && (
               <p id={`${base}-address-error`} className="field-error" role="alert">
@@ -267,7 +292,7 @@ export function EndpointScreen(props: EndpointScreenProps) {
                     }}
                   />{" "}
                   <span className="choice-body">
-                    <strong className="choice-title">{entry.key}</strong>{" "}
+                    <strong className="choice-title">{nameOf(entry)}</strong>{" "}
                     <span className="choice-url">{entry.baseUrl}</span>
                     <span className="choice-access" data-route={entry.executeRoute}>
                       {entry.executeRoute === "relay" ? "relay" : "direct"}
@@ -278,7 +303,7 @@ export function EndpointScreen(props: EndpointScreenProps) {
                   </span>
                 </label>
               ))}
-              {presets.map((preset, index) => (
+              {listedPresets.map(({ preset, index }) => (
                 <label key={presetKey(index)} className="choice choice-card">
                   <input
                     type="radio"

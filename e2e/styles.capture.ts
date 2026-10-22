@@ -114,7 +114,7 @@ test.describe("styles", () => {
         localStorage.clear();
       });
       await page.reload();
-      await page.getByRole("radio", { name: /pygeoapi-cors/ }).waitFor();
+      await page.getByRole("radio", { name: /^pygeoapi[- ]cors /i }).waitFor();
       await shot(page, `${tag}-1-start`);
 
       await page.getByRole("button", { name: /Browse all/ }).click();
@@ -123,7 +123,7 @@ test.describe("styles", () => {
       // Out of sight once its slide is over: until then its buttons are on screen.
       await expect(page.getByRole("dialog", { name: "Examples" })).toBeHidden();
 
-      await page.getByRole("radio", { name: /pygeoapi-cors/ }).check();
+      await page.getByRole("radio", { name: /^pygeoapi[- ]cors /i }).check();
       await page.getByRole("button", { name: "Connect", exact: true }).click();
       await page.getByRole("button", { name: "Hello World", exact: true }).waitFor();
       await shot(page, `${tag}-3-list`);

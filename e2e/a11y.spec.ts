@@ -130,7 +130,7 @@ for (const style of ["instrument", "instrument-updated"] as const) {
 
       // The relay question: an endpoint the relay may read, which the page
       // can't read directly.
-      await page.getByRole("radio", { name: /^pygeoapi-nocors-relay / }).check();
+      await page.getByRole("radio", { name: /^pygeoapi[- ]nocors[- ]relay /i }).check();
       await page.getByRole("button", { name: "Connect", exact: true }).click();
       await expect(page.getByTestId("relay-confirm")).toBeVisible({ timeout: 20_000 });
       await noViolations(page, "the relay question");

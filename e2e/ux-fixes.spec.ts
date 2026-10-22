@@ -410,7 +410,7 @@ for (const style of STYLES) {
 test("#35 My jobs stays open while a followed job finishes", async ({ page }) => {
   await requireService(`${RELAY}/healthz`, "the relay");
   await open(page, "instrument-updated");
-  await page.getByRole("radio", { name: /^pygeoapi-cors / }).check();
+  await page.getByRole("radio", { name: /^pygeoapi[- ]cors /i }).check();
   await page.getByRole("button", { name: "Connect", exact: true }).click();
   await openProcess(page, "Slow process");
   await field(page, "Seconds (optional)").fill("3");

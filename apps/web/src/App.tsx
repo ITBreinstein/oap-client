@@ -334,6 +334,7 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
           connecting={state.connecting}
           error={state.error}
           failed={state.failed}
+          titleOf={(baseUrl) => titles.services.get(baseUrl.replace(/\/+$/, ""))}
           staticOnly={relayUrl === undefined}
           onConnect={address.connect}
           linked={address.linked}

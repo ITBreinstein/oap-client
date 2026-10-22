@@ -262,7 +262,7 @@ for (const { style, updated } of VERSIONS) {
       }),
     );
     await page.goto(`/?style=${style}&theme=light`);
-    await page.getByRole("radio", { name: /pygeoapi-cors/ }).check();
+    await page.getByRole("radio", { name: /^pygeoapi[- ]cors /i }).check();
     await page.getByRole("button", { name: "Connect", exact: true }).click();
     await page.getByRole("button", { name: "Slow process", exact: true }).click();
     await page.getByRole("textbox", { name: "Seconds (optional)" }).fill("1");
@@ -551,7 +551,7 @@ for (const { style, updated } of VERSIONS) {
       route.fulfill({ contentType: "application/json", body: JSON.stringify(config) }),
     );
     await page.goto(`/?style=${style}&theme=light`);
-    await page.getByRole("radio", { name: /pygeoapi-cors/ }).check();
+    await page.getByRole("radio", { name: /^pygeoapi[- ]cors /i }).check();
     await page.getByRole("button", { name: "Connect", exact: true }).click();
     await page.getByRole("button", { name: "Slow process", exact: true }).click();
     await page.getByRole("textbox", { name: "Seconds (optional)" }).fill("3");
