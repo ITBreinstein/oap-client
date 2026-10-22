@@ -499,13 +499,9 @@ export function ProcessScreen(props: ProcessScreenProps) {
     (state.stage === "result" && state.watched === true);
   // The server's answer to the last Run: beside the Run button in the updated
   // Instrument, below the form in Instrument as it is.
+  // An input the service's words name is in the headline, by its label (#23).
   const serverError = state.stage === "process" && (
-    <>
-      <ErrorMessage error={state.error} tone={state.error?.notice === true ? "notice" : "error"} />
-      {state.error?.inputId !== undefined && (
-        <p className="hint">The server’s message names the input “{state.error.inputId}”.</p>
-      )}
-    </>
+    <ErrorMessage error={state.error} tone={state.error?.notice === true ? "notice" : "error"} />
   );
 
   return (

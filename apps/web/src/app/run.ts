@@ -11,7 +11,7 @@ import {
   type ProcessDescription,
 } from "@breinstein/oap-client";
 import { toExecuteBody, type EncodeNote, type FormValues } from "../forms/encode.js";
-import type { FormPlan } from "../forms/plan.js";
+import type { FieldPlan, FormPlan } from "../forms/plan.js";
 import type { EndpointRef, WorkflowError } from "./workflow.js";
 import type { RelayEndpoint } from "../relay/contract.js";
 import { relayRateLimitIn } from "../relay/relay-fetch.js";
@@ -133,6 +133,34 @@ export function rateLimitMessage(cause: unknown): WorkflowError | undefined {
 }
 
 /**
+ * The input a service's words name, when they name one of the form's by its
+ * id, quoted or in angle brackets: `"area"`, `'area'`, `` `area` ``, `<area>`.
+ */
+export function namedInput(words: string | undefined, plan: FormPlan): FieldPlan | undefined {
+  if (words === undefined) return undefined;
+  return plan.fields.find((field) => new RegExp(`["'\`<]${escape(field.id)}["'\`>]`).test(words));
+}
+
+/**
+ * What the form says when the service reported an error (#23): that it did,
+ * and to check an input only when the service's own words name one, by the
+ * label the form shows it under. Nothing else: a process that fails while
+ * running is answered with a 400 too (pygeoapi), and is no fault of the
+ * inputs.
+ */
+export function serviceErrorTitle(inputLabel: string | undefined): string {
+  return inputLabel === undefined
+    ? "The service reported an error."
+    : `The service reported an error. Check the input “${inputLabel}” and run again.`;
+}
+
+/** The service's error, its own words as the detail, and the input they name. */
+export function serviceError(words: string | undefined, plan: FormPlan): WorkflowError {
+  const named = namedInput(words, plan);
+  return { title: serviceErrorTitle(named?.title), detail: words, inputId: named?.id };
+}
+
+/**
  * A server's refusal, as the form shows it (T5): its own `detail`, and the
  * input it names when its words name one we know. The relay's rate limit
  * first: then the server never saw the request.
@@ -149,15 +177,7 @@ export function runError(cause: unknown, plan: FormPlan): WorkflowError {
       (typeof description === "string" ? description : undefined) ??
       problem?.title ??
       cause.bodyPreview;
-    const named = plan.fields.find(
-      (field) =>
-        detail !== undefined && new RegExp(`["'\`<]${escape(field.id)}["'\`>]`).test(detail),
-    );
-    return {
-      title: `The server refused the request (HTTP ${String(cause.status)}). Check the inputs and run again.`,
-      detail,
-      inputId: named?.id,
-    };
+    return serviceError(detail, plan);
   }
   if (cause instanceof BodyTooLargeError) {
     // The run finished; its answer is more than this page reads. Not "did not

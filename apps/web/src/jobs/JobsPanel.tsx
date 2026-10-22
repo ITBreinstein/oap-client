@@ -19,6 +19,7 @@
 import { resolveResultsUrl } from "@breinstein/oap-client";
 import { useId, useState } from "react";
 import type { DismissAdvertisedBy, JobRow } from "../relay/job-session.js";
+import { withoutExceptionCode } from "./job-message.js";
 
 export interface JobsPanelProps {
   readonly jobs: readonly JobRow[];
@@ -106,7 +107,9 @@ function StatusText({ job }: { readonly job: JobRow }) {
         </span>
       )}
       {status.progress !== undefined && `, ${String(status.progress)}%`}
-      {status.message !== undefined && <span className="muted"> — {status.message}</span>}
+      {status.message !== undefined && (
+        <span className="muted"> — {withoutExceptionCode(status.message)}</span>
+      )}
       {job.lastError !== undefined && (
         <span className="muted"> (last read failed: {job.lastError})</span>
       )}
@@ -163,7 +166,7 @@ function JobFacts({
         {status?.message !== undefined && (
           <div>
             <dt>Message</dt>
-            <dd>{status.message}</dd>
+            <dd>{withoutExceptionCode(status.message)}</dd>
           </div>
         )}
         {job.gone && (

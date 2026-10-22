@@ -60,6 +60,7 @@ import {
   relayEndpointFor,
   runError,
   runRequest,
+  serviceError,
 } from "./run.js";
 import {
   exampleLanding,
@@ -724,13 +725,10 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
       dispatch({
         type: "run-failed",
         runId,
-        error: {
-          title:
-            status.status === "dismissed"
-              ? "The job was cancelled."
-              : "The job failed on the server. Check the inputs and run again.",
-          detail: status.message,
-        },
+        error:
+          status.status === "dismissed"
+            ? { title: "The job was cancelled.", detail: status.message }
+            : serviceError(status.message, state.plan),
       });
       return;
     }

@@ -106,7 +106,7 @@ test.describe("the coverage processes", () => {
       timeout: 15_000,
     });
     const alert = page.getByRole("alert");
-    await expect(alert).toContainText("The job failed on the server.", { timeout: 30_000 });
+    await expect(alert).toContainText("The service reported an error.", { timeout: 30_000 });
     await expect(alert).toContainText("Out of coffee");
   });
 
