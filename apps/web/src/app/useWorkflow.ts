@@ -298,6 +298,12 @@ function formObservationsOf(
   ];
 }
 
+/** What the screen says of a job this page cancelled. */
+const CANCELLED: WorkflowError = {
+  title: "Job cancelled. The server has dismissed it.",
+  notice: true,
+};
+
 /** The jobs this browser had cancelled, and when, by status URL. */
 function cancelledOf(jobs: readonly JobRow[] | undefined): ReadonlyMap<string, string> {
   const cancelled = new Map<string, string>();
@@ -345,6 +351,12 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
    * rather than "gone". Kept with the job, so it says so after a reload too
    * (#14e).
    */
+  /**
+   * The jobs whose cancel this page has sent and not yet heard back on: the
+   * server may already say it has no such job, and that is the cancel, not
+   * news of a job lost.
+   */
+  const cancelling = useRef(new Set<string>());
   const markCancelled = (statusUrl: string) => {
     session.current?.markCancelled(statusUrl, new Date().toISOString());
   };
@@ -845,7 +857,10 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
       dispatch({
         type: "run-failed",
         runId,
-        error: { title: "The server no longer has this job: it was cancelled or has expired." },
+        // Cancelled from here, and gone before the cancel's own answer came.
+        error: cancelling.current.has(jobRef)
+          ? CANCELLED
+          : { title: "The server no longer has this job: it was cancelled or has expired." },
       });
       return;
     }
@@ -991,6 +1006,7 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
       advertisedBy,
     };
     setJobNotice("Cancelling the job…");
+    cancelling.current.add(jobRef);
     void (async () => {
       try {
         const dismissal = await connection.client.dismissJob(jobRef);
@@ -999,11 +1015,7 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
           active.record(endpointUrl, { ...base, outcome: "dismissed" });
           setJobNotice(undefined);
           markCancelled(jobRef);
-          dispatch({
-            type: "run-failed",
-            runId,
-            error: { title: "Job cancelled. The server has dismissed it.", notice: true },
-          });
+          dispatch({ type: "run-failed", runId, error: CANCELLED });
         } else {
           active.record(endpointUrl, { ...base, outcome: "unsupported" });
           setJobNotice(
@@ -1015,6 +1027,8 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
         setJobNotice(
           `The job could not be cancelled: ${cause instanceof Error ? cause.message : String(cause)}. It may still be running.`,
         );
+      } finally {
+        cancelling.current.delete(jobRef);
       }
     })();
   };

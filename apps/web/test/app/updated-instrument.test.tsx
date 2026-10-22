@@ -128,6 +128,23 @@ describe("a job in My jobs, in the updated Instrument", () => {
     expect(facts[2]?.[1]).toBe("100%");
     expect(facts[3]?.[1]).toBe("Job complete");
   });
+
+  it("calls a job the server no longer has cancelled, not gone", () => {
+    const view = render(
+      <JobsPanel
+        jobs={[{ ...job, gone: true, status: undefined }]}
+        activeJob={undefined}
+        dismissAdvertisedFor={() => "nothing"}
+        messages={new Map()}
+        onRemove={vi.fn()}
+        onDismiss={vi.fn()}
+        structured
+      />,
+    );
+    expect(view.querySelector(".job-badge")?.textContent).toBe("cancelled");
+    expect(view.textContent).not.toContain("gone");
+    expect(view.textContent).toContain("No longer there: cancelled, or expired.");
+  });
 });
 
 describe("Run again in My jobs, in the updated Instrument", () => {

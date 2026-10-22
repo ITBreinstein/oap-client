@@ -175,7 +175,9 @@ function JobFacts({
             <strong data-job-status="cancelled-by-you">cancelled by you</strong>
           ) : (
             <strong data-job-status={status?.status}>
-              {job.gone ? "gone" : (status?.rawStatus ?? "checking…")}
+              {/* A job leaves the server when it is cancelled, as a rule: said
+                  so, rather than "gone". The line below gives the other way. */}
+              {job.gone ? "cancelled" : (status?.rawStatus ?? "checking…")}
             </strong>
           )}
           {/* STYLE TRIAL (#30): for developers; the job is done. */}
@@ -220,7 +222,7 @@ function JobFacts({
         {job.gone && !cancelled && (
           <div>
             <dt>Server</dt>
-            <dd>No longer there: dismissed, or expired.</dd>
+            <dd>No longer there: cancelled, or expired.</dd>
           </div>
         )}
         {job.lastError !== undefined && (
