@@ -1405,3 +1405,61 @@ test("the updated Instrument's map is the light one in the dark theme too", asyn
   expect(styles).not.toContain("/styles/dark");
   expect(styles).not.toContain("/styles/liberty");
 });
+
+for (const style of STYLES) {
+  test(`a long list of properties keeps Close in view, clear of Show the result (${style})`, async ({
+    page,
+  }) => {
+    const properties = Object.fromEntries(
+      Array.from({ length: 20 }, (_, index) => [
+        `property_${String(index)}`,
+        `value ${String(index)}`,
+      ]),
+    );
+    const plot = {
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          properties,
+          geometry: {
+            type: "Polygon",
+            coordinates: [
+              [
+                [5.38, 52.16],
+                [5.39, 52.16],
+                [5.39, 52.165],
+                [5.38, 52.16],
+              ],
+            ],
+          },
+        },
+      ],
+    };
+    await page.setViewportSize({ width: 1440, height: 800 });
+    await open(page, style);
+    await connectTyped(page);
+    await openProcess(page, "Area of each feature");
+    await page.getByRole("textbox", { name: "Value (JSON)" }).fill(JSON.stringify(plot));
+    await page.getByRole("button", { name: "Run", exact: true }).click();
+    await expect(page.getByTestId("feature-hint")).toBeVisible({ timeout: 15_000 });
+    const canvas = page.locator(".map-canvas canvas").first();
+    await page.waitForTimeout(800);
+    const area = await canvas.boundingBox();
+    if (area === null) throw new Error("the map has no size");
+    await page.mouse.click(area.x + area.width * 0.8, area.y + area.height * 0.75);
+    const panel = page.getByTestId("feature-properties");
+    await expect(panel.getByRole("button", { name: "Close" })).toBeInViewport({ ratio: 1 });
+    // Away from the result: its button and the panel side by side, not on each other.
+    await page.mouse.move(area.x + area.width * 0.6, area.y + area.height * 0.5);
+    await page.mouse.down();
+    await page.mouse.move(area.x + area.width * 0.95, area.y + area.height * 0.05, { steps: 8 });
+    await page.mouse.up();
+    const show = page.getByRole("button", { name: "Show the result" });
+    await expect(show).toBeVisible();
+    const [panelBox, showBox] = await Promise.all([panel.boundingBox(), show.boundingBox()]);
+    expect((panelBox?.y ?? 0) + (panelBox?.height ?? 0)).toBeLessThanOrEqual(showBox?.y ?? 0);
+    await panel.getByRole("button", { name: "Close" }).click();
+    await expect(panel).toHaveCount(0);
+  });
+}

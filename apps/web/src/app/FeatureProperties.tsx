@@ -86,14 +86,17 @@ export function FeatureProperties({
       data-testid="feature-properties"
       data-side={side}
     >
-      <h3 id={`${base}-heading`}>Feature properties</h3>
-      <p className="muted">From the result “{feature.outputId}”.</p>
-      <Properties origin={feature.origin} />
-      <p className="actions">
+      {/* Close in the head, which stays while the properties scroll: always in view. */}
+      <div className="feature-properties-head">
+        <h3 id={`${base}-heading`}>Feature properties</h3>
         <button type="button" className="secondary" onClick={onClose}>
           Close
         </button>
-      </p>
+      </div>
+      <div className="feature-properties-body">
+        <p className="muted">From the result “{feature.outputId}”.</p>
+        <Properties origin={feature.origin} />
+      </div>
     </section>
   );
 }

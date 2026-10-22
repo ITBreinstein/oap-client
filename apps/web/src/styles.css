@@ -218,7 +218,40 @@ legend,
   box-shadow: var(--shadow-popover);
 }
 
-.feature-properties h3 {
+/*
+ * A clicked shape's properties: a head with Close that stays, and what
+ * scrolls under it. Clear of what sits at the map's foot (the legend, the
+ * scale, "Show the result").
+ */
+.map-pane .feature-properties {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100% - 4rem - 6rem);
+  padding: 0;
+  overflow: hidden;
+}
+
+.feature-properties-head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.feature-properties-head h3 {
+  margin: 0;
+}
+
+.feature-properties-body {
+  min-height: 0;
+  padding: 0.5rem 0.75rem;
+  overflow: auto;
+}
+
+.feature-properties-body > :first-child {
   margin-top: 0;
 }
 
@@ -399,7 +432,7 @@ pre.code {
   top: 6.5rem;
   right: 0.75rem;
   left: auto;
-  max-height: calc(100% - 9rem);
+  max-height: calc(100% - 6.5rem - 6rem);
 }
 
 /*
