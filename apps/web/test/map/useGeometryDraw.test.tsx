@@ -130,6 +130,44 @@ describe("useGeometryDraw", () => {
     expect(engine.calls).toEqual(["show:1", "show:2", "show:0"]);
   });
 
+  it("starts placing the tool it is asked to start with, when nothing is drawn yet (#17)", () => {
+    const engine = fakeEngine();
+    render(
+      <Harness
+        props={props({ tools: ["Polygon", "Rectangle"], startWith: "Polygon" })}
+        engine={engine}
+      />,
+    );
+    expect(engine.calls).toEqual(["show:0", "place:Polygon"]);
+  });
+
+  it("does not start placing over a shape already there", () => {
+    const engine = fakeEngine();
+    render(
+      <Harness
+        props={props({
+          tools: ["Polygon", "Rectangle"],
+          startWith: "Polygon",
+          value: [
+            {
+              type: "Polygon",
+              coordinates: [
+                [
+                  [5, 52],
+                  [5.1, 52],
+                  [5.1, 52.1],
+                  [5, 52],
+                ],
+              ],
+            },
+          ],
+        })}
+        engine={engine}
+      />,
+    );
+    expect(engine.calls).toEqual(["show:1"]);
+  });
+
   it("removes the draw mode when drawing stops", () => {
     const engine = fakeEngine();
     render(<Harness props={props({})} engine={engine} />);

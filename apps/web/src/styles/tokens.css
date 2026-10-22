@@ -1,0 +1,197 @@
+/*
+ * Every colour, font, radius and shadow the page uses, by meaning (ADR 0002).
+ * `styles.css` and the `style-*.css` files read these names and never a
+ * colour of their own; the one exception is the map's own colours
+ * (`map/basemap.ts`) and the legend swatches that mirror them.
+ *
+ * Two kinds of block, kept apart so a theme can never change a shape:
+ *
+ * - a **shape** block, `[data-style="instrument"]`: fonts, label treatment,
+ *   radii. Never a colour.
+ * - a **colour** block per theme, `[data-style="instrument"][data-theme=…]`:
+ *   colours and shadows. Never a size.
+ *
+ * Contrast: text at least 4.5:1 and field borders at least 3:1 against what
+ * they sit on; `test/styles/tokens.test.ts` checks both for every block.
+ *
+ * `:root` carries the shape block and the light colours too, so the page has
+ * a complete set before `main.tsx` has written `data-style` and `data-theme`.
+ *
+ * Lines come in four weights: `--line` (hairlines inside a container),
+ * `--line-mid` (a middle rule), `--line-strong` (container edges) and
+ * `--line-label` (the thin box around a label). The `--backdrop-*` streets
+ * tokens are all the page colour: the start screen shows a picture of
+ * Europe instead (`backdrop.css`), under `--backdrop-scrim`, the page colour
+ * at 20%.
+ */
+
+/* ---------------------------------------------------------------- shapes */
+
+:root,
+[data-style="instrument"] {
+  --font-ui: "Manrope", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --font-heading: var(--font-ui);
+  --heading-weight: 800;
+  --heading-tracking: -0.03em;
+  --label-font: var(--font-mono);
+  --label-size: 0.6875rem;
+  --label-weight: 500;
+  --label-transform: uppercase;
+  --label-tracking: 0.08em;
+  --r-card: 6px;
+  --r-item: 6px;
+  --r-control: 4px;
+  --r-tag: 4px;
+}
+
+/* ------------------------------------------------------- Instrument colours */
+
+/*
+ * Breinstein's colours: midnight navy, and violet as the one main colour in
+ * both themes. Buttons are violet under white text. Violet as text on navy
+ * is too faint, so --accent-ink, a lighter violet at night and a deeper one
+ * by day, carries links, the rail's bar and selected edges. Yellow is focus
+ * and "running" at night. Orange and cyan, also Breinstein's, mark what the
+ * user gives (an area) and what comes back (a result).
+ */
+
+[data-style="instrument"][data-theme="dark"] {
+  --page: #040727;
+  --surface: #0b1036;
+  --surface-2: #0d1238;
+  --surface-hover: #151b47;
+  --field: #020419;
+  --rail: #020419;
+  --rail-hover: #151b47;
+  --text: #f4f4f4;
+  --text-strong: #f4f4f4;
+  --text-secondary: #d5d9e3;
+  --muted: #b4bfd0;
+  --ident: #94a3b8;
+  --label-color: #94a3b8;
+  --line: #1b2250;
+  --line-strong: #2b3363;
+  --line-mid: #2b3363;
+  --line-label: #2b3363;
+  --field-border: #646d9c;
+  --accent: #8b47dc;
+  --accent-hover: #7327ce;
+  --accent-text: #ffffff;
+  --accent-ink: #be98eb;
+  --selected-bg: rgb(139 71 220 / 22%);
+  --selected-text: #f4f4f4;
+  --selected-line: #be98eb;
+  --focus: #fce403;
+  --need-area-fg: #ff7600;
+  --need-area-bg: transparent;
+  --need-data-fg: #29d5d6;
+  --need-data-bg: transparent;
+  --need-values-fg: #d5d9e3;
+  --need-values-bg: transparent;
+  --result-fg: #29d5d6;
+  --result-surface: #08202e;
+  --result-line: #1a6f78;
+  --success: #60d937;
+  --success-surface: rgb(96 217 55 / 14%);
+  --warning: #fce403;
+  --error: #ff6b6e;
+  --error-surface: #3a0d14;
+  --notice-surface: #232531;
+  --notice-line: #6b6420;
+  --overlay: rgb(2 4 25 / 60%);
+  --shadow-card: none;
+  --shadow-panel: 24px 0 48px rgb(0 0 0 / 50%);
+  --shadow-popover: 0 16px 40px rgb(0 0 0 / 55%);
+  --backdrop-ground: #040727;
+  --backdrop-line-1: #040727;
+  --backdrop-line-2: #040727;
+  --backdrop-water: #040727;
+  --backdrop-park: #040727;
+  --backdrop-veil: transparent;
+  --backdrop-veil-list: transparent;
+  --backdrop-veil-sheet: transparent;
+  --backdrop-scrim: rgb(4 7 39 / 20%);
+}
+
+:root,
+[data-style="instrument"][data-theme="light"] {
+  --page: #f4f4f4;
+  --surface: #ffffff;
+  --surface-2: #ffffff;
+  --surface-hover: #eef0f5;
+  --field: #ffffff;
+  --rail: #e6e6e8;
+  --rail-hover: #eef0f5;
+  --text: #040727;
+  --text-strong: #040727;
+  --text-secondary: #1b2250;
+  --muted: #475569;
+  --ident: #55617a;
+  --label-color: #55617a;
+  --line: #dfe1e8;
+  --line-strong: #94a3b8;
+  --line-mid: #c3c8d4;
+  --line-label: #94a3b8;
+  --field-border: #7b8794;
+  --accent: #8b47dc;
+  --accent-hover: #7327ce;
+  --accent-text: #ffffff;
+  --accent-ink: #7327ce;
+  --selected-bg: rgb(139 71 220 / 10%);
+  --selected-text: #040727;
+  --selected-line: #7327ce;
+  --focus: #7327ce;
+  --need-area-fg: #c2410c;
+  --need-area-bg: transparent;
+  --need-data-fg: #0e7490;
+  --need-data-bg: transparent;
+  --need-values-fg: #475569;
+  --need-values-bg: transparent;
+  --result-fg: #0e7490;
+  --result-surface: #e6f7f7;
+  --result-line: #7fd3d4;
+  --success: #2f7d1a;
+  --success-surface: #eef8e9;
+  --warning: #92400e;
+  --error: #b91c1c;
+  --error-surface: #fdecec;
+  --notice-surface: #fdf8d8;
+  --notice-line: #e8d77a;
+  --overlay: rgb(4 7 39 / 45%);
+  --shadow-card: none;
+  --shadow-panel: 24px 0 48px rgb(4 7 39 / 12%);
+  --shadow-popover: 0 12px 32px rgb(4 7 39 / 16%);
+  --backdrop-ground: #f4f4f4;
+  --backdrop-line-1: #f4f4f4;
+  --backdrop-line-2: #f4f4f4;
+  --backdrop-water: #f4f4f4;
+  --backdrop-park: #f4f4f4;
+  --backdrop-veil: transparent;
+  --backdrop-veil-list: transparent;
+  --backdrop-veil-sheet: transparent;
+  --backdrop-scrim: rgb(244 244 244 / 20%);
+}
+
+/* ------------------------------------------------------------ both themes */
+
+/* Native controls follow the theme: scrollbars, date pickers, <select>. */
+[data-theme="light"] {
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+/*
+ * Before main.tsx has run, a dark system gets a dark page rather than a
+ * white flash. Only what shows before the first render: the page itself.
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    --page: #040727;
+    --text: #f4f4f4;
+  }
+}

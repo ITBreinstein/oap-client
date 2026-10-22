@@ -180,7 +180,7 @@ describe("loading a file into a complex input", () => {
     expect(status(container)).toBe("That file is not valid JSON, so the value was not changed.");
   });
 
-  it("makes a JSON object file the value", async () => {
+  it("makes a JSON object file the value, and keeps the file's name for the record", async () => {
     const onChange = vi.fn();
     const container = complexField(0, onChange);
     await pick(
@@ -191,6 +191,7 @@ describe("loading a file into a complex input", () => {
     expect(onChange).toHaveBeenCalledWith({
       format: 0,
       value: '{"type":"FeatureCollection","features":[]}',
+      file: "fc.json",
     });
     expect(status(container)).toBeUndefined();
   });
@@ -199,6 +200,10 @@ describe("loading a file into a complex input", () => {
     const onChange = vi.fn();
     const container = complexField(1, onChange);
     await pick(container, new File(["<gml:Polygon/>"], "shape.gml"), onChange);
-    expect(onChange).toHaveBeenCalledWith({ format: 1, value: "<gml:Polygon/>" });
+    expect(onChange).toHaveBeenCalledWith({
+      format: 1,
+      value: "<gml:Polygon/>",
+      file: "shape.gml",
+    });
   });
 });

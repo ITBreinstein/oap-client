@@ -96,6 +96,7 @@ describe("a large result reaching the map", () => {
         listener();
       },
       onResultClick: () => undefined,
+      select: () => undefined,
       stop: () => undefined,
     });
     const map = { fitBounds: () => undefined } as never;

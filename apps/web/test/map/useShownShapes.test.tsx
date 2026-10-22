@@ -8,12 +8,13 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { MapShape } from "../../src/map/geometry-engine.js";
 import type {
+  ClickPlace,
   CreateShapeLayers,
   ShapeLayers,
   ShownImage,
   ShownShapes,
 } from "../../src/map/shape-layers.js";
-import { useShownShapes } from "../../src/map/useShownShapes.js";
+import { INPUT_SETTLE_MS, useShownShapes } from "../../src/map/useShownShapes.js";
 
 interface FakeLayers extends ShapeLayers {
   readonly shown: (readonly ShownShapes[])[];
@@ -23,14 +24,17 @@ interface FakeLayers extends ShapeLayers {
   becomeReady(): void;
   /** What a click on result shape `index` would do. */
   click(index: number): void;
+  /** What was outlined, in order (#20). */
+  readonly selected: (number | undefined)[];
 }
 
 function fakeLayers(): FakeLayers {
   let ready: (() => void) | undefined;
-  let clicked: ((index: number) => void) | undefined;
+  let clicked: ((index: number, at: ClickPlace) => void) | undefined;
   const layers: FakeLayers = {
     shown: [],
     images: [],
+    selected: [],
     stopped: false,
     create: () => layers,
     show: (sets) => layers.shown.push(sets),
@@ -41,11 +45,14 @@ function fakeLayers(): FakeLayers {
     onResultClick: (listener) => {
       clicked = listener;
     },
+    select: (index) => {
+      layers.selected.push(index);
+    },
     stop: () => {
       layers.stopped = true;
     },
     becomeReady: () => ready?.(),
-    click: (index) => clicked?.(index),
+    click: (index) => clicked?.(index, { x: 10, width: 100 }),
   };
   return layers;
 }
@@ -81,7 +88,8 @@ function Harness(props: {
   sets: readonly ShownShapes[];
   image?: ShownImage;
   layers: FakeLayers;
-  onResultClick?: (index: number) => void;
+  onResultClick?: (index: number, at: ClickPlace) => void;
+  selected?: number;
 }) {
   const { resultShapes, resultImage } = useShownShapes(
     props.map as never,
@@ -89,6 +97,7 @@ function Harness(props: {
     props.image,
     props.layers.create,
     props.onResultClick,
+    props.selected,
   );
   return <span data-count={resultShapes} data-image={String(resultImage)} />;
 }
@@ -151,8 +160,16 @@ describe("useShownShapes", () => {
     render(<Harness map={map} sets={[]} layers={layers} onResultClick={second} />);
     layers.click(3);
     expect(first).not.toHaveBeenCalled();
-    expect(second).toHaveBeenCalledWith(3);
+    expect(second).toHaveBeenCalledWith(3, { x: 10, width: 100 });
     expect(layers.stopped).toBe(false);
+  });
+
+  it("outlines the selected result shape, and none when it is put down (#20)", () => {
+    const layers = fakeLayers();
+    const { map } = fakeMap();
+    render(<Harness map={map} sets={[]} layers={layers} selected={1} />);
+    render(<Harness map={map} sets={[]} layers={layers} />);
+    expect(layers.selected).toEqual([1, undefined]);
   });
 
   it("does nothing without a map, and takes the layers off when unmounted", () => {
@@ -191,5 +208,90 @@ describe("useShownShapes", () => {
 
     render(<Harness map={map} sets={[]} layers={layers} />);
     expect(layers.images.at(-1)).toBeUndefined();
+  });
+});
+
+describe("an input set from outside the map (#19)", () => {
+  /** A map showing west, south, east, north, that records where it was moved. */
+  function viewMap(view: [number, number, number, number]) {
+    const fitted: unknown[] = [];
+    return {
+      fitted,
+      map: {
+        fitBounds: (bounds: unknown) => fitted.push(bounds),
+        getBounds: () => ({
+          getWest: () => view[0],
+          getSouth: () => view[1],
+          getEast: () => view[2],
+          getNorth: () => view[3],
+        }),
+      },
+    };
+  }
+  const far: MapShape = { type: "Point", coordinates: [2.17, 41.39] };
+
+  it("moves the map to it once it has settled, not on every change", () => {
+    vi.useFakeTimers();
+    try {
+      const layers = fakeLayers();
+      const { map, fitted } = viewMap([4, 51, 6, 53]);
+      render(<Harness map={map} sets={[{ role: "input", shapes: [drawn] }]} layers={layers} />);
+      render(<Harness map={map} sets={[{ role: "input", shapes: [far] }]} layers={layers} />);
+      act(() => {
+        vi.advanceTimersByTime(INPUT_SETTLE_MS - 1);
+      });
+      expect(fitted).toEqual([]);
+      act(() => {
+        vi.advanceTimersByTime(1);
+      });
+      expect(fitted).toEqual([
+        [
+          [2.17, 41.39],
+          [2.17, 41.39],
+        ],
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("leaves the map where it is when the input is already in view", () => {
+    vi.useFakeTimers();
+    try {
+      const layers = fakeLayers();
+      const { map, fitted } = viewMap([4, 51, 6, 53]);
+      render(<Harness map={map} sets={[{ role: "input", shapes: [drawn] }]} layers={layers} />);
+      act(() => {
+        vi.advanceTimersByTime(INPUT_SETTLE_MS);
+      });
+      expect(fitted).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("leaves it to the result, once there is one", () => {
+    vi.useFakeTimers();
+    try {
+      const layers = fakeLayers();
+      const { map, fitted } = viewMap([4, 51, 6, 53]);
+      render(
+        <Harness
+          map={map}
+          sets={[
+            { role: "input", shapes: [far] },
+            { role: "result", shapes: [turned] },
+          ]}
+          layers={layers}
+        />,
+      );
+      const once = fitted.length;
+      act(() => {
+        vi.advanceTimersByTime(INPUT_SETTLE_MS);
+      });
+      expect(fitted).toHaveLength(once);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -29,6 +29,9 @@ export default defineConfig({
     // the local stack and saves the matrix's evidence, one export per
     // endpoint. See e2e/observations.capture.ts.
     { name: "capture", testMatch: /observations\.capture\.ts/, fullyParallel: false },
+    // `pnpm capture:styles`: not a test lane either. Screenshots of every
+    // style × theme for choosing one (ADR 0002); see e2e/styles.capture.ts.
+    { name: "styles", testMatch: /styles\.capture\.ts/ },
   ],
   webServer: [
     {

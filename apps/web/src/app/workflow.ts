@@ -60,6 +60,17 @@ export interface WorkflowError {
   readonly inputId?: string | undefined;
   /** Not a failure: something the user asked for, reported on the same line. */
   readonly notice?: true | undefined;
+  /**
+   * What a developer is told about it, in the Developer section: never in
+   * the visitor's words (#25).
+   */
+  readonly technical?: string | undefined;
+  /**
+   * A direct connection failed the way a missing CORS header fails (or the
+   * server is down: a browser can't tell, W34). The relay may read a
+   * configured endpoint of the same address (#4).
+   */
+  readonly corsOrUnreachable?: true | undefined;
 }
 
 interface Connected {
@@ -76,6 +87,10 @@ interface Connected {
   readonly route: "direct" | "relay";
   readonly service: ServiceDescription;
   readonly processes: ProcessList;
+  /** The process opened last on this connection: the list returns to it. */
+  readonly lastOpened?: string | undefined;
+  /** The processes run to a result on this connection, each once, in the order first run. */
+  readonly ran?: readonly string[] | undefined;
 }
 
 interface ProcessOpen extends Connected {
@@ -92,7 +107,15 @@ interface ProcessOpen extends Connected {
   readonly linkOutputs: readonly string[];
 }
 
-export type AsyncRun = { readonly mode: "async"; readonly jobRef?: string | undefined };
+export type AsyncRun = {
+  readonly mode: "async";
+  readonly jobRef?: string | undefined;
+  /**
+   * A job this page follows but did not start: opened from a link to it, or
+   * from My jobs. Its inputs are not known here.
+   */
+  readonly watched?: true | undefined;
+};
 export type Run = { readonly mode: "sync" } | AsyncRun;
 
 export type Workflow =
@@ -109,6 +132,10 @@ export type Workflow =
       readonly offer?:
         { readonly endpoint: EndpointRef; readonly error: WorkflowError } | undefined;
       readonly error?: WorkflowError | undefined;
+      /** The endpoint `error` is about. */
+      readonly failed?: EndpointRef | undefined;
+      /** An example was chosen: the process to open once connected. */
+      readonly openAfter?: string | undefined;
     }
   | (Connected & {
       readonly stage: "connected";
@@ -134,10 +161,14 @@ export type Workflow =
       readonly results: readonly RenderableResult[];
       /** The job the results came from, for an asynchronous run. */
       readonly jobRef?: string | undefined;
+      /** That job was followed, not started here: its inputs are not known. */
+      readonly watched?: true | undefined;
     });
 
 export type WorkflowAction =
   | { readonly type: "connect"; readonly endpoint: EndpointRef }
+  /** An example: connect to `endpoint`, then open `processId` there. */
+  | { readonly type: "open-example"; readonly endpoint: EndpointRef; readonly processId: string }
   | {
       readonly type: "connected";
       readonly endpoint: EndpointRef;
@@ -176,6 +207,8 @@ export type WorkflowAction =
     }
   | { readonly type: "back-to-list" }
   | { readonly type: "set-value"; readonly id: string; readonly value: unknown }
+  /** "Clear the form" (#10): every input back to what it started with. */
+  | { readonly type: "reset-form"; readonly values: FormValues }
   | { readonly type: "set-mode"; readonly mode: ExecutionMode }
   | {
       readonly type: "set-transmission";
@@ -184,6 +217,8 @@ export type WorkflowAction =
     }
   | { readonly type: "run-started"; readonly runId: string; readonly mode: ExecutionMode }
   | { readonly type: "job-started"; readonly runId: string; readonly jobRef: string }
+  /** Follow a job already on the server, from the open process. */
+  | { readonly type: "watch-job"; readonly runId: string; readonly jobRef: string }
   | {
       readonly type: "results";
       readonly runId: string;
@@ -197,6 +232,8 @@ export type WorkflowAction =
       readonly loaded: LoadedReference;
     }
   | { readonly type: "run-failed"; readonly runId: string; readonly error: WorkflowError }
+  /** A word about the form on screen, such as why it is empty (#33). */
+  | { readonly type: "form-notice"; readonly processId: string; readonly notice: string }
   | { readonly type: "edit" };
 
 export const INITIAL_WORKFLOW: Workflow = { stage: "choose-endpoint" };
@@ -204,6 +241,26 @@ export const INITIAL_WORKFLOW: Workflow = { stage: "choose-endpoint" };
 /** T6: sync when the process can, else async. The toggle only exists when both work. */
 export function defaultMode(process: ProcessDescription): ExecutionMode {
   return process.execution.sync || !process.execution.async ? "sync" : "async";
+}
+
+/**
+ * Where an example lands once connected: on its process, or, when the list
+ * does not have it, on the list with a notice. A list cut short might hold it
+ * further on, so there the description is asked for all the same.
+ */
+export function exampleLanding(processes: ProcessList, processId: string): "open" | "missing" {
+  return processes.truncated || processes.processes.some((process) => process.id === processId)
+    ? "open"
+    : "missing";
+}
+
+/** What the list says when an example names a process the service does not list. */
+export function missingProcess(processId: string): WorkflowError {
+  return {
+    title: `This service has no process called ${processId}.`,
+    detail: "The example names a process this service does not list. Choose one from the list.",
+    notice: true,
+  };
 }
 
 function sameEndpoint(a: EndpointRef | undefined, b: EndpointRef): boolean {
@@ -217,6 +274,8 @@ function connectedPart(state: Connected): Connected {
     route: state.route,
     service: state.service,
     processes: state.processes,
+    lastOpened: state.lastOpened,
+    ran: state.ran,
   };
 }
 
@@ -232,12 +291,38 @@ function openPart(state: ProcessOpen): ProcessOpen {
   };
 }
 
+/**
+ * Whether the screen may move on from `state` to the list or another
+ * process. Not mid-run, where leaving would abandon a run the user has not
+ * been told the fate of: except a background job the server has named,
+ * which goes on in My jobs and has its own link.
+ */
+function leavable(
+  state: Workflow,
+): state is Extract<Workflow, { stage: "process" | "running" | "result" }> {
+  return (
+    state.stage === "process" ||
+    state.stage === "result" ||
+    (state.stage === "running" && state.run.mode === "async" && state.run.jobRef !== undefined)
+  );
+}
+
 export function workflowReducer(state: Workflow, action: WorkflowAction): Workflow {
   switch (action.type) {
     case "connect":
       // Not while the question is open: it must be answered, and recorded.
       return state.stage === "choose-endpoint" && state.offer === undefined
         ? { stage: "choose-endpoint", connecting: action.endpoint }
+        : state;
+
+    case "open-example":
+      // A connect that remembers which process to open. From the start
+      // screen, or from anywhere connected — never mid-run (but a background
+      // job: `leavable`), nor while the relay question is open.
+      return (state.stage === "choose-endpoint" && state.offer === undefined) ||
+        state.stage === "connected" ||
+        leavable(state)
+        ? { stage: "choose-endpoint", connecting: action.endpoint, openAfter: action.processId }
         : state;
 
     case "connected":
@@ -253,24 +338,39 @@ export function workflowReducer(state: Workflow, action: WorkflowAction): Workfl
             route: action.route,
             service: action.service,
             processes: action.processes,
+            // An example's process: opened at once, or a notice that it is not there.
+            ...(state.openAfter === undefined
+              ? {}
+              : exampleLanding(action.processes, state.openAfter) === "open"
+                ? { opening: state.openAfter, lastOpened: state.openAfter }
+                : { error: missingProcess(state.openAfter) }),
           }
         : state;
 
     case "connect-failed":
       return state.stage === "choose-endpoint" && sameEndpoint(state.connecting, action.endpoint)
-        ? { stage: "choose-endpoint", error: action.error }
+        ? { stage: "choose-endpoint", error: action.error, failed: action.endpoint }
         : state;
 
     case "relay-offered":
       return state.stage === "choose-endpoint" &&
         state.viaRelay !== true &&
         sameEndpoint(state.connecting, action.endpoint)
-        ? { stage: "choose-endpoint", offer: { endpoint: action.endpoint, error: action.error } }
+        ? {
+            stage: "choose-endpoint",
+            offer: { endpoint: action.endpoint, error: action.error },
+            openAfter: state.openAfter,
+          }
         : state;
 
     case "relay-confirmed":
       return state.stage === "choose-endpoint" && state.offer !== undefined
-        ? { stage: "choose-endpoint", connecting: state.offer.endpoint, viaRelay: true }
+        ? {
+            stage: "choose-endpoint",
+            connecting: state.offer.endpoint,
+            viaRelay: true,
+            openAfter: state.openAfter,
+          }
         : state;
 
     case "relay-declined":
@@ -283,14 +383,21 @@ export function workflowReducer(state: Workflow, action: WorkflowAction): Workfl
 
     case "open-process":
       // From the list, from a form, or from a result — never mid-run, where
-      // leaving would abandon a job the user has not been told the fate of.
-      return state.stage === "connected" || state.stage === "process" || state.stage === "result"
-        ? { stage: "connected", ...connectedPart(state), opening: action.processId }
+      // leaving would abandon a job the user has not been told the fate of
+      // (but a background job: `leavable`).
+      return state.stage === "connected" || leavable(state)
+        ? {
+            stage: "connected",
+            ...connectedPart(state),
+            opening: action.processId,
+            lastOpened: action.processId,
+          }
         : state;
 
     case "process-loaded":
-      // A fresh plan and fresh values, always: nothing of the previous
-      // process's form survives into this one. Reduction test (c).
+      // A fresh plan, and the values this process's form was left with this
+      // visit, or its starting values (#10; `form-memory.ts`): never another
+      // process's. Reduction test (c).
       return state.stage === "connected" &&
         state.connection === action.connection &&
         state.opening === action.process.id
@@ -314,14 +421,18 @@ export function workflowReducer(state: Workflow, action: WorkflowAction): Workfl
         : state;
 
     case "back-to-list":
-      return state.stage === "process" || state.stage === "result"
-        ? { stage: "connected", ...connectedPart(state) }
-        : state;
+      return leavable(state) ? { stage: "connected", ...connectedPart(state) } : state;
 
     case "set-value":
       return state.stage === "process"
         ? {
             ...state,
+            // A changed input is no longer the one the service's error named:
+            // its mark goes, as the form's own does (#11). The words stay.
+            error:
+              state.error?.inputId === action.id
+                ? { ...state.error, inputId: undefined }
+                : state.error,
             // A Map would be safer for ids like "__proto__"; `fromEntries`
             // defines own properties, which is what the encoder reads (N5).
             values: Object.fromEntries([
@@ -329,6 +440,12 @@ export function workflowReducer(state: Workflow, action: WorkflowAction): Workfl
               [action.id, action.value],
             ]),
           }
+        : state;
+
+    case "reset-form":
+      // The last run's error was about the values that are gone.
+      return state.stage === "process"
+        ? { ...state, values: action.values, error: undefined }
         : state;
 
     case "set-mode":
@@ -356,6 +473,16 @@ export function workflowReducer(state: Workflow, action: WorkflowAction): Workfl
           }
         : state;
 
+    case "watch-job":
+      return state.stage === "process"
+        ? {
+            stage: "running",
+            ...openPart(state),
+            run: { mode: "async", jobRef: action.jobRef, watched: true },
+            runId: action.runId,
+          }
+        : state;
+
     case "job-started":
       // A synchronous request the server answered with a job becomes an
       // asynchronous run: the server decides, and the screen follows.
@@ -370,15 +497,25 @@ export function workflowReducer(state: Workflow, action: WorkflowAction): Workfl
         ? {
             stage: "result",
             ...openPart(state),
+            ran: (state.ran ?? []).includes(state.process.id)
+              ? state.ran
+              : [...(state.ran ?? []), state.process.id],
             runId: state.runId,
             results: action.results,
             jobRef: state.run.mode === "async" ? state.run.jobRef : undefined,
+            watched: state.run.mode === "async" ? state.run.watched : undefined,
           }
         : state;
 
     case "run-failed":
       return state.stage === "running" && state.runId === action.runId
         ? { stage: "process", ...openPart(state), error: action.error }
+        : state;
+
+    case "form-notice":
+      // Only onto the form of the process it was meant for.
+      return state.stage === "process" && state.process.id === action.processId
+        ? { ...state, error: { title: action.notice, notice: true } }
         : state;
 
     case "reference-loaded":

@@ -99,6 +99,12 @@ export interface LoadedReference {
   readonly page: PageInfo | undefined;
   /** The items link followed from a collection. */
   readonly itemsUrl: string | undefined;
+  /**
+   * The href is an image a browser shows (#28), by its declared type or its
+   * extension, and allowed to be fetched at all: where this page could not
+   * read it, it is shown as an image all the same.
+   */
+  readonly image?: true | undefined;
 }
 
 export interface ReferenceEndpoint {
@@ -410,11 +416,39 @@ async function follow(
   }
 }
 
+/** The image types a browser shows in an `<img>`, by media type and by extension. */
+const IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
+const IMAGE_EXTENSION = /\.(png|jpe?g|gif|webp)$/i;
+
+/**
+ * Whether an output given by reference is an image the browser can show
+ * (#28): its declared type says so, or its href's path ends as one does.
+ */
+export function isImageReference(reference: {
+  readonly href: string;
+  readonly mediaType?: string | undefined;
+}): boolean {
+  const declared = reference.mediaType?.split(";")[0]?.trim().toLowerCase();
+  if (declared !== undefined && IMAGE_TYPES.has(declared)) return true;
+  try {
+    return IMAGE_EXTENSION.test(new URL(reference.href).pathname);
+  } catch {
+    return false;
+  }
+}
+
 /** Load what one output given by reference points at. Never throws. */
 export async function loadReference(
   reference: { readonly href: string; readonly mediaType?: string | undefined },
   options: LoadOptions,
 ): Promise<LoadedReference> {
   const accept = reference.mediaType === undefined ? "*/*" : `${reference.mediaType}, */*;q=0.1`;
-  return follow(reference.href, accept, options, true);
+  const loaded = await follow(reference.href, accept, options, true);
+  // Read as before, so what the page can read of it is recorded as before;
+  // an image is then also shown where it couldn't be (#28).
+  return isImageReference(reference) &&
+    loaded.outcome !== "unsupported-scheme" &&
+    loaded.outcome !== "mixed-content"
+    ? { ...loaded, image: true }
+    : loaded;
 }

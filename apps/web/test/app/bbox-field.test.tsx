@@ -271,3 +271,21 @@ describe("leaving the JSON editor (W32)", () => {
     expect(inputs(page).map((input) => input.value)).toEqual(["", "", "", ""]);
   });
 });
+
+describe("the box's size (#15)", () => {
+  it("says how far across a box in longitude and latitude is, once it is whole", () => {
+    const page = mount(boxOffering([EPSG_4326, EPSG_28992]));
+    typeAll(page, ["4.885", "52.36", "4.94"]);
+    expect(page.querySelector('[data-testid="shape-size"]')).toBeNull();
+    typeAll(page, ["4.885", "52.36", "4.94", "52.38"]);
+    expect(page.querySelector('[data-testid="shape-size"]')?.textContent).toBe(
+      "About 3.7 km across",
+    );
+  });
+
+  it("says nothing for a box in projected units", () => {
+    const page = mount(boxOffering([EPSG_28992, EPSG_4326]));
+    typeAll(page, ["120000", "480000", "125000", "485000"]);
+    expect(page.querySelector('[data-testid="shape-size"]')).toBeNull();
+  });
+});

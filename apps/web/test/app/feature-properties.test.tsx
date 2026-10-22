@@ -89,7 +89,8 @@ describe("FeatureProperties", () => {
     );
     const values = [...view.querySelectorAll("dd")].map((dd) => dd.textContent);
     expect(values).toEqual([
-      "12.5",
+      // A number the Dutch way (#20).
+      "12,5",
       "false",
       "null",
       '{\n  "street": "<b>Main</b>",\n  "number": 1\n}',
@@ -101,6 +102,46 @@ describe("FeatureProperties", () => {
       "owner",
       "address",
     ]);
+  });
+
+  it("links a web address, groups a large number's digits, lists a short list (#20)", () => {
+    const view = render(
+      <FeatureProperties
+        feature={feature({
+          page: "https://bag.basisregistraties.overheid.nl/pand/0363100012165490",
+          oppervlakte: 125430.5,
+          bouwjaar: 1923,
+          gebruik: ["wonen", "kantoor"],
+          code: "javascript:alert(1)",
+        })}
+        onClose={vi.fn()}
+      />,
+    );
+    const values = [...view.querySelectorAll("dd")];
+    const link = values[0]?.querySelector("a");
+    expect(link?.getAttribute("href")).toBe(
+      "https://bag.basisregistraties.overheid.nl/pand/0363100012165490",
+    );
+    expect(link?.getAttribute("rel")).toBe("noopener noreferrer");
+    expect(values.slice(1).map((dd) => dd.textContent)).toEqual([
+      "125.430,5",
+      "1923",
+      "wonen, kantoor",
+      "javascript:alert(1)",
+    ]);
+    expect(values[4]?.querySelector("a")).toBeNull();
+  });
+
+  it("sits on the side it is given, the left one unless told", () => {
+    const left = render(<FeatureProperties feature={feature({ a: 1 })} onClose={vi.fn()} />);
+    expect(left.querySelector("section")?.dataset["side"]).toBe("left");
+    act(() => {
+      root?.unmount();
+    });
+    const right = render(
+      <FeatureProperties feature={feature({ a: 1 })} side="right" onClose={vi.fn()} />,
+    );
+    expect(right.querySelector("section")?.dataset["side"]).toBe("right");
   });
 
   it("says so when there are no properties: null, empty, or a bare geometry", () => {
@@ -179,15 +220,57 @@ describe("the map pane's feature pick", () => {
     expect(view.querySelector('[data-testid="feature-hint"]')).not.toBeNull();
 
     act(() => {
-      mapProps.current?.onResultClick?.(1);
+      // On the map's left half: the properties go to the right (#20).
+      mapProps.current?.onResultClick?.(1, { x: 120, width: 800 });
     });
     expect(view.querySelector('[data-testid="feature-properties"] dd')?.textContent).toBe(
       "first-1",
     );
+    expect(
+      view.querySelector<HTMLElement>('[data-testid="feature-properties"]')?.dataset["side"],
+    ).toBe("right");
+    // The map outlines the clicked shape meanwhile.
+    expect(mapProps.current?.selected).toBe(1);
+    act(() => {
+      mapProps.current?.onResultClick?.(0, { x: 700, width: 800 });
+    });
+    expect(
+      view.querySelector<HTMLElement>('[data-testid="feature-properties"]')?.dataset["side"],
+    ).toBe("left");
 
     act(() => {
       root?.render(pane(withResults([collection("second")])));
     });
     expect(view.querySelector('[data-testid="feature-properties"]')).toBeNull();
+    expect(mapProps.current?.selected).toBeUndefined();
+  });
+
+  it("invites a click only when a shape has properties to show (#21)", () => {
+    const bare: RenderableResult = {
+      kind: "json",
+      outputId: "rotated",
+      value: {
+        type: "Polygon",
+        coordinates: [
+          [
+            [5, 52],
+            [5.1, 52],
+            [5.1, 52.1],
+            [5, 52],
+          ],
+        ],
+      },
+    };
+    const empty: RenderableResult = {
+      kind: "json",
+      outputId: "features",
+      value: {
+        type: "FeatureCollection",
+        features: [{ type: "Feature", properties: {}, geometry: point }],
+      },
+    };
+    const view = render(pane(withResults([bare, empty])));
+    expect(mapProps.current?.shown?.some((set) => set.role === "result")).toBe(true);
+    expect(view.querySelector('[data-testid="feature-hint"]')).toBeNull();
   });
 });

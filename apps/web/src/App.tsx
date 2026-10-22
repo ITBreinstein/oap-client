@@ -1,23 +1,91 @@
-import { VERSION } from "@breinstein/oap-client";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { redactUrl } from "@breinstein/oap-client";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
+import { createPortal } from "react-dom";
+import { PanelHandle } from "./app/PanelHandle.js";
+import { useWide } from "./app/useWide.js";
+import { PANEL_START } from "./app/panel-width.js";
+import type { Appearance } from "./app/appearance.js";
+import { AppearanceControl } from "./app/AppearanceControl.js";
+import { UpdatedContext } from "./app/variant.js";
+import { DeveloperContext } from "./app/developer.js";
+import { sameService, useAddress, wouldLoseWork } from "./app/address.js";
+import { AppFrame, RailItem, type FramePlace } from "./app/AppFrame.js";
 import { DeveloperPanel } from "./app/DeveloperPanel.js";
-import { activeDrawField, DrawContext, type DrawRequest, type DrawTarget } from "./app/draw.js";
+import {
+  activeDrawField,
+  DrawContext,
+  type DrawRequest,
+  type DrawTarget,
+  type MapExtent,
+} from "./app/draw.js";
 import { EndpointScreen } from "./app/EndpointScreen.js";
 import { MapBoundary } from "./app/MapBoundary.js";
 import { MapLimitsContext, type MapLimits } from "./app/map-limits.js";
+import { mapNeeded } from "./app/map-need.js";
 import { MapPane } from "./app/MapPane.js";
+import { createWorldMap } from "./map/MapView.js";
+import { needsOfPlan, type Needs } from "./app/needs.js";
 import { ProcessListScreen } from "./app/ProcessListScreen.js";
-import { ProcessScreen } from "./app/ProcessScreen.js";
-import { DEV_PRESETS } from "./app/dev-presets.js";
+import { ProcessScreen, RequestLog } from "./app/ProcessScreen.js";
+import { AboutFooter, AboutPanel } from "./app/AboutPanel.js";
+import { DEV_EXAMPLES, DEV_PRESETS } from "./app/dev-presets.js";
+import { exampleNeeds } from "./app/examples.js";
+import { ExamplesBrowser, FeaturedExamples } from "./app/ExamplesView.js";
+import { typedEndpoint } from "./app/run.js";
+import { SidePanel } from "./app/SidePanel.js";
+import {
+  learnTitles,
+  NO_TITLES,
+  pageTitle,
+  processTitle,
+  serviceTitle,
+  type Titles,
+} from "./app/titles.js";
+import type { EndpointRef } from "./app/workflow.js";
+import type { FormValues } from "./forms/encode.js";
+import type { JobRow } from "./relay/job-session.js";
 import { JobsPanel } from "./jobs/JobsPanel.js";
+import { isUnderWay } from "./jobs/under-way.js";
 import { RelayBanner, RelayOffer } from "./app/RelayRoute.js";
+import { useAppearance } from "./app/useAppearance.js";
 import { useWorkflow } from "./app/useWorkflow.js";
 import {
   DEFAULT_MAX_EDITABLE_COORDINATES,
   DEFAULT_MAX_MAP_COORDINATES,
   STATIC_ONLY,
+  type Example,
   type RuntimeConfig,
 } from "./config/runtime-config.js";
+import type { RelayEndpoint } from "./relay/contract.js";
+
+/** The side panels; one is open at a time. */
+type Panel = "examples" | "jobs" | "about";
+const PANEL_IDS: Readonly<Record<Panel, string>> = {
+  examples: "examples-panel",
+  jobs: "jobs-panel",
+  about: "about-panel",
+};
+
+/**
+ * Where an example is reached: as the relay's endpoint of the same address
+ * when the relay lists one, so its background runs go where that endpoint
+ * says; otherwise directly, exactly as a typed address.
+ */
+function exampleEndpoint(
+  example: Example,
+  configured: readonly RelayEndpoint[],
+): EndpointRef | undefined {
+  const entry = configured.find((candidate) => candidate.baseUrl === example.service);
+  return entry === undefined ? typedEndpoint(example.service) : { source: "configured", ...entry };
+}
 
 function developerRequested(): boolean {
   try {
@@ -32,15 +100,24 @@ export interface AppProps {
   readonly config?: RuntimeConfig | undefined;
   /** Why the page fell back to running without the relay, if it did. */
   readonly configWarning?: string | undefined;
+  /** The style and theme `main.tsx` put on `<html>`; read afresh when absent. */
+  readonly appearance?: Appearance | undefined;
 }
 
-export function App({ config = STATIC_ONLY, configWarning }: AppProps) {
+export function App({ config = STATIC_ONLY, configWarning, appearance: initial }: AppProps) {
   const { relayUrl } = config;
+  const { appearance, setStyle, setTheme } = useAppearance(initial);
   // The local reference servers, in development only: `import.meta.env.DEV` is
   // `false` in a production build, and the list is dropped from the bundle.
   const presets = useMemo(
     () => (import.meta.env.DEV ? [...DEV_PRESETS, ...config.presets] : config.presets),
     [config.presets],
+  );
+  // Development adds examples on the local reference server, as it adds presets.
+  const examples = useMemo(
+    () =>
+      import.meta.env.DEV ? [...DEV_EXAMPLES, ...(config.examples ?? [])] : (config.examples ?? []),
+    [config.examples],
   );
   const view = useWorkflow(relayUrl, config.acceptedNoticeMs);
   const mapLimits = useMemo<MapLimits>(
@@ -51,8 +128,203 @@ export function App({ config = STATIC_ONLY, configWarning }: AppProps) {
     [config.maxMapCoordinates, config.maxEditableCoordinates],
   );
   const { state, commands } = view;
+  const address = useAddress(state, commands);
   const [developer] = useState(developerRequested);
   const [mapAvailable, setMapAvailable] = useState(false);
+
+  // What each process opened this visit needs, by endpoint and id: the
+  // process list shows it once known, and never fetches a description for it.
+  const [described, setDescribed] = useState<ReadonlyMap<string, Needs>>(() => new Map());
+  const openedPlan =
+    state.stage === "choose-endpoint" || state.stage === "connected" ? undefined : state.plan;
+  const openedKey =
+    state.stage === "choose-endpoint" || state.stage === "connected"
+      ? undefined
+      : `${state.endpoint.baseUrl}\n${state.process.id}`;
+  // Recorded while rendering, the way React documents for state that follows
+  // other state: no effect, and no render with the old value on screen.
+  if (openedKey !== undefined && openedPlan !== undefined && !described.has(openedKey)) {
+    setDescribed(new Map(described).set(openedKey, needsOfPlan(openedPlan)));
+  }
+  // What the list can say a process needs: what the examples say, and over
+  // that, what the page made of a description it read.
+  const listNeeds = useMemo(() => {
+    if (state.stage !== "connected") return undefined;
+    const prefix = `${state.endpoint.baseUrl}\n`;
+    return new Map([
+      ...exampleNeeds(examples, state.endpoint.baseUrl),
+      ...[...described]
+        .filter(([key]) => key.startsWith(prefix))
+        .map(([key, needs]): [string, Needs] => [key.slice(prefix.length), needs]),
+    ]);
+  }, [described, examples, state]);
+
+  // The names this visit has read, for My jobs (#43): learned while
+  // rendering, as `described` is, from the service and process on screen.
+  const [titles, setTitles] = useState<Titles>(NO_TITLES);
+  const learned =
+    state.stage === "choose-endpoint"
+      ? titles
+      : learnTitles(titles, state.endpoint.baseUrl, state.service.title, [
+          ...state.processes.processes,
+          ...(state.stage === "connected" ? [] : [state.process]),
+        ]);
+  if (learned !== titles) setTitles(learned);
+
+  // The browser tab says where the page is (#37), and changes with it.
+  const tabTitle = pageTitle(
+    state.stage === "choose-endpoint"
+      ? state
+      : state.stage === "connected"
+        ? { stage: state.stage, service: serviceTitle(learned, presets, state.endpoint.baseUrl) }
+        : {
+            stage: state.stage,
+            service: serviceTitle(learned, presets, state.endpoint.baseUrl),
+            process: state.process.title ?? state.process.id,
+          },
+  );
+  useEffect(() => {
+    document.title = tabTitle;
+  }, [tabTitle]);
+  // STYLE TRIAL (updated Instrument, #43): My jobs names a job's process and service.
+  const jobNames = (job: JobRow) => ({
+    process:
+      job.processId === undefined
+        ? (job.status?.jobId ?? job.statusUrl)
+        : processTitle(titles, examples, job.endpoint, job.processId),
+    service: serviceTitle(titles, presets, job.endpoint),
+  });
+
+  const [panelOpen, setPanelOpen] = useState<Panel | undefined>();
+  const togglePanel = (which: Panel) => {
+    setPanelOpen((current) => (current === which ? undefined : which));
+  };
+  const closePanel = useCallback(() => {
+    setPanelOpen(undefined);
+  }, []);
+  // STYLE TRIAL: in the updated Instrument a background job with a link can
+  // be left, from the rail too: it goes on in My jobs.
+  const leaveJob =
+    appearance.style === "instrument-updated" && state.stage === "running" && !wouldLoseWork(state);
+  const busy =
+    (state.stage === "running" && !leaveJob) ||
+    (state.stage === "choose-endpoint" && state.connecting !== undefined);
+  const jobs = view.snapshot?.jobs ?? [];
+  // Under way only: a finished job needs nothing from anyone, even while the
+  // page confirms it (#30).
+  const runningJobs = jobs.filter(isUnderWay).length;
+  const jobsBadge =
+    runningJobs === 0 ? undefined : (
+      <span className="badge">
+        <span className="visually-hidden">, </span>
+        {String(runningJobs)}
+        <span className="visually-hidden"> running</span>
+      </span>
+    );
+  // STYLE TRIAL (updated Instrument): "Run again" in My jobs. The inputs of
+  // each background job started this visit, by its status URL: in memory
+  // only, never stored, so a job from an earlier visit opens an empty form.
+  const sentFor = useRef(new Map<string, FormValues>());
+  useEffect(() => {
+    // A job this page only followed: its inputs are not the form's.
+    if (
+      state.stage === "running" &&
+      state.run.mode === "async" &&
+      state.run.jobRef !== undefined &&
+      state.run.watched !== true
+    ) {
+      sentFor.current.set(state.run.jobRef, state.values);
+    } else if (state.stage === "result" && state.jobRef !== undefined && state.watched !== true) {
+      sentFor.current.set(state.jobRef, state.values);
+    }
+  }, [state]);
+  const pendingRerun = useRef<{
+    processId: string;
+    values?: FormValues | undefined;
+    /** Tick Run in the background once it is open (#25). */
+    background?: true | undefined;
+    /** STYLE TRIAL (#33): say the form is empty because the job's inputs weren't kept. */
+    unkept?: true | undefined;
+  }>(undefined);
+  useEffect(() => {
+    const pending = pendingRerun.current;
+    if (
+      pending === undefined ||
+      state.stage !== "process" ||
+      state.process.id !== pending.processId
+    ) {
+      return;
+    }
+    pendingRerun.current = undefined;
+    if (pending.unkept === true) {
+      commands.formNotice(
+        pending.processId,
+        "This job is from an earlier visit, and its inputs weren’t kept: fill in the form to run it again.",
+      );
+    }
+    if (pending.values === undefined && pending.background !== true) return;
+    for (const [id, value] of Object.entries(pending.values ?? {})) commands.setValue(id, value);
+    commands.setMode("async");
+  }, [state, commands]);
+  /** The service a listed job ran on, reached the way this page reaches it. */
+  const endpointOfJob = (job: JobRow): EndpointRef | undefined => {
+    const here = state.stage === "choose-endpoint" ? undefined : state.endpoint;
+    const listed = view.configured.find((entry) => entry.key === job.endpointKey);
+    return here !== undefined && sameService(here.baseUrl, job.endpoint)
+      ? here
+      : listed !== undefined
+        ? { source: "configured", ...listed }
+        : typedEndpoint(job.endpoint);
+  };
+  const rerun = (job: JobRow) => {
+    const endpoint = endpointOfJob(job);
+    if (job.processId === undefined || endpoint === undefined) return;
+    const values = sentFor.current.get(job.statusUrl);
+    pendingRerun.current = {
+      processId: job.processId,
+      values,
+      ...(values === undefined ? { unkept: true } : {}),
+    };
+    setPanelOpen(undefined);
+    commands.openExample(endpoint, job.processId);
+  };
+  // STYLE TRIAL (updated Instrument): a job in My jobs shown here, as its link shows it.
+  const followJob = (job: JobRow) => {
+    const endpoint = endpointOfJob(job);
+    if (job.processId === undefined || endpoint === undefined) return;
+    setPanelOpen(undefined);
+    address.followJob(endpoint, job.processId, job.statusUrl);
+  };
+
+  // #25: a direct service that hides where its background jobs are, which
+  // the relay also lists with its background runs through it. One click
+  // reconnects that way, to the same process: the form comes back as it is
+  // (it is kept by service), with Run in the background ticked.
+  const backgroundUnfindable =
+    state.stage !== "choose-endpoint" && view.backgroundUnfindable(state.endpoint);
+  const relayForBackground =
+    state.stage === "choose-endpoint" || !view.backgroundUnfindable(state.endpoint)
+      ? undefined
+      : view.configured.find(
+          (entry) =>
+            entry.executeRoute === "relay" &&
+            sameService(entry.baseUrl, state.endpoint.baseUrl) &&
+            !view.backgroundUnfindable({ source: "configured", ...entry }),
+        );
+  const switchToRelay =
+    relayForBackground === undefined || state.stage !== "process"
+      ? undefined
+      : () => {
+          pendingRerun.current = { processId: state.process.id, background: true };
+          commands.openExample({ source: "configured", ...relayForBackground }, state.process.id);
+        };
+
+  const openExample = (example: Example) => {
+    const endpoint = exampleEndpoint(example, view.configured);
+    if (endpoint === undefined) return;
+    setPanelOpen(undefined);
+    commands.openExample(endpoint, example.process);
+  };
 
   // Drawing belongs to one field of one open process. It is recorded with the
   // process it was started for, so choosing another process — or leaving the
@@ -62,40 +334,111 @@ export function App({ config = STATIC_ONLY, configWarning }: AppProps) {
   const openForm = state.stage === "process" ? state.plan : undefined;
   const drawField = activeDrawField(drawFor, openForm);
 
+  // The map's view, read on demand (#18): the map sits beside the form, so
+  // it is handed over here.
+  const drawPresses = useRef(0);
+  const viewReader = useRef<(() => MapExtent | undefined) | undefined>(undefined);
+  const readView = useCallback((read: (() => MapExtent | undefined) | undefined) => {
+    viewReader.current = read;
+  }, []);
   const draw = useMemo<DrawTarget>(
     () => ({
       fieldId: drawField,
       available: mapAvailable,
       start: (fieldId) => {
-        if (openForm !== undefined) setDrawFor({ form: openForm, fieldId });
+        drawPresses.current += 1;
+        if (openForm !== undefined) {
+          setDrawFor({ form: openForm, fieldId, press: drawPresses.current });
+        }
       },
       stop: () => {
         setDrawFor(undefined);
       },
+      focusToken: drawFor?.press,
+      currentView: () => viewReader.current?.(),
     }),
-    [drawField, mapAvailable, openForm],
+    [drawField, mapAvailable, openForm, drawFor?.press],
   );
 
   // Each stage moves focus to its heading, so a keyboard user lands where the
   // new content starts rather than on a button that no longer exists.
+  // Not on the first render, though: on arrival the page starts at its top, as
+  // any page does, rather than with a focus ring around the first heading.
   const panel = useRef<HTMLDivElement>(null);
   const stageKey = `${state.stage}:${openProcessId ?? ""}`;
+  const shownStage = useRef(stageKey);
   useEffect(() => {
+    // Compared, not counted, so React's development double run changes nothing.
+    if (shownStage.current === stageKey) return;
+    shownStage.current = stageKey;
     const target = panel.current?.querySelector<HTMLElement>("[data-focus-on-stage]");
     target?.focus();
   }, [stageKey]);
+  // The user's own way somewhere else closes any side panel (#35). From
+  // inside a panel, its actions close it themselves (an example, Run again,
+  // a job followed); from outside, with the page inert behind it, the rail
+  // does (its Start and Processes), and so do the browser's Back and Forward here. Not
+  // the page's own moves: a followed job finishing, or a reload going back to
+  // where it was.
+  useEffect(() => {
+    const onPop = () => {
+      setPanelOpen(undefined);
+    };
+    globalThis.addEventListener("popstate", onPop);
+    return () => {
+      globalThis.removeEventListener("popstate", onPop);
+    };
+  }, []);
+
+  // The map is on screen only while it has a job to do: an input it can draw,
+  // or a result it can show (`app/map-need.ts`). Otherwise the panel has the
+  // page to itself, and no basemap tile is fetched.
+  const showMap = mapNeeded(state, mapLimits.maxCoordinates);
+  // Docked at the left beside the map; without one, a card on the picture.
+  const docked = showMap;
+  // STYLE TRIAL (#36): in the updated Instrument the form beside the map can
+  // be made wider, on a wide window.
+  const updatedStyle = appearance.style === "instrument-updated";
+  const wide = useWide();
+  const [panelWidth, setPanelWidth] = useState(PANEL_START);
+  // STYLE TRIAL (#40): on a narrow screen the updated Instrument puts the map
+  // right under the result, not at the foot of the page.
+  const mapUnderResult = updatedStyle && !wide && state.stage === "result" && showMap;
+  const [mapSlot, setMapSlot] = useState<HTMLElement | undefined>();
+  const giveMapSlot = useCallback((element: HTMLDivElement | null) => {
+    setMapSlot(element ?? undefined);
+  }, []);
 
   let screen: ReactNode;
   switch (state.stage) {
     case "choose-endpoint":
       screen = (
         <EndpointScreen
+          // A new link to answer starts the screen afresh, its address filled in.
+          key={address.linked?.service ?? ""}
           configured={view.configured}
+          unavailable={view.unavailable}
           configuredError={view.configuredError}
           presets={presets}
           connecting={state.connecting}
           error={state.error}
-          onConnect={commands.connect}
+          failed={state.failed}
+          titleOf={(baseUrl) => titles.services.get(baseUrl.replace(/\/+$/, ""))}
+          staticOnly={relayUrl === undefined}
+          onConnect={address.connect}
+          linked={address.linked}
+          examples={
+            <FeaturedExamples
+              examples={examples}
+              busy={busy}
+              onOpen={openExample}
+              onBrowse={() => {
+                togglePanel("examples");
+              }}
+              browsing={panelOpen === "examples"}
+              panelId={PANEL_IDS.examples}
+            />
+          }
         />
       );
       break;
@@ -106,6 +449,10 @@ export function App({ config = STATIC_ONLY, configWarning }: AppProps) {
           service={state.service}
           processes={state.processes}
           opening={state.opening}
+          route={state.route}
+          needs={listNeeds}
+          lastOpened={state.lastOpened}
+          ran={state.ran ?? []}
           error={state.error}
           onOpen={commands.openProcess}
           onDisconnect={commands.disconnect}
@@ -122,8 +469,11 @@ export function App({ config = STATIC_ONLY, configWarning }: AppProps) {
             ...commands,
             // Running ends drawing: the form it was drawing for is read-only
             // from here, and coming back to edit should not resume it.
+            // STYLE TRIAL: in the updated Instrument, "Change the inputs"
+            // brings the drawing back, its tools and its shape to edit: the
+            // drawing is kept, and is the open form's again once it is back.
             run: () => {
-              setDrawFor(undefined);
+              if (appearance.style !== "instrument-updated") setDrawFor(undefined);
               commands.run();
             },
           }}
@@ -132,6 +482,10 @@ export function App({ config = STATIC_ONLY, configWarning }: AppProps) {
           jobNotice={view.jobNotice}
           dismissAdvertisedBy={view.dismissAdvertisedBy}
           developer={developer}
+          observations={view.snapshot?.observations}
+          backgroundUnfindable={backgroundUnfindable}
+          onRelayForBackground={switchToRelay}
+          mapSlot={mapUnderResult ? giveMapSlot : undefined}
         />
       );
       break;
@@ -140,74 +494,310 @@ export function App({ config = STATIC_ONLY, configWarning }: AppProps) {
   // While the relay offer is open, everything else is inert: no keyboard or
   // pointer can reach Connect or the jobs behind the question (review W22).
   const offerOpen = state.stage === "choose-endpoint" && state.offer !== undefined;
+  // While a side panel is open, so is everything but it (#35): it is a dialog.
+  const behindPanel = panelOpen !== undefined;
+  const behind = offerOpen || behindPanel;
 
+  // Where the page is, and the ways back, for the frame's navigation. Never
+  // mid-run: leaving would abandon a job the user has not been told the fate of.
+  const place: FramePlace =
+    state.stage === "choose-endpoint"
+      ? "connect"
+      : state.stage === "connected"
+        ? "processes"
+        : "process";
+  const focusStage = () => {
+    panel.current?.querySelector<HTMLElement>("[data-focus-on-stage]")?.focus();
+  };
+  // What the visitor's words leave out, for the Developer section (#25, #43).
+  const shownJobRef =
+    state.stage === "running" && state.run.mode === "async"
+      ? state.run.jobRef
+      : state.stage === "result"
+        ? state.jobRef
+        : undefined;
+  const shownJobId =
+    shownJobRef === undefined
+      ? undefined
+      : jobs.find((job) => job.statusUrl === shownJobRef)?.status?.jobId;
+  const developerNotes = [
+    ...(state.stage === "process" && state.error?.technical !== undefined
+      ? [state.error.technical]
+      : []),
+    ...(shownJobId === undefined ? [] : [`Job ${shownJobId}`]),
+    ...(state.stage === "result" &&
+    jobs.find((job) => job.statusUrl === shownJobRef)?.confirmation?.state === "pending"
+      ? ["Not yet confirmed: the page reads the job's status again, quietly, for a while."]
+      : []),
+  ];
+  // Start and Processes in the rail are the user going somewhere: an open
+  // side panel closes (§11.2).
+  const leaving = (go: () => void) => () => {
+    setPanelOpen(undefined);
+    go();
+  };
+  const toStage = () => {
+    setPanelOpen(undefined);
+    focusStage();
+  };
+  const onConnect =
+    state.stage === "choose-endpoint"
+      ? toStage
+      : state.stage === "running" && !leaveJob
+        ? undefined
+        : leaving(commands.disconnect);
+  const onProcesses =
+    state.stage === "connected"
+      ? toStage
+      : state.stage === "process" || state.stage === "result" || leaveJob
+        ? leaving(commands.backToList)
+        : undefined;
+  const mapElement = (
+    <MapBoundary>
+      <MapPane
+        state={state}
+        draw={draw}
+        setValue={commands.setValue}
+        onAvailable={setMapAvailable}
+        onViewReader={readView}
+        basemap={
+          // STYLE TRIAL: the updated Instrument's map is the world, light in either theme.
+          appearance.style === "instrument-updated"
+            ? {
+                create: createWorldMap,
+                label: "Map of the world (OpenFreeMap)",
+              }
+            : undefined
+        }
+      />
+    </MapBoundary>
+  );
   return (
     <MapLimitsContext value={mapLimits}>
-      <DrawContext.Provider value={draw}>
-        <div className="app" data-relay-stream={view.snapshot?.relay}>
-          <header className="app-header" inert={offerOpen}>
-            <h1>OGC API - Processes client</h1>
-            <p className="muted" data-testid="core-version">
-              core {VERSION}
-            </p>
-          </header>
-          {configWarning !== undefined && (
-            <p
-              className="notice config-warning"
-              role="alert"
-              data-testid="config-warning"
-              inert={offerOpen}
+      <UpdatedContext value={appearance.style === "instrument-updated"}>
+        <DeveloperContext value={developer}>
+          <DrawContext.Provider value={draw}>
+            <div
+              className="app"
+              data-relay-stream={view.snapshot?.relay}
+              data-developer={developer ? true : undefined}
             >
-              {configWarning}
-            </p>
-          )}
-          {relayUrl === undefined && (
-            <p className="muted static-only" data-testid="static-only" inert={offerOpen}>
-              This page runs without the relay: every request goes straight from your browser to the
-              service. A service must allow web pages to read it (CORS), and a background run is
-              found only where the service lets a page read the job&apos;s address. Callbacks, and
-              reading services that send no CORS headers, need the relay.
-            </p>
-          )}
-          <div className="layout" inert={offerOpen}>
-            <main className="panel" ref={panel}>
-              {state.stage !== "choose-endpoint" && state.route === "relay" && <RelayBanner />}
-              {screen}
-              <JobsPanel
-                jobs={view.snapshot?.jobs ?? []}
-                activeJob={
-                  state.stage === "running" && state.run.mode === "async"
-                    ? state.run.jobRef
-                    : undefined
+              {/* The first stop for a keyboard: past the rail, to the page itself.
+                  Inert with the rest behind a side panel or the relay question (#7). */}
+              <a className="skip-link" href="#content" inert={behind}>
+                Skip to content
+              </a>
+              <AppFrame
+                // The rail stays in reach behind a side panel: its item closes
+                // the panel again, another opens that one instead.
+                inert={offerOpen}
+                appearance={
+                  <AppearanceControl
+                    appearance={appearance}
+                    onStyle={setStyle}
+                    onTheme={setTheme}
+                  />
                 }
-                dismissAdvertisedFor={view.dismissAdvertisedFor}
-                messages={view.jobMessages}
-                onRemove={commands.removeJob}
-                onDismiss={commands.dismissJob}
+                place={place}
+                onConnect={onConnect}
+                onProcesses={onProcesses}
+                railItems={
+                  examples.length > 0 && (
+                    <RailItem
+                      icon="examples"
+                      label="Examples"
+                      pressed={panelOpen === "examples"}
+                      controls={PANEL_IDS.examples}
+                      onClick={() => {
+                        togglePanel("examples");
+                      }}
+                    />
+                  )
+                }
+                aboutItem={
+                  <RailItem
+                    icon="about"
+                    label="About"
+                    pressed={panelOpen === "about"}
+                    controls={PANEL_IDS.about}
+                    onClick={() => {
+                      togglePanel("about");
+                    }}
+                  />
+                }
+                jobsItem={
+                  <RailItem
+                    icon="jobs"
+                    label="Jobs"
+                    pressed={panelOpen === "jobs"}
+                    controls={PANEL_IDS.jobs}
+                    badge={jobsBadge}
+                    onClick={() => {
+                      togglePanel("jobs");
+                    }}
+                  />
+                }
               />
-              <DeveloperPanel
-                observations={view.snapshot?.observations ?? []}
-                dropped={view.snapshot?.droppedObservations ?? 0}
-                relayUrl={relayUrl}
-                open={developer}
-                census={view.census}
-                onDescribeAll={state.stage === "choose-endpoint" ? undefined : commands.describeAll}
-              />
-            </main>
-            <MapBoundary>
-              <MapPane
-                state={state}
-                draw={draw}
-                setValue={commands.setValue}
-                onAvailable={setMapAvailable}
-              />
-            </MapBoundary>
-          </div>
-          {offerOpen && (
-            <RelayOffer onConfirm={commands.confirmRelay} onDecline={commands.declineRelay} />
-          )}
-        </div>
-      </DrawContext.Provider>
+              <div className="app-body">
+                {configWarning !== undefined && (
+                  <p
+                    className="notice config-warning"
+                    role="alert"
+                    data-testid="config-warning"
+                    inert={behind}
+                  >
+                    {configWarning}
+                  </p>
+                )}
+                <div
+                  className={docked ? "layout" : "layout layout-single"}
+                  inert={behind}
+                  // STYLE TRIAL (#36): the form's width, as the visitor set it.
+                  style={
+                    updatedStyle && showMap
+                      ? ({ "--panel-width": `${String(panelWidth)}px` } as CSSProperties)
+                      : undefined
+                  }
+                >
+                  <main
+                    id="content"
+                    tabIndex={-1}
+                    className="panel"
+                    ref={panel}
+                    data-stage={state.stage}
+                  >
+                    {state.stage !== "choose-endpoint" && state.route === "relay" && (
+                      <RelayBanner />
+                    )}
+                    {screen}
+                    {/* The credit for the picture behind the page without a map (backdrop.css). */}
+                    {!docked && (
+                      <p className="backdrop-credit">
+                        Imagery: NASA Blue Marble and Blue Marble clouds · NASA Earth at Night 2012
+                      </p>
+                    )}
+                    {/* STYLE TRIAL (#38): the updated Instrument has the Developer
+                        section only with `?developer`. The session records
+                        what it observes all the same. */}
+                    {(!updatedStyle || developer) && (
+                      <DeveloperPanel
+                        observations={view.snapshot?.observations ?? []}
+                        dropped={view.snapshot?.droppedObservations ?? 0}
+                        relayUrl={relayUrl}
+                        open={developer}
+                        census={view.census}
+                        notes={developerNotes}
+                        onDescribeAll={
+                          state.stage === "choose-endpoint" ? undefined : commands.describeAll
+                        }
+                        first={
+                          // STYLE TRIAL: the updated Instrument keeps the request log here.
+                          appearance.style === "instrument-updated" &&
+                          state.stage !== "choose-endpoint" ? (
+                            <RequestLog
+                              entries={view.snapshot?.observations ?? []}
+                              endpoint={redactUrl(state.endpoint.baseUrl)}
+                            />
+                          ) : undefined
+                        }
+                      />
+                    )}
+                  </main>
+                  {showMap &&
+                    // STYLE TRIAL (#40): under the result on a narrow screen.
+                    (mapUnderResult
+                      ? mapSlot !== undefined && createPortal(mapElement, mapSlot)
+                      : mapElement)}
+                  {updatedStyle && showMap && wide && (
+                    <PanelHandle width={panelWidth} onWidth={setPanelWidth} />
+                  )}
+                </div>
+                {/* What an open panel covers: a press on it closes the panel (#35).
+                  The panel's keyboard way out is Escape, or its Close button. */}
+                {behindPanel && (
+                  <div className="panel-scrim" aria-hidden="true" onClick={closePanel} />
+                )}
+                {examples.length > 0 && (
+                  <SidePanel
+                    id={PANEL_IDS.examples}
+                    title="Examples"
+                    open={panelOpen === "examples"}
+                    inert={offerOpen}
+                    onClose={closePanel}
+                    className="examples-panel"
+                  >
+                    <ExamplesBrowser examples={examples} busy={busy} onOpen={openExample} />
+                  </SidePanel>
+                )}
+                <SidePanel
+                  id={PANEL_IDS.jobs}
+                  title="My jobs"
+                  open={panelOpen === "jobs"}
+                  inert={offerOpen}
+                  onClose={closePanel}
+                  className="my-jobs-panel"
+                >
+                  {jobs.length === 0 && (
+                    <div className="jobs-empty">
+                      <p>No background jobs yet.</p>
+                      <p className="help">
+                        A process you run in the background is listed here, with its status, until
+                        you remove it from the list. It stays listed when you reload the page.
+                      </p>
+                      <p className="help">
+                        Some services do not let a web page find a job it started, so the job runs
+                        but cannot be listed. The relay can find it: choose a service the relay
+                        offers.
+                      </p>
+                    </div>
+                  )}
+                  <JobsPanel
+                    heading={false}
+                    structured={appearance.style === "instrument-updated"}
+                    names={appearance.style === "instrument-updated" ? jobNames : undefined}
+                    cancelled={view.cancelled}
+                    rerun={
+                      appearance.style === "instrument-updated"
+                        ? {
+                            start: rerun,
+                            filled: (job) => sentFor.current.has(job.statusUrl),
+                            follow: followJob,
+                            // A run that can't be left: a background job with a link can.
+                            busy: wouldLoseWork(state) && state.stage === "running",
+                          }
+                        : undefined
+                    }
+                    jobs={view.snapshot?.jobs ?? []}
+                    activeJob={
+                      state.stage === "running" && state.run.mode === "async"
+                        ? state.run.jobRef
+                        : undefined
+                    }
+                    dismissAdvertisedFor={view.dismissAdvertisedFor}
+                    messages={view.jobMessages}
+                    onRemove={commands.removeJob}
+                    onDismiss={commands.dismissJob}
+                  />
+                </SidePanel>
+                <SidePanel
+                  id={PANEL_IDS.about}
+                  title="About"
+                  open={panelOpen === "about"}
+                  inert={offerOpen}
+                  onClose={closePanel}
+                  className="about-panel"
+                  footer={<AboutFooter />}
+                >
+                  <AboutPanel />
+                </SidePanel>
+              </div>
+              {offerOpen && (
+                <RelayOffer onConfirm={commands.confirmRelay} onDecline={commands.declineRelay} />
+              )}
+            </div>
+          </DrawContext.Provider>
+        </DeveloperContext>
+      </UpdatedContext>
     </MapLimitsContext>
   );
 }

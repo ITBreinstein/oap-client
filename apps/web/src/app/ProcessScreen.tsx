@@ -3,15 +3,38 @@
  * (S2–S4).
  */
 
-import { useId, useMemo, type SyntheticEvent } from "react";
+import { redactUrl } from "@breinstein/oap-client";
+import {
+  useCallback,
+  useContext,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type SyntheticEvent,
+} from "react";
 import { schemaWarnings } from "../forms/schema-warnings.js";
 import type { FieldErrors } from "../forms/validate.js";
+import type { SessionObservation } from "../observations.js";
 import type { JobRow } from "../relay/job-session.js";
+import type { RenderableResult } from "../results/renderable.js";
 import { CONFIRM_WINDOW_MS } from "../relay/reconciler.js";
+import { linkTo, placeOf } from "./address.js";
+import { CopyField } from "./CopyButton.js";
 import { ErrorMessage } from "./ErrorMessage.js";
+import { lastExecution, requestLog } from "./request-log.js";
 import { FieldView } from "./FormFields.js";
 import { ResultsView } from "./ResultsView.js";
-import { offersLink } from "./run.js";
+import { SentInputs } from "./SentInputs.js";
+import { Versioned } from "./Versioned.js";
+import { useSpared } from "./developer.js";
+import { useUpdated } from "./variant.js";
+import { isUntouched } from "./form-memory.js";
+import { initialValues } from "../forms/defaults.js";
+import { shownOnMap } from "./input-shapes.js";
+import { MapLimitsContext } from "./map-limits.js";
+import { offersLink, namedFieldError } from "./run.js";
 import type { WorkflowCommands, WorkflowView } from "./useWorkflow.js";
 import type { Workflow } from "./workflow.js";
 
@@ -90,12 +113,10 @@ function About({ state }: { readonly state: Open }) {
 function OutputChoices({
   state,
   developer,
-  editable,
   onChange,
 }: {
   readonly state: Open;
   readonly developer: boolean;
-  readonly editable: boolean;
   readonly onChange: WorkflowCommands["setTransmission"];
 }) {
   const { process, linkOutputs } = state;
@@ -103,7 +124,7 @@ function OutputChoices({
   if (process.outputs.length === 0 || (!allowed && !developer)) return null;
   if (!allowed) {
     return (
-      <fieldset className="outputs developer" disabled={!editable}>
+      <fieldset className="outputs developer">
         <legend>Developer: ask for a link anyway</legend>
         <p className="muted">
           The description does not offer outputs by reference (
@@ -128,7 +149,7 @@ function OutputChoices({
     );
   }
   return (
-    <fieldset className="outputs" disabled={!editable}>
+    <fieldset className="outputs">
       <legend>Outputs</legend>
       {process.outputs.map((output) => {
         const link = linkOutputs.includes(output.id);
@@ -164,7 +185,20 @@ function OutputChoices({
   );
 }
 
-function JobStatusLine({ job }: { readonly job: JobRow | undefined }) {
+function JobStatusLine({
+  job,
+  processTitle,
+  spared,
+}: {
+  readonly job: JobRow | undefined;
+  readonly processTitle: string;
+  /**
+   * STYLE TRIAL (#43): the updated Instrument leads with the process and its
+   * status, "Slow process: running, 40%"; the job's id is the Developer
+   * section's.
+   */
+  readonly spared: boolean;
+}) {
   if (job === undefined) return <>Starting the job…</>;
   if (job.status === undefined) {
     return (
@@ -174,12 +208,21 @@ function JobStatusLine({ job }: { readonly job: JobRow | undefined }) {
       </>
     );
   }
-  const progress = job.status.progress === undefined ? "" : `, ${String(job.status.progress)}%`;
   return (
     <>
-      Job <code>{job.status.jobId}</code>:{" "}
+      {spared ? (
+        <>{processTitle}: </>
+      ) : (
+        <>
+          Job <code>{job.status.jobId}</code>:{" "}
+        </>
+      )}
       <strong data-job-status={job.status.status}>{job.status.rawStatus}</strong>
-      {progress}
+      {job.status.progress !== undefined && (
+        <>
+          , <span className="progress-figure">{job.status.progress}%</span>
+        </>
+      )}
       {job.status.message !== undefined && <span className="muted"> — {job.status.message}</span>}
       {job.acceptedLong && job.status.status === "accepted" && (
         // Information, not a warning: nothing is known to be wrong, and the
@@ -199,10 +242,25 @@ function JobStatusLine({ job }: { readonly job: JobRow | undefined }) {
  * 0047). Both are shown, and the results read after the first stay on screen:
  * they are what the server handed out.
  */
-function StatusChanged({ job }: { readonly job: JobRow | undefined }) {
+function StatusChanged({
+  job,
+  updated,
+}: {
+  readonly job: JobRow | undefined;
+  /** STYLE TRIAL (#30): the updated Instrument says it in one line. */
+  readonly updated: boolean;
+}) {
   if (job?.confirmation?.state !== "changed" || job.status === undefined) return null;
   const { first } = job.confirmation;
   const now = job.status;
+  if (updated) {
+    return (
+      <p className="notice" role="status" data-status-changed={`${first.status}->${now.status}`}>
+        The service later reported this job as {now.rawStatus}.
+        {now.message !== undefined && <span className="muted"> {now.message}</span>}
+      </p>
+    );
+  }
   return (
     <div className="notice" role="status" data-status-changed={`${first.status}->${now.status}`}>
       <p>
@@ -223,8 +281,18 @@ function StatusChanged({ job }: { readonly job: JobRow | undefined }) {
  * a server can rewrite it as `failed` when it cannot deliver the success
  * callback (finding 0047, review W14). Information, not a warning.
  */
-function NotYetConfirmed({ job }: { readonly job: JobRow | undefined }) {
-  if (job?.confirmation?.state !== "pending") return null;
+function NotYetConfirmed({
+  job,
+  updated,
+}: {
+  readonly job: JobRow | undefined;
+  /**
+   * STYLE TRIAL (#30): the updated Instrument shows the result as done and
+   * reads on quietly; the Developer section says it is not yet confirmed.
+   */
+  readonly updated: boolean;
+}) {
+  if (updated || job?.confirmation?.state !== "pending") return null;
   const minutes = Math.round(CONFIRM_WINDOW_MS / 60_000);
   return (
     <p className="hint" data-not-yet-confirmed="true">
@@ -233,6 +301,195 @@ function NotYetConfirmed({ job }: { readonly job: JobRow | undefined }) {
       minutes.
     </p>
   );
+}
+
+/** The host of a base URL, for the path line above the title. */
+function hostOf(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url;
+  }
+}
+
+function seconds(ms: number): string {
+  return ms < 1000 ? `${String(Math.round(ms))} ms` : `${(ms / 1000).toFixed(1)} s`;
+}
+
+function bytes(size: number): string {
+  if (size < 1024) return `${String(size)} bytes`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} kB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/** What the page knows of one output's media type: none for a link not loaded. */
+function mediaTypeOf(result: RenderableResult): string | undefined {
+  switch (result.kind) {
+    case "json":
+      return "application/json";
+    case "text":
+    case "download":
+    case "reference":
+      return result.mediaType;
+  }
+}
+
+/** The bytes the server sent for one output, where the page holds them. */
+function sizeOf(result: RenderableResult): number | undefined {
+  switch (result.kind) {
+    case "text":
+    case "download":
+      return result.blob?.size;
+    case "json":
+    case "reference":
+      return undefined;
+  }
+}
+
+/** The reason phrase HTTP gives the statuses a run ends with. */
+const REASONS: Readonly<Record<number, string>> = { 200: "OK", 201: "Created", 204: "No Content" };
+
+/**
+ * One ruled line under a result: how it ended, in what format, how large, and,
+ * for a run in the foreground, how long the server took. Only what the page
+ * has: a cell it does not know is left out, never guessed.
+ */
+/** How long a background job ran, by the server's own clock, when it says. */
+function jobTook(job: JobRow | undefined): number | undefined {
+  const started = Date.parse(job?.status?.started ?? "");
+  const finished = Date.parse(job?.status?.finished ?? "");
+  return Number.isNaN(started) || Number.isNaN(finished) || finished < started
+    ? undefined
+    : finished - started;
+}
+
+function ResultStrip({
+  state,
+  job,
+  execution,
+  spared,
+}: {
+  readonly state: Extract<Workflow, { stage: "result" }>;
+  readonly job: JobRow | undefined;
+  readonly execution: ReturnType<typeof lastExecution>;
+  /**
+   * STYLE TRIAL (#27): the updated Instrument says "Finished" and how long it
+   * took, the same for a run in the foreground and one in the background;
+   * the HTTP status and the media types are for developers.
+   */
+  readonly spared: boolean;
+}) {
+  const background = state.jobRef !== undefined;
+  if (spared) {
+    const took = background ? jobTook(job) : execution?.elapsedMs;
+    return (
+      <dl className="result-strip">
+        <div>
+          <dt className="label">Status</dt>
+          <dd data-ok="true">Finished</dd>
+        </div>
+        {took !== undefined && (
+          <div>
+            <dt className="label">Took</dt>
+            <dd className="mono">{seconds(took)}</dd>
+          </div>
+        )}
+      </dl>
+    );
+  }
+  const code = execution?.status;
+  const status = background
+    ? job?.status?.rawStatus
+    : code === undefined
+      ? undefined
+      : [String(code), REASONS[code]].filter(Boolean).join(" ");
+  const ok = background ? job?.status?.status === "successful" : code !== undefined && code < 300;
+  const formats = [...new Set(state.results.flatMap((result) => mediaTypeOf(result) ?? []))].join(
+    " · ",
+  );
+  const sizes = state.results.map(sizeOf);
+  const size = sizes.every((each) => each !== undefined)
+    ? sizes.reduce((sum, each) => sum + each, 0)
+    : undefined;
+  return (
+    <dl className="result-strip">
+      {status !== undefined && (
+        <div>
+          <dt className="label">Status</dt>
+          <dd className="mono" data-ok={ok}>
+            {status}
+          </dd>
+        </div>
+      )}
+      {formats !== "" && (
+        <div>
+          <dt className="label">Format</dt>
+          <dd className="mono">{formats}</dd>
+        </div>
+      )}
+      {size !== undefined && state.results.length > 0 && (
+        <div>
+          <dt className="label">Size</dt>
+          <dd className="mono">{bytes(size)}</dd>
+        </div>
+      )}
+      {!background && execution !== undefined && (
+        <div>
+          <dt className="label">Took</dt>
+          <dd className="mono">{seconds(execution.elapsedMs)}</dd>
+        </div>
+      )}
+    </dl>
+  );
+}
+
+/**
+ * The requests this page made to the service, newest last, as the session
+ * recorded them.
+ */
+export function RequestLog({
+  entries,
+  endpoint,
+}: {
+  readonly entries: readonly SessionObservation[];
+  readonly endpoint: string;
+}) {
+  const base = useId();
+  const requests = requestLog(entries, endpoint, 12);
+  return (
+    <section className="request-log" aria-labelledby={`${base}-log`}>
+      <h3 id={`${base}-log`} className="label">
+        Requests to this service
+      </h3>
+      <ol>
+        {requests.length === 0 && <li className="mono muted">Nothing sent yet.</li>}
+        {requests.map((request, index) => (
+          // The same request can repeat (a poll): its place is its identity.
+          <li key={index} className="mono">
+            <span className="request-method">{request.method}</span>{" "}
+            {/* The path under the service's address: the address is the page's already. */}
+            <span className="request-url" title={request.url}>
+              {pathUnder(request.url, endpoint)}
+            </span>{" "}
+            <span
+              className="request-status"
+              data-ok={request.status !== undefined && request.status < 400}
+            >
+              {request.status === undefined ? "—" : String(request.status)}
+            </span>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
+/** A request's address under the service's own, as a path; another address whole. */
+function pathUnder(url: string, endpoint: string): string {
+  const base = endpoint.endsWith("/") ? endpoint.slice(0, -1) : endpoint;
+  if (url !== base && !url.startsWith(`${base}/`) && !url.startsWith(`${base}?`)) return url;
+  const rest = url.slice(base.length);
+  return rest.startsWith("/") ? rest : `/${rest}`;
 }
 
 /** Whether the relay registered callbacks for a job; `undefined` for no job. */
@@ -250,6 +507,69 @@ export interface ProcessScreenProps {
   readonly dismissAdvertisedBy: WorkflowView["dismissAdvertisedBy"];
   /** Opened with `?developer`: offers asking for a link the description does not. */
   readonly developer?: boolean | undefined;
+  /** The session's observations: the request log and the result's timing are read off them. */
+  readonly observations?: readonly SessionObservation[] | undefined;
+  /**
+   * This page has seen that it can't find a background job started on this
+   * service the way it reaches it (#25): Run in the background is off.
+   */
+  readonly backgroundUnfindable?: boolean | undefined;
+  /**
+   * The relay lists this service, and its background runs go through it:
+   * reconnect that way, to this process, the form as it is (#25).
+   */
+  readonly onRelayForBackground?: (() => void) | undefined;
+  /**
+   * STYLE TRIAL (#40): on a narrow screen, where the map goes, right under
+   * the result: the element is handed to this, and the result links to it.
+   */
+  readonly mapSlot?: ((element: HTMLDivElement | null) => void) | undefined;
+}
+
+/** After this long, a foreground run that may go in the background says so. */
+export const BACKGROUND_HINT_SECONDS = 10;
+
+/**
+ * A foreground run under way (#24): how long it has waited, counted each
+ * second, and a way out. Mounted when the run starts, so its first render is
+ * the run's start. The count is not read out every second: the live region
+ * around it announces the hint once, and nothing else.
+ */
+export function WaitingForAnswer({
+  canRunInBackground,
+  onStop,
+}: {
+  readonly canRunInBackground: boolean;
+  readonly onStop: () => void;
+}) {
+  const [startedAt] = useState(() => Date.now());
+  const [now, setNow] = useState(startedAt);
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+    return () => {
+      clearInterval(timer);
+    };
+  }, []);
+  const seconds = Math.floor((now - startedAt) / 1000);
+  return (
+    <>
+      <p aria-live="off" data-testid="waited">
+        Waiting for the service: {seconds} s
+      </p>
+      {canRunInBackground && seconds >= BACKGROUND_HINT_SECONDS && (
+        <p className="hint">
+          Long runs can go in the background: tick Run in the background next time.
+        </p>
+      )}
+      <p className="actions">
+        <button type="button" className="secondary" onClick={onStop}>
+          Stop waiting
+        </button>
+      </p>
+    </>
+  );
 }
 
 export function ProcessScreen(props: ProcessScreenProps) {
@@ -258,8 +578,10 @@ export function ProcessScreen(props: ProcessScreenProps) {
   const { process, plan, values, warnings, mode } = state;
   const base = useId();
   const both = process.execution.sync && process.execution.async;
+  const unfindable = props.backgroundUnfindable === true;
   const onlyAsync = process.execution.async && !process.execution.sync;
   const editable = state.stage === "process";
+  const { maxCoordinates } = useContext(MapLimitsContext);
   const errorCount = fieldErrors.size;
   // Recomputed only when the values change, not on every job snapshot.
   const schemaNotes = useMemo(
@@ -267,10 +589,84 @@ export function ProcessScreen(props: ProcessScreenProps) {
     [editable, process, plan, values],
   );
 
+  // After a Run the form refused, focus goes to the first input in error,
+  // so it is read with its message and can be put right at once.
+  const form = useRef<HTMLFormElement>(null);
+  const submitted = useRef(false);
   const onSubmit = (event: SyntheticEvent) => {
     event.preventDefault();
+    submitted.current = true;
     commands.run();
   };
+  useEffect(() => {
+    if (!submitted.current) return;
+    submitted.current = false;
+    if (fieldErrors.size === 0) return;
+    form.current
+      ?.querySelector<HTMLElement>(
+        ".field.has-error :is(input:not([type='hidden']), select, textarea, button)",
+      )
+      ?.focus();
+  }, [fieldErrors]);
+  // STYLE TRIAL: in the updated Instrument the server's answer is beside Run.
+  // When it comes, the stage's focus lands on it rather than on the heading
+  // (App.tsx moves it), and it is then scrolled clear of the Run bar: after
+  // that move, which would otherwise scroll the panel back to its top.
+  const updated = useUpdated();
+  const spared = useSpared(updated);
+  const serverErrorBox = useRef<HTMLDivElement>(null);
+  const shownError = state.stage === "process" ? state.error : undefined;
+  // The service's words name an input, which is marked as the form's own
+  // checks mark one (#11): focus goes to it, not to the heading or the error.
+  const namedInput = shownError?.inputId;
+  const serviceNamed = namedFieldError(shownError);
+  const errorTakesFocus = updated && shownError !== undefined && namedInput === undefined;
+  useEffect(() => {
+    if (namedInput === undefined) return;
+    form.current
+      ?.querySelector<HTMLElement>(
+        ".field.has-error :is(input:not([type='hidden']), select, textarea, button)",
+      )
+      ?.focus();
+  }, [shownError, namedInput]);
+  useEffect(() => {
+    if (shownError === undefined || namedInput !== undefined) return undefined;
+    const frame = requestAnimationFrame(() => {
+      const box = serverErrorBox.current;
+      // Not in every DOM: jsdom, for one, has no scrolling.
+      if (box !== null && "scrollIntoView" in box) box.scrollIntoView({ block: "nearest" });
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+    };
+  }, [shownError, namedInput]);
+  // A Run that went ahead leaves nothing to focus later.
+  useEffect(() => {
+    submitted.current = false;
+  }, [state.stage]);
+
+  // STYLE TRIAL (#40): the map's place under the result, on a narrow screen.
+  const giveMapSlot = props.mapSlot;
+  const mapHere = giveMapSlot !== undefined;
+  const mapSlotRef = useCallback(
+    (element: HTMLDivElement | null) => {
+      giveMapSlot?.(element);
+    },
+    [giveMapSlot],
+  );
+
+  // Cancel job asks first (#31); the question goes with the run.
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
+  const keepJob = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (confirmingCancel) keepJob.current?.focus();
+  }, [confirmingCancel]);
+  const runKey = state.stage === "running" ? state.runId : undefined;
+  const [askedFor, setAskedFor] = useState(runKey);
+  if (askedFor !== runKey) {
+    setAskedFor(runKey);
+    setConfirmingCancel(false);
+  }
 
   const run = state.stage === "running" ? state.run : undefined;
   const job = run?.mode === "async" ? jobs.find((row) => row.statusUrl === run.jobRef) : undefined;
@@ -278,27 +674,51 @@ export function ProcessScreen(props: ProcessScreenProps) {
     state.stage === "result" && state.jobRef !== undefined
       ? jobs.find((row) => row.statusUrl === state.jobRef)
       : undefined;
+  const observations = props.observations ?? [];
+  const endpointKey = redactUrl(state.endpoint.baseUrl);
+  // STYLE TRIAL: in the updated Instrument a background job with a link can be
+  // left for another process; its link is on screen, and it goes on in My jobs.
+  const place = placeOf(state);
+  const jobLink = place.job === undefined ? undefined : linkTo(place);
+  const leavable = state.stage !== "running" || (updated && jobLink !== undefined);
+  const watched =
+    (state.stage === "running" && state.run.mode === "async" && state.run.watched === true) ||
+    (state.stage === "result" && state.watched === true);
+  // The server's answer to the last Run: beside the Run button in the updated
+  // Instrument, below the form in Instrument as it is.
+  // An input the service's words name is in the headline, by its label (#23).
+  const serverError = state.stage === "process" && (
+    <ErrorMessage error={state.error} tone={state.error?.notice === true ? "notice" : "error"} />
+  );
 
   return (
-    <section aria-labelledby={`${base}-heading`}>
+    <section className="process-screen" aria-labelledby={`${base}-heading`}>
       <p className="breadcrumb">
-        <button
-          type="button"
-          className="link"
-          onClick={commands.backToList}
-          disabled={state.stage === "running"}
-        >
-          All processes
+        <button type="button" className="link" onClick={commands.backToList} disabled={!leavable}>
+          <span aria-hidden="true">← </span>All processes
         </button>
+      </p>
+      <p className="process-path mono">
+        <span className="process-service">
+          {state.service.title ?? hostOf(state.endpoint.baseUrl)} <span aria-hidden="true">/</span>
+          <span className="visually-hidden">, process</span>{" "}
+        </span>
+        <span className="process-path-id">{process.id}</span>
       </p>
       <h2
         id={`${base}-heading`}
         tabIndex={-1}
-        data-focus-on-stage={state.stage === "process" ? true : undefined}
+        data-focus-on-stage={
+          state.stage === "process" && !errorTakesFocus && namedInput === undefined
+            ? true
+            : undefined
+        }
       >
         {process.title ?? process.id}
       </h2>
-      {process.description !== undefined && <p>{process.description}</p>}
+      {process.description !== undefined && (
+        <p className="process-summary">{process.description}</p>
+      )}
       <About state={state} />
 
       {process.execution.defaulted && (
@@ -319,66 +739,6 @@ export function ProcessScreen(props: ProcessScreenProps) {
         </div>
       )}
 
-      <form onSubmit={onSubmit} noValidate aria-labelledby={`${base}-heading`}>
-        <fieldset disabled={!editable} className="form-body">
-          <legend className="visually-hidden">Inputs</legend>
-          {plan.fields.length === 0 && <p>This process takes no inputs.</p>}
-          {plan.fields.map((field, index) => (
-            <FieldView
-              key={field.id}
-              field={field}
-              index={index}
-              values={values}
-              error={fieldErrors.get(field.id)}
-              warnings={schemaNotes?.get(field.id)}
-              onChange={commands.setValue}
-            />
-          ))}
-        </fieldset>
-
-        <OutputChoices
-          state={state}
-          developer={developer}
-          editable={editable}
-          onChange={commands.setTransmission}
-        />
-
-        {errorCount > 0 && (
-          <p className="error-box" role="alert">
-            {errorCount === 1 ? "One input needs" : `${String(errorCount)} inputs need`} attention
-            before this can run. The messages are next to each one.
-          </p>
-        )}
-
-        {state.stage === "process" && (
-          <div className="run-bar">
-            {both && (
-              <label className="choice">
-                <input
-                  type="checkbox"
-                  checked={mode === "async"}
-                  onChange={(event) => {
-                    commands.setMode(event.target.checked ? "async" : "sync");
-                  }}
-                />{" "}
-                Run in the background
-              </label>
-            )}
-            <button type="submit">{onlyAsync ? "Run in the background" : "Run"}</button>
-          </div>
-        )}
-      </form>
-
-      {state.stage === "process" && (
-        <ErrorMessage
-          error={state.error}
-          tone={state.error?.notice === true ? "notice" : "error"}
-        />
-      )}
-      {state.stage === "process" && state.error?.inputId !== undefined && (
-        <p className="hint">The server's message names the input “{state.error.inputId}”.</p>
-      )}
-
       {state.stage === "running" && (
         <div
           className="running"
@@ -388,22 +748,97 @@ export function ProcessScreen(props: ProcessScreenProps) {
           data-doorbells={job?.doorbells}
           data-callbacks={callbacksOf(job)}
         >
+          {/* Movement only: the words below say what is happening. */}
+          <div className="progress-line" aria-hidden="true" />
           {state.run.mode === "sync" ? (
-            <p>Running… waiting for the server's answer.</p>
+            <WaitingForAnswer
+              canRunInBackground={process.execution.async}
+              onStop={commands.stopWaiting}
+            />
           ) : (
             <>
               <p>
-                <JobStatusLine job={job} />
+                <JobStatusLine
+                  job={job}
+                  processTitle={process.title ?? process.id}
+                  spared={spared}
+                />
               </p>
-              {state.run.jobRef !== undefined && (
+              {updated && jobLink !== undefined && (
+                <div className="job-link">
+                  <p>
+                    The job runs on the service, whether this page is open or not. Its link shows
+                    its progress, then its results, wherever you open it:
+                  </p>
+                  <CopyField text={jobLink} name="Copy the job’s link">
+                    <input
+                      type="text"
+                      readOnly
+                      value={jobLink}
+                      aria-label="The job’s link"
+                      onFocus={(event) => {
+                        event.currentTarget.select();
+                      }}
+                    />
+                  </CopyField>
+                </div>
+              )}
+              {state.run.jobRef !== undefined && confirmingCancel && !watched && (
+                // As My jobs' Dismiss asks (#31): the safe answer has the focus.
+                <div className="job-confirm" role="group" aria-label="Confirm cancelling">
+                  <p>
+                    Cancel this job on the server? The server stops it if it is still running, and
+                    may delete its results. This cannot be undone.
+                  </p>
+                  <p className="actions">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setConfirmingCancel(false);
+                        commands.cancelJob();
+                      }}
+                    >
+                      Cancel job
+                    </button>{" "}
+                    <button
+                      type="button"
+                      className="secondary"
+                      ref={keepJob}
+                      onClick={() => {
+                        setConfirmingCancel(false);
+                      }}
+                    >
+                      Keep job
+                    </button>
+                  </p>
+                </div>
+              )}
+              {state.run.jobRef !== undefined && !(confirmingCancel && !watched) && (
                 <p className="actions">
-                  <button type="button" className="secondary" onClick={commands.cancelJob}>
-                    Cancel job
-                  </button>
-                  {dismissAdvertisedBy === "nothing" && (
+                  {updated && jobLink !== undefined && (
+                    <button type="button" onClick={commands.backToList}>
+                      Start another process
+                    </button>
+                  )}
+                  {/* Not for a job this page only follows (#32): it isn't this browser's to cancel. */}
+                  {!watched && (
+                    <button
+                      type="button"
+                      className="secondary"
+                      onClick={() => {
+                        setConfirmingCancel(true);
+                      }}
+                    >
+                      Cancel job
+                    </button>
+                  )}
+                  {!watched && dismissAdvertisedBy === "nothing" && (
                     <span className="muted">
                       {" "}
-                      This server does not advertise that jobs can be cancelled; trying is recorded.
+                      <Versioned
+                        current="This server does not advertise that jobs can be cancelled; trying is recorded."
+                        updated="This service doesn’t say it supports cancelling. You can still try; what happens is noted below."
+                      />
                     </span>
                   )}
                 </p>
@@ -419,25 +854,176 @@ export function ProcessScreen(props: ProcessScreenProps) {
         // gone the moment a read finds the job done, which can be within
         // milliseconds of the doorbell that prompted the read.
         <div
+          className="result-block"
           data-result-of={state.jobRef}
           data-doorbells={resultJob?.doorbells}
           data-callbacks={callbacksOf(resultJob)}
           data-confirmation={resultJob?.confirmation?.state}
         >
-          <StatusChanged job={resultJob} />
-          <NotYetConfirmed job={resultJob} />
+          <StatusChanged job={resultJob} updated={updated} />
+          <NotYetConfirmed job={resultJob} updated={updated} />
           <ResultsView
             results={state.results}
             processId={process.id}
             onLoad={commands.loadReference}
           />
-          <p className="actions">
-            <button type="button" onClick={commands.edit}>
-              Change the inputs
-            </button>
-          </p>
+          <ResultStrip
+            state={state}
+            job={resultJob}
+            execution={lastExecution(observations, endpointKey, process.id)}
+            spared={spared}
+          />
+          {mapHere && (
+            <p className="show-on-map">
+              {/* A button, not a #fragment link: that would be a step in the
+                  page's history, which Back reads as leaving the result. */}
+              <button
+                type="button"
+                className="link"
+                onClick={() => {
+                  const map = document.getElementById("result-map");
+                  map?.scrollIntoView({ block: "start" });
+                  map?.focus({ preventScroll: true });
+                }}
+              >
+                Show on the map
+              </button>
+            </p>
+          )}
         </div>
       )}
+      {/* STYLE TRIAL (#40): the map, right under the result, on a narrow screen. */}
+      {state.stage === "result" && mapHere && (
+        <div id="result-map" className="map-slot" ref={mapSlotRef} tabIndex={-1} />
+      )}
+      {state.stage === "result" && (
+        <p className="actions next-steps">
+          <button type="button" onClick={commands.edit}>
+            Change the inputs
+          </button>
+          {/* STYLE TRIAL: the updated Instrument has the way back at the top only. */}
+          {!updated && (
+            <button type="button" className="secondary" onClick={commands.backToList}>
+              Choose another process
+            </button>
+          )}
+        </p>
+      )}
+
+      {/* While a run is under way and after it, the status or result comes
+          first, and below it the record of what was sent, as text, under its
+          own heading. "Change the inputs" brings the form back. */}
+      {!editable && watched && (
+        <p className="muted sent-unknown">
+          This page didn’t start this job, so it doesn’t know its inputs.
+        </p>
+      )}
+      {!editable && !watched && (
+        <SentInputs
+          headingId={`${base}-sent`}
+          plan={plan}
+          values={values}
+          process={process}
+          linkOutputs={state.linkOutputs}
+          developer={developer}
+          done={state.stage === "result"}
+          onMap={(fieldId, value) => {
+            const field = plan.fields.find((candidate) => candidate.id === fieldId);
+            return field !== undefined && shownOnMap(field, value, maxCoordinates);
+          }}
+        />
+      )}
+      {editable && (
+        <form ref={form} onSubmit={onSubmit} noValidate aria-labelledby={`${base}-heading`}>
+          <fieldset className="form-body">
+            <legend className="visually-hidden">Inputs</legend>
+            {plan.fields.length === 0 && <p>This process takes no inputs.</p>}
+            {plan.fields.map((field, index) => (
+              <FieldView
+                key={field.id}
+                field={field}
+                index={index}
+                values={values}
+                error={fieldErrors.get(field.id) ?? serviceNamed.get(field.id)}
+                warnings={schemaNotes?.get(field.id)}
+                onChange={commands.setValue}
+              />
+            ))}
+          </fieldset>
+
+          {/* The form comes back as it was left (#10): this is the way to start over. */}
+          {!isUntouched(values, initialValues(plan)) && (
+            <p className="actions clear-form">
+              <button type="button" className="secondary" onClick={commands.clearForm}>
+                Clear the form
+              </button>
+            </p>
+          )}
+
+          <OutputChoices state={state} developer={developer} onChange={commands.setTransmission} />
+
+          {errorCount > 0 && (
+            <p className="error-box" role="alert">
+              {errorCount === 1 ? "One input needs" : `${String(errorCount)} inputs need`} attention
+              before this can run. The messages are next to each one.
+            </p>
+          )}
+
+          {updated && shownError !== undefined && (
+            <div
+              className="server-error"
+              ref={serverErrorBox}
+              tabIndex={-1}
+              data-focus-on-stage={namedInput === undefined ? true : undefined}
+            >
+              {serverError}
+            </div>
+          )}
+
+          {unfindable && (both || onlyAsync) && (
+            <div className="background-help">
+              <p id={`${base}-no-background`} className="hint">
+                This service can’t tell a web page where its background jobs are.
+              </p>
+              {props.onRelayForBackground !== undefined && (
+                <p className="actions">
+                  <button type="button" className="secondary" onClick={props.onRelayForBackground}>
+                    Use the relay for background runs
+                  </button>
+                </p>
+              )}
+            </div>
+          )}
+
+          <div className="run-bar">
+            {both && (
+              <label className="choice">
+                <input
+                  type="checkbox"
+                  checked={mode === "async" && !unfindable}
+                  disabled={unfindable}
+                  aria-describedby={unfindable ? `${base}-no-background` : undefined}
+                  onChange={(event) => {
+                    commands.setMode(event.target.checked ? "async" : "sync");
+                  }}
+                />{" "}
+                Run in the background
+              </label>
+            )}
+            {(both || onlyAsync) && (
+              // What "in the background" asks the server for, in its own words.
+              <code className="run-hint" aria-hidden="true">
+                Prefer: respond-async
+              </code>
+            )}
+            <button type="submit">{onlyAsync ? "Run in the background" : "Run"}</button>
+          </div>
+        </form>
+      )}
+
+      {!updated && serverError}
+      {/* STYLE TRIAL: the updated Instrument has it in the developer section instead (App.tsx). */}
+      {!updated && <RequestLog entries={observations} endpoint={endpointKey} />}
     </section>
   );
 }

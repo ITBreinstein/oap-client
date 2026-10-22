@@ -8,6 +8,7 @@
  */
 
 import { useEffect, useId, useLayoutEffect, useRef } from "react";
+import { useUpdated } from "./variant.js";
 
 export interface RelayOfferProps {
   readonly onConfirm: () => void;
@@ -23,9 +24,10 @@ export interface RelayOfferProps {
  */
 export function RelayOffer({ onConfirm, onDecline }: RelayOfferProps) {
   const base = useId();
+  const updated = useUpdated();
   const cancel = useRef<HTMLButtonElement>(null);
   // Focus the safe answer: nothing is sent through the relay unless the user
-  // moves to "Use relay" and presses it.
+  // moves to "Use relay" ("Open") and presses it.
   useEffect(() => {
     cancel.current?.focus();
   }, []);
@@ -55,14 +57,19 @@ export function RelayOffer({ onConfirm, onDecline }: RelayOfferProps) {
         aria-describedby={`${base}-text`}
         data-testid="relay-offer"
       >
-        <h2 id={`${base}-title`}>Use the relay?</h2>
+        {/* STYLE TRIAL: the updated Instrument asks in a visitor's words (#5).
+            The attempt is recorded as a finding all the same. */}
+        <h2 id={`${base}-title`}>
+          {updated ? "Open through Breinstein’s server?" : "Use the relay?"}
+        </h2>
         <p id={`${base}-text`}>
-          This page could not read this server directly: it sends no CORS headers, or it could not
-          be reached. Try it through the relay instead? This will be recorded as a finding.
+          {updated
+            ? "This service can’t be opened directly from a web page. Breinstein’s server can pass the requests on for you."
+            : "This page could not read this server directly: it sends no CORS headers, or it could not be reached. Try it through the relay instead? This will be recorded as a finding."}
         </p>
         <p className="actions">
           <button type="button" onClick={onConfirm} data-testid="relay-confirm">
-            Use relay
+            {updated ? "Open" : "Use relay"}
           </button>
           <button
             type="button"
@@ -71,7 +78,7 @@ export function RelayOffer({ onConfirm, onDecline }: RelayOfferProps) {
             onClick={onDecline}
             data-testid="relay-decline"
           >
-            Cancel
+            {updated ? "Not now" : "Cancel"}
           </button>
         </p>
       </div>

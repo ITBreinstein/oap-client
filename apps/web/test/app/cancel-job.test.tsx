@@ -50,7 +50,9 @@ beforeEach(() => {
   executes.length = 0;
   deletes.length = 0;
   vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = new URL(input instanceof Request ? input.url : String(input));
+    // Against the page, as a browser's fetch takes a path: the page fetches its own
+    // backdrop picture by one when it is idle, which a slow run reaches mid-test.
+    const url = new URL(input instanceof Request ? input.url : String(input), location.href);
     const method = (init?.method ?? "GET").toUpperCase();
     if (method === "POST" && url.pathname.endsWith("/execution")) {
       executes.push({ url: url.toString(), prefer: new Headers(init?.headers).get("Prefer") });
@@ -161,6 +163,11 @@ async function cancel(view: HTMLElement): Promise<void> {
     button(view, "Cancel job")?.click();
     await Promise.resolve();
   });
+  // It asks first (#31); the answer is Cancel job again.
+  await act(async () => {
+    view.querySelector<HTMLButtonElement>(".job-confirm button")?.click();
+    await Promise.resolve();
+  });
   await flush();
 }
 
@@ -212,5 +219,34 @@ describe("Cancel job on a background run", () => {
     );
     expect(view.querySelector("[data-job-ref]")).not.toBeNull();
     expect(cancelRecord(view)).toMatchObject({ outcome: "failed" });
+  });
+});
+
+describe("Cancel job asks first (#31)", () => {
+  it("sends nothing until the question is answered, and Keep job keeps it", async () => {
+    let asked = 0;
+    dismissAnswer = () => {
+      asked += 1;
+      return json({ jobID: "j1", status: "dismissed" });
+    };
+    const view = await connectTyped(BASE);
+    await runInBackground(view);
+    await act(async () => {
+      button(view, "Cancel job")?.click();
+      await Promise.resolve();
+    });
+    const question = view.querySelector(".job-confirm");
+    expect(question?.textContent).toContain(
+      "Cancel this job on the server? The server stops it if it is still running, and may delete its results. This cannot be undone.",
+    );
+    expect(document.activeElement?.textContent).toBe("Keep job");
+    await act(async () => {
+      button(view, "Keep job")?.click();
+      await Promise.resolve();
+    });
+    await flush();
+    expect(asked).toBe(0);
+    expect(view.querySelector(".job-confirm")).toBeNull();
+    expect(view.querySelector("[data-job-ref]")).not.toBeNull();
   });
 });

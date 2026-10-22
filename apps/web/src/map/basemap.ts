@@ -18,6 +18,17 @@ export const PDOK_BRT_MAX_ZOOM = 19;
 export const PDOK_BRT_ATTRIBUTION =
   'Kaartgegevens &copy; <a href="https://www.kadaster.nl">Kadaster</a> (BRT-Achtergrondkaart, CC BY 4.0), via <a href="https://www.pdok.nl">PDOK</a>';
 
+/**
+ * STYLE TRIAL (updated Instrument): the whole world, from OpenFreeMap:
+ * OpenStreetMap data as OpenMapTiles vector tiles, with no key and no usage
+ * limits, answering `Access-Control-Allow-Origin: *` (checked 2026-10-21). Its
+ * light style in either theme: the dark one was too dark to read the map by.
+ * "Bright" rather than "Liberty": the same map without 3D buildings, which
+ * were slow to draw. The tiles credit themselves (OpenFreeMap, OpenMapTiles,
+ * OpenStreetMap), and the attribution control shows it.
+ */
+export const OPENFREEMAP_STYLE = "https://tiles.openfreemap.org/styles/bright";
+
 /** The Netherlands, west, south, east, north: where the demo starts. */
 export const INITIAL_BOUNDS = [3.2, 50.7, 7.3, 53.6] as const;
 
@@ -59,4 +70,13 @@ export const RESULT_STYLE = {
   fillOpacity: 0.3,
   outline: "#1d4ed8",
   outlineWidth: 3,
+} as const;
+
+/**
+ * A clicked result shape (#20): outlined dark and thicker, on a white casing,
+ * so it stands out by its outline's weight and not by colour alone.
+ */
+export const SELECTED_STYLE = {
+  outline: "#0f172a",
+  outlineWidth: 4,
 } as const;

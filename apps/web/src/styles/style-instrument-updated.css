@@ -1,0 +1,1188 @@
+/*
+ * STYLE TRIAL: Instrument, updated after a UI/UX review, to compare with
+ * Instrument as it is. Appearance → Style → "Instrument (updated)", or
+ * `?style=instrument-updated`. Both versions are `data-style="instrument"`;
+ * this one is also `data-variant="updated"`, and every rule here is under it.
+ *
+ * Once one is chosen: if the update wins, drop the `[data-variant="updated"]`
+ * prefix and move these rules into `style-instrument.css`; if it loses,
+ * delete this file. Either way, delete the second entry of `STYLE_NAMES`
+ * (`app/appearance.ts`) and `data-variant` (ADR 0002).
+ *
+ * Markup only the update shows, hidden by default in `styles.css`: the words
+ * in `app/Versioned.tsx` (`.when-updated`), used once, for a job that can't
+ * be cancelled. Keep the update's words and delete the component, or the
+ * other way round.
+ *
+ * What the update does in code, where `useUpdated()` (`app/variant.ts`) or
+ * `appearance.style` is read: the start screen picks no service for the
+ * user (`EndpointScreen.tsx`, `unpicked`), fills in a picked service's
+ * address, and shows the featured examples right under the address row
+ * (`EndpointScreen.tsx`, #2); a need is shown in a word beside its mark,
+ * and nothing where it is not known yet (`NeedsTag.tsx`, `NEEDS_SHORT`, #8);
+ * without `?developer`, a visitor is spared a box's CRS (`BboxField`), "The
+ * attempt has been recorded." (`ErrorMessage`, `ResultsView`) and a running
+ * job's id (`ProcessScreen`, `JobStatusLine`), all through `useSpared`
+ * (`app/developer.ts`), and My jobs names a job's process and service by
+ * their titles (`app/titles.ts`, `App.tsx` `jobNames`, `JobsPanel` `names`;
+ * #43); the relay question asks in a visitor's words (`RelayRoute.tsx`, #5);
+ * the known services are listed once each, by name, and "Always reached
+ * directly" is said of a typed address only (`EndpointScreen.tsx`,
+ * `app/service-list.ts`, #3); a finished job being confirmed says nothing, and
+ * a changed status is said in one line (`ProcessScreen` `NotYetConfirmed`,
+ * `StatusChanged`; `JobsPanel` `JobFacts`; #30); a result that is one plain
+ * value is shown large, and the status line says "Finished" and how long it
+ * took (`ResultsView`, `results/plain-value.ts`, `ProcessScreen` `ResultStrip`;
+ * #27); the form beside the map can be made wider (`App.tsx`,
+ * `app/PanelHandle.tsx`, `app/panel-width.ts`; #36); on a narrow screen the map is right under the
+ * result, which links to it (`App.tsx` `mapUnderResult`, `ProcessScreen`
+ * `mapSlot`; #40); the Developer section is there only with `?developer`
+ * (`App.tsx`, #38); a form leaves out a line of limits its description
+ * already gives, and a yes/no box has "Yes" beside it (`FormFields.tsx`
+ * `limitsSaid`, `labelId`; `forms/limits-stated.ts`; #14); JSON that doesn't
+ * parse is said under its box in plain words, the parser's for developers
+ * (`FormFields.tsx` `boxTrouble`, `JsonTroubleNote.tsx`,
+ * `forms/json-trouble.ts`; #13); a small image is shown at 128px at least,
+ * and opens full size (`ResultImage.tsx`, #29); My jobs says once that jobs
+ * from an earlier visit are checked now and then, and keeps "Run again" for
+ * them, the form then saying why it is empty (`JobsPanel.tsx` `structured`,
+ * `App.tsx` `unkept`; #33); the map is OpenFreeMap's world, light in
+ * either theme (`App.tsx` `basemap`, `createWorldMap` in `map/MapView.tsx`),
+ * and About credits it (`AboutPanel.tsx`); "Change service" comes first in
+ * the process list, for the top right corner (`ProcessListScreen.tsx`); JSON is laid out with tabs
+ * (`app/json-text.ts`, in `FormFields`, `GeometryField`, `ComplexField`,
+ * `MapPane`, `ResultsView`); inputs and outputs have Copy in their boxes
+ * (`CopyButton.tsx`: `CopyField` in `FormFields`, `GeometryField`,
+ * `ComplexField`; `CopyButton` in `ResultsView`); the request log is in the developer
+ * section (`ProcessScreen`, `App.tsx`); My jobs has `structured` rows and
+ * "Run again" (`JobsPanel.tsx`, `JobFacts`; the inputs, kept in memory for
+ * the visit, in `App.tsx`); a background job shows its link and can be left
+ * for another process, and My jobs shows a job here (`ProcessScreen`,
+ * `JobsPanel`, `App.tsx` `followJob`); the server's error is beside Run and
+ * "Choose another process" only at the top (`ProcessScreen`); "Change the
+ * inputs" brings drawing back (`App.tsx`, `run`). Keep each branch, or
+ * delete it.
+ */
+
+/* ------------------------------------------------- the rail, easier to read */
+
+/* Labels at 12px, not 10: the rail widens to hold them. */
+[data-variant="updated"] .app-rail {
+  width: 84px;
+}
+
+[data-variant="updated"] .rail-item,
+[data-variant="updated"] .app-rail .appearance-button {
+  width: 72px;
+  font-size: 0.75rem;
+}
+
+/*
+ * With the rail a bar at the foot, About is in it too, beside Appearance:
+ * below 52rem (a phone, or a page zoomed in) it was out of reach. Six
+ * places share the bar.
+ */
+@media (max-width: 52rem) {
+  [data-variant="updated"] .app-rail {
+    width: auto;
+  }
+
+  /* Six to a bar: the labels shrink a little with the screen, never below 9px. */
+  [data-variant="updated"] .rail-item,
+  [data-variant="updated"] .app-rail .appearance-button {
+    width: 100%;
+    font-size: clamp(0.5625rem, 2.7vw, 0.6875rem);
+  }
+
+  [data-variant="updated"] .rail-nav {
+    flex: 4 1 0;
+  }
+
+  [data-variant="updated"] .rail-end {
+    display: contents;
+  }
+
+  [data-variant="updated"] .rail-end-items {
+    display: block;
+    flex: 1 1 0;
+    margin: 0;
+  }
+
+  [data-variant="updated"] .rail-end-items li,
+  [data-variant="updated"] .app-rail .appearance {
+    height: 100%;
+  }
+
+  [data-variant="updated"] .app-rail .appearance {
+    flex: 1 1 0;
+  }
+}
+
+/* ------------------------------------------------ side panels, set apart */
+
+/*
+ * An open panel (Examples, Jobs, About) dims what it covers, so its edge is
+ * plain in both themes. Only a wash: the press that closes the panel goes to
+ * `.panel-scrim` beneath it (#35).
+ */
+[data-variant="updated"] .app-body:has(> .side-panel[data-open="true"])::after {
+  content: "";
+  position: absolute;
+  z-index: 11;
+  inset: 0;
+  background: color-mix(in srgb, var(--overlay) 60%, transparent);
+  pointer-events: none;
+}
+
+/* ------------------------------------------------- targets a finger can hit */
+
+/* Text buttons ("Change service", "← All processes"): 24px, and 44px for a finger. */
+[data-variant="updated"] button.link {
+  min-height: 24px;
+}
+
+@media (pointer: coarse) {
+  [data-variant="updated"] button.link {
+    min-height: 44px;
+  }
+}
+
+/* A whole row opens its process, not only its name. */
+[data-variant="updated"] .process-list li {
+  position: relative;
+}
+
+[data-variant="updated"] .process-list .process-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
+[data-variant="updated"] .process-list li:hover .process-link {
+  text-decoration: underline;
+}
+
+/* A listed service's focus ring goes round the whole row, not its 8px dot. */
+[data-variant="updated"] label.choice-card:has(input:focus-visible) {
+  outline: 3px solid var(--focus);
+  outline-offset: -3px;
+}
+
+[data-variant="updated"] label.choice-card input[type="radio"]:focus-visible {
+  outline: none;
+}
+
+/* ------------------------------------------------- the process list's columns */
+
+/*
+ * "Needs" is known only once a process has been opened, "This visit" only
+ * once one has run: until then each column is a dash or blank on every row,
+ * so it stays out.
+ */
+[data-variant="updated"] .process-table:not(:has(.cell-needs[data-known="true"])) .cell-needs,
+[data-variant="updated"]
+  .process-table:not(:has(.cell-needs[data-known="true"]))
+  .process-head
+  .label:nth-child(2),
+[data-variant="updated"] .process-table:not(:has(.cell-ran .tag)) .cell-ran,
+[data-variant="updated"]
+  .process-table:not(:has(.cell-ran .tag))
+  .process-head
+  .label:nth-child(4) {
+  display: none;
+}
+
+/*
+ * Each column as wide as it is, after the process's: one that is left out
+ * (Needs, This visit, and Runs for a visitor, #43) takes no room, and the
+ * heads stay over their cells.
+ */
+@media (min-width: 52rem) {
+  [data-variant="updated"] .process-table :is(.process-head, .process-list li) {
+    grid-template-columns: minmax(0, 1fr);
+    grid-auto-columns: max-content;
+    grid-auto-flow: column;
+  }
+
+  [data-variant="updated"] :is(.cell-needs, .process-head .label:nth-child(2)) {
+    width: 7rem;
+  }
+
+  [data-variant="updated"] :is(.cell-runs, .process-head .label:nth-child(3)) {
+    width: 6.5rem;
+  }
+
+  [data-variant="updated"] :is(.cell-ran, .process-head .label:nth-child(4)) {
+    width: 5.5rem;
+  }
+}
+
+/* ------------------------------------------------- the technical words, for developers */
+
+/*
+ * What a visitor does not need to read (#43), shown again with `?developer`
+ * (`.app[data-developer]`): the request header behind "Run in the
+ * background", the relay/direct tags on the start screen, the service's
+ * access, jobs and standard (its process count stays), and how each process
+ * runs. In code (`useSpared`, `app/developer.ts`): a box's CRS, "The attempt
+ * has been recorded.", a job's id, and My jobs' titles.
+ */
+[data-variant="updated"] .app:not([data-developer]) .run-hint,
+[data-variant="updated"] .app:not([data-developer]) .choice-access,
+[data-variant="updated"] .app:not([data-developer]) .service-facts .fact-access,
+[data-variant="updated"] .app:not([data-developer]) .service-facts .fact-jobs,
+[data-variant="updated"] .app:not([data-developer]) .service-facts .fact-standard,
+[data-variant="updated"] .app:not([data-developer]) .cell-runs,
+[data-variant="updated"] .app:not([data-developer]) .process-head .label:nth-child(3) {
+  display: none;
+}
+
+/*
+ * What a process needs, in a word beside its mark (#8; NeedsTag): "Area",
+ * "Data", "Values". Where it is not known yet the cell is empty, never a
+ * dash; a screen reader still hears "Not known yet".
+ */
+[data-variant="updated"] .needs {
+  gap: 6px;
+}
+
+[data-variant="updated"] .needs-short {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/*
+ * An example's row: its title, what it needs, its process id. The rows of a
+ * list share one set of columns (a subgrid of the list's), so every row's
+ * need starts at the same place, whatever the length of its title or id.
+ */
+[data-variant="updated"] :is(.example-grid, .example-rows) {
+  grid-template-columns: minmax(0, 1fr) 5.5rem auto;
+  column-gap: 0;
+}
+
+[data-variant="updated"] :is(.example-grid, .example-rows) > li {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+}
+
+[data-variant="updated"] :is(.example-row, .example-card) {
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+}
+
+[data-variant="updated"] :is(.example-row, .example-card) .example-title,
+[data-variant="updated"] :is(.example-row, .example-card) .example-service {
+  grid-column: 1;
+}
+
+[data-variant="updated"] :is(.example-row, .example-card) .needs {
+  grid-column: 2;
+}
+
+[data-variant="updated"] :is(.example-row, .example-card) .example-id {
+  grid-column: 3;
+  text-align: right;
+}
+
+/* ------------------------------------------------- the map, uncovered */
+
+/* The request log stays in the form's column instead of lying over the map. */
+@media (min-width: 52rem) {
+  [data-variant="updated"] .layout:not(.layout-single) .request-log {
+    position: static;
+    width: auto;
+    max-height: none;
+    margin: 16px 22px 0;
+    background: var(--surface);
+  }
+}
+
+/* ------------------------------------------------- controls that match */
+
+/* The file picker's button, like every other secondary button. */
+[data-variant="updated"] input[type="file"]::file-selector-button {
+  min-height: 40px;
+  margin-right: 10px;
+  padding: 0 14px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-control);
+  cursor: pointer;
+}
+
+/* A job's Results, a button beside "Remove from list" rather than a link. */
+[data-variant="updated"] .job-row .actions > a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 14px;
+  font-weight: 600;
+  color: var(--text);
+  text-decoration: none;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-control);
+}
+
+[data-variant="updated"] .job-row .actions > a:hover {
+  background: var(--surface-hover);
+}
+
+/* ------------------------------------------------- words */
+
+/* Where the two versions say something differently (`Versioned.tsx`). */
+[data-variant="updated"] .when-current {
+  display: none;
+}
+
+[data-variant="updated"] .when-updated {
+  display: inline;
+}
+
+/* ------------------------------------------- the start screen, and the picture */
+
+/* The heading says what the screen is; the label above it repeated the product. */
+[data-variant="updated"] .start-card .eyebrow {
+  display: none;
+}
+
+/*
+ * Europe behind every page without a map, not only the start screen: the
+ * process list and a process whose inputs need none. Same picture, scrim
+ * and place as on the start screen (`backdrop.css`); the text stays on
+ * cards.
+ */
+[data-variant="updated"][data-theme="light"] .layout-single {
+  background-image:
+    linear-gradient(var(--backdrop-scrim), var(--backdrop-scrim)),
+    url("../assets/backdrop/europe-day.webp");
+}
+
+[data-variant="updated"][data-theme="dark"] .layout-single {
+  background-image:
+    linear-gradient(var(--backdrop-scrim), var(--backdrop-scrim)),
+    url("../assets/backdrop/europe-night.webp");
+}
+
+[data-variant="updated"] .layout-single {
+  position: relative;
+  overflow: clip;
+  background-size: cover;
+  background-position: 43.4% 62.7%;
+}
+
+[data-variant="updated"] .layout-single .panel {
+  display: flex;
+  flex-direction: column;
+  background: transparent;
+}
+
+[data-variant="updated"] .layout-single .process-list-screen {
+  padding: 1.25rem 1.5rem;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-panel);
+}
+
+[data-variant="updated"] .layout-single .process-screen {
+  border-color: var(--line-strong);
+  box-shadow: var(--shadow-panel);
+}
+
+/* The developer box: the last card, 16px clear of the credit below it. */
+[data-variant="updated"] .layout-single .panel:not([data-stage="choose-endpoint"]) > .developer {
+  margin-block: 16px;
+  padding: 12px 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+}
+
+/*
+ * The credit in the picture's lower right corner, quiet: small and muted, on
+ * the page's surface at 80% so no word lies on the picture itself (≥ 4.5:1
+ * in both themes over pure white and pure black alike; 75% falls short). Never under a card.
+ * On a wide window it stays in the corner; otherwise it is in the panel's
+ * flow, last, pushed to the foot when the page is short and set below the
+ * cards when it is long, as on a phone, where it ends the page, at its right.
+ */
+[data-variant="updated"] .panel > .backdrop-credit {
+  order: 1;
+  align-self: flex-end;
+  width: fit-content;
+  max-width: 100%;
+  margin: auto 0 0;
+  padding: 1px 5px;
+  font-size: 0.5625rem;
+  line-height: 1.35;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--surface) 80%, transparent);
+  border: none;
+}
+
+/*
+ * Beside the rail: into the corner, 12px from the window's edges. The
+ * negative margins undo the panel's padding: on the start screen 32px at the
+ * right (backdrop.css) and 16px below; elsewhere the column's centring
+ * (styles.css), measured on the page's width (`cqi`), and 2rem below.
+ */
+@media (min-width: 52rem) {
+  [data-variant="updated"] .layout-single {
+    container-type: inline-size;
+  }
+
+  [data-variant="updated"] .panel > .backdrop-credit {
+    max-width: 240px;
+    margin-right: calc(12px - max(1.25rem, (100cqi - var(--column, 40rem)) / 2));
+    margin-bottom: calc(12px - 2rem);
+  }
+
+  [data-variant="updated"] .panel[data-stage="choose-endpoint"] > .backdrop-credit {
+    margin-right: calc(12px - 32px);
+    margin-bottom: calc(12px - 16px);
+  }
+}
+
+/*
+ * Wide enough that no card reaches the corner: there the credit stays, still
+ * while the page scrolls under it, as the picture does.
+ */
+@media (min-width: 78rem) {
+  [data-variant="updated"] .panel > .backdrop-credit,
+  [data-variant="updated"] .panel[data-stage="choose-endpoint"] > .backdrop-credit {
+    position: fixed;
+    z-index: 2;
+    right: 12px;
+    bottom: 12px;
+    margin: 0;
+  }
+}
+
+/* ------------------------------------------------- the process page */
+
+/*
+ * Beside the map: the way back to the list at the top, as on a page of its
+ * own (Instrument leaves it to the rail), and the Run bar straight after the
+ * inputs, not at the sheet's foot. It still stays in view while a long form
+ * scrolls.
+ */
+@media (min-width: 52rem) {
+  [data-variant="updated"] .layout:not(.layout-single) .process-screen > .breadcrumb {
+    display: block;
+    margin: 16px 22px 0;
+  }
+
+  [data-variant="updated"] .layout:not(.layout-single) .process-screen > .process-path {
+    margin-top: 12px;
+  }
+
+  [data-variant="updated"] .layout:not(.layout-single) .run-bar {
+    margin-top: 0;
+    /* Just above the Developer bar, which holds the sheet's foot; at the foot without it (#38). */
+    bottom: var(--developer-bar, 0px);
+  }
+
+  /*
+   * The Developer section stays at the sheet's foot with Run, as one bar.
+   * Opened, it keeps a fixed height and scrolls within, so it stays in the
+   * bar rather than move to the end of the sheet. Without `?developer` there
+   * is none (#38), and Run has the foot to itself.
+   */
+  [data-variant="updated"]
+    .layout:not(.layout-single)
+    .panel:has(> .process-screen):has(> .developer) {
+    --developer-bar: 45px;
+  }
+
+  [data-variant="updated"]
+    .layout:not(.layout-single)
+    .panel:has(> .process-screen):has(> .developer[open]) {
+    --developer-bar: 40vh;
+  }
+
+  [data-variant="updated"] .layout:not(.layout-single) .panel:has(> .process-screen) > .developer {
+    position: sticky;
+    z-index: 3;
+    bottom: 0;
+    /* Its height, never less: the panel is a column that shrinks what scrolls. */
+    flex: none;
+    height: var(--developer-bar);
+    margin: auto 0 0;
+    padding: 10px 22px;
+    overflow: auto;
+    overscroll-behavior: contain;
+    line-height: 24px;
+    background: var(--surface-2);
+    border-top: 1px solid var(--line);
+  }
+
+  /* "About this process" as wide as the rest of the sheet, its words centred in it. */
+  [data-variant="updated"] .layout:not(.layout-single) .process-screen > details.about {
+    margin: 12px 22px 0;
+    padding: 12px 16px;
+    border: 1px solid var(--line);
+  }
+
+  [data-variant="updated"] .layout:not(.layout-single) .form-body,
+  [data-variant="updated"] .layout:not(.layout-single) .form-body > .field:last-child {
+    margin-bottom: 0;
+  }
+}
+
+/*
+ * The server's answer to Run, just above it: scrolled to clear of the Run
+ * bar, and of the Developer bar under it beside the map.
+ */
+[data-variant="updated"] .server-error {
+  scroll-margin-bottom: calc(120px + var(--developer-bar, 0px));
+}
+
+[data-variant="updated"] .server-error > :last-child {
+  margin-bottom: 0;
+}
+
+/* A background job's link, to copy or open later; then the way on. */
+[data-variant="updated"] .job-link {
+  margin: 12px 0;
+}
+
+[data-variant="updated"] .job-link p {
+  margin: 0 0 6px;
+}
+
+[data-variant="updated"] .job-link input {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+
+[data-variant="updated"] .sent-unknown {
+  margin: 16px 0 0;
+}
+
+/* "About this process": a box that opens, as the developer section is. */
+[data-variant="updated"] details.about {
+  padding: 12px 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+}
+
+[data-variant="updated"] details.about > summary {
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+}
+
+[data-variant="updated"] details.about[open] > summary {
+  margin-bottom: 8px;
+}
+
+/*
+ * Buttons that aren't the screen's one filled button, the file picker's and
+ * a job's Results: an edge in the fields' colour, which stands out from the
+ * page (3:1) in both themes, where the hairline did not.
+ */
+[data-variant="updated"] button.secondary,
+[data-variant="updated"] a.button.secondary,
+[data-variant="updated"] input[type="file"]::file-selector-button,
+[data-variant="updated"] .job-row .actions > a {
+  color: var(--text-strong);
+  background: var(--surface-hover);
+  border-color: var(--field-border);
+}
+
+[data-variant="updated"] button.secondary:hover:not(:disabled),
+[data-variant="updated"] a.button.secondary:hover,
+[data-variant="updated"] input[type="file"]::file-selector-button:hover,
+[data-variant="updated"] .job-row .actions > a:hover {
+  background: var(--selected-bg);
+  border-color: var(--accent-ink);
+}
+
+/*
+ * The same for the buttons Instrument draws its own way: the draw tools
+ * beside the map ("Draw on the map", "Clear") and the ways on after a
+ * result ("Change the inputs", "Choose another process").
+ */
+[data-variant="updated"] .actions button.secondary,
+[data-variant="updated"] .next-steps button {
+  color: var(--text-strong);
+  background: var(--surface-hover);
+  border-color: var(--field-border);
+}
+
+[data-variant="updated"] .actions button.secondary:hover:not(:disabled),
+[data-variant="updated"] .next-steps button:hover:not(:disabled) {
+  background: var(--selected-bg);
+  border-color: var(--accent-ink);
+}
+
+/* The way back, a button like the others, its arrow included: not a line of text. */
+[data-variant="updated"] .breadcrumb button.link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 12px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-strong);
+  text-decoration: none;
+  background: var(--surface-hover);
+  border: 1px solid var(--field-border);
+  border-radius: var(--r-control);
+}
+
+[data-variant="updated"] .breadcrumb button.link:hover:not(:disabled) {
+  color: var(--text-strong);
+  background: var(--selected-bg);
+  border-color: var(--accent-ink);
+}
+
+[data-variant="updated"] .breadcrumb button.link:disabled {
+  opacity: 0.5;
+}
+
+[data-variant="updated"] .process-screen > .breadcrumb {
+  margin-bottom: 12px;
+}
+
+/* "Change service" in the list's top right corner, the service's name beside it. */
+[data-variant="updated"] .process-list-screen > .breadcrumb {
+  display: flow-root;
+  /* The words' first line centred on the 36px button. */
+  padding-top: 6px;
+  line-height: 24px;
+}
+
+[data-variant="updated"] .process-list-screen > .breadcrumb button.link {
+  float: right;
+  margin: -6px 0 0 12px;
+}
+
+/* "Inputs you sent": a panel of its own, edged like a field, with room below it. */
+[data-variant="updated"] .sent-inputs {
+  margin-bottom: 24px;
+  background: var(--surface-hover);
+  border-color: var(--field-border);
+}
+
+/* Each input's name and value on one baseline, whatever their sizes. */
+[data-variant="updated"] .sent-list {
+  align-items: baseline;
+}
+
+[data-variant="updated"] .sent-row dt {
+  padding-top: 0;
+}
+
+/*
+ * Copy: an icon in the corner of what it copies. The button is 44px square
+ * to press; the 32px face inside it is what shows. Its tooltip, the button's
+ * name, shows at its left on hover and keyboard focus.
+ */
+[data-variant="updated"] .code-box {
+  position: relative;
+}
+
+[data-variant="updated"] .code-box > pre {
+  padding-right: 52px;
+}
+
+/* A CSV's table stops short of its Copy, as text does. */
+[data-variant="updated"] .code-box > .csv-table {
+  margin-right: 52px;
+}
+
+[data-variant="updated"] .code-box > .copy {
+  position: absolute;
+  top: 0;
+  right: 0;
+}
+
+/* In a text box of the form: the box's text stops short of it. */
+[data-variant="updated"] .copy-field {
+  position: relative;
+  display: block;
+}
+
+[data-variant="updated"] .copy-field > :is(input, textarea) {
+  padding-right: 48px;
+}
+
+[data-variant="updated"] .copy-field > .copy {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  translate: 0 -50%;
+}
+
+[data-variant="updated"] .copy-field[data-multiline] > .copy {
+  top: 0;
+  translate: none;
+}
+
+[data-variant="updated"] .copy {
+  position: relative;
+  display: inline-flex;
+  flex-direction: row-reverse;
+  align-items: center;
+  gap: 8px;
+}
+
+[data-variant="updated"] .copy-button {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+}
+
+[data-variant="updated"] .copy-button:focus-visible {
+  outline-offset: -4px;
+}
+
+[data-variant="updated"] .copy-face {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  background: var(--surface);
+  border: 1px solid var(--field-border);
+  border-radius: var(--r-control);
+}
+
+[data-variant="updated"] .copy-button:hover:not(:disabled) {
+  color: var(--text-strong);
+  background: transparent;
+}
+
+[data-variant="updated"] .copy-button:hover:not(:disabled) .copy-face {
+  background: var(--surface-hover);
+  border-color: var(--accent-ink);
+}
+
+/* Copied: the tick and its edge green, under the pointer too. */
+[data-variant="updated"] .copy-button[data-copied]:not(:disabled) {
+  color: var(--success);
+}
+
+[data-variant="updated"] .copy-button[data-copied]:not(:disabled) .copy-face {
+  border-color: var(--success);
+}
+
+[data-variant="updated"] .copy-button .icon {
+  width: 16px;
+  height: 16px;
+}
+
+[data-variant="updated"] .copy-tip {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  right: 100%;
+  translate: 0 -50%;
+  display: none;
+  padding: 4px 8px;
+  font-size: var(--label-size);
+  line-height: 1.4;
+  white-space: nowrap;
+  color: var(--surface);
+  background: var(--text-strong);
+  border-radius: var(--r-control);
+}
+
+[data-variant="updated"] .copy:not([data-tip-hidden]) > .copy-button:focus-visible ~ .copy-tip {
+  display: block;
+}
+
+@media (hover: hover) {
+  [data-variant="updated"] .copy:not([data-tip-hidden]):hover > .copy-tip {
+    display: block;
+  }
+}
+
+[data-variant="updated"] .copy-status {
+  font-size: var(--label-size);
+  color: var(--error);
+}
+
+/* "Run in the background": the box centred on its words, at any text size. */
+[data-variant="updated"] .run-bar label.choice {
+  align-items: center;
+}
+
+[data-variant="updated"] .run-bar label.choice input[type="checkbox"] {
+  flex: none;
+  margin: 0;
+}
+
+/* JSON is laid out with tabs: four columns each, not the browser's eight. */
+[data-variant="updated"] textarea,
+[data-variant="updated"] pre.code {
+  tab-size: 4;
+}
+
+/* ------------------------------------------------- My jobs */
+
+/* Each job a card: its title and status, its facts one to a line, its actions. */
+[data-variant="updated"] .job-row {
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--field-border);
+  border-radius: var(--r-card);
+}
+
+[data-variant="updated"] .job-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 8px;
+}
+
+[data-variant="updated"] .job-top .job-title {
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+
+/* The status as a badge, in its colours: done, failed, under way, or gone. */
+[data-variant="updated"] .job-badge {
+  flex: none;
+  padding: 2px 8px;
+  font-family: var(--label-font);
+  font-size: var(--label-size);
+  letter-spacing: var(--label-tracking);
+  text-transform: var(--label-transform);
+  color: var(--muted);
+  border: 1px solid currentColor;
+  border-radius: var(--r-tag);
+}
+
+[data-variant="updated"] .job-badge strong {
+  font-weight: 600;
+}
+
+[data-variant="updated"] .job-badge[data-job-state="successful"] {
+  color: var(--success);
+  background: var(--success-surface);
+}
+
+[data-variant="updated"] .job-badge[data-job-state="failed"] {
+  color: var(--error);
+  background: var(--error-surface);
+}
+
+[data-variant="updated"] .job-badge[data-job-state="running"],
+[data-variant="updated"] .job-badge[data-job-state="accepted"] {
+  color: var(--warning);
+}
+
+/* Label and value side by side, the labels in one column. */
+[data-variant="updated"] .job-facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 4px 14px;
+  margin: 0 0 10px;
+  font-size: 0.875rem;
+}
+
+[data-variant="updated"] .job-facts > div {
+  display: contents;
+}
+
+[data-variant="updated"] .job-facts dt {
+  font-family: var(--label-font);
+  font-size: var(--label-size);
+  letter-spacing: var(--label-tracking);
+  text-transform: var(--label-transform);
+  line-height: 1.6;
+  color: var(--label-color);
+}
+
+[data-variant="updated"] .job-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+[data-variant="updated"] .job-progress {
+  font-variant-numeric: tabular-nums;
+}
+
+[data-variant="updated"] .job-row .actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+}
+
+/* ------------------------------------------------- the start screen's examples */
+
+/*
+ * The featured examples come first, right under the address row (#2;
+ * EndpointScreen), on a phone too: compact rows in the card, above the
+ * services, where Instrument as it is hides them below 52rem.
+ */
+[data-variant="updated"] .start-card .featured-examples {
+  margin: 4px 0 8px;
+}
+
+@media (max-width: 52rem) {
+  [data-variant="updated"] .start .featured-examples {
+    display: flex;
+  }
+
+  [data-variant="updated"] .start .example-grid {
+    grid-template-columns: minmax(0, 1fr) 5.5rem;
+  }
+
+  /* One line each: the title, and what it needs. */
+  [data-variant="updated"] .start .example-card .example-summary,
+  [data-variant="updated"] .start .example-card .example-service,
+  [data-variant="updated"] .start .example-card .example-id {
+    display: none;
+  }
+}
+
+/* ------------------------------------------------- a plain value, large */
+
+/* A result that is one string, number or boolean is the answer itself (#27). */
+[data-variant="updated"] .result-value-box > .result-value {
+  padding-right: 52px;
+}
+
+[data-variant="updated"] .result-value {
+  margin: 4px 0 12px;
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--text-strong);
+  overflow-wrap: anywhere;
+}
+
+/* ------------------------------------------------- the form beside the map, any width */
+
+/* A process with a map docks its form at the left (#36); without one, it is a card on the picture. */
+[data-variant="updated"] .layout {
+  position: relative;
+}
+
+/*
+ * The edge between the form and the map, to drag or move with the arrow keys
+ * (#36; PanelHandle.tsx): 400 to 640px. A thin line, a wider target.
+ */
+[data-variant="updated"] .panel-handle-region {
+  position: absolute;
+  z-index: 4;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--panel-width) - 5px);
+  width: 10px;
+}
+
+[data-variant="updated"] .panel-handle {
+  position: absolute;
+  inset: 0;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+[data-variant="updated"] .panel-handle::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 4px;
+  width: 2px;
+  background: transparent;
+}
+
+[data-variant="updated"] .panel-handle:hover::after,
+[data-variant="updated"] .panel-handle:focus-visible::after {
+  background: var(--focus);
+}
+
+[data-variant="updated"] .panel-handle:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+@media (max-width: 52rem) {
+  [data-variant="updated"] .panel-handle-region {
+    display: none;
+  }
+}
+
+/* ------------------------------------------------- the map under the result, narrow */
+
+/*
+ * On a narrow screen the map is right under the result (#40; App.tsx
+ * `mapUnderResult`), before what was sent and the developer section, and the
+ * result links to it.
+ */
+[data-variant="updated"] .map-slot {
+  margin: 16px 0 0;
+  scroll-margin-top: 8px;
+}
+
+[data-variant="updated"] .map-slot > .map-pane {
+  height: 60vh;
+  min-height: 20rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-card);
+  overflow: hidden;
+}
+
+[data-variant="updated"] .show-on-map {
+  margin: 8px 0 0;
+}
+
+/* ------------------------------------------------- a short window */
+
+/*
+ * A phone on its side, or any window under 30rem high (#41): the Developer
+ * section no longer holds the sheet's foot, so the form has the height; it
+ * scrolls with the rest, and Run stays at the foot alone.
+ */
+@media (min-width: 52rem) and (max-height: 30rem) {
+  [data-variant="updated"] .layout:not(.layout-single) .panel:has(> .process-screen),
+  [data-variant="updated"]
+    .layout:not(.layout-single)
+    .panel:has(> .process-screen):has(> .developer[open]) {
+    --developer-bar: 0px;
+  }
+
+  [data-variant="updated"] .layout:not(.layout-single) .panel:has(> .process-screen) > .developer {
+    position: static;
+    height: auto;
+    margin-top: 16px;
+    overflow: visible;
+  }
+}
+
+/*
+ * The line over a process's title (#42): it breaks after the service's "/",
+ * never inside the process id, which moves to the next line whole. An id
+ * wider than the whole line is cut short with an ellipsis rather than split.
+ */
+[data-variant="updated"] .process-path {
+  overflow-wrap: normal;
+}
+
+[data-variant="updated"] .process-path-id {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+/*
+ * One size for the form's small buttons (#14): Draw on the map for a box,
+ * an area or a complex input, Use the current map view, a list's Add and
+ * Remove, "Type it instead" and Clear the form. Copy keeps its own.
+ */
+[data-variant="updated"] :is(.form-body, .clear-form) button:not(.copy-button) {
+  min-height: 36px;
+  padding: 0 12px;
+  font-size: 0.8125rem;
+}
+
+/*
+ * A small image result (#29): its longer side at 128px at least
+ * (`ResultImage.tsx` sets the size), its pixels kept sharp rather than
+ * blurred, and a press opens it as large as the window allows.
+ */
+[data-variant="updated"] .result-image[data-enlarged] {
+  box-sizing: content-box;
+  max-width: none;
+  image-rendering: pixelated;
+}
+
+[data-variant="updated"] .image-open {
+  display: inline-block;
+  min-height: 0;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: zoom-in;
+}
+
+[data-variant="updated"] .image-open > .result-image {
+  margin: 0;
+}
+
+[data-variant="updated"] .image-open:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+[data-variant="updated"] .image-dialog {
+  max-width: 95vw;
+  max-height: 95vh;
+  padding: 16px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-card);
+}
+
+[data-variant="updated"] .image-dialog::backdrop {
+  background: var(--overlay);
+}
+
+[data-variant="updated"] .image-dialog-picture {
+  display: block;
+  width: min(85vw, calc(85vh - 5rem));
+  height: min(85vw, calc(85vh - 5rem));
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+[data-variant="updated"] .image-dialog .actions {
+  display: flex;
+  justify-content: flex-end;
+  margin: 12px 0 0;
+}
+
+/*
+ * With the rail a bar at the foot (#14b): the picture reaches down to the
+ * bar however short the page, rather than stopping above it on a grey band.
+ */
+@media (max-width: 52rem) {
+  [data-variant="updated"] .layout-single {
+    min-height: calc(100vh - 64px);
+    min-height: calc(100dvh - 64px);
+  }
+}
+
+/*
+ * Drawing on a phone (#14d): the map fills the window above the bar at the
+ * foot, so its lower edge (the scale, the attribution) is never under the
+ * bar, and the page can bring its top, with Done and Clear, to the window's
+ * top. The zoom buttons step down below Done and Clear.
+ */
+@media (max-width: 52rem) {
+  [data-variant="updated"] .map-pane[data-drawing-here="true"] {
+    min-height: 0;
+    height: calc(100vh - 64px);
+    height: calc(100dvh - 64px);
+  }
+
+  [data-variant="updated"] .map-pane[data-drawing-here="true"] .maplibregl-ctrl-top-right {
+    margin-top: 3.75rem;
+  }
+}

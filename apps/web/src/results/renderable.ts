@@ -130,6 +130,25 @@ export function defaultFilename(
   return `${processId}-${outputId}.${extension}`;
 }
 
+/** A media type without its parameters, in lower case: `text/csv; charset=utf-8` is `text/csv`. */
+function essence(mediaType: string): string {
+  return (mediaType.split(";")[0] ?? "").trim().toLowerCase();
+}
+
+/**
+ * The file name a text result downloads as (#26): its media type's extension
+ * when the map above knows it, `.txt` otherwise. A CSV is `.csv`.
+ */
+export function textFilename(processId: string, outputId: string, mediaType: string): string {
+  const extension = EXTENSIONS[essence(mediaType)] ?? "txt";
+  return `${processId}-${outputId}.${extension}`;
+}
+
+/** Whether a media type is CSV, parameters or not. */
+export function isCsv(mediaType: string | undefined): boolean {
+  return mediaType !== undefined && essence(mediaType) === "text/csv";
+}
+
 /** Text a person can read: `text/*` and XML. HTML counts, and is shown as source. */
 export function isTextual(mediaType: string | undefined): boolean {
   if (mediaType === undefined) return false;

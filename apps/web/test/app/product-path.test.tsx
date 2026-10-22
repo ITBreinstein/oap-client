@@ -53,7 +53,9 @@ beforeEach(() => {
   executes.length = 0;
   serverDown = false;
   vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = new URL(input instanceof Request ? input.url : String(input));
+    // Against the page, as a browser's fetch takes a path: the page fetches its own
+    // backdrop picture by one when it is idle, which a slow run reaches mid-test.
+    const url = new URL(input instanceof Request ? input.url : String(input), location.href);
     // What a browser shows script for a refused preflight, a CORS block or a
     // dead host alike: a TypeError and no response.
     if (serverDown) throw new TypeError("Failed to fetch");
@@ -183,9 +185,21 @@ describe("finding 0039 on the product path: a background job the page cannot nam
 
     expect(executes).toHaveLength(1);
     expect(executes[0]?.prefer).toMatch(/respond-async/);
-    expect(view.querySelector("[role='alert']")?.textContent).toContain(
-      "The server started a job but did not tell this page where to find it.",
+    const alert = view.querySelector("[role='alert']")?.textContent;
+    expect(alert).toContain(
+      "The service started the run in the background, but can’t tell this page where to find it.",
     );
+    // The technical reason is the Developer section's, not the visitor's (#25).
+    expect(alert).not.toContain("Location");
+    expect(view.querySelector('[data-testid="developer-note"]')?.textContent).toContain(
+      "finding 0039",
+    );
+    // And Run in the background is off, so Run does not start another.
+    const box = [...view.querySelectorAll<HTMLInputElement>("input[type='checkbox']")].find(
+      (input) => input.closest("label")?.textContent.includes("Run in the background") === true,
+    );
+    expect(box?.checked).toBe(false);
+    expect(box?.disabled).toBe(true);
     const execution = observations(view).find((o) => o["kind"] === "execution");
     expect(execution).toMatchObject({
       outcome: "error",

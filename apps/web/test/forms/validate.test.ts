@@ -115,9 +115,17 @@ describe("validateForm", () => {
   it("does not check pattern or format, which the server is authoritative on", () => {
     const shaped = {
       p: { schema: { type: "string", pattern: "^[0-9]+$" } },
-      d: { schema: { type: "string", format: "date-time" } },
+      u: { schema: { type: "string", format: "uri" } },
     };
-    expect(errorsFor(shaped, { p: "letters", d: "yesterday" })).toEqual({});
+    expect(errorsFor(shaped, { p: "letters", u: "not a uri" })).toEqual({});
+  });
+
+  it("checks a date-time against RFC 3339, the one format it checks (#12)", () => {
+    const shaped = { d: { schema: { type: "string", format: "date-time" } } };
+    expect(errorsFor(shaped, { d: "21-10-2026 14:30" })).toEqual({
+      d: "Give a date and time with its offset from UTC, such as 2026-10-21T14:30:00+02:00, or use the date and time fields.",
+    });
+    expect(errorsFor(shaped, { d: "2026-10-21T14:30:00+02:00" })).toEqual({});
   });
 
   it("keys errors in a Map, so an input called __proto__ is an ordinary key (N5)", () => {

@@ -104,6 +104,11 @@ async function run(
     const job = page.locator("[data-job-ref]");
     await expect(job).toHaveAttribute("data-job-ref", /./, { timeout: 30_000 });
     await page.getByRole("button", { name: "Cancel job" }).click();
+    // It asks first (#31).
+    await page
+      .getByRole("group", { name: "Confirm cancelling" })
+      .getByRole("button", { name: "Cancel job" })
+      .click();
   }
 
   await expect(page.locator(".running")).toHaveCount(0, { timeout: options.timeout ?? 60_000 });
@@ -149,7 +154,7 @@ async function exportEndpoint(page: Page, endpoint: string): Promise<void> {
   await developerPanel(page);
   await page.getByRole("combobox", { name: "Observations from" }).selectOption(endpoint);
   const download = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Download this endpoint's observations" }).click();
+  await page.getByRole("button", { name: "Download this endpoint’s observations" }).click();
   const file = await download;
   await mkdir(OUT, { recursive: true });
   const path = join(OUT, file.suggestedFilename());

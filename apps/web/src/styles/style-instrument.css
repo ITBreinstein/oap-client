@@ -1,0 +1,1268 @@
+/*
+ * Instrument: a dark, exact tool for testers. A rail down the left edge
+ * instead of a header; panels that slide out of it; Manrope headings, mono
+ * capitals for labels; one accent-filled control per screen.
+ *
+ * Only what this style does beyond `styles.css`, every rule under
+ * `[data-style="instrument"]`. Deleting this file (and its blocks in
+ * `tokens.css`, and the rail in `AppFrame.tsx`) removes the style (ADR 0002).
+ */
+
+/* ------------------------------------------------------------- labels */
+
+[data-style="instrument"] .featured-head h3,
+[data-style="instrument"] .example-group-head,
+[data-style="instrument"] .how-it-works summary,
+[data-style="instrument"] .about-access summary,
+[data-style="instrument"] .results > h3,
+[data-style="instrument"] .sent-heading,
+[data-style="instrument"] .process-path,
+[data-style="instrument"] .service-choices .connect-line,
+[data-style="instrument"] .examples-panel .examples-count {
+  font-family: var(--label-font);
+  font-size: var(--label-size);
+  font-weight: var(--label-weight);
+  text-transform: var(--label-transform);
+  letter-spacing: var(--label-tracking);
+  color: var(--label-color);
+}
+
+/* ------------------------------------------------------------- the rail */
+
+[data-style="instrument"] .app {
+  flex-direction: row;
+}
+
+[data-style="instrument"] .app-rail {
+  position: relative;
+  z-index: 15;
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  width: 72px;
+  padding: 14px 0 8px;
+  background: var(--rail);
+  border-right: 1px solid var(--line);
+  /* Taller than the window, a phone on its side: it scrolls, so Appearance
+     and About stay within reach (#41). */
+  max-height: 100dvh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Breinstein's wordmark, in the rail labels' colour; no fill behind it. */
+[data-style="instrument"] .rail-logo {
+  display: block;
+  width: 60px;
+  margin: 0 0 14px;
+  padding: 4px 0 6px;
+  color: var(--label-color);
+  border-radius: 4px;
+}
+
+[data-style="instrument"] .rail-logo[href]:hover {
+  color: var(--text);
+}
+
+[data-style="instrument"] .rail-logo .wordmark {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+[data-style="instrument"] .rail-nav ul {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+[data-style="instrument"] .rail-item,
+[data-style="instrument"] .app-rail .appearance-button {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 56px;
+  min-height: 0;
+  padding: 10px 0 8px;
+  font-family: var(--font-ui);
+  font-size: 0.625rem;
+  font-weight: 600;
+  color: var(--label-color);
+  background: none;
+  border: none;
+  border-radius: var(--r-item);
+}
+
+[data-style="instrument"] .rail-item:hover:not(:disabled),
+[data-style="instrument"] .app-rail .appearance-button:hover {
+  color: var(--text-strong);
+  background: var(--rail-hover);
+}
+
+[data-style="instrument"] .rail-item[aria-current="page"],
+[data-style="instrument"] .rail-item[aria-expanded="true"] {
+  color: var(--text-strong);
+  background: var(--rail-hover);
+  box-shadow: inset 2px 0 0 var(--accent-ink);
+}
+
+[data-style="instrument"] .rail-item:disabled {
+  opacity: 0.4;
+}
+
+[data-style="instrument"] .rail-item .icon,
+[data-style="instrument"] .app-rail .appearance-button .icon {
+  width: 20px;
+  height: 20px;
+}
+
+[data-style="instrument"] .rail-end {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: auto;
+}
+
+[data-style="instrument"] .rail-version {
+  margin: 0.25rem 0 0;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  text-align: center;
+  color: var(--ident);
+}
+
+/* About sits above Appearance, at the rail's foot. */
+[data-style="instrument"] .rail-end-items {
+  margin: 0 0 6px;
+  padding: 0;
+  list-style: none;
+}
+
+/* The Appearance popover opens beside the rail, from its foot. */
+[data-style="instrument"] .app-rail .appearance-popover {
+  top: auto;
+  right: auto;
+  bottom: 0;
+  left: calc(100% + 0.5rem);
+}
+
+@media (max-width: 52rem) {
+  [data-style="instrument"] .app {
+    flex-direction: column;
+    padding-bottom: 64px;
+  }
+
+  [data-style="instrument"] .app-rail {
+    position: fixed;
+    inset: auto 0 0;
+    flex-direction: row;
+    align-items: stretch;
+    width: auto;
+    height: 64px;
+    padding: 0;
+    border-top: 1px solid var(--line);
+    border-right: none;
+  }
+
+  /* No room for About in the bar at the foot: five places are its most. */
+  [data-style="instrument"] .rail-logo,
+  [data-style="instrument"] .rail-version,
+  [data-style="instrument"] .rail-end-items {
+    display: none;
+  }
+
+  /* With the rail at the foot, the wordmark heads the start card instead. */
+  [data-style="instrument"] .start-wordmark {
+    display: block;
+    width: 52px;
+    height: auto;
+    margin: 0 0 12px;
+    color: var(--label-color);
+  }
+
+  [data-style="instrument"] .rail-nav {
+    flex: 1;
+  }
+
+  [data-style="instrument"] .rail-nav ul {
+    flex-direction: row;
+    align-items: stretch;
+    gap: 0;
+    height: 100%;
+  }
+
+  [data-style="instrument"] .rail-nav li {
+    flex: 1;
+  }
+
+  [data-style="instrument"] .rail-item,
+  [data-style="instrument"] .app-rail .appearance-button {
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
+  }
+
+  [data-style="instrument"] .rail-item[aria-current="page"],
+  [data-style="instrument"] .rail-item[aria-expanded="true"] {
+    box-shadow: inset 0 2px 0 var(--accent-ink);
+  }
+
+  [data-style="instrument"] .rail-end {
+    width: 72px;
+    margin: 0;
+  }
+
+  [data-style="instrument"] .app-rail .appearance-popover {
+    bottom: calc(100% + 0.5rem);
+    left: auto;
+    right: 0.5rem;
+  }
+}
+
+/* ------------------------------------------------------------ type */
+
+[data-style="instrument"] h2 {
+  font-size: 1.6rem;
+  line-height: 1.2;
+}
+
+/* One accent-filled control per screen: everything else is outlined. */
+[data-style="instrument"] button.secondary,
+[data-style="instrument"] a.button.secondary {
+  color: var(--text);
+  border-color: var(--line-strong);
+}
+
+[data-style="instrument"] button.secondary:hover:not(:disabled) {
+  border-color: var(--field-border);
+}
+
+[data-style="instrument"] .card {
+  border-color: var(--line);
+}
+
+/* ---------------------------------------------------- the start screen */
+
+/* No card and no backdrop: the page, left-aligned, as wide as an instrument's face. */
+[data-style="instrument"] .layout-single .panel[data-stage="choose-endpoint"] {
+  padding: 64px calc(72px + var(--dock, 0px)) 64px 72px;
+}
+
+[data-style="instrument"] .start {
+  align-items: flex-start;
+  gap: 36px;
+  max-width: 836px;
+}
+
+[data-style="instrument"] .start > *,
+[data-style="instrument"] .start > .start-card {
+  max-width: none;
+}
+
+[data-style="instrument"] .start > .start-card.card {
+  padding: 0;
+  background: none;
+  border: none;
+  box-shadow: none;
+}
+
+[data-style="instrument"] .start-card .eyebrow {
+  color: var(--label-color);
+}
+
+[data-style="instrument"] .start-card h2 {
+  font-size: 3rem;
+  line-height: 1.04;
+  letter-spacing: -0.032em;
+  font-weight: 800;
+}
+
+[data-style="instrument"] .start .lead {
+  max-width: 620px;
+  color: var(--muted);
+}
+
+[data-style="instrument"] .start-card form {
+  gap: 36px;
+}
+
+[data-style="instrument"] .address-field {
+  max-width: 720px;
+}
+
+[data-style="instrument"] .address-field > label,
+[data-style="instrument"] .service-choices legend {
+  color: var(--text-secondary);
+}
+
+[data-style="instrument"] .input-with-button {
+  gap: 8px;
+}
+
+[data-style="instrument"] .input-with-button input {
+  min-height: 48px;
+  padding: 0 14px;
+  font-size: 0.9375rem;
+}
+
+[data-style="instrument"] .input-with-button button {
+  min-height: 48px;
+  padding: 0 22px;
+  font-size: 0.9375rem;
+  font-weight: 800;
+}
+
+/* The known services: a table, the radio as its status dot. */
+[data-style="instrument"] .service-choices {
+  max-width: 760px;
+}
+
+[data-style="instrument"] .service-choices .connect-line strong {
+  font-weight: inherit;
+  color: var(--text-secondary);
+}
+
+[data-style="instrument"] label.choice-card {
+  gap: 16px;
+  min-height: 52px;
+  padding: 0 16px;
+  background: var(--surface);
+  border-color: var(--line);
+}
+
+[data-style="instrument"] label.choice-card:first-of-type {
+  border-radius: var(--r-card) var(--r-card) 0 0;
+}
+
+[data-style="instrument"] label.choice-card:last-of-type {
+  border-radius: 0 0 var(--r-card) var(--r-card);
+}
+
+[data-style="instrument"] label.choice-card:hover {
+  background: var(--surface-hover);
+}
+
+[data-style="instrument"] label.choice-card:has(input:checked) {
+  background: var(--surface-hover);
+  box-shadow: inset 2px 0 0 var(--accent-ink);
+}
+
+[data-style="instrument"] label.choice-card input[type="radio"] {
+  appearance: none;
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin: 0;
+  border: 1.5px solid var(--ident);
+  border-radius: 50%;
+}
+
+[data-style="instrument"] label.choice-card input[type="radio"]:checked {
+  background: var(--accent-ink);
+  border-color: var(--accent-ink);
+}
+
+[data-style="instrument"] .choice-body {
+  flex-wrap: nowrap;
+  gap: 0 0.4rem;
+}
+
+[data-style="instrument"] .choice-title {
+  font-size: 0.9375rem;
+}
+
+[data-style="instrument"] .choice-url {
+  font-size: 0.75rem;
+  color: var(--label-color);
+}
+
+[data-style="instrument"] .choice-access {
+  padding-left: 1rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+[data-style="instrument"] .choice-access[data-route="relay"] {
+  color: var(--warning);
+}
+
+[data-style="instrument"] .featured-head .browse-all {
+  min-height: 40px;
+  font-size: 0.8125rem;
+}
+
+[data-style="instrument"] .how-it-works,
+[data-style="instrument"] .about-access {
+  background: var(--surface);
+  border-color: var(--line);
+}
+
+/* As wide as the known services and the examples, not the whole column. */
+[data-style="instrument"] .how-it-works,
+[data-style="instrument"] .about-access,
+[data-style="instrument"] .start-card form > .notice {
+  max-width: 760px;
+}
+
+[data-style="instrument"] ol.steps li::before {
+  border-radius: var(--r-tag);
+  font-family: var(--font-mono);
+}
+
+/* Featured examples: compact rows in one table, as the panel lists them. */
+[data-style="instrument"] .featured-examples {
+  max-width: 760px;
+}
+
+[data-style="instrument"] .example-grid {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  overflow: hidden;
+}
+
+[data-style="instrument"] .example-grid li + li {
+  border-top: 1px solid var(--line);
+}
+
+/* --------------------------------------------- the examples panel, out of the rail */
+
+/* Over the content, never beside it: the start screen stays where it is. */
+[data-style="instrument"] {
+  --examples-width: 420px;
+}
+
+[data-style="instrument"] .app-body:has(> .examples-panel[data-open="true"]) {
+  --dock: 0px;
+}
+
+[data-style="instrument"] .side-panel {
+  right: auto;
+  left: 0;
+  background: var(--surface-2);
+  border-left: none;
+  border-right: 1px solid var(--line-strong);
+}
+
+[data-style="instrument"] .side-panel[data-open="false"] {
+  transform: translateX(-100%);
+}
+
+[data-style="instrument"] .examples-panel .side-panel-head {
+  padding: 20px 20px 0;
+}
+
+[data-style="instrument"] .examples-panel .side-panel-head h2 {
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: -0.015em;
+}
+
+[data-style="instrument"] .examples-tools {
+  gap: 12px;
+  padding: 12px 20px 14px;
+}
+
+[data-style="instrument"] .examples-tools .search-field label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Room at its end for the count, so neither the hint nor what's typed runs under it. */
+[data-style="instrument"] .examples-tools input[type="search"] {
+  min-height: 40px;
+  padding-right: 96px;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  border-color: var(--line-strong);
+}
+
+/*
+ * How many are shown, at the search field's end, centred in it. Placed from
+ * the panel's scrolling body, which is positioned (styles.css) and clips:
+ * the heading row above it is out of reach without moving the count's markup.
+ */
+[data-style="instrument"] .examples-panel .examples-count {
+  top: 24px;
+  right: 34px;
+  width: auto;
+  height: auto;
+  clip-path: none;
+  margin: 0;
+}
+
+/* The filters: keys. */
+[data-style="instrument"] .filter {
+  padding: 0 12px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  border-color: var(--line-strong);
+}
+
+[data-style="instrument"] .filter[aria-pressed="true"],
+[data-style="instrument"] .filter[aria-pressed="true"]:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--selected-bg);
+  border-color: var(--selected-line);
+}
+
+[data-style="instrument"] .example-group,
+[data-style="instrument"] .example-group + .example-group {
+  margin: 0;
+  padding: 0;
+  border-top: none;
+}
+
+[data-style="instrument"] .example-group-head {
+  margin: 0;
+  padding: 12px 14px 6px;
+  border-bottom: 1px solid var(--line);
+}
+
+[data-style="instrument"] .example-group-head .mono {
+  font-family: inherit;
+}
+
+[data-style="instrument"] .example-rows {
+  gap: 0;
+}
+
+[data-style="instrument"] .example-rows li {
+  border-bottom: 1px solid var(--line);
+}
+
+/* A row: its need's mark, its title over its service, the process id at its end. */
+[data-style="instrument"] .example-row,
+[data-style="instrument"] .example-card {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  gap: 2px 12px;
+  min-height: 52px;
+  padding: 6px 14px;
+  background: none;
+  border: none;
+  border-radius: 0;
+}
+
+[data-style="instrument"] .example-row:hover:not(:disabled),
+[data-style="instrument"] .example-card:hover:not(:disabled) {
+  background: var(--surface-hover);
+  box-shadow: none;
+}
+
+[data-style="instrument"] :is(.example-row, .example-card) .example-more {
+  display: contents;
+}
+
+[data-style="instrument"] :is(.example-row, .example-card) .needs {
+  display: inline-flex;
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  align-self: center;
+}
+
+[data-style="instrument"] :is(.example-row, .example-card) .example-title {
+  grid-column: 2;
+  grid-row: 1;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+[data-style="instrument"] :is(.example-row, .example-card) .example-summary {
+  display: none;
+}
+
+[data-style="instrument"] :is(.example-row, .example-card) .example-service {
+  display: block;
+  grid-column: 2;
+  grid-row: 2;
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  color: var(--label-color);
+}
+
+[data-style="instrument"] :is(.example-row, .example-card) .example-id {
+  display: block;
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  max-width: none;
+  font-size: 0.6875rem;
+  color: var(--ident);
+}
+
+/* ---------------------------------------------------------- the list */
+
+[data-style="instrument"] .service-facts dd {
+  color: var(--text-secondary);
+}
+
+[data-style="instrument"] .process-table {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+}
+
+[data-style="instrument"] .process-head,
+[data-style="instrument"] .process-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 7rem 6.5rem 5.5rem;
+  gap: 0 1rem;
+  align-items: center;
+  padding: 0.5rem 0.85rem;
+}
+
+[data-style="instrument"] .process-head {
+  margin: 0;
+  border-bottom: 1px solid var(--line-strong);
+}
+
+[data-style="instrument"] .process-list li {
+  border-bottom: 1px solid var(--line);
+}
+
+[data-style="instrument"] .process-list li:last-child {
+  border-bottom: none;
+}
+
+[data-style="instrument"] .process-list li:hover {
+  background: var(--surface-hover);
+}
+
+[data-style="instrument"] .process-list li[data-last-opened] {
+  margin: 0;
+  padding-inline: 0.85rem;
+  box-shadow: inset 2px 0 0 var(--accent-ink);
+}
+
+[data-style="instrument"] .process-link {
+  color: var(--text-strong);
+  text-decoration: none;
+  font-weight: 700;
+}
+
+[data-style="instrument"] .process-link:hover {
+  text-decoration: underline;
+}
+
+[data-style="instrument"] .process-id {
+  display: block;
+  font-size: 0.78rem;
+}
+
+[data-style="instrument"] .process-description {
+  display: none;
+}
+
+[data-style="instrument"] .cell-ran:empty {
+  display: block;
+}
+
+/* "ran": a success, in the success colours, as the design marks it. */
+[data-style="instrument"] .tag {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  color: var(--success);
+  background: var(--success-surface);
+  border-color: transparent;
+}
+
+/* What a process needs: a mark, with its words for screen readers. */
+[data-style="instrument"] .needs {
+  padding: 0;
+  background: none;
+}
+
+[data-style="instrument"] .needs-text {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+[data-style="instrument"] .needs-mark {
+  display: inline-block;
+  flex: none;
+}
+
+[data-style="instrument"] .needs[data-needs="area"] .needs-mark {
+  width: 8px;
+  height: 8px;
+  border: 1.5px dashed currentColor;
+}
+
+[data-style="instrument"] .needs[data-needs="data"] .needs-mark {
+  width: 8px;
+  height: 8px;
+  background: currentColor;
+  border-radius: 50%;
+}
+
+[data-style="instrument"] .needs[data-needs="values"] .needs-mark {
+  width: 8px;
+  height: 2px;
+  background: currentColor;
+}
+
+@media (max-width: 52rem) {
+  [data-style="instrument"] .process-head {
+    display: none;
+  }
+
+  [data-style="instrument"] .process-list li {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 0.2rem 0.75rem;
+  }
+
+  [data-style="instrument"] .cell-process {
+    grid-column: 1 / -1;
+  }
+}
+
+/* -------------------------------------------------------- one process */
+
+[data-style="instrument"] .breadcrumb button.link {
+  color: var(--muted);
+  text-decoration: none;
+}
+
+[data-style="instrument"] .breadcrumb button.link:hover:not(:disabled) {
+  color: var(--text-strong);
+}
+
+[data-style="instrument"] .layout-single .process-screen {
+  padding: 1.25rem 1.5rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+}
+
+/* The run bar stays at the foot of the sheet while the form scrolls. */
+[data-style="instrument"] .run-bar {
+  position: sticky;
+  bottom: -2rem;
+  z-index: 2;
+  margin: 0 -1.25rem;
+  padding: 0.75rem 1.25rem 2rem;
+  background: var(--surface);
+  border-top: 1px solid var(--line-strong);
+}
+
+[data-style="instrument"] .layout-single .run-bar {
+  margin: 0 -1.5rem;
+  padding-inline: 1.5rem;
+}
+
+[data-style="instrument"] .run-hint {
+  display: inline;
+  margin-right: auto;
+  font-size: 0.75rem;
+  color: var(--ident);
+}
+
+[data-style="instrument"] .progress-line {
+  height: 2px;
+}
+
+/* The result, in the result colours. */
+[data-style="instrument"] .result {
+  background: var(--result-surface);
+  border: 1px solid var(--result-line);
+}
+
+[data-style="instrument"] .result > details > summary strong,
+[data-style="instrument"] .result > p > strong {
+  color: var(--result-fg);
+}
+
+[data-style="instrument"] .result pre.code,
+[data-style="instrument"] .result .csv-table,
+[data-style="instrument"] .result .csv-table th {
+  background: var(--field);
+}
+
+[data-style="instrument"] .result-strip dt {
+  color: var(--label-color);
+}
+
+/* After a result, both ways on are outlined: Run was the screen's one primary. */
+[data-style="instrument"] .next-steps button {
+  min-height: 38px;
+  padding: 0 12px;
+  font-size: 0.8125rem;
+  color: var(--text);
+  background: var(--surface);
+  border-color: var(--line-strong);
+}
+
+[data-style="instrument"] .next-steps button:hover:not(:disabled) {
+  background: var(--surface-hover);
+  border-color: var(--field-border);
+}
+
+/* The requests this page made to the service, newest last. */
+[data-style="instrument"] .request-log {
+  display: block;
+  margin-top: 1.5rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--line);
+}
+
+[data-style="instrument"] .request-log h3 {
+  margin: 0 0 8px;
+}
+
+[data-style="instrument"] .request-log ol {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+[data-style="instrument"] .request-log li {
+  gap: 0.6em;
+}
+
+[data-style="instrument"] .request-url {
+  color: var(--text-secondary);
+}
+
+[data-style="instrument"] .request-status[data-ok="true"] {
+  color: var(--success);
+}
+
+/* -------------------------- one process, beside the map: the left sheet */
+
+@media (min-width: 52rem) {
+  [data-style="instrument"] .layout:not(.layout-single) {
+    --panel-width: 400px;
+  }
+
+  [data-style="instrument"] .layout:not(.layout-single) .panel {
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    background: var(--surface-2);
+    border-right-color: var(--line-strong);
+  }
+
+  [data-style="instrument"] .layout:not(.layout-single) .process-screen {
+    display: flex;
+    flex: 1 0 auto;
+    flex-direction: column;
+  }
+
+  [data-style="instrument"] .layout:not(.layout-single) .process-screen > * {
+    margin-inline: 22px;
+  }
+
+  /* The rail's Processes item is the way back. */
+  [data-style="instrument"] .layout:not(.layout-single) .breadcrumb {
+    display: none;
+  }
+
+  /* The title block: where it lives, its title, what it does, ruled off. */
+  [data-style="instrument"] .layout:not(.layout-single) .process-path {
+    margin-top: 20px;
+    margin-bottom: 0;
+  }
+
+  [data-style="instrument"] .layout:not(.layout-single) .process-screen > h2 {
+    margin-block: 8px 0;
+    font-size: 1.625rem;
+    line-height: 1.1;
+    letter-spacing: -0.024em;
+    font-weight: 800;
+  }
+
+  [data-style="instrument"] .layout:not(.layout-single) .process-summary {
+    margin-block: 8px 0;
+    font-size: 0.875rem;
+    color: var(--muted);
+  }
+
+  [data-style="instrument"] .layout:not(.layout-single) .about {
+    margin: 8px 0 0;
+    padding: 0 22px 16px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  [data-style="instrument"] .layout:not(.layout-single) .running {
+    margin-inline: 0;
+    padding: 0 22px 0.5rem;
+  }
+
+  /* The result: a block in the result colours, above the inputs. */
+  [data-style="instrument"] .layout:not(.layout-single) .result-block {
+    margin-top: 20px;
+    padding: 14px;
+    background: var(--result-surface);
+    border: 1px solid var(--result-line);
+    border-radius: var(--r-control);
+  }
+
+  [data-style="instrument"] .layout:not(.layout-single) .results {
+    margin: 0;
+  }
+
+  [data-style="instrument"] .layout:not(.layout-single) .results > h3 {
+    margin: 0 0 6px;
+    color: var(--result-fg);
+  }
+
+  [data-style="instrument"] .layout:not(.layout-single) .result {
+    margin: 0;
+    padding: 0;
+    background: none;
+    border: none;
+  }
+
+  [data-style="instrument"] .layout:not(.layout-single) .result-strip {
+    margin-top: 6px;
+    font-size: 0.75rem;
+    color: var(--muted);
+  }
+
+  [data-style="instrument"] .layout:not(.layout-single) .next-steps {
+    margin-top: 12px;
+  }
+
+  [data-style="instrument"] .layout:not(.layout-single) .sent-inputs {
+    margin-top: 20px;
+  }
+
+  /* The inputs, then the run bar pinned to the sheet's foot. */
+  [data-style="instrument"] .layout:not(.layout-single) form {
+    display: flex;
+    flex: 1 0 auto;
+    flex-direction: column;
+    gap: 20px;
+    padding-top: 20px;
+  }
+
+  [data-style="instrument"] .layout:not(.layout-single) .form-body fieldset {
+    margin: 0;
+    padding: 0;
+    border: none;
+  }
+
+  [data-style="instrument"] .layout:not(.layout-single) .form-body legend {
+    padding: 0 0 10px;
+    color: var(--text-secondary);
+  }
+
+  /* A box's and an area's: one look, drawing or not (#17). */
+  [data-style="instrument"] :is(.geometry, .bbox) .actions button {
+    min-height: 36px;
+    padding: 0 12px;
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
+    background: var(--surface);
+    border-color: var(--line-strong);
+  }
+
+  /* Drawing is on: the key is pressed, not a second primary. */
+  [data-style="instrument"] :is(.geometry, .bbox) .actions button:not(.secondary) {
+    color: var(--text);
+    background: var(--selected-bg);
+    border-color: var(--selected-line);
+  }
+
+  /* The choice and what it asks the server for, stacked; Run beside them. */
+  [data-style="instrument"] .layout:not(.layout-single) .run-bar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    bottom: 0;
+    gap: 2px 10px;
+    margin: auto -22px 0;
+    padding: 14px 22px 18px;
+    background: var(--surface-2);
+    border-top: 1px solid var(--line);
+  }
+
+  [data-style="instrument"] .layout:not(.layout-single) .run-bar label.choice {
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
+  }
+
+  [data-style="instrument"] .layout:not(.layout-single) .run-bar input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent);
+  }
+
+  [data-style="instrument"] .layout:not(.layout-single) .run-hint {
+    grid-column: 1;
+    padding-left: calc(16px + 0.4rem);
+  }
+
+  [data-style="instrument"] .layout:not(.layout-single) .run-bar button[type="submit"] {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    min-height: 46px;
+    padding: 0 22px;
+    font-size: 0.9375rem;
+    font-weight: 800;
+  }
+
+  [data-style="instrument"] .layout:not(.layout-single) .developer {
+    margin: 0;
+    padding: 0.5rem 22px;
+  }
+
+  /* The request log lies over the map's foot, out of the sheet. */
+  [data-style="instrument"] .layout:not(.layout-single) .request-log {
+    position: fixed;
+    z-index: 3;
+    left: calc(72px + var(--panel-width) + 20px);
+    bottom: 20px;
+    width: min(560px, calc(100vw - 72px - var(--panel-width) - 40px));
+    max-height: 40vh;
+    margin: 0;
+    padding: 12px 14px;
+    overflow: auto;
+    background: color-mix(in srgb, var(--rail) 92%, transparent);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--r-card);
+  }
+
+  /* Its legend at the other corner, above the attribution. */
+  [data-style="instrument"] .map-pane > .map-legend {
+    left: auto;
+    right: 20px;
+    bottom: 40px;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+  }
+
+  [data-style="instrument"] .map-pane > .map-hint:not(.map-legend) {
+    /* Below "Find a place" (#16). */
+    top: 4.25rem;
+    bottom: auto;
+    left: 20px;
+  }
+}
+
+[data-style="instrument"] .map-hint,
+[data-style="instrument"] .map-overlay {
+  border-color: var(--line-strong);
+  border-radius: var(--r-card);
+}
+
+/* ------------------------------------------------------------- my jobs */
+
+[data-style="instrument"] .job-status,
+[data-style="instrument"] .job-service {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+}
+
+[data-style="instrument"] .job-row {
+  border-color: var(--line);
+}
+
+/* On a narrow screen, a listed service's name, address and access stack. */
+@media (max-width: 40rem) {
+  [data-style="instrument"] .choice-body {
+    flex-wrap: wrap;
+  }
+
+  [data-style="instrument"] .choice-url {
+    flex-basis: 100%;
+    order: 1;
+  }
+
+  [data-style="instrument"] .choice-access {
+    padding-left: 0;
+  }
+}
+
+/* The start screen on a narrow screen: the page's gutter, a smaller heading. */
+@media (max-width: 40rem) {
+  [data-style="instrument"] .layout-single .panel[data-stage="choose-endpoint"] {
+    padding: 32px 16px;
+  }
+
+  [data-style="instrument"] .start-card h2 {
+    font-size: 2.25rem;
+  }
+}
+
+/* ------------------------------------------------------------ what was sent */
+
+/* Compact rows: the label in mono capitals, the value beside it. */
+[data-style="instrument"] .sent-inputs {
+  padding: 12px 14px;
+}
+
+[data-style="instrument"] .sent-heading {
+  margin: 0 0 8px;
+}
+
+[data-style="instrument"] .sent-list {
+  gap: 4px 14px;
+  font-size: 0.8125rem;
+}
+
+[data-style="instrument"] .sent-row dt {
+  padding-top: 1px;
+  font-family: var(--label-font);
+  font-size: var(--label-size);
+  font-weight: var(--label-weight);
+  text-transform: var(--label-transform);
+  letter-spacing: var(--label-tracking);
+  color: var(--label-color);
+}
+
+[data-style="instrument"] .sent-row dd {
+  font-weight: 500;
+}
+
+[data-style="instrument"] .sent-full summary {
+  font-size: 0.75rem;
+}
+
+[data-style="instrument"] .sent-none,
+[data-style="instrument"] .sent-not-sent {
+  margin-top: 8px;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+
+/* ------------------------------------------------------------ About */
+
+/* Out of the rail like Examples, at its width. */
+[data-style="instrument"] .about-panel {
+  width: min(var(--examples-width), 100%);
+}
+
+[data-style="instrument"] .about-panel .side-panel-head {
+  padding: 20px 20px 12px;
+  border-bottom: none;
+}
+
+[data-style="instrument"] .about-panel .side-panel-head h2 {
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: -0.015em;
+}
+
+/* The sections carry their own padding and rules. */
+[data-style="instrument"] .about-panel .side-panel-body {
+  padding: 0;
+}
+
+[data-style="instrument"] .about-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+[data-style="instrument"] .about-section h3 {
+  margin: 0 0 2px;
+}
+
+[data-style="instrument"] .about-section p {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+[data-style="instrument"] .about-section strong {
+  color: var(--text-secondary);
+}
+
+[data-style="instrument"] .about-intro {
+  gap: 14px;
+  padding-top: 6px;
+}
+
+[data-style="instrument"] .about-logo {
+  display: block;
+  width: 168px;
+  height: auto;
+  color: var(--text);
+}
+
+[data-style="instrument"] .about-section .about-lead {
+  font-size: 0.9375rem;
+  color: var(--text-secondary);
+}
+
+[data-style="instrument"] .about-section .about-lead strong {
+  color: var(--text);
+}
+
+[data-style="instrument"] .about-facts {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr);
+  gap: 7px 14px;
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+[data-style="instrument"] .about-facts dt {
+  color: var(--label-color);
+}
+
+[data-style="instrument"] .about-facts dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+[data-style="instrument"] .about-facts a,
+[data-style="instrument"] .about-links a {
+  font-weight: 700;
+  text-underline-offset: 3px;
+}
+
+[data-style="instrument"] .about-version {
+  font-family: var(--font-mono);
+}
+
+[data-style="instrument"] .about-panel .side-panel-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 14px 20px 16px;
+}
+
+[data-style="instrument"] .about-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 0;
+  font-size: 0.8125rem;
+}
+
+[data-style="instrument"] .about-copyright {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--label-color);
+}

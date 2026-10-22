@@ -51,6 +51,10 @@ export interface JobRow extends TrackedJob {
   readonly startedAt: string | undefined;
   /** Found in storage after a reload, rather than started on this page. */
   readonly restored: boolean;
+  /** Followed from its link, not started by this browser (#32). */
+  readonly followed: boolean;
+  /** ISO 8601: when this browser had the server cancel it (#31), kept across a reload (#14e). */
+  readonly cancelledAt: string | undefined;
 }
 
 /**
@@ -98,10 +102,21 @@ export interface JobSession {
     description?: ProcessDescription,
     reads?: Reads,
   ): Promise<Execution>;
-  /** Start reconciling a job the caller found some other way — a sync run the server made async. */
-  track(endpoint: RelayEndpoint, statusUrl: string, reads?: Reads, processId?: string): void;
+  /**
+   * Start reconciling a job the caller found some other way: a sync run the
+   * server made async, or (`followed`) a job opened from its link (#32).
+   */
+  track(
+    endpoint: RelayEndpoint,
+    statusUrl: string,
+    reads?: Reads,
+    processId?: string,
+    followed?: boolean,
+  ): void;
   /** Take a job off this browser's list, and out of storage. The server is not told. */
   remove(statusUrl: string): void;
+  /** Note that this browser had the server cancel a job, and when: stored with it (#14e). */
+  markCancelled(statusUrl: string, at: string): void;
   /**
    * Ask the server to dismiss a job (`DELETE`), through the route its reads
    * take, then read it again. The core records the attempt.
@@ -203,6 +218,8 @@ export function createJobSession(
       processId: string | undefined;
       startedAt: string | undefined;
       restored: boolean;
+      followed: boolean;
+      cancelledAt: string | undefined;
     }
   >();
 
@@ -238,6 +255,8 @@ export function createJobSession(
         statusUrl,
         processId: job.processId,
         startedAt: job.startedAt,
+        ...(job.followed ? { followed: true } : {}),
+        ...(job.cancelledAt === undefined ? {} : { cancelledAt: job.cancelledAt }),
       });
     }
     store.save([...kept.values()]);
@@ -255,6 +274,8 @@ export function createJobSession(
       processId: meta.get(job.statusUrl)?.processId,
       startedAt: meta.get(job.statusUrl)?.startedAt,
       restored: meta.get(job.statusUrl)?.restored ?? false,
+      followed: meta.get(job.statusUrl)?.followed ?? false,
+      cancelledAt: meta.get(job.statusUrl)?.cancelledAt,
     })),
     observations,
     droppedObservations: dropped,
@@ -371,6 +392,8 @@ export function createJobSession(
       processId: stored.processId,
       startedAt: stored.startedAt,
       restored: true,
+      followed: stored.followed === true,
+      cancelledAt: stored.cancelledAt,
     });
     reconciler.track(stored.statusUrl);
   };
@@ -457,7 +480,7 @@ export function createJobSession(
       return routedClient(endpoint, readFetch(endpoint, reads));
     },
 
-    track(endpoint, statusUrl, reads = "direct", processId) {
+    track(endpoint, statusUrl, reads = "direct", processId, followed = false) {
       const read = readFetch(endpoint, reads);
       meta.set(statusUrl, {
         endpointKey: endpoint.key,
@@ -467,6 +490,8 @@ export function createJobSession(
         processId,
         startedAt: now().toISOString(),
         restored: false,
+        followed,
+        cancelledAt: undefined,
       });
       persist();
       reconciler.track(statusUrl);
@@ -477,6 +502,14 @@ export function createJobSession(
       reconciler.untrack(statusUrl);
       meta.delete(statusUrl);
       removedHere.add(statusUrl);
+      persist();
+      publish();
+    },
+
+    markCancelled(statusUrl, at) {
+      const job = meta.get(statusUrl);
+      if (job === undefined) return;
+      meta.set(statusUrl, { ...job, cancelledAt: at });
       persist();
       publish();
     },
@@ -524,6 +557,8 @@ export function createJobSession(
           processId,
           startedAt,
           restored: false,
+          followed: false,
+          cancelledAt: undefined,
         });
         persist();
         reconciler.track(statusUrl, refs.get(statusUrl));

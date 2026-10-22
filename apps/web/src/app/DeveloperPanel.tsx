@@ -15,7 +15,7 @@
  */
 
 import { VERSION } from "@breinstein/oap-client";
-import { useId, useState } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { AsyncJobPanel } from "../jobs/AsyncJobPanel.js";
 import {
   kindCounts,
@@ -66,6 +66,8 @@ export function DeveloperPanel({
   open,
   census,
   onDescribeAll,
+  first,
+  notes = [],
 }: {
   readonly observations: readonly SessionObservation[];
   /** How many the session dropped to stay under its cap. */
@@ -75,6 +77,13 @@ export function DeveloperPanel({
   readonly census: CensusProgress | undefined;
   /** Absent while nothing is connected: there is no process list to walk. */
   readonly onDescribeAll: (() => void) | undefined;
+  /** What goes first in it: the updated Instrument's request log. */
+  readonly first?: ReactNode;
+  /**
+   * What the visitor's words leave out (#25, #43): the last error as a
+   * developer is told it, the job on screen by its id.
+   */
+  readonly notes?: readonly string[] | undefined;
 }) {
   const [expanded, setExpanded] = useState(open);
   const [endpoint, setEndpoint] = useState("");
@@ -97,12 +106,18 @@ export function DeveloperPanel({
       }}
     >
       <summary>Developer</summary>
+      {notes.map((note) => (
+        <p key={note} className="developer-note" data-testid="developer-note">
+          {note}
+        </p>
+      ))}
+      {first}
       <p>
         {observations.length} observations this session, {forms} from form generation.
       </p>
       {dropped > 0 && (
         <p role="alert">
-          {dropped} older observations were dropped to keep the page's memory bounded. The downloads
+          {dropped} older observations were dropped to keep the page’s memory bounded. The downloads
           are incomplete, and say so.
         </p>
       )}
@@ -157,7 +172,7 @@ export function DeveloperPanel({
               download(observations, dropped, endpoint);
             }}
           >
-            Download this endpoint's observations
+            Download this endpoint’s observations
           </button>
         )}
         {onDescribeAll !== undefined && (

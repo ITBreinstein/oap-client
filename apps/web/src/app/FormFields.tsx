@@ -14,6 +14,9 @@
 import { useId, type ReactNode } from "react";
 import { initialValue } from "../forms/defaults.js";
 import { bareObjectHint, isRawJson, type FormValues } from "../forms/encode.js";
+import { jsonTrouble, type JsonTrouble } from "../forms/json-trouble.js";
+import { limitsStated } from "../forms/limits-stated.js";
+import { jsonBoxText } from "../forms/validate.js";
 import type {
   CheckboxControl,
   Control,
@@ -27,6 +30,11 @@ import type {
 import { BboxField } from "./BboxField.js";
 import { ComplexField } from "./ComplexField.js";
 import { GeometryField } from "./GeometryField.js";
+import { CopyField } from "./CopyButton.js";
+import { DateTimeField } from "./DateTimeField.js";
+import { formatJsonText } from "./json-text.js";
+import { JsonTroubleNote } from "./JsonTroubleNote.js";
+import { useUpdated } from "./variant.js";
 
 export interface ControlProps<C extends Control = Control> {
   readonly id: string;
@@ -34,11 +42,25 @@ export interface ControlProps<C extends Control = Control> {
   readonly value: unknown;
   readonly required: boolean;
   readonly describedBy: string | undefined;
+  /** The field has an error: said to screen readers on the control itself. */
+  readonly invalid?: boolean | undefined;
   readonly onChange: (value: unknown) => void;
   /** The label text, for inputs inside a group that need their own. */
   readonly label: string;
   /** The plan's input id, for a top-level field only: what the map draws for. */
   readonly inputId?: string | undefined;
+  /**
+   * STYLE TRIAL (updated Instrument, #14): the id of the field's own label,
+   * for a yes/no box with "Yes" beside it, which keeps the field's name.
+   */
+  readonly labelId?: string | undefined;
+  /** STYLE TRIAL (#14): the description already says the limits; the page does not repeat them. */
+  readonly limitsSaid?: boolean | undefined;
+  /**
+   * STYLE TRIAL (#13): the field's error is that its box holds no valid
+   * JSON. Said under the box, as the field's error (`${id}-error`).
+   */
+  readonly boxTrouble?: JsonTrouble | undefined;
 }
 
 function asText(value: unknown): string {
@@ -47,37 +69,70 @@ function asText(value: unknown): string {
   return "";
 }
 
-function TextInput({ id, control, value, describedBy, onChange }: ControlProps<TextControl>) {
+function TextInput(props: ControlProps<TextControl>) {
+  // A date-time is a date, a time and an offset (#12).
+  if (props.control.format === "date-time" && props.control.multiline !== true) {
+    return <DateTimeField {...props} />;
+  }
+  return <PlainTextInput {...props} />;
+}
+
+function PlainTextInput({
+  id,
+  control,
+  value,
+  describedBy,
+  invalid,
+  onChange,
+  label,
+}: ControlProps<TextControl>) {
   const common = {
     id,
     value: asText(value),
     "aria-describedby": describedBy,
+    "aria-invalid": invalid === true ? true : undefined,
     onChange: (event: { target: { value: string } }) => {
       onChange(event.target.value);
     },
   };
-  return control.multiline === true ? (
-    <textarea {...common} rows={4} />
-  ) : (
-    <input {...common} type={control.format === "date" ? "date" : "text"} />
+  // STYLE TRIAL: the updated Instrument has Copy in the box (`CopyField`).
+  return (
+    <CopyField text={common.value} name={`Copy ${label}`} multiline={control.multiline === true}>
+      {control.multiline === true ? (
+        <textarea {...common} rows={4} />
+      ) : (
+        <input {...common} type={control.format === "date" ? "date" : "text"} />
+      )}
+    </CopyField>
   );
 }
 
-function NumberInput({ id, control, value, describedBy, onChange }: ControlProps<NumberControl>) {
+function NumberInput({
+  id,
+  control,
+  value,
+  describedBy,
+  invalid,
+  onChange,
+  label,
+}: ControlProps<NumberControl>) {
   // A text input, not type="number": a number input empties itself on a
   // partial entry like "0." and applies the browser's locale to the decimal
   // separator. The client-side check (T5) says what is wrong instead.
   return (
-    <input
-      id={id}
-      type="text"
-      inputMode={control.integer ? "numeric" : "decimal"}
-      value={asText(value)}
-      aria-describedby={describedBy}
-      onChange={(event) => {
-        onChange(event.target.value);
-      }}
-    />
+    <CopyField text={asText(value)} name={`Copy ${label}`}>
+      <input
+        id={id}
+        type="text"
+        inputMode={control.integer ? "numeric" : "decimal"}
+        value={asText(value)}
+        aria-describedby={describedBy}
+        aria-invalid={invalid === true ? true : undefined}
+        onChange={(event) => {
+          onChange(event.target.value);
+        }}
+      />
+    </CopyField>
   );
 }
 
@@ -87,6 +142,7 @@ function SelectInput({
   value,
   required,
   describedBy,
+  invalid,
   onChange,
 }: ControlProps<SelectControl>) {
   const selected = control.options.findIndex(
@@ -97,6 +153,7 @@ function SelectInput({
       id={id}
       value={selected < 0 ? "" : String(selected)}
       aria-describedby={describedBy}
+      aria-invalid={invalid === true ? true : undefined}
       onChange={(event) => {
         const index = Number(event.target.value);
         onChange(event.target.value === "" ? undefined : control.options[index]?.value);
@@ -113,7 +170,28 @@ function SelectInput({
 }
 
 function BooleanInput(props: ControlProps<CheckboxControl>) {
-  const { id, value, required, describedBy, onChange, label } = props;
+  const { id, value, required, describedBy, invalid, onChange, label, labelId } = props;
+  // STYLE TRIAL (updated Instrument, #14): "Yes" beside the box says what a
+  // tick means. The box is still named by the field's label, which is no
+  // longer tied to it by `for` (two labels would name it "… Yes").
+  if (required && labelId !== undefined) {
+    return (
+      <label className="choice checkbox-yes">
+        <input
+          id={id}
+          type="checkbox"
+          checked={value === true}
+          aria-labelledby={labelId}
+          aria-describedby={describedBy}
+          aria-invalid={invalid === true ? true : undefined}
+          onChange={(event) => {
+            onChange(event.target.checked);
+          }}
+        />{" "}
+        Yes
+      </label>
+    );
+  }
   if (required) {
     return (
       <input
@@ -121,6 +199,7 @@ function BooleanInput(props: ControlProps<CheckboxControl>) {
         type="checkbox"
         checked={value === true}
         aria-describedby={describedBy}
+        aria-invalid={invalid === true ? true : undefined}
         onChange={(event) => {
           onChange(event.target.checked);
         }}
@@ -141,6 +220,7 @@ function BooleanInput(props: ControlProps<CheckboxControl>) {
       role="radiogroup"
       aria-label={label}
       aria-describedby={describedBy}
+      aria-invalid={invalid === true ? true : undefined}
     >
       {choices.map(([text, choice]) => (
         <label key={text} className="choice">
@@ -159,30 +239,48 @@ function BooleanInput(props: ControlProps<CheckboxControl>) {
   );
 }
 
-function JsonInput({ id, value, describedBy, onChange }: ControlProps<JsonControl>) {
+function JsonInput({
+  id,
+  value,
+  describedBy,
+  invalid,
+  onChange,
+  label,
+  boxTrouble,
+}: ControlProps<JsonControl>) {
+  // STYLE TRIAL: the updated Instrument lays JSON out with tabs.
+  const updated = useUpdated();
   const text = isRawJson(value)
     ? value.rawJson
     : value === undefined
       ? ""
-      : JSON.stringify(value, null, 2);
+      : JSON.stringify(value, null, updated ? "\t" : 2);
   // Said, never enforced: what is typed here is sent as typed.
   const bare = bareObjectHint({ rawJson: text });
   return (
     <>
-      <textarea
-        id={id}
-        className="code"
-        rows={5}
-        spellCheck={false}
-        value={text}
-        aria-describedby={
-          bare === undefined ? describedBy : `${describedBy ?? ""} ${id}-bare`.trim()
-        }
-        placeholder="JSON"
-        onChange={(event) => {
-          onChange({ rawJson: event.target.value });
-        }}
-      />
+      <CopyField text={text} name={`Copy ${label}`} multiline>
+        <textarea
+          id={id}
+          className="code"
+          rows={5}
+          spellCheck={false}
+          value={text}
+          aria-describedby={
+            bare === undefined ? describedBy : `${describedBy ?? ""} ${id}-bare`.trim()
+          }
+          aria-invalid={invalid === true ? true : undefined}
+          placeholder="JSON"
+          onChange={(event) => {
+            onChange({ rawJson: event.target.value });
+          }}
+          onBlur={() => {
+            const laidOut = updated ? formatJsonText(text) : undefined;
+            if (laidOut !== undefined && laidOut !== text) onChange({ rawJson: laidOut });
+          }}
+        />
+      </CopyField>
+      {boxTrouble !== undefined && <JsonTroubleNote id={`${id}-error`} trouble={boxTrouble} />}
       {bare !== undefined && (
         <p id={`${id}-bare`} className="hint" data-bare-object-hint="true">
           {bare}
@@ -199,7 +297,7 @@ function JsonInput({ id, value, describedBy, onChange }: ControlProps<JsonContro
  * where the list's first row did.
  */
 function ListInput(props: ControlProps<ListControl>) {
-  const { id, control, value, required, onChange, label, describedBy } = props;
+  const { id, control, value, required, onChange, label } = props;
   const items: readonly unknown[] = Array.isArray(value)
     ? value
     : value === undefined
@@ -210,7 +308,7 @@ function ListInput(props: ControlProps<ListControl>) {
     onChange(items.map((item, at) => (at === index ? next : item)));
   };
   return (
-    <div className="list" aria-describedby={describedBy}>
+    <div className="list">
       <ol>
         {items.map((item, index) => (
           <li key={index}>
@@ -250,7 +348,9 @@ function ListInput(props: ControlProps<ListControl>) {
       >
         Add a value
       </button>
-      {control.maxItems !== undefined && <span className="help"> Up to {control.maxItems}.</span>}
+      {control.maxItems !== undefined && props.limitsSaid !== true && (
+        <span className="help"> Up to {control.maxItems}.</span>
+      )}
     </div>
   );
 }
@@ -290,10 +390,20 @@ function isGroup(control: Control, required: boolean): boolean {
   );
 }
 
-function hint(field: FieldPlan): string | undefined {
+/** The numbers an input is limited by, which the page says in a line of its own. */
+function limitsOf(control: Control): number[] {
+  if (control.kind === "number") {
+    return [control.min, control.max].filter((limit) => limit !== undefined);
+  }
+  if (control.kind === "text") return control.maxLength === undefined ? [] : [control.maxLength];
+  if (control.kind === "list") return control.maxItems === undefined ? [] : [control.maxItems];
+  return [];
+}
+
+function hint(field: FieldPlan, limitsSaid: boolean): string | undefined {
   const { control } = field;
   const notes: string[] = [];
-  if (control.kind === "number") {
+  if (control.kind === "number" && !limitsSaid) {
     if (control.min !== undefined) {
       notes.push(`${control.minExclusive === true ? "Above" : "At least"} ${String(control.min)}.`);
     }
@@ -301,7 +411,7 @@ function hint(field: FieldPlan): string | undefined {
       notes.push(`${control.maxExclusive === true ? "Below" : "At most"} ${String(control.max)}.`);
     }
   }
-  if (control.kind === "text" && control.maxLength !== undefined) {
+  if (control.kind === "text" && control.maxLength !== undefined && !limitsSaid) {
     notes.push(`At most ${String(control.maxLength)} characters.`);
   }
   if (!field.required) {
@@ -336,7 +446,17 @@ export function FieldView({ field, index, values, error, warnings, onChange }: F
   const base = useId();
   const id = `${base}-field-${String(index)}`;
   const help = field.description;
-  const extra = hint(field);
+  // STYLE TRIAL (updated Instrument, #14): no line of limits the description
+  // already gives, and "Yes" beside a yes/no box.
+  const updated = useUpdated();
+  const limitsSaid = updated && limitsStated(help, limitsOf(field.control));
+  const yesBeside = updated && field.control.kind === "checkbox" && field.required;
+  const extra = hint(field, limitsSaid);
+  const value = Object.hasOwn(values, field.id) ? values[field.id] : undefined;
+  // STYLE TRIAL (updated Instrument, #13): a box that holds no valid JSON is
+  // said to be so under the box, not at the foot of the field.
+  const boxText = updated && error !== undefined ? jsonBoxText(field.control, value) : undefined;
+  const boxTrouble = boxText === undefined ? undefined : jsonTrouble(boxText);
   const warned = error === undefined && warnings !== undefined && warnings.length > 0;
   const describedBy =
     [
@@ -347,7 +467,6 @@ export function FieldView({ field, index, values, error, warnings, onChange }: F
     ]
       .filter((part): part is string => typeof part === "string" && part !== "")
       .join(" ") || undefined;
-  const value = Object.hasOwn(values, field.id) ? values[field.id] : undefined;
   const group = isGroup(field.control, field.required);
   const title = (
     <>
@@ -367,8 +486,12 @@ export function FieldView({ field, index, values, error, warnings, onChange }: F
       value={value}
       required={field.required}
       describedBy={describedBy}
+      invalid={error !== undefined}
       label={field.title}
       inputId={field.id}
+      labelId={yesBeside ? `${id}-label` : undefined}
+      limitsSaid={limitsSaid}
+      boxTrouble={boxTrouble}
       onChange={(next) => {
         onChange(field.id, next);
       }}
@@ -397,19 +520,22 @@ export function FieldView({ field, index, values, error, warnings, onChange }: F
       data-control={field.control.kind}
     >
       {group ? (
-        <fieldset>
+        // A group's help and error are said with its legend, on entering it.
+        <fieldset aria-describedby={describedBy}>
           <legend>{title}</legend>
           {notes}
           {control}
         </fieldset>
       ) : (
         <>
-          <label htmlFor={id}>{title}</label>
+          <label id={`${id}-label`} htmlFor={yesBeside ? undefined : id}>
+            {title}
+          </label>
           {notes}
           {control}
         </>
       )}
-      {error !== undefined && (
+      {error !== undefined && boxTrouble === undefined && (
         <p id={`${id}-error`} className="field-error">
           {error}
         </p>

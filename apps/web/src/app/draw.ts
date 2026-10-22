@@ -10,6 +10,9 @@
 
 import { createContext } from "react";
 
+/** West, south, east, north, in longitude and latitude: what the map shows. */
+export type MapExtent = readonly [number, number, number, number];
+
 export interface DrawTarget {
   /** The field being drawn for, or undefined when the map is only a map. */
   readonly fieldId: string | undefined;
@@ -17,6 +20,13 @@ export interface DrawTarget {
   readonly available: boolean;
   start(fieldId: string): void;
   stop(): void;
+  /**
+   * Changes each time Draw is pressed (#18): the tools take the focus once for
+   * it, and not when drawing comes back by itself after a run.
+   */
+  readonly focusToken?: number | undefined;
+  /** What the map shows now (#18), for "Use the current map view"; undefined without a map. */
+  readonly currentView?: (() => MapExtent | undefined) | undefined;
 }
 
 export const DrawContext = createContext<DrawTarget>({
@@ -34,6 +44,8 @@ export const DrawContext = createContext<DrawTarget>({
 export interface DrawRequest {
   readonly form: object;
   readonly fieldId: string;
+  /** Which press of Draw this is (#18). */
+  readonly press?: number | undefined;
 }
 
 /**

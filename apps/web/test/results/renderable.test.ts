@@ -255,7 +255,7 @@ describe("runError on a real refusal", () => {
     );
     const cause: unknown = await requireOk(refusal).catch((error: unknown) => error);
     expect(runError(cause, plan)).toEqual({
-      title: "The server refused the request (HTTP 400). Check the inputs and run again.",
+      title: "The service reported an error. Check the input “Bounding box” and run again.",
       detail:
         'Error executing process: The "bbox" input must be in CRS84; received crs "http://www.opengis.net/def/crs/EPSG/0/4326"',
       inputId: "bbox",

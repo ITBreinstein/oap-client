@@ -12,6 +12,9 @@
 
 import { useContext, useId, useState } from "react";
 import { classifyCrs, drawableCrs, isDrawableCrs, typedBboxCrs } from "../forms/crs.js";
+import { useSpared } from "./developer.js";
+import { extentOfBbox, metresAcross, sizeLabel } from "./shape-size.js";
+import { useUpdated } from "./variant.js";
 import { isRawJson, type BboxValue } from "../forms/encode.js";
 import type { BboxControl } from "../forms/plan.js";
 import { DrawContext } from "./draw.js";
@@ -84,6 +87,7 @@ export function BboxField(props: ControlProps<BboxControl>) {
   const { control, value, onChange, describedBy, inputId } = props;
   const draw = useContext(DrawContext);
   const base = useId();
+  const spared = useSpared(useUpdated());
   const box = isBboxValue(value) ? value : undefined;
   const mapCrs = control.dimensions.includes(4) ? drawableCrs(control.crs) : undefined;
   const crs = box?.crs ?? typedBboxCrs(control);
@@ -100,6 +104,8 @@ export function BboxField(props: ControlProps<BboxControl>) {
         : PROJECTED_3D;
   const drawing = inputId !== undefined && draw.fieldId === inputId;
   const canDraw = inputId !== undefined && draw.available && mapCrs !== undefined && count === 4;
+  const extent = geographic && box !== undefined ? extentOfBbox(box.coordinates) : undefined;
+  const size = extent === undefined ? undefined : sizeLabel(metresAcross(extent));
 
   // The typed fields keep what was typed, "5." included; the value is derived
   // from them. A box drawn on the map arrives as a new value instead, and its
@@ -148,6 +154,7 @@ export function BboxField(props: ControlProps<BboxControl>) {
         <textarea
           id={`${base}-json`}
           className="code"
+          aria-invalid={props.invalid === true ? true : undefined}
           rows={4}
           spellCheck={false}
           value={value.rawJson}
@@ -174,7 +181,7 @@ export function BboxField(props: ControlProps<BboxControl>) {
   }
 
   return (
-    <div className="bbox" aria-describedby={describedBy}>
+    <div className="bbox">
       {control.crs.length > 1 ? (
         <p>
           <label htmlFor={`${base}-crs`}>Coordinate reference system</label>
@@ -199,7 +206,14 @@ export function BboxField(props: ControlProps<BboxControl>) {
           </select>
         </p>
       ) : (
-        <p className="help">Coordinate reference system: {crsLabel(crs)}</p>
+        <p className="help">
+          {/* STYLE TRIAL: the updated Instrument spares a visitor the CRS's address (#43). */}
+          {spared && geographic
+            ? kind === "crs84h"
+              ? "In longitude and latitude, with heights."
+              : "In longitude and latitude."
+            : `Coordinate reference system: ${crsLabel(crs)}`}
+        </p>
       )}
 
       {mapCrs === undefined && (
@@ -217,6 +231,7 @@ export function BboxField(props: ControlProps<BboxControl>) {
             <input
               id={`${base}-c${String(index)}`}
               type="text"
+              aria-invalid={props.invalid === true ? true : undefined}
               inputMode="decimal"
               value={texts[index] ?? ""}
               onChange={(event) => {
@@ -228,6 +243,13 @@ export function BboxField(props: ControlProps<BboxControl>) {
           </p>
         ))}
       </div>
+
+      {/* How big it is, to check a process's limit against (#15): in longitude and latitude only. */}
+      {size !== undefined && (
+        <p className="help shape-size" data-testid="shape-size">
+          {size}
+        </p>
+      )}
 
       {notice !== undefined && (
         <p className="hint" role="status">
@@ -266,6 +288,22 @@ export function BboxField(props: ControlProps<BboxControl>) {
             {drawing ? "Stop drawing" : "Draw on the map"}
           </button>
         )}
+        {canDraw && (
+          <button
+            type="button"
+            className="secondary"
+            onClick={() => {
+              // The map's view as the box (#18), in the CRS the map draws in.
+              const view = draw.currentView?.();
+              if (view === undefined) return;
+              setNotice(undefined);
+              const value: BboxValue = { coordinates: [...view], crs: mapCrs };
+              onChange(value);
+            }}
+          >
+            Use the current map view
+          </button>
+        )}
         <button
           type="button"
           className="secondary"
@@ -288,6 +326,12 @@ export function BboxField(props: ControlProps<BboxControl>) {
           </button>
         )}
       </p>
+      {canDraw && (
+        <p className="help draw-hint">
+          Drawing needs a mouse or touch. You can also type the coordinates or use the current map
+          view.
+        </p>
+      )}
     </div>
   );
 }

@@ -15,11 +15,13 @@ import {
   type Client,
   type ExecutionMode,
   type ProcessDescription,
+  type ProcessList,
   type ProcessSummary,
 } from "@breinstein/oap-client";
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { drawableCrs } from "../forms/crs.js";
 import { initialValues } from "../forms/defaults.js";
+import { formKey, remember, restoredValues, type FormMemory } from "./form-memory.js";
 import type { BboxControl, Control, FormPlan } from "../forms/plan.js";
 import { resolveFormPlan } from "../forms/resolve.js";
 import { schemaWarnings } from "../forms/schema-warnings.js";
@@ -59,8 +61,10 @@ import {
   relayEndpointFor,
   runError,
   runRequest,
+  serviceError,
 } from "./run.js";
 import {
+  exampleLanding,
   INITIAL_WORKFLOW,
   workflowReducer,
   type EndpointRef,
@@ -71,6 +75,11 @@ import {
 /** Properties, not methods: each is handed to a component on its own. */
 export interface WorkflowCommands {
   readonly connect: (endpoint: EndpointRef) => void;
+  /**
+   * An example: connect to `endpoint` and open `processId` there, or, when
+   * already connected to it, open the process at once.
+   */
+  readonly openExample: (endpoint: EndpointRef, processId: string) => void;
   /** "Use relay": the only way anything is sent through the relay's read route. */
   readonly confirmRelay: () => void;
   /** "Cancel", Escape, or any other way of closing the question. */
@@ -79,10 +88,24 @@ export interface WorkflowCommands {
   readonly openProcess: (summary: ProcessSummary) => void;
   readonly backToList: () => void;
   readonly setValue: (id: string, value: unknown) => void;
+  /** "Clear the form" (#10): every input back to what it started with, and forgotten. */
+  readonly clearForm: () => void;
+  /** Say something about the open form of this process, as a notice above it (#33). */
+  readonly formNotice: (processId: string, notice: string) => void;
   readonly setMode: (mode: ExecutionMode) => void;
   /** Task 8, T2: ask for one output as a value (as the server prefers) or a link. */
   readonly setTransmission: (outputId: string, transmission: "value" | "reference") => void;
   readonly run: () => void;
+  /**
+   * "Stop waiting" on a foreground run (#24): abort the request and go back
+   * to the form, its values as they were. The service may still finish.
+   */
+  readonly stopWaiting: () => void;
+  /**
+   * Follow a job already on the server, from the open process: the job a
+   * link names, or one in My jobs. Its status, then its results, as a run's.
+   */
+  readonly watchJob: (statusUrl: string) => void;
   readonly cancelJob: () => void;
   readonly edit: () => void;
   /**
@@ -119,8 +142,16 @@ export interface WorkflowView {
   readonly state: Workflow;
   readonly commands: WorkflowCommands;
   readonly snapshot: JobSessionSnapshot | undefined;
-  /** From the relay's `GET /endpoints`; empty without a relay. */
+  /**
+   * From the relay's `GET /endpoints`, as it last answered; empty without a
+   * relay, or while it does not answer.
+   */
   readonly configured: readonly RelayEndpoint[];
+  /**
+   * The endpoints the relay listed earlier this visit, while it does not
+   * answer now (#6): shown, but not offered. Empty otherwise.
+   */
+  readonly unavailable: readonly RelayEndpoint[];
   readonly configuredError: string | undefined;
   readonly fieldErrors: FieldErrors;
   /** A message about the running job that is not a stage change, e.g. a refused cancel. */
@@ -135,6 +166,18 @@ export interface WorkflowView {
   /** What the last Dismiss of a job ended in, by status URL. */
   readonly jobMessages: ReadonlyMap<string, string>;
   readonly census: CensusProgress | undefined;
+  /**
+   * Whether this page has seen that it cannot find a background job started
+   * on `endpoint` the way it reaches it (#25): the server hides `Location`.
+   */
+  readonly backgroundUnfindable: (endpoint: EndpointRef) => boolean;
+  /** When this page had the server cancel a job, by its status URL (#31). */
+  readonly cancelled: ReadonlyMap<string, string>;
+}
+
+/** Which way an endpoint's background runs go, and where: what #25 is remembered by. */
+function backgroundKey(endpoint: RelayEndpoint): string {
+  return `${endpoint.executeRoute}\n${endpoint.baseUrl.replace(/\/+$/, "")}`;
 }
 
 const NO_ERRORS: FieldErrors = new Map();
@@ -176,6 +219,7 @@ function transportMessage(cause: unknown, endpoint: EndpointRef): WorkflowError 
           ? "Connect again to be offered the relay, which reaches the server without CORS and so tells the two apart, or choose another service."
           : "The relay is not set up to read this service for a web page, so it cannot help here. Check that the server is running. If it is, choose another service, or ask this server's operator to enable CORS.";
     return {
+      corsOrUnreachable: true,
       title:
         "This page could not read this server: it sends no CORS headers, or it could not be reached. The attempt has been recorded.",
       detail: `A browser gives a web page the same error for both. A page may only read another site's answers when that site sends Access-Control-Allow-Origin. ${next}`,
@@ -254,10 +298,27 @@ function formObservationsOf(
   ];
 }
 
+/** What the screen says of a job this page cancelled. */
+const CANCELLED: WorkflowError = {
+  title: "Job cancelled. The server has dismissed it.",
+  notice: true,
+};
+
+/** The jobs this browser had cancelled, and when, by status URL. */
+function cancelledOf(jobs: readonly JobRow[] | undefined): ReadonlyMap<string, string> {
+  const cancelled = new Map<string, string>();
+  for (const job of jobs ?? []) {
+    if (job.cancelledAt !== undefined) cancelled.set(job.statusUrl, job.cancelledAt);
+  }
+  return cancelled;
+}
+
 export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: number): WorkflowView {
   const [state, dispatch] = useReducer(workflowReducer, INITIAL_WORKFLOW);
   const [snapshot, setSnapshot] = useState<JobSessionSnapshot | undefined>();
   const [configured, setConfigured] = useState<RelayEndpoint[]>([]);
+  /** Whether the relay's last answer to `GET /endpoints` is out of date: it did not answer since (#6). */
+  const [configuredStale, setConfiguredStale] = useState(false);
   const [configuredError, setConfiguredError] = useState<string | undefined>();
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>(NO_ERRORS);
   const [jobNotice, setJobNotice] = useState<string | undefined>();
@@ -276,10 +337,37 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
       }
     | undefined
   >(undefined);
+  /** The foreground run being waited for, and how to stop waiting for it (#24). */
+  const waiting = useRef<{ readonly runId: string; readonly stop: AbortController } | undefined>(
+    undefined,
+  );
+  /**
+   * The endpoints whose background runs this page cannot find, seen this
+   * visit (#25), by {@link backgroundKey}: Run in the background is off there.
+   */
+  const [unfindable, setUnfindable] = useState<ReadonlySet<string>>(() => new Set());
+  /**
+   * A job this page had the server cancel, and when (#31): My jobs says so,
+   * rather than "gone". Kept with the job, so it says so after a reload too
+   * (#14e).
+   */
+  /**
+   * The jobs whose cancel this page has sent and not yet heard back on: the
+   * server may already say it has no such job, and that is the cancel, not
+   * news of a job lost.
+   */
+  const cancelling = useRef(new Set<string>());
+  const markCancelled = (statusUrl: string) => {
+    session.current?.markCancelled(statusUrl, new Date().toISOString());
+  };
+  /** Each process's form as it was left this visit, in memory only (#10). */
+  const forms = useRef<FormMemory>(new Map());
   /** Connections made so far; each successful one takes the next number. */
   const connections = useRef(0);
   /** The direct attempt behind an open offer, for the record its answer completes. */
   const pendingOffer = useRef<AttemptFacts | undefined>(undefined);
+  /** The example's process to open once the connection being made is up. */
+  const openAfterConnect = useRef<string | undefined>(undefined);
   const relayAvailable = relayUrl !== undefined && relayUrl !== "";
   /** Endpoints where a dismissal has been seen to work this session (T6). */
   const [dismissWorked, setDismissWorked] = useState<ReadonlySet<string>>(() => new Set());
@@ -304,28 +392,41 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
     const created = createJobSession(relayUrl, { acceptedNoticeMs, store: createJobStore() });
     session.current = created;
     const unsubscribe = created.subscribe(setSnapshot);
-    let live = true;
-    if (relayUrl !== undefined && relayUrl !== "") {
-      created
-        .endpoints()
-        .then((list) => {
-          if (live) setConfigured(list);
-        })
-        .catch(() => {
-          if (live) {
-            setConfiguredError(
-              "The relay did not list its endpoints. Type a server's address instead.",
-            );
-          }
-        });
-    }
     return () => {
-      live = false;
       unsubscribe();
       created.dispose();
       if (session.current === created) session.current = undefined;
     };
   }, [relayUrl, acceptedNoticeMs]);
+
+  // The relay's endpoints, read each time the start screen is shown (#6): a
+  // relay that went down since keeps its rows from earlier this visit, shown
+  // as unavailable, and one that is back offers them again. After the effect
+  // above, which made the session this asks.
+  const atStart = state.stage === "choose-endpoint";
+  useEffect(() => {
+    const asking = session.current;
+    if (!atStart || asking === undefined || relayUrl === undefined || relayUrl === "") {
+      return undefined;
+    }
+    let live = true;
+    asking
+      .endpoints()
+      .then((list) => {
+        if (!live) return;
+        setConfigured(list);
+        setConfiguredStale(false);
+        setConfiguredError(undefined);
+      })
+      .catch(() => {
+        if (!live) return;
+        setConfiguredStale(true);
+        setConfiguredError("Some services are temporarily unavailable.");
+      });
+    return () => {
+      live = false;
+    };
+  }, [atStart, relayUrl, acceptedNoticeMs]);
 
   const record = useCallback((observations: readonly FormObservation[]) => {
     for (const observation of observations) {
@@ -336,18 +437,94 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
     }
   }, []);
 
+  /**
+   * Read one process's description on the open connection and show its
+   * form. The reducer has already been told which process is opening.
+   */
+  const load = useCallback(
+    (
+      connection: NonNullable<typeof client.current>,
+      active: JobSession,
+      processId: string,
+      summary: ProcessSummary | undefined,
+    ) => {
+      setFieldErrors(NO_ERRORS);
+      void (async () => {
+        let warnings: readonly string[] = [];
+        try {
+          const process = await connection.client.getProcess(processId, {
+            summary,
+            // Per call, so the parse warnings can be read off the observation
+            // that carries them; forwarded, so the session still records it.
+            onObservation: (observation) => {
+              if (observation.kind === "process-fetched") warnings = observation.warnings;
+              active.record(connection.endpoint.baseUrl, observation);
+            },
+          });
+          const plan = resolveFormPlan(process);
+          record(formObservationsOf(connection.endpoint.baseUrl, process, plan));
+          dispatch({
+            type: "process-loaded",
+            connection: connection.id,
+            process,
+            plan,
+            values: restoredValues(
+              plan,
+              initialValues(plan),
+              forms.current.get(formKey(connection.endpoint.baseUrl, process.id)),
+            ),
+            warnings,
+          });
+        } catch (cause) {
+          dispatch({
+            type: "process-failed",
+            connection: connection.id,
+            processId,
+            error: rateLimitMessage(cause) ?? {
+              title:
+                "Could not read this process's description. Choose it again, or another process.",
+              detail: cause instanceof Error ? cause.message : String(cause),
+            },
+          });
+        }
+      })();
+    },
+    [record],
+  );
+
+  /** After a connection is up: open the example's process, if one was chosen and is there. */
+  const openChosen = useCallback(
+    (connection: NonNullable<typeof client.current>, active: JobSession, list: ProcessList) => {
+      const processId = openAfterConnect.current;
+      openAfterConnect.current = undefined;
+      if (processId === undefined || exampleLanding(list, processId) === "missing") return;
+      load(
+        connection,
+        active,
+        processId,
+        list.processes.find((process) => process.id === processId),
+      );
+    },
+    [load],
+  );
+
   // Direct first, always (route-decision.ts). The relay is offered only for a
   // CORS-shaped failure on an endpoint that allows it, and tried only from
   // confirmRelay. The attempt's one record is written when it settles.
-  const connect = useCallback(
-    (endpoint: EndpointRef) => {
+  const start = useCallback(
+    (endpoint: EndpointRef, openAfter: string | undefined) => {
       const active = session.current;
       if (active === undefined) return;
       // The relay offer is open: only its answer moves on (review W22). The
       // reducer ignores a connect here, and clearing the pending offer lost
       // the open attempt's record, or gave "Use relay" another endpoint's.
       if (pendingOffer.current !== undefined) return;
-      dispatch({ type: "connect", endpoint });
+      openAfterConnect.current = openAfter;
+      dispatch(
+        openAfter === undefined
+          ? { type: "connect", endpoint }
+          : { type: "open-example", endpoint, processId: openAfter },
+      );
       const at = new Date();
       // Refused before sending: the browser would block it, and the opaque
       // error it throws cross-origin is indistinguishable from CORS.
@@ -362,6 +539,7 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
             directError: undefined,
           }),
         );
+        openAfterConnect.current = undefined;
         dispatch({ type: "connect-failed", endpoint, error: MIXED_CONTENT_ERROR });
         return;
       }
@@ -372,7 +550,8 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
           const processes = await connection.listProcesses();
           connections.current += 1;
           const id = connections.current;
-          client.current = { endpoint, client: connection, reads: "direct", id };
+          const opened = { endpoint, client: connection, reads: "direct" as const, id };
+          client.current = opened;
           active.record(
             endpoint.baseUrl,
             accessRecord({
@@ -391,6 +570,7 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
             service,
             processes,
           });
+          openChosen(opened, active, processes);
         } catch (cause) {
           const direct = directFailure(cause);
           const facts = { endpoint, at, relayAvailable, direct, directError: errorName(cause) };
@@ -400,12 +580,20 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
             dispatch({ type: "relay-offered", endpoint, error });
             return;
           }
+          openAfterConnect.current = undefined;
           active.record(endpoint.baseUrl, accessRecord(facts));
           dispatch({ type: "connect-failed", endpoint, error });
         }
       })();
     },
-    [relayAvailable],
+    [relayAvailable, openChosen],
+  );
+
+  const connect = useCallback(
+    (endpoint: EndpointRef) => {
+      start(endpoint, undefined);
+    },
+    [start],
   );
 
   const confirmRelay = useCallback(() => {
@@ -422,7 +610,8 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
         const processes = await connection.listProcesses();
         connections.current += 1;
         const id = connections.current;
-        client.current = { endpoint, client: connection, reads: "relay", id };
+        const opened = { endpoint, client: connection, reads: "relay" as const, id };
+        client.current = opened;
         active.record(
           endpoint.baseUrl,
           accessRecord({ ...facts, confirmed: true, relay: relayAttempt(undefined) }),
@@ -435,7 +624,9 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
           service,
           processes,
         });
+        openChosen(opened, active, processes);
       } catch (cause) {
+        openAfterConnect.current = undefined;
         const attempt = relayAttempt(cause);
         active.record(
           endpoint.baseUrl,
@@ -444,13 +635,14 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
         dispatch({ type: "connect-failed", endpoint, error: relayFailureMessage(attempt, cause) });
       }
     })();
-  }, []);
+  }, [openChosen]);
 
   // Cancel, Escape, or anything else that closes the question: a decline.
   const declineRelay = useCallback(() => {
     const active = session.current;
     const facts = pendingOffer.current;
     pendingOffer.current = undefined;
+    openAfterConnect.current = undefined;
     if (facts !== undefined) {
       active?.record(facts.endpoint.baseUrl, accessRecord({ ...facts, confirmed: false }));
     }
@@ -463,44 +655,9 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
       const active = session.current;
       if (connection === undefined || active === undefined) return;
       dispatch({ type: "open-process", processId: summary.id });
-      setFieldErrors(NO_ERRORS);
-      void (async () => {
-        let warnings: readonly string[] = [];
-        try {
-          const process = await connection.client.getProcess(summary.id, {
-            summary,
-            // Per call, so the parse warnings can be read off the observation
-            // that carries them; forwarded, so the session still records it.
-            onObservation: (observation) => {
-              if (observation.kind === "process-fetched") warnings = observation.warnings;
-              active.record(connection.endpoint.baseUrl, observation);
-            },
-          });
-          const plan = resolveFormPlan(process);
-          record(formObservationsOf(connection.endpoint.baseUrl, process, plan));
-          dispatch({
-            type: "process-loaded",
-            connection: connection.id,
-            process,
-            plan,
-            values: initialValues(plan),
-            warnings,
-          });
-        } catch (cause) {
-          dispatch({
-            type: "process-failed",
-            connection: connection.id,
-            processId: summary.id,
-            error: rateLimitMessage(cause) ?? {
-              title:
-                "Could not read this process's description. Choose it again, or another process.",
-              detail: cause instanceof Error ? cause.message : String(cause),
-            },
-          });
-        }
-      })();
+      load(connection, active, summary.id, summary);
     },
-    [record],
+    [load],
   );
 
   // Not memoised: a command is only ever called from a handler rendered with
@@ -514,7 +671,15 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
     setFieldErrors(errors);
     if (errors.size > 0) return;
 
-    const { process, plan, mode, linkOutputs } = state;
+    const { process, plan, linkOutputs } = state;
+    // Never a background run this page has seen it can't find (#25), when
+    // the process can run in the foreground.
+    const mode =
+      state.mode === "async" &&
+      process.execution.sync &&
+      unfindable.has(backgroundKey(relayEndpointFor(connection.endpoint)))
+        ? "sync"
+        : state.mode;
     const request = runRequest(process, plan, state.values, linkOutputs);
     // Package 6: the schema warnings were on screen and do not stop the run;
     // an input whose value could not be checked is recorded, once.
@@ -553,6 +718,10 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
 
     const outputIds = Object.keys(request.outputs);
     const relayEndpoint = relayEndpointFor(connection.endpoint);
+    // A foreground run can be given up on (#24). The core records the abort
+    // as it records any request that ended without an answer.
+    const stop = mode === "sync" ? new AbortController() : undefined;
+    if (stop !== undefined) waiting.current = { runId, stop };
     void (async () => {
       try {
         const execution =
@@ -562,6 +731,7 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
                 outputs: request.outputs,
                 mode: "sync",
                 description: process,
+                signal: stop?.signal,
               })
             : await active.run(
                 relayEndpoint,
@@ -590,22 +760,87 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
         dispatch({ type: "results", runId, results });
       } catch (cause) {
         if (cause instanceof AmbiguousExecutionResponseError) {
+          // Every background run here would end the same way: not again
+          // this visit (#25). The execution observation has the evidence.
+          setUnfindable((known) => new Set(known).add(backgroundKey(relayEndpoint)));
           dispatch({
             type: "run-failed",
             runId,
             error: {
               title:
-                "The server started a job but did not tell this page where to find it. Run it in the foreground, or use an endpoint that runs through the relay.",
-              detail:
-                "The server does not expose the Location header to web pages (finding 0039). The job may still be running on the server.",
+                "The service started the run in the background, but can’t tell this page where to find it. The job may still be running on the service.",
+              technical:
+                "The server answered the asynchronous execute without exposing the Location header to web pages (finding 0039), so the page cannot name the job.",
             },
           });
+          dispatch({ type: "set-mode", mode: "sync" });
           return;
         }
+        // Stopped by the user: the screen has already gone back to the form.
+        if (stop?.signal.aborted === true) return;
         dispatch({ type: "run-failed", runId, error: runError(cause, plan) });
+      } finally {
+        if (waiting.current?.runId === runId) waiting.current = undefined;
       }
     })();
   };
+
+  const stopWaiting = () => {
+    const run = waiting.current;
+    if (state.stage !== "running" || run === undefined || run.runId !== state.runId) return;
+    waiting.current = undefined;
+    run.stop.abort();
+    dispatch({
+      type: "run-failed",
+      runId: run.runId,
+      error: {
+        title:
+          "Stopped waiting. The service may still finish the run; nothing will be shown for it.",
+        notice: true,
+      },
+    });
+  };
+
+  const watchJob = (statusUrl: string) => {
+    const connection = client.current;
+    const active = session.current;
+    if (state.stage !== "process" || connection === undefined || active === undefined) return;
+    const { process, linkOutputs } = state;
+    const runId = newRunId();
+    lastRun.current = {
+      runId,
+      endpoint: connection.endpoint.baseUrl,
+      processId: process.id,
+      declaredTransmission: process.outputTransmission,
+      linkOutputs,
+    };
+    setFieldErrors(NO_ERRORS);
+    setJobNotice(undefined);
+    // A job My jobs already follows keeps its record (when it started, how).
+    if (snapshot?.jobs.some((row) => row.statusUrl === statusUrl) !== true) {
+      // Followed, not started here (#32): My jobs lists it apart.
+      active.track(
+        relayEndpointFor(connection.endpoint),
+        statusUrl,
+        connection.reads,
+        process.id,
+        true,
+      );
+    }
+    dispatch({ type: "watch-job", runId, jobRef: statusUrl });
+  };
+
+  // Each process's form, kept as it is left (#10): on every change, so
+  // whichever way the page moves on, it comes back as it was.
+  useEffect(() => {
+    if (state.stage !== "process") return;
+    forms.current = remember(
+      forms.current,
+      formKey(state.endpoint.baseUrl, state.process.id),
+      state.values,
+      initialValues(state.plan),
+    );
+  }, [state]);
 
   // An asynchronous run ends when the reconciler says the job did: read its
   // results once it succeeded, or say why there are none.
@@ -622,7 +857,10 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
       dispatch({
         type: "run-failed",
         runId,
-        error: { title: "The server no longer has this job: it was cancelled or has expired." },
+        // Cancelled from here, and gone before the cancel's own answer came.
+        error: cancelling.current.has(jobRef)
+          ? CANCELLED
+          : { title: "The server no longer has this job: it was cancelled or has expired." },
       });
       return;
     }
@@ -633,16 +871,12 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
     // shows both, and the results the server handed out.
     const decided = job.confirmation?.state === "changed" ? job.confirmation.first : status;
     if (decided.status !== "successful") {
+      const failure =
+        status.status === "dismissed" ? undefined : serviceError(status.message, state.plan);
       dispatch({
         type: "run-failed",
         runId,
-        error: {
-          title:
-            status.status === "dismissed"
-              ? "The job was cancelled."
-              : "The job failed on the server. Check the inputs and run again.",
-          detail: status.message,
-        },
+        error: failure ?? { title: "The job was cancelled.", detail: status.message },
       });
       return;
     }
@@ -736,6 +970,7 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
           setDismissWorked((seen) => new Set([...seen, job.endpoint]));
           active.record(job.endpoint, { ...base, outcome: "dismissed" });
           setJobMessage(statusUrl, "Dismissed on the server.");
+          markCancelled(statusUrl);
         } else {
           active.record(job.endpoint, { ...base, outcome: "unsupported" });
           setJobMessage(
@@ -771,6 +1006,7 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
       advertisedBy,
     };
     setJobNotice("Cancelling the job…");
+    cancelling.current.add(jobRef);
     void (async () => {
       try {
         const dismissal = await connection.client.dismissJob(jobRef);
@@ -778,11 +1014,8 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
           setDismissWorked((seen) => new Set([...seen, endpointUrl]));
           active.record(endpointUrl, { ...base, outcome: "dismissed" });
           setJobNotice(undefined);
-          dispatch({
-            type: "run-failed",
-            runId,
-            error: { title: "Job cancelled. The server has dismissed it.", notice: true },
-          });
+          markCancelled(jobRef);
+          dispatch({ type: "run-failed", runId, error: CANCELLED });
         } else {
           active.record(endpointUrl, { ...base, outcome: "unsupported" });
           setJobNotice(
@@ -794,6 +1027,8 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
         setJobNotice(
           `The job could not be cancelled: ${cause instanceof Error ? cause.message : String(cause)}. It may still be running.`,
         );
+      } finally {
+        cancelling.current.delete(jobRef);
       }
     })();
   };
@@ -864,6 +1099,27 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
       setFieldErrors(NO_ERRORS);
       dispatch({ type: "disconnect" });
     },
+    openExample: (endpoint, processId) => {
+      if (state.stage === "running") return;
+      // Already connected to that service, and it lists the process: open it.
+      const open = client.current;
+      if (
+        open !== undefined &&
+        state.stage !== "choose-endpoint" &&
+        open.endpoint.source === endpoint.source &&
+        open.endpoint.baseUrl === endpoint.baseUrl
+      ) {
+        const summary = state.processes.processes.find((process) => process.id === processId);
+        if (summary !== undefined) {
+          openProcess(summary);
+          return;
+        }
+      }
+      // Otherwise connect afresh, as Connect does, and open it once there.
+      if (state.stage !== "choose-endpoint") client.current = undefined;
+      setFieldErrors(NO_ERRORS);
+      start(endpoint, processId);
+    },
     openProcess,
     backToList: () => {
       setFieldErrors(NO_ERRORS);
@@ -878,6 +1134,14 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
       });
       dispatch({ type: "set-value", id, value });
     },
+    formNotice: (processId, notice) => {
+      dispatch({ type: "form-notice", processId, notice });
+    },
+    clearForm: () => {
+      if (state.stage !== "process") return;
+      setFieldErrors(NO_ERRORS);
+      dispatch({ type: "reset-form", values: initialValues(state.plan) });
+    },
     setMode: (mode) => {
       dispatch({ type: "set-mode", mode });
     },
@@ -885,6 +1149,8 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
       dispatch({ type: "set-transmission", outputId, transmission });
     },
     run,
+    stopWaiting,
+    watchJob,
     cancelJob,
     edit: () => {
       dispatch({ type: "edit" });
@@ -899,7 +1165,8 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
     state,
     commands,
     snapshot,
-    configured,
+    configured: configuredStale ? [] : configured,
+    unavailable: configuredStale ? configured : [],
     configuredError,
     fieldErrors,
     jobNotice,
@@ -907,5 +1174,7 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
     dismissAdvertisedFor,
     jobMessages,
     census,
+    cancelled: cancelledOf(snapshot?.jobs),
+    backgroundUnfindable: (endpoint) => unfindable.has(backgroundKey(relayEndpointFor(endpoint))),
   };
 }

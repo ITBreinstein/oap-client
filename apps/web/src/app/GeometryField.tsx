@@ -10,7 +10,7 @@
  * New rather than reading its metres as degrees.
  */
 
-import { useContext, useEffect, useId, useState } from "react";
+import { useContext, useEffect, useId, useMemo, useState } from "react";
 import { isGeoJsonText, type GeoJsonText } from "../forms/encode.js";
 import { describeLoad, readGeoJson } from "../forms/geojson.js";
 import { drawableTypes, holdsSeveral, toGeoJson } from "../forms/geometry.js";
@@ -19,6 +19,11 @@ import { refuseSize } from "../forms/upload.js";
 import { DrawContext } from "./draw.js";
 import { tooManyToEditMessage, useTooManyToEdit } from "./map-limits.js";
 import type { ControlProps } from "./FormFields.js";
+import { CopyField } from "./CopyButton.js";
+import { formatJsonText } from "./json-text.js";
+import { JsonTroubleNote } from "./JsonTroubleNote.js";
+import { sizeOfGeoJsonText } from "./shape-size.js";
+import { useUpdated } from "./variant.js";
 
 const SINGULAR = { Point: "point", LineString: "line", Polygon: "area" } as const;
 const PLURAL = { Point: "points", LineString: "lines", Polygon: "areas" } as const;
@@ -44,14 +49,20 @@ function describeTarget(control: GeometryControl): string {
 }
 
 export function GeometryField(props: ControlProps<GeometryControl>) {
-  const { control, value, onChange, describedBy, inputId } = props;
+  const { control, value, onChange, inputId, label } = props;
+  // STYLE TRIAL: the updated Instrument lays GeoJSON out with tabs.
+  const updated = useUpdated();
   const draw = useContext(DrawContext);
   const base = useId();
   const [message, setMessage] = useState<string | undefined>();
   const text = isGeoJsonText(value) ? value.geojson : "";
   const drawing = inputId !== undefined && draw.fieldId === inputId;
   const canDraw = inputId !== undefined && draw.available && drawableTypes(control).length > 0;
+  // An area input can take the map's view as its area (#18).
+  const canView =
+    inputId !== undefined && draw.available && drawableTypes(control).includes("Polygon");
   const tooMany = useTooManyToEdit(text);
+  const size = useMemo(() => sizeOfGeoJsonText(text), [text]);
   // A value too large to edit — loaded or pasted while drawing — ends drawing.
   useEffect(() => {
     if (drawing && tooMany !== undefined) draw.stop();
@@ -63,23 +74,40 @@ export function GeometryField(props: ControlProps<GeometryControl>) {
   };
 
   return (
-    <div className="geometry" aria-describedby={describedBy}>
+    <div className="geometry">
       <p className="help">{describeTarget(control)}</p>
       <p>
         <label htmlFor={`${base}-geojson`}>GeoJSON</label>
-        <textarea
-          id={`${base}-geojson`}
-          className="code"
-          rows={5}
-          spellCheck={false}
-          value={text}
-          placeholder='{ "type": "Polygon", "coordinates": … }'
-          onChange={(event) => {
-            setMessage(undefined);
-            set(event.target.value);
-          }}
-        />
+        <CopyField text={text} name={`Copy ${label}`} multiline>
+          <textarea
+            id={`${base}-geojson`}
+            className="code"
+            aria-invalid={props.invalid === true ? true : undefined}
+            aria-describedby={props.boxTrouble === undefined ? undefined : `${props.id}-error`}
+            rows={5}
+            spellCheck={false}
+            value={text}
+            placeholder='{ "type": "Polygon", "coordinates": … }'
+            onChange={(event) => {
+              setMessage(undefined);
+              set(event.target.value);
+            }}
+            onBlur={() => {
+              const laidOut = updated ? formatJsonText(text) : undefined;
+              if (laidOut !== undefined && laidOut !== text) set(laidOut);
+            }}
+          />
+        </CopyField>
       </p>
+      {props.boxTrouble !== undefined && (
+        <JsonTroubleNote id={`${props.id}-error`} trouble={props.boxTrouble} />
+      )}
+      {/* How big it is, to check a process's limit against (#15): while drawing, and after. */}
+      {size !== undefined && (
+        <p className="help shape-size" data-testid="shape-size">
+          {size}
+        </p>
+      )}
       <p>
         <label htmlFor={`${base}-file`}>Or load a GeoJSON file</label>
         <input
@@ -149,6 +177,23 @@ export function GeometryField(props: ControlProps<GeometryControl>) {
             {drawing ? "Stop drawing" : "Draw on the map"}
           </button>
         )}
+        {canView && (
+          <button
+            type="button"
+            className="secondary"
+            onClick={() => {
+              const view = draw.currentView?.();
+              if (view === undefined) return;
+              const shaped = toGeoJson(control, [extentPolygon(view)]);
+              setMessage(undefined);
+              if (shaped.geojson !== undefined) {
+                set(JSON.stringify(shaped.geojson, null, updated ? "\t" : undefined));
+              }
+            }}
+          >
+            Use the current map view
+          </button>
+        )}
         <button
           type="button"
           className="secondary"
@@ -160,6 +205,28 @@ export function GeometryField(props: ControlProps<GeometryControl>) {
           Clear
         </button>
       </p>
+      {/* The drawing tools, right after the Draw button in the tab order (#18). */}
+      {canDraw && (
+        <p className="help draw-hint">
+          Drawing needs a mouse or touch. You can also paste GeoJSON or use the current map view.
+        </p>
+      )}
     </div>
   );
+}
+
+/** A view, west, south, east, north, as the area it covers. */
+function extentPolygon([west, south, east, north]: readonly [number, number, number, number]) {
+  return {
+    type: "Polygon" as const,
+    coordinates: [
+      [
+        [west, south],
+        [east, south],
+        [east, north],
+        [west, north],
+        [west, south],
+      ],
+    ],
+  };
 }

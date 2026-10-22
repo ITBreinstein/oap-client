@@ -4,9 +4,10 @@
  *
  * One GeoJSON source and a layer per role and geometry kind, added to the map
  * the page already has, and beneath them an image source and its raster
- * layer when there is an image, so the drawn outline stays on top of it. Nothing here can be edited or selected; that is the
- * draw mode's job, and the two never run at once (the form is closed while a
- * result is shown).
+ * layer when there is an image, so the drawn outline stays on top of it.
+ * Nothing here can be edited; that is the draw mode's job, and the two never
+ * run at once (the form is closed while a result is shown). A clicked result
+ * shape is outlined while its properties are shown (#20).
  *
  * Knows geometry and nothing else. What counts as a result, and which shapes
  * are the input, is decided above here from the workflow.
@@ -19,7 +20,7 @@ import type {
   MapMouseEvent,
   Map as MapLibreMap,
 } from "maplibre-gl";
-import { INPUT_STYLE, RESULT_STYLE } from "./basemap.js";
+import { INPUT_STYLE, RESULT_STYLE, SELECTED_STYLE } from "./basemap.js";
 import type { MapShape } from "./geometry-engine.js";
 
 /** `input` in the drawn input's amber, `result` in blue. */
@@ -36,6 +37,12 @@ export interface ShownImage {
   readonly bounds: readonly [number, number, number, number];
 }
 
+/** Where across the map a click was, in CSS pixels: for what opens beside it. */
+export interface ClickPlace {
+  readonly x: number;
+  readonly width: number;
+}
+
 export interface ShapeLayers {
   /** Show these instead of whatever is shown. An empty list clears the map. */
   show(sets: readonly ShownShapes[]): void;
@@ -44,10 +51,13 @@ export interface ShapeLayers {
   /** Called once the layers are on the map, which waits for its style to load. */
   onReady(listener: () => void): void;
   /**
-   * Called with a result shape's index in its set when the user clicks it.
-   * Only results: an input is what the user sent, and is not asked about.
+   * Called with a result shape's index in its set when the user clicks it,
+   * and where across the map the click was. Only results: an input is what
+   * the user sent, and is not asked about.
    */
-  onResultClick(listener: (index: number) => void): void;
+  onResultClick(listener: (index: number, at: ClickPlace) => void): void;
+  /** Outline this result shape, by its index in its set; undefined outlines none (#20). */
+  select(index: number | undefined): void;
   /** Remove the layers and the source. */
   stop(): void;
 }
@@ -131,8 +141,53 @@ function layersFor(role: ShownRole): LayerSpecification[] {
   ];
 }
 
-/** The input first, so a result that overlaps it is drawn on top. */
-const LAYERS = [...layersFor("input"), ...layersFor("result")];
+/** The outline of a clicked result shape: dark on a light casing, and thicker, so not by colour alone. */
+const SELECTED_LINE = `${SOURCE}-selected-line`;
+const SELECTED_POINT = `${SOURCE}-selected-point`;
+const SELECTED_CASING = `${SOURCE}-selected-casing`;
+
+function selectedFilter(index: number | undefined, kind: ExpressionSpecification) {
+  return [
+    "all",
+    byRole("result"),
+    kind,
+    ["==", ["get", "index"], index ?? -1],
+  ] satisfies ExpressionSpecification;
+}
+
+const lineKinds: ExpressionSpecification = ["any", isPolygon, isLine];
+
+const SELECTED_LAYERS: LayerSpecification[] = [
+  {
+    id: SELECTED_CASING,
+    type: "line",
+    source: SOURCE,
+    filter: selectedFilter(undefined, lineKinds),
+    paint: { "line-color": "#ffffff", "line-width": SELECTED_STYLE.outlineWidth + 4 },
+  },
+  {
+    id: SELECTED_LINE,
+    type: "line",
+    source: SOURCE,
+    filter: selectedFilter(undefined, lineKinds),
+    paint: { "line-color": SELECTED_STYLE.outline, "line-width": SELECTED_STYLE.outlineWidth },
+  },
+  {
+    id: SELECTED_POINT,
+    type: "circle",
+    source: SOURCE,
+    filter: selectedFilter(undefined, isPoint),
+    paint: {
+      "circle-color": RESULT_STYLE.fill,
+      "circle-radius": 9,
+      "circle-stroke-color": SELECTED_STYLE.outline,
+      "circle-stroke-width": 3,
+    },
+  },
+];
+
+/** The input first, so a result that overlaps it is drawn on top; the selected outline over both. */
+const LAYERS = [...layersFor("input"), ...layersFor("result"), ...SELECTED_LAYERS];
 const RESULT_LAYERS = layersFor("result").map((layer) => layer.id);
 
 /** How far from a click, in pixels, a thin line or a small point still counts as hit. */
@@ -157,26 +212,43 @@ export const createMapLibreShapeLayers: CreateShapeLayers = (map) => {
   let added = false;
   let stopped = false;
   let ready: (() => void) | undefined;
-  let clicked: ((index: number) => void) | undefined;
+  let clicked: ((index: number, at: ClickPlace) => void) | undefined;
+  let selected: number | undefined;
 
+  /** The result shape a click at `point` would show, if any. */
+  const shapeAt = ({ x, y }: { x: number; y: number }) =>
+    clickedIndex(
+      map.queryRenderedFeatures(
+        [
+          [x - CLICK_TOLERANCE, y - CLICK_TOLERANCE],
+          [x + CLICK_TOLERANCE, y + CLICK_TOLERANCE],
+        ],
+        { layers: RESULT_LAYERS },
+      ),
+    );
   const onClick = (event: MapMouseEvent) => {
     if (!added || clicked === undefined) return;
-    const { x, y } = event.point;
-    const hits = map.queryRenderedFeatures(
-      [
-        [x - CLICK_TOLERANCE, y - CLICK_TOLERANCE],
-        [x + CLICK_TOLERANCE, y + CLICK_TOLERANCE],
-      ],
-      { layers: RESULT_LAYERS },
-    );
-    const index = clickedIndex(hits);
-    if (index !== undefined) clicked(index);
+    const index = shapeAt(event.point);
+    if (index !== undefined) {
+      clicked(index, { x: event.point.x, width: map.getCanvas().clientWidth });
+    }
   };
-  const pointer = () => {
-    map.getCanvas().style.cursor = "pointer";
+  // The pointing hand over what a click would show, the open hand elsewhere,
+  // decided by the click's own query so the two always agree. Entering and
+  // leaving each layer did not: leaving a shape's outline for its own fill
+  // gave the open hand back while still over the shape, and the click's
+  // tolerance reached past where the pointer showed.
+  let over = false;
+  const showOver = (next: boolean) => {
+    if (next === over) return;
+    over = next;
+    map.getCanvas().style.cursor = next ? "pointer" : "";
   };
-  const plain = () => {
-    map.getCanvas().style.cursor = "";
+  const onMove = (event: MapMouseEvent) => {
+    showOver(added && clicked !== undefined && shapeAt(event.point) !== undefined);
+  };
+  const onOut = () => {
+    showOver(false);
   };
 
   const add = () => {
@@ -197,11 +269,10 @@ export const createMapLibreShapeLayers: CreateShapeLayers = (map) => {
     }
     added = true;
     placeImage();
+    placeSelection();
     map.on("click", onClick);
-    for (const layer of RESULT_LAYERS) {
-      map.on("mouseenter", layer, pointer);
-      map.on("mouseleave", layer, plain);
-    }
+    map.on("mousemove", onMove);
+    map.on("mouseout", onOut);
     ready?.();
   };
 
@@ -232,6 +303,12 @@ export const createMapLibreShapeLayers: CreateShapeLayers = (map) => {
     );
   };
 
+  const placeSelection = () => {
+    map.setFilter(SELECTED_CASING, selectedFilter(selected, lineKinds));
+    map.setFilter(SELECTED_LINE, selectedFilter(selected, lineKinds));
+    map.setFilter(SELECTED_POINT, selectedFilter(selected, isPoint));
+  };
+
   const removeAll = () => {
     removeImage();
     for (const layer of [...LAYERS].reverse()) {
@@ -259,15 +336,19 @@ export const createMapLibreShapeLayers: CreateShapeLayers = (map) => {
     onResultClick: (listener) => {
       clicked = listener;
     },
+    select: (index) => {
+      if (index === selected) return;
+      selected = index;
+      if (added) placeSelection();
+    },
     stop: () => {
       stopped = true;
       clicked = undefined;
       map.off("styledata", add);
       map.off("click", onClick);
-      for (const layer of RESULT_LAYERS) {
-        map.off("mouseenter", layer, pointer);
-        map.off("mouseleave", layer, plain);
-      }
+      map.off("mousemove", onMove);
+      map.off("mouseout", onOut);
+      showOver(false);
       try {
         removeAll();
       } catch {

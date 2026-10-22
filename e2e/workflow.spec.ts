@@ -308,8 +308,10 @@ test.describe("the workflow in a browser", () => {
     const terms = await panel.locator("dt").allTextContents();
     expect(terms).toEqual(["bbox", "crs"]);
     const values = await panel.locator("dd").allTextContents();
-    expect(JSON.parse(values[0] ?? "null")).toEqual(box);
-    expect(values[1]).toMatch(/CRS84$/);
+    // A short list in words, its numbers the Dutch way (#20).
+    expect(values[0]).toBe("5,1; 52,05; 5,2; 52,12");
+    // An http address, as a link (#20).
+    await expect(panel.locator("dd").nth(1).getByRole("link")).toHaveAttribute("href", /CRS84$/);
 
     await panel.getByRole("button", { name: "Close" }).click();
     await expect(panel).toHaveCount(0);
@@ -454,13 +456,14 @@ test.describe("the workflow in a browser", () => {
     // Drawing first, then the file.
     await draw.click();
     await polygon.getByLabel("Or load a GeoJSON file").setInputFiles(file);
-    await expect(polygon.getByRole("status")).toHaveText("Loaded 1 shape.");
+    // The field's own word: the drawing tools beside it have one of theirs (#18).
+    await expect(polygon.locator("p.hint[role='status']")).toHaveText("Loaded 1 shape.");
     await page.waitForTimeout(500);
     expect(JSON.parse(await geojson.inputValue())).toEqual(shape);
 
     // Not drawing: the loaded shape is on the map as the input, not yet sent.
     await stop.click();
-    await expect(page.getByTestId("map-legend")).toHaveText("The input, not yet sent.");
+    await expect(page.getByTestId("map-legend")).toHaveText("The area, not yet sent.");
 
     // The file first, then drawing.
     await draw.click();
@@ -532,9 +535,7 @@ test.describe("the workflow in a browser", () => {
       "true",
     );
     await expect(page.locator(".map-canvas")).toHaveAttribute("data-result-shapes", "1");
-    await expect(page.getByTestId("map-legend")).toHaveText(
-      "The result beside the input you sent.",
-    );
+    await expect(page.getByTestId("map-legend")).toHaveText("The result beside the area you sent.");
   });
 
   test(
@@ -585,7 +586,7 @@ test.describe("the workflow in a browser", () => {
 
       await expect(page.locator(".map-canvas")).toHaveAttribute("data-result-image", "true");
       await expect(page.getByTestId("map-legend")).toHaveText(
-        "The result’s image beside the input you sent.",
+        "The result’s image beside the area you sent.",
       );
     },
   );
@@ -686,6 +687,70 @@ test.describe("the workflow in a browser", () => {
     expect((await request).postData()).toContain(`"ratio":${typed}`);
   });
 
+  test("after a run, says what was sent as text, with nothing to click, and gives the form back to change it", async ({
+    page,
+  }) => {
+    await connectTyped(page, PYGEOAPI);
+    await openProcess(page, "Hello World");
+    await page.getByRole("textbox", { name: "Name (required)" }).fill("Groningen");
+    await page.getByRole("button", { name: "Run", exact: true }).click();
+
+    const sent = page.getByRole("region", { name: "Inputs you sent" });
+    await expect(sent).toBeVisible();
+    await expect(sent.locator("input, textarea, select, button, a")).toHaveCount(0);
+    await expect(sent.getByRole("term")).toHaveText(["Name"]);
+    await expect(sent.getByRole("definition")).toHaveText(["Groningen"]);
+    await expect(sent).toContainText("Not sent: Message (optional, left empty).");
+
+    await page.getByRole("button", { name: "Change the inputs" }).click();
+    const name = page.getByRole("textbox", { name: "Name (required)" });
+    await expect(name).toBeEnabled();
+    await expect(name).toHaveValue("Groningen");
+  });
+
+  test("after a run, names the file a value was read from, and folds the value out whole", async ({
+    page,
+  }) => {
+    const features = {
+      type: "FeatureCollection",
+      features: [0, 1].map((at) => ({
+        type: "Feature",
+        properties: {},
+        geometry: {
+          type: "Polygon",
+          coordinates: [
+            [
+              [4.884 + at * 0.003, 52.366],
+              [4.886 + at * 0.003, 52.366],
+              [4.886 + at * 0.003, 52.368],
+              [4.884 + at * 0.003, 52.366],
+            ],
+          ],
+        },
+      })),
+    };
+    const text = JSON.stringify(features);
+    await connectTyped(page, PYGEOAPI);
+    await openProcess(page, "Area of each feature");
+    await page.getByLabel("Or read the value from a file").setInputFiles({
+      name: "areas.geojson",
+      mimeType: "application/geo+json",
+      buffer: Buffer.from(text),
+    });
+    await expect(page.getByRole("textbox", { name: "Value (JSON)" })).toHaveValue(text);
+    await page.getByRole("button", { name: "Run", exact: true }).click();
+
+    const sent = page.getByRole("region", { name: "Inputs you sent" });
+    const value = sent.getByRole("definition");
+    await expect(value).toContainText("From a file: areas.geojson");
+    await expect(value).toContainText("FeatureCollection, 2 features (polygons)");
+    await expect(sent.locator("input, textarea, select, button")).toHaveCount(0);
+    const fold = sent.locator("details");
+    await expect(fold).not.toHaveAttribute("open");
+    await fold.locator("summary").click();
+    await expect(fold.locator("pre")).toHaveText(text);
+  });
+
   test("runs in the background through the relay, then cancels a second run", async ({ page }) => {
     await requireService(`${RELAY}/healthz`, "the relay");
     await page.goto("/");
@@ -710,6 +775,11 @@ test.describe("the workflow in a browser", () => {
     await expect(running).toHaveAttribute("data-job-ref", /\/jobs\//, { timeout: 15_000 });
     const jobUrl = (await running.getAttribute("data-job-ref")) ?? "";
     await page.getByRole("button", { name: "Cancel job" }).click();
+    // It asks first (#31).
+    await page
+      .getByRole("group", { name: "Confirm cancelling" })
+      .getByRole("button", { name: "Cancel job" })
+      .click();
     await expect(page.getByText("Job cancelled. The server has dismissed it.")).toBeVisible();
 
     // Dismissed on the server: pygeoapi deletes a dismissed job (finding 0035).
@@ -891,7 +961,7 @@ test.describe("the workflow in a browser", () => {
     await expect(polygon.getByTestId("too-many-to-edit")).toContainText(
       "This input has 5 coordinates, more than the 4 the map edits at once",
     );
-    await expect(page.getByTestId("map-legend")).toHaveText("The input, not yet sent.");
+    await expect(page.getByTestId("map-legend")).toHaveText("The area, not yet sent.");
     expect(JSON.parse(await geojson.inputValue())).toEqual(square);
 
     const exchange = page.waitForResponse(
@@ -922,7 +992,7 @@ test.describe("the workflow in a browser", () => {
     await expect(page.locator(".observation-list > li")).toHaveCount(total);
 
     const download = page.waitForEvent("download");
-    await page.getByRole("button", { name: "Download this endpoint's observations" }).click();
+    await page.getByRole("button", { name: "Download this endpoint’s observations" }).click();
     const exported = JSON.parse(await readFile(await (await download).path(), "utf8")) as {
       endpoint: string;
       observations: { kind: string; processId?: string }[];

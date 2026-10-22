@@ -19,21 +19,20 @@
  * beside it gives (`results/plottable.ts`).
  */
 
-import { useContext, useState } from "react";
-import { drawableCrs, isDrawableCrs } from "../forms/crs.js";
-import type { BboxValue, ComplexValue, GeoJsonText } from "../forms/encode.js";
+import { useContext, useEffect, useRef, useState } from "react";
+import { classifyCrs, drawableCrs, isDrawableCrs } from "../forms/crs.js";
+import { extentOfBbox } from "./shape-size.js";
+import type { BboxValue } from "../forms/encode.js";
 import {
-  ANY_FEATURE_COLLECTION,
   drawableTypes,
   holdsSeveral,
   shapesOfText,
   toGeoJson,
   type GeometryTarget,
 } from "../forms/geometry.js";
-import type { FieldPlan } from "../forms/plan.js";
 import type { Bbox } from "../map/bbox.js";
 import type { MapShape, Tool } from "../map/geometry-engine.js";
-import { MapView } from "../map/MapView.js";
+import { MapView, type CreateMap } from "../map/MapView.js";
 import type { ShownShapes } from "../map/shape-layers.js";
 import {
   mapImage,
@@ -44,10 +43,16 @@ import {
 } from "../results/plottable.js";
 import type { RenderableResult } from "../results/renderable.js";
 import { FeatureProperties } from "./FeatureProperties.js";
+import { hasProperties } from "./property-value.js";
+import { legendKind, legendNoun, shapeKinds } from "./shape-words.js";
+import { PlaceSearch } from "./PlaceSearch.js";
+import { useWide } from "./useWide.js";
+import { shapeBinding } from "./input-shapes.js";
 import type { GeometryDrawProps } from "../map/useGeometryDraw.js";
 import type { DrawTarget } from "./draw.js";
 import { MapLimitsContext, tooManyToEdit } from "./map-limits.js";
 import { useDataUrl } from "./useDataUrl.js";
+import { useUpdated } from "./variant.js";
 import type { Workflow } from "./workflow.js";
 
 function toBbox(value: unknown): Bbox | undefined {
@@ -63,52 +68,33 @@ function toBbox(value: unknown): Bbox | undefined {
     : [west, south, east, north];
 }
 
-function readText(record: unknown, key: string): string | undefined {
-  if (typeof record !== "object" || record === null) return undefined;
-  const text: unknown = (record as Record<string, unknown>)[key];
-  return typeof text === "string" ? text : undefined;
-}
-
-function readFormat(record: unknown): number {
-  if (typeof record !== "object" || record === null) return 0;
-  const format: unknown = (record as Record<string, unknown>)["format"];
-  return typeof format === "number" ? format : 0;
-}
-
-/** How a field holds GeoJSON, if the map can draw for it in its current state. */
-interface ShapeBinding {
-  readonly target: GeometryTarget;
-  readonly text: string;
-  readonly write: (text: string) => unknown;
-}
-
-function shapeBinding(field: FieldPlan, current: unknown): ShapeBinding | undefined {
-  const { control } = field;
-  if (control.kind === "geometry") {
-    return {
-      target: control,
-      text: readText(current, "geojson") ?? "",
-      write: (text) => {
-        const value: GeoJsonText = { geojson: text };
-        return text === "" ? undefined : value;
-      },
-    };
-  }
-  if (control.kind === "complex") {
-    const format = readFormat(current);
-    if (control.formats[format]?.object !== true || readText(current, "href") !== undefined) {
-      return undefined;
-    }
-    return {
-      target: ANY_FEATURE_COLLECTION,
-      text: readText(current, "value") ?? "",
-      write: (text) => {
-        const value: ComplexValue = { format, value: text };
-        return value;
-      },
-    };
-  }
-  return undefined;
+/** A box value in longitude and latitude as the polygon it outlines; none otherwise. */
+export function boxOutline(value: unknown): MapShape[] {
+  if (typeof value !== "object" || value === null || !("crs" in value)) return [];
+  const crs: unknown = value.crs;
+  const kind = typeof crs === "string" ? classifyCrs(crs) : "unknown";
+  if (kind !== "crs84" && kind !== "epsg4326" && kind !== "crs84h") return [];
+  const coordinates: unknown = "coordinates" in value ? value.coordinates : undefined;
+  if (!Array.isArray(coordinates)) return [];
+  const numbers = coordinates.filter((entry): entry is number => typeof entry === "number");
+  if (numbers.length !== coordinates.length) return [];
+  const extent = extentOfBbox(numbers);
+  if (extent === undefined) return [];
+  const { west, south, east, north } = extent;
+  return [
+    {
+      type: "Polygon",
+      coordinates: [
+        [
+          [west, south],
+          [east, south],
+          [east, north],
+          [west, north],
+          [west, south],
+        ],
+      ],
+    },
+  ];
 }
 
 function toolsFor(target: GeometryTarget): Tool[] {
@@ -144,6 +130,9 @@ export function shownFor(
   const input = state.plan.fields.flatMap((field) => {
     if (state.stage === "process" && field.id === drawing) return [];
     const current = Object.hasOwn(state.values, field.id) ? state.values[field.id] : undefined;
+    // A box in longitude and latitude, as its outline (#19): typed, it is on
+    // the map too, as a drawn one is.
+    if (field.control.kind === "bbox") return boxOutline(current);
     const binding = shapeBinding(field, current);
     if (binding === undefined) return [];
     const shapes = shapesOfText(binding.text);
@@ -199,11 +188,19 @@ export function MapPane({
   draw,
   setValue,
   onAvailable,
+  onViewReader,
+  basemap,
 }: {
   readonly state: Workflow;
   readonly draw: DrawTarget;
   readonly setValue: (id: string, value: unknown) => void;
   readonly onAvailable: (available: boolean) => void;
+  /** How to read what the map shows, for "Use the current map view" (#18). */
+  readonly onViewReader?:
+    | ((read: (() => readonly [number, number, number, number] | undefined) | undefined) => void)
+    | undefined;
+  /** STYLE TRIAL: the updated Instrument's world map; PDOK's otherwise. */
+  readonly basemap?: { readonly create: CreateMap; readonly label: string } | undefined;
 }) {
   const field =
     state.stage === "process" && draw.fieldId !== undefined
@@ -223,6 +220,8 @@ export function MapPane({
       : undefined;
   const shapes = field === undefined ? undefined : shapeBinding(field, current);
   const { maxCoordinates, maxEditableCoordinates } = useContext(MapLimitsContext);
+  // STYLE TRIAL: the updated Instrument writes drawn GeoJSON laid out with tabs.
+  const updated = useUpdated();
   // Never into the draw mode: Terra Draw keeps a feature per vertex and
   // redraws them all on every move. Shown read-only on the input layer
   // instead, and the field says why (map-limits.ts).
@@ -236,10 +235,24 @@ export function MapPane({
           active: true,
           tools: toolsFor(shapes.target),
           several: holdsSeveral(shapes.target),
+          // One area: drawing starts on "Add area" (#17); "Add box" stays a click away.
+          startWith:
+            !holdsSeveral(shapes.target) &&
+            drawableTypes(shapes.target).length === 1 &&
+            drawableTypes(shapes.target)[0] === "Polygon"
+              ? "Polygon"
+              : undefined,
           value: shapesOfText(shapes.text),
           onChange: (drawn: readonly MapShape[]) => {
             const { geojson } = toGeoJson(shapes.target, drawn);
-            setValue(field.id, shapes.write(geojson === undefined ? "" : JSON.stringify(geojson)));
+            setValue(
+              field.id,
+              shapes.write(
+                geojson === undefined
+                  ? ""
+                  : JSON.stringify(geojson, null, updated ? "\t" : undefined),
+              ),
+            );
           },
         };
 
@@ -253,13 +266,53 @@ export function MapPane({
   // order `shownFor` shows them in. Held with the results it was made on, so
   // a new run, or leaving the result, drops it without anything noticing.
   const [picked, setPicked] = useState<
-    { readonly results: readonly RenderableResult[]; readonly index: number } | undefined
+    | {
+        readonly results: readonly RenderableResult[];
+        readonly index: number;
+        /** Where the properties go: the side of the map away from the click (#20). */
+        readonly side: "left" | "right";
+      }
+    | undefined
   >();
   const results = state.stage === "result" ? state.results : undefined;
-  const selected =
-    results !== undefined && picked?.results === results
-      ? plottedFeatures(results, maxCoordinates)[picked.index]
-      : undefined;
+  const features = results === undefined ? [] : plottedFeatures(results, maxCoordinates);
+  const selected = picked?.results === results ? features[picked?.index ?? -1] : undefined;
+  // Something to show when a shape is clicked: only then does the map invite a click (#21).
+  const clickable = features.some((feature) => hasProperties(feature.origin));
+  // On a phone the map is below the form (#39): drawing brings it into view,
+  // with Done and Clear pinned over it, and Done goes back to the field.
+  const wide = useWide();
+  const pane = useRef<HTMLElement>(null);
+  const drawingHere = field !== undefined && !wide;
+  useEffect(() => {
+    if (!drawingHere) return;
+    const element = pane.current;
+    if (element !== null && "scrollIntoView" in element) {
+      element.scrollIntoView({ block: "start", behavior: "auto" });
+    }
+  }, [drawingHere]);
+  const done = () => {
+    const id = field?.id;
+    draw.stop();
+    if (id === undefined) return;
+    requestAnimationFrame(() => {
+      const back = document.querySelector<HTMLElement>(`[data-input-id="${CSS.escape(id)}"]`);
+      if (back !== null && "scrollIntoView" in back) back.scrollIntoView({ block: "center" });
+      back?.querySelector<HTMLElement>("button[aria-pressed]")?.focus({ preventScroll: true });
+    });
+  };
+  const clearDrawn = () => {
+    if (field === undefined) return;
+    setValue(
+      field.id,
+      control === undefined && shapes !== undefined ? shapes.write("") : undefined,
+    );
+  };
+
+  // A place chosen in "Find a place" (#16): the map moves to it once.
+  const [goTo, setGoTo] = useState<
+    { readonly id: number; readonly extent: readonly [number, number, number, number] } | undefined
+  >();
   const placed = state.stage === "result" ? mapImage(state.results) : undefined;
   const imageUrl = useDataUrl(placed?.blob);
   const image =
@@ -267,19 +320,45 @@ export function MapPane({
       ? undefined
       : { url: imageUrl, bounds: placed.bounds };
   const drawnInput = shown.some((set) => set.role === "input" && set.shapes.length > 0);
+  const inputKinds = shapeKinds(
+    shown.filter((set) => set.role === "input").flatMap((set) => set.shapes),
+  );
   const plotted =
     image !== undefined || shown.some((set) => set.role === "result" && set.shapes.length > 0);
 
   return (
-    <aside className="map-pane" aria-label="Map">
+    <aside className="map-pane" aria-label="Map" ref={pane} data-drawing-here={drawingHere}>
+      {drawingHere && (
+        <div className="draw-bar" role="group" aria-label={`Drawing “${field.title}”`}>
+          <span className="draw-bar-title">Drawing “{field.title}”</span>
+          <button type="button" className="secondary" onClick={clearDrawn}>
+            Clear
+          </button>
+          <button type="button" onClick={done}>
+            Done
+          </button>
+        </div>
+      )}
+      <PlaceSearch
+        onPlace={(place) => {
+          setGoTo((last) => ({ id: (last?.id ?? 0) + 1, extent: place.extent }));
+        }}
+      />
       <MapView
+        goTo={goTo}
+        createMap={basemap?.create}
+        label={basemap?.label}
         onAvailable={onAvailable}
+        onViewReader={onViewReader}
+        focusToken={draw.focusToken}
         geometry={geometry}
         shown={shown}
         image={image}
-        onResultClick={(index) => {
-          if (results !== undefined) setPicked({ results, index });
+        onResultClick={(index, at) => {
+          if (results === undefined) return;
+          setPicked({ results, index, side: at.x < at.width / 2 ? "right" : "left" });
         }}
+        selected={selected === undefined ? undefined : picked?.index}
         draw={{
           active: field !== undefined && control !== undefined,
           value: toBbox(current),
@@ -320,12 +399,17 @@ export function MapPane({
           {plotted && drawnInput && " beside "}
           {drawnInput && (
             <span>
-              <span className="swatch swatch-input" aria-hidden="true" />{" "}
+              {/* Named, and drawn, by what it holds: a point, a line, an area (#22). */}
+              <span
+                className="swatch swatch-input"
+                data-kind={legendKind(inputKinds)}
+                aria-hidden="true"
+              />{" "}
               {state.stage === "process"
-                ? "The input, not yet sent"
+                ? `The ${legendNoun(inputKinds)}, not yet sent`
                 : plotted
-                  ? "the input you sent"
-                  : "The input you sent"}
+                  ? `the ${legendNoun(inputKinds)} you sent`
+                  : `The ${legendNoun(inputKinds)} you sent`}
             </span>
           )}
           .
@@ -343,7 +427,8 @@ export function MapPane({
       )}
       {selected === undefined ? (
         plotted &&
-        image === undefined && (
+        image === undefined &&
+        clickable && (
           <p className="map-overlay" data-testid="feature-hint">
             Click a result shape to see its properties.
           </p>
@@ -351,6 +436,7 @@ export function MapPane({
       ) : (
         <FeatureProperties
           feature={selected}
+          side={picked?.side}
           onClose={() => {
             setPicked(undefined);
           }}

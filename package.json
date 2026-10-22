@@ -22,6 +22,7 @@
     "test:e2e:zoo": "playwright test --project=zoo",
     "test:e2e:pdok": "playwright test --project=pdok",
     "capture:observations": "playwright test --project=capture --workers=1",
+    "capture:styles": "playwright test --project=styles",
     "build": "pnpm -r build",
     "verify": "pnpm typecheck && pnpm lint && pnpm boundaries && pnpm format:check && pnpm test && pnpm build"
   },
@@ -31,6 +32,7 @@
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.5",
+    "@axe-core/playwright": "4.13.0",
     "@eslint/js": "10.0.1",
     "@playwright/test": "1.62.1",
     "@types/node": "24.13.3",

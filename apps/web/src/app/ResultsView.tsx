@@ -14,9 +14,13 @@
 
 import { DEFAULT_MAX_BUFFER_BYTES } from "@breinstein/oap-client";
 import { useContext, useId, useState } from "react";
+import { CopyButton } from "./CopyButton.js";
 import { MapLimitsContext } from "./map-limits.js";
+import { ResultImage } from "./ResultImage.js";
 import { saveBlob } from "./save.js";
 import { useDataUrl } from "./useDataUrl.js";
+import { useSpared } from "./developer.js";
+import { useUpdated } from "./variant.js";
 import {
   isShownImage,
   mapImage,
@@ -25,7 +29,14 @@ import {
   type MapImage,
 } from "../results/plottable.js";
 import { isOpenable, isTruncated, originOf, type LoadedReference } from "../results/reference.js";
-import { defaultFilename, type RenderableResult } from "../results/renderable.js";
+import { parseCsv } from "../results/csv.js";
+import { plainValue } from "../results/plain-value.js";
+import {
+  defaultFilename,
+  isCsv,
+  textFilename,
+  type RenderableResult,
+} from "../results/renderable.js";
 
 type ValueResult = Exclude<RenderableResult, { kind: "reference" }>;
 type ReferenceResult = Extract<RenderableResult, { kind: "reference" }>;
@@ -68,31 +79,92 @@ function filenameOf(result: ValueResult, processId: string): string {
     case "json":
       return `${processId}-${result.outputId}.json`;
     case "text":
-      return `${processId}-${result.outputId}.txt`;
+      return textFilename(processId, result.outputId, result.mediaType);
     case "download":
       return result.filename ?? `${processId}-${result.outputId}`;
   }
 }
 
+/** How many of a CSV's rows are shown; the download has them all. */
+export const CSV_ROWS_SHOWN = 50;
+
+/**
+ * A CSV result as a table (#26): its first row as the heading, then the
+ * first {@link CSV_ROWS_SHOWN} rows, and how many more the download holds.
+ */
+function CsvTable({
+  rows,
+  outputId,
+}: {
+  readonly rows: readonly (readonly string[])[];
+  readonly outputId: string;
+}) {
+  const [head = [], ...body] = rows;
+  const shown = body.slice(0, CSV_ROWS_SHOWN);
+  const more = body.length - shown.length;
+  return (
+    <>
+      <div className="csv-table" tabIndex={0} role="region" aria-label={`Table “${outputId}”`}>
+        <table>
+          <thead>
+            <tr>
+              {head.map((cell, index) => (
+                <th key={index} scope="col">
+                  {cell}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {shown.map((row, index) => (
+              <tr key={index}>
+                {row.map((cell, column) => (
+                  <td key={column}>{cell}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {more > 0 && (
+        <p className="muted" data-testid="csv-more">
+          and {more.toLocaleString("en")} more {more === 1 ? "row" : "rows"}; download for all.
+        </p>
+      )}
+    </>
+  );
+}
+
 function ImagePreview({ blob, outputId }: { readonly blob: Blob; readonly outputId: string }) {
   const url = useDataUrl(blob);
-  return url === undefined ? null : (
-    <img className="result-image" src={url} alt={`The image result “${outputId}”`} />
-  );
+  return url === undefined ? null : <ResultImage src={url} outputId={outputId} />;
 }
 
 function ResultItem({
   result,
   processId,
   placed,
+  several,
 }: {
   readonly result: ValueResult;
   readonly processId: string;
   readonly placed: MapImage | undefined;
+  /** More than one result: each one's Copy names its output. */
+  readonly several: boolean;
 }) {
   const [blob] = useState(() => blobOf(result));
   const filename = filenameOf(result, processId);
+  // A CSV this page can read is a table; any other text, or a CSV it can't, is text.
+  const [csvRows] = useState(() => {
+    if (result.kind !== "text" || !isCsv(result.mediaType)) return undefined;
+    const rows = parseCsv(result.value);
+    return rows === undefined || rows.length === 0 ? undefined : rows;
+  });
   const { maxCoordinates } = useContext(MapLimitsContext);
+  // STYLE TRIAL: the updated Instrument lays JSON out with tabs, and offers Copy.
+  const updated = useUpdated();
+  const copyName = several ? `Copy ${result.outputId}` : "Copy result";
+  const plain = updated && result.kind === "json" ? plainValue(result.value) : undefined;
   const status = plotStatus(result, maxCoordinates);
   const plot = status.kind;
   const imageOnMap = placed?.outputId === result.outputId;
@@ -122,12 +194,35 @@ function ResultItem({
           Download it to open it elsewhere.
         </p>
       )}
+      {/* STYLE TRIAL (#27): one plain value is the answer itself, shown large. */}
+      {plain !== undefined && (
+        <div className="code-box result-value-box">
+          <p className="result-value" data-plain-value="true">
+            {String(plain)}
+          </p>
+          <CopyButton name={copyName} text={() => String(plain)} />
+        </div>
+      )}
       {result.kind === "json" && (
-        <details open>
+        // Folded when the map shows it: the shape is the answer there, and
+        // pages of coordinates would push the next steps off screen. Folded
+        // too beneath a plain value (#27).
+        <details open={plot !== "plotted" && plain === undefined}>
           <summary>
             <strong>{result.outputId}</strong> <span className="muted">JSON</span>
           </summary>
-          <pre className="code">{JSON.stringify(result.value, null, 2)}</pre>
+          {updated ? (
+            <div className="code-box">
+              <pre className="code">{JSON.stringify(result.value, null, "\t")}</pre>
+              <CopyButton
+                // Beneath a plain value, which has "Copy result" of its own (#27).
+                name={plain === undefined ? copyName : `${copyName} as JSON`}
+                text={() => JSON.stringify(result.value, null, "\t")}
+              />
+            </div>
+          ) : (
+            <pre className="code">{JSON.stringify(result.value, null, 2)}</pre>
+          )}
         </details>
       )}
       {result.kind === "text" && (
@@ -135,7 +230,24 @@ function ResultItem({
           <summary>
             <strong>{result.outputId}</strong> <span className="muted">{result.mediaType}</span>
           </summary>
-          <pre className="code">{result.value}</pre>
+          {csvRows !== undefined ? (
+            updated ? (
+              // STYLE TRIAL: Copy copies the CSV as the service sent it.
+              <div className="code-box">
+                <CsvTable rows={csvRows} outputId={result.outputId} />
+                <CopyButton name={copyName} text={() => result.value} />
+              </div>
+            ) : (
+              <CsvTable rows={csvRows} outputId={result.outputId} />
+            )
+          ) : updated ? (
+            <div className="code-box">
+              <pre className="code">{result.value}</pre>
+              <CopyButton name={copyName} text={() => result.value} />
+            </div>
+          ) : (
+            <pre className="code">{result.value}</pre>
+          )}
         </details>
       )}
       {result.kind === "download" && isShownImage(result) && (
@@ -211,16 +323,89 @@ function LoadedOk({ loaded, host }: { readonly loaded: LoadedReference; readonly
   }
 }
 
-function LoadedLine({ loaded, href }: { readonly loaded: LoadedReference; readonly href: string }) {
+/**
+ * An image given by reference, shown as the browser shows any image (#28):
+ * from its host directly, never read by this page. What it can't show is
+ * said, with the way on: the link.
+ */
+function LinkedImage({
+  href,
+  outputId,
+  onShown,
+}: {
+  readonly href: string;
+  readonly outputId: string;
+  readonly onShown?: (() => void) | undefined;
+}) {
+  const [failed, setFailed] = useState(false);
+  return failed ? (
+    <p className="notice">
+      The browser could not show it as an image. Open the link to see it in a new tab.
+    </p>
+  ) : (
+    <ResultImage
+      src={href}
+      outputId={outputId}
+      referrerPolicy="no-referrer"
+      onError={() => {
+        setFailed(true);
+      }}
+      onShown={onShown}
+    />
+  );
+}
+
+function LoadedLine({
+  loaded,
+  href,
+  outputId,
+}: {
+  readonly loaded: LoadedReference;
+  readonly href: string;
+  readonly outputId: string;
+}) {
   const host = hostOf(href) ?? "the server";
+  const spared = useSpared(useUpdated());
+  // Once the browser shows it as an image (#28), what could not be read is no
+  // longer an error: a plain line says what that means instead.
+  const [shown, setShown] = useState(false);
+  const shownAsImage = (
+    <p className="hint shown-as-image" data-testid="shown-as-image">
+      Shown as an image. This page can’t read the file itself, so it can’t be checked or drawn on
+      the map.
+      {/* STYLE TRIAL: spared in the updated Instrument, recorded all the same (#43). */}
+      {!spared && " The attempt has been recorded."}
+    </p>
+  );
+  const onShown = () => {
+    setShown(true);
+  };
   switch (loaded.outcome) {
     case "ok":
       return <LoadedOk loaded={loaded} host={host} />;
     case "cors-blocked":
-      return (
+      // An image is shown all the same (#28): a browser shows an image from
+      // anywhere, though the page itself may not read it.
+      return loaded.image === true ? (
+        <>
+          {shown ? (
+            shownAsImage
+          ) : (
+            <p className="notice">
+              This page could not read it: {host} sends no CORS headers for it, or could not be
+              reached.
+              {/* STYLE TRIAL: spared in the updated Instrument, recorded all the same (#43). */}
+              {!spared && " The attempt has been recorded."}
+            </p>
+          )}
+          <LinkedImage href={href} outputId={outputId} onShown={onShown} />
+        </>
+      ) : (
         <p className="notice">
           This page could not read it: {host} sends no CORS headers for it, or could not be reached.
-          Open the link to see it in a new tab. The attempt has been recorded.
+          Open the link to see it in a new tab.
+          {/* STYLE TRIAL: spared in the updated Instrument, recorded all the same (#43). */}
+          {!spared && " The attempt has been recorded."}
         </p>
       );
     case "http-error":
@@ -252,7 +437,12 @@ function LoadedLine({ loaded, href }: { readonly loaded: LoadedReference; readon
         <p className="notice">Not an http or https address, so it is not fetched or opened.</p>
       );
     case "failed":
-      return (
+      return loaded.image === true ? (
+        <>
+          {shown && shownAsImage}
+          <LinkedImage href={href} outputId={outputId} onShown={onShown} />
+        </>
+      ) : (
         <p className="notice">
           It could not be read{loaded.detail === undefined ? "" : ` (${loaded.detail})`}.
         </p>
@@ -310,7 +500,9 @@ function ReferenceItem({
         </p>
       )}
       <div role="status" aria-live="polite">
-        {loaded !== undefined && <LoadedLine loaded={loaded} href={result.href} />}
+        {loaded !== undefined && (
+          <LoadedLine loaded={loaded} href={result.href} outputId={result.outputId} />
+        )}
       </div>
       {plot === "plotted" && <p className="muted">GeoJSON: shown on the map in blue.</p>}
       {plot === "plotted" && loaded?.axes === "swapped" && (
@@ -400,6 +592,7 @@ export function ResultsView({
             result={result}
             processId={processId}
             placed={placed}
+            several={results.length > 1}
           />
         ),
       )}

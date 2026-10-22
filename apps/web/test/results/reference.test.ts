@@ -10,6 +10,7 @@ import { describe, expect, it, vi } from "vitest";
 import { RelayRouteError } from "../../src/relay/relay-fetch.js";
 import { plotStatus } from "../../src/results/plottable.js";
 import {
+  isImageReference,
   axisHandling,
   isTruncated,
   loadReference,
@@ -416,5 +417,42 @@ describe("failures are outcomes, never exceptions", () => {
       },
     );
     expect(loaded.detail?.length).toBeLessThanOrEqual(500);
+  });
+});
+
+describe("an image given by reference (#28)", () => {
+  it("is known by its declared type or its extension", () => {
+    expect(isImageReference({ href: "https://x.test/a", mediaType: "image/png" })).toBe(true);
+    expect(isImageReference({ href: "https://x.test/a", mediaType: "image/webp; q=1" })).toBe(true);
+    expect(isImageReference({ href: "https://x.test/photo.JPG" })).toBe(true);
+    expect(isImageReference({ href: "https://x.test/anim.gif?size=2" })).toBe(true);
+    expect(isImageReference({ href: "https://x.test/a.json", mediaType: "application/json" })).toBe(
+      false,
+    );
+    expect(isImageReference({ href: "https://x.test/map.tif", mediaType: "image/tiff" })).toBe(
+      false,
+    );
+    expect(isImageReference({ href: "not a url" })).toBe(false);
+  });
+
+  it("is read as before, and marked to be shown as an image where it could not be", async () => {
+    vi.stubGlobal("location", new URL("http://localhost:3000/"));
+    try {
+      const url = "http://localhost:5081/static/img/logo.png";
+      const fetch: FetchLike = () => Promise.reject(new TypeError("Failed to fetch"));
+      const loaded = await loadReference({ href: url }, { endpoint: PYGEOAPI, fetch });
+      expect(loaded).toMatchObject({ outcome: "cors-blocked", route: "direct", image: true });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("is not marked where it is refused before sending", async () => {
+    const loaded = await loadReference(
+      { href: "http://plain.example/logo.png" },
+      { endpoint: PYGEOAPI, pageProtocol: "https:" },
+    );
+    expect(loaded.outcome).toBe("mixed-content");
+    expect(loaded.image).toBeUndefined();
   });
 });

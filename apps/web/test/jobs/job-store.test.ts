@@ -172,3 +172,72 @@ describe("hearing another tab (review W12)", () => {
     }).not.toThrow();
   });
 });
+
+describe("a job followed from its link (#32)", () => {
+  it("keeps its flag across a reload, and nothing else more", () => {
+    const storage = memoryStorage();
+    createJobStore(() => storage).save([{ ...JOB, followed: true }]);
+    const [stored] = JSON.parse(storage.items.get(STORAGE_KEY) ?? "[]") as Record<
+      string,
+      unknown
+    >[];
+    expect(Object.keys(stored ?? {}).sort()).toEqual([
+      "endpoint",
+      "followed",
+      "processId",
+      "startedAt",
+      "statusUrl",
+    ]);
+    expect(createJobStore(() => storage).load()).toEqual([{ ...JOB, followed: true }]);
+  });
+
+  it("stores a job started here with four fields, no flag", () => {
+    const storage = memoryStorage();
+    createJobStore(() => storage).save([{ ...JOB, followed: undefined }]);
+    const [stored] = JSON.parse(storage.items.get(STORAGE_KEY) ?? "[]") as Record<
+      string,
+      unknown
+    >[];
+    expect(Object.keys(stored ?? {})).toHaveLength(4);
+  });
+
+  it("reads a flag that isn't true as no flag", () => {
+    const storage = memoryStorage();
+    storage.items.set(STORAGE_KEY, JSON.stringify([{ ...JOB, followed: "yes" }]));
+    expect(createJobStore(() => storage).load()).toEqual([JOB]);
+  });
+});
+
+describe("a job this browser had cancelled (#14e)", () => {
+  const AT = "2026-10-22T10:15:00.000Z";
+
+  it("keeps when it was cancelled across a reload", () => {
+    const storage = memoryStorage();
+    createJobStore(() => storage).save([{ ...JOB, cancelledAt: AT }]);
+    const [stored] = JSON.parse(storage.items.get(STORAGE_KEY) ?? "[]") as Record<
+      string,
+      unknown
+    >[];
+    expect(Object.keys(stored ?? {}).sort()).toEqual([
+      "cancelledAt",
+      "endpoint",
+      "processId",
+      "startedAt",
+      "statusUrl",
+    ]);
+    expect(createJobStore(() => storage).load()).toEqual([{ ...JOB, cancelledAt: AT }]);
+  });
+
+  it("drops a cancel time that is no time, and keeps the job", () => {
+    const JOB2 = { ...JOB, statusUrl: "http://localhost:5080/jobs/2" };
+    const storage = memoryStorage();
+    storage.items.set(
+      STORAGE_KEY,
+      JSON.stringify([
+        { ...JOB, cancelledAt: "yesterday-ish" },
+        { ...JOB2, cancelledAt: 3 },
+      ]),
+    );
+    expect(createJobStore(() => storage).load()).toEqual([JOB, JOB2]);
+  });
+});

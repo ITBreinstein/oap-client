@@ -11,15 +11,36 @@
 
 import type { Map as MapLibreMap } from "maplibre-gl";
 import { useEffect, useRef, useState } from "react";
-import { moveTo } from "./fit.js";
+import { boundsOf, moveTo } from "./fit.js";
 import type { MapShape } from "./geometry-engine.js";
 import {
   createMapLibreShapeLayers,
+  type ClickPlace,
   type CreateShapeLayers,
   type ShapeLayers,
   type ShownImage,
   type ShownShapes,
 } from "./shape-layers.js";
+
+/** How long an input must stay as it is before the map moves to it (#19): typing pauses. */
+export const INPUT_SETTLE_MS = 500;
+
+/** Whether every one of the shapes is within what the map shows now. */
+function inView(map: MapLibreMap, shapes: readonly MapShape[]): boolean {
+  const bounds = boundsOf(shapes);
+  if (bounds === undefined) return true;
+  try {
+    const view = map.getBounds();
+    return (
+      bounds[0] >= view.getWest() &&
+      bounds[2] <= view.getEast() &&
+      bounds[1] >= view.getSouth() &&
+      bounds[3] <= view.getNorth()
+    );
+  } catch {
+    return true;
+  }
+}
 
 function resultCount(sets: readonly ShownShapes[]): number {
   return sets
@@ -52,8 +73,17 @@ export function useShownShapes(
   sets: readonly ShownShapes[],
   image: ShownImage | undefined,
   createLayers: CreateShapeLayers = createMapLibreShapeLayers,
-  onResultClick?: (index: number) => void,
-): { readonly resultShapes: number; readonly resultImage: boolean } {
+  onResultClick?: (index: number, at: ClickPlace) => void,
+  /** The result shape to outline, by its index in its set (#20). */
+  selected?: number,
+): {
+  readonly resultShapes: number;
+  readonly resultImage: boolean;
+  /** A result is on the map and the map has been moved off it (#16). */
+  readonly resultAway: boolean;
+  /** Move the map back to the result. */
+  readonly showResult: () => void;
+} {
   const layers = useRef<ShapeLayers | undefined>(undefined);
   const latest = useRef({ sets, image, onResultClick });
   useEffect(() => {
@@ -77,8 +107,8 @@ export function useShownShapes(
       setReady(true);
     });
     // Through the ref, so a new handler each render does not rebuild the layers.
-    created.onResultClick((index) => {
-      latest.current.onResultClick?.(index);
+    created.onResultClick((index, at) => {
+      latest.current.onResultClick?.(index, at);
     });
     return () => {
       created.stop();
@@ -86,6 +116,31 @@ export function useShownShapes(
       setReady(false);
     };
   }, [map, createLayers]);
+
+  // An input changed from outside the map: typed, pasted, loaded, or brought
+  // back with its form (#19). Once it has settled, and only when it parses
+  // into shapes, the map moves to it, unless it is already wholly in view.
+  const inputKey = JSON.stringify(sets.filter((set) => set.role === "input"));
+  useEffect(() => {
+    if (map === undefined) return undefined;
+    const timer = setTimeout(() => {
+      const current = latest.current;
+      if (resultCount(current.sets) > 0 || current.image !== undefined) return;
+      const inputs = current.sets
+        .filter((set) => set.role === "input")
+        .flatMap((set) => set.shapes);
+      if (inputs.length === 0 || inView(map, inputs)) return;
+      moveTo(map, inputs);
+    }, INPUT_SETTLE_MS);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [inputKey, map]);
+
+  // The clicked shape, outlined while its properties are shown (#20).
+  useEffect(() => {
+    layers.current?.select(selected);
+  }, [selected, map]);
 
   const key = JSON.stringify({ sets, image });
   useEffect(() => {
@@ -97,8 +152,41 @@ export function useShownShapes(
     }
   }, [key, map]);
 
+  // Whether the result is still in view, each time the map stops moving.
+  const [away, setAway] = useState(false);
+  useEffect(() => {
+    if (map === undefined) return undefined;
+    const check = () => {
+      const current = latest.current;
+      const shapes = [
+        ...current.sets.filter((set) => set.role === "result").flatMap((set) => set.shapes),
+        ...outlineOf(current.image),
+      ];
+      setAway(shapes.length > 0 && !inView(map, shapes));
+    };
+    try {
+      map.on("moveend", check);
+    } catch {
+      return undefined;
+    }
+    return () => {
+      try {
+        map.off("moveend", check);
+      } catch {
+        // Gone already.
+      }
+    };
+  }, [map]);
+
+  const hasResult = resultCount(sets) > 0 || image !== undefined;
   return {
     resultShapes: ready ? resultCount(sets) : 0,
     resultImage: ready && image !== undefined,
+    resultAway: ready && hasResult && away,
+    showResult: () => {
+      const current = latest.current;
+      if (map === undefined) return;
+      moveTo(map, [...current.sets.flatMap((set) => set.shapes), ...outlineOf(current.image)]);
+    },
   };
 }

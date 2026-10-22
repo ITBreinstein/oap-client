@@ -13,6 +13,8 @@ import {
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { UpdatedContext } from "../../src/app/variant.js";
+import { isUnderWay } from "../../src/jobs/under-way.js";
 import { ProcessScreen } from "../../src/app/ProcessScreen.js";
 import type { WorkflowCommands } from "../../src/app/useWorkflow.js";
 import { workflowReducer, type Workflow, type WorkflowAction } from "../../src/app/workflow.js";
@@ -95,23 +97,27 @@ function row(change: Partial<JobRow>): JobRow {
     processId: "breinstein-inputs",
     startedAt: "2026-09-30T10:00:00.000Z",
     restored: false,
+    followed: false,
+    cancelledAt: undefined,
     ...change,
   };
 }
 
 const commands = new Proxy({} as WorkflowCommands, { get: () => vi.fn() });
 
-function screen(state: Workflow, job: JobRow): HTMLElement {
+function screen(state: Workflow, job: JobRow, updated = false): HTMLElement {
   if (state.stage !== "running" && state.stage !== "result") throw new Error(state.stage);
   return render(
-    <ProcessScreen
-      state={state}
-      commands={commands}
-      fieldErrors={new Map()}
-      jobs={[job]}
-      jobNotice={undefined}
-      dismissAdvertisedBy="nothing"
-    />,
+    <UpdatedContext value={updated}>
+      <ProcessScreen
+        state={state}
+        commands={commands}
+        fieldErrors={new Map()}
+        jobs={[job]}
+        jobNotice={undefined}
+        dismissAdvertisedBy="nothing"
+      />
+    </UpdatedContext>,
   );
 }
 
@@ -211,5 +217,48 @@ describe("a status the server changed after a first successful (finding 0047)", 
     );
     expect(page.querySelector("[data-not-yet-confirmed]")).toBeNull();
     expect(page.querySelector("[data-status-changed]")).toBeNull();
+  });
+});
+
+describe("a finished job, while the page confirms it (#30)", () => {
+  const withResults = stateAfter({
+    type: "results",
+    runId: "run-1",
+    results: [{ kind: "json", outputId: "echo", value: { ok: true } }],
+  });
+
+  it("is not under way: the Jobs badge leaves it out", () => {
+    expect(
+      isUnderWay(row({ status: status("successful", JOB), confirmation: { state: "pending" } })),
+    ).toBe(false);
+    expect(isUnderWay(row({ status: status("running", JOB) }))).toBe(true);
+    expect(isUnderWay(row({ status: undefined }))).toBe(true);
+    expect(isUnderWay(row({ status: status("failed", JOB) }))).toBe(false);
+    expect(isUnderWay(row({ status: status("running", JOB), gone: true }))).toBe(false);
+  });
+
+  it("is shown as done in the updated Instrument, with nothing said", () => {
+    const page = screen(
+      withResults,
+      row({ status: status("successful", JOB), confirmation: { state: "pending" } }),
+      true,
+    );
+    expect(page.querySelector("[data-not-yet-confirmed]")).toBeNull();
+    expect(page.querySelector('[data-output-id="echo"]')).not.toBeNull();
+  });
+
+  it("speaks up in one line in the updated Instrument when the service changes its mind", () => {
+    const page = screen(
+      withResults,
+      row({
+        status: { ...status("failed", JOB), message: "callback could not be sent" },
+        settled: true,
+        confirmation: { state: "changed", first: status("successful", JOB) },
+      }),
+      true,
+    );
+    expect(page.querySelector("[data-status-changed]")?.textContent).toBe(
+      "The service later reported this job as failed. callback could not be sent",
+    );
   });
 });

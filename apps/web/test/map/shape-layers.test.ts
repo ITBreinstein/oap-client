@@ -25,7 +25,9 @@ function fakeMap({ loaded }: { loaded: boolean }) {
   /** What `queryRenderedFeatures` answers, and what it was asked. */
   const rendered: { properties?: unknown }[] = [];
   const queried: unknown[] = [];
-  const canvas = { style: { cursor: "" } };
+  const canvas = { style: { cursor: "" }, clientWidth: 800 };
+  /** Each layer's filter, as last set (#20). */
+  const filters = new Map<string, unknown>();
   const map = {
     loaded,
     sources,
@@ -34,6 +36,11 @@ function fakeMap({ loaded }: { loaded: boolean }) {
     rendered,
     queried,
     canvas,
+    filters,
+    setFilter(id: string, filter: unknown) {
+      if (!layers.includes(id)) throw new Error(`no layer ${id}`);
+      filters.set(id, filter);
+    },
     on(event: string, layerOrListener: string | Listener, maybe?: Listener) {
       if (typeof layerOrListener === "string") {
         if (maybe !== undefined) handlers.push({ event, layer: layerOrListener, listener: maybe });
@@ -48,7 +55,11 @@ function fakeMap({ loaded }: { loaded: boolean }) {
     },
     /** A click at a pixel, as MapLibre fires it. */
     click(x: number, y: number) {
-      for (const handler of handlers.filter((entry) => entry.event === "click")) {
+      map.fire("click", x, y);
+    },
+    /** Any pointer event at a pixel. */
+    fire(event: string, x: number, y: number) {
+      for (const handler of handlers.filter((entry) => entry.event === event)) {
         handler.listener({ point: { x, y } });
       }
     },
@@ -161,11 +172,12 @@ describe("clicking a result", () => {
   it("reports the clicked result's index, asking MapLibre about result layers only", () => {
     const map = fakeMap({ loaded: true });
     const layers = createMapLibreShapeLayers(map as never);
-    const seen: number[] = [];
-    layers.onResultClick((index) => seen.push(index));
+    const seen: unknown[] = [];
+    layers.onResultClick((index, at) => seen.push(index, at));
     map.rendered.push({ properties: { role: "result", index: 2 } });
     map.click(100, 50);
-    expect(seen).toEqual([2]);
+    // And where across the map it was, for the properties to open away from it (#20).
+    expect(seen).toEqual([2, { x: 100, width: 800 }]);
     expect(map.queried).toEqual([
       {
         box: [
@@ -197,15 +209,81 @@ describe("clicking a result", () => {
   });
 });
 
+describe("the pointer over a result", () => {
+  function hovered() {
+    const map = fakeMap({ loaded: true });
+    const layers = createMapLibreShapeLayers(map as never);
+    layers.onResultClick(() => undefined);
+    return { map, layers };
+  }
+
+  it("is the pointing hand wherever a click would show a result, the open hand elsewhere", () => {
+    const { map } = hovered();
+    map.rendered.push({ properties: { role: "result", index: 0 } });
+    map.fire("mousemove", 100, 50);
+    expect(map.canvas.style.cursor).toBe("pointer");
+    map.rendered.splice(0);
+    map.fire("mousemove", 10, 10);
+    expect(map.canvas.style.cursor).toBe("");
+  });
+
+  it("stays the pointing hand moving from a shape's outline onto its fill", () => {
+    const { map } = hovered();
+    // The outline, then the fill: two layers, one shape.
+    map.rendered.push({ properties: { role: "result", index: 0 } });
+    map.fire("mousemove", 100, 50);
+    map.rendered.splice(0, 1, { properties: { role: "result", index: 0 } });
+    map.fire("mousemove", 104, 50);
+    expect(map.canvas.style.cursor).toBe("pointer");
+  });
+
+  it("is the open hand again when the pointer leaves the map, or the layers stop", () => {
+    const { map, layers } = hovered();
+    map.rendered.push({ properties: { role: "result", index: 0 } });
+    map.fire("mousemove", 100, 50);
+    map.fire("mouseout", 0, 0);
+    expect(map.canvas.style.cursor).toBe("");
+    map.fire("mousemove", 100, 50);
+    layers.stop();
+    expect(map.canvas.style.cursor).toBe("");
+  });
+
+  it("is never the pointing hand over an input, which a click does not show", () => {
+    const { map } = hovered();
+    map.fire("mousemove", 100, 50);
+    expect(map.canvas.style.cursor).toBe("");
+  });
+});
+
 describe("createMapLibreShapeLayers", () => {
   it("adds one source and a layer per role and kind, input below result", () => {
     const map = fakeMap({ loaded: true });
     createMapLibreShapeLayers(map as never);
     expect([...map.sources.keys()]).toEqual(["oap-shown"]);
-    expect(map.layers).toHaveLength(6);
+    // And the outline of a clicked result, over both (#20).
+    expect(map.layers).toHaveLength(9);
     expect(map.layers.indexOf("oap-shown-input-fill")).toBeLessThan(
       map.layers.indexOf("oap-shown-result-fill"),
     );
+    expect(map.layers.slice(-3)).toEqual([
+      "oap-shown-selected-casing",
+      "oap-shown-selected-line",
+      "oap-shown-selected-point",
+    ]);
+  });
+
+  it("outlines the selected result shape, and none once it is put down (#20)", () => {
+    const map = fakeMap({ loaded: false });
+    const layers = createMapLibreShapeLayers(map as never);
+    // Asked before the style is in: done once it is.
+    layers.select(2);
+    map.styleLoads();
+    const indexIn = (filter: unknown) => JSON.stringify(filter).match(/"index"\],(-?\d+)/)?.[1];
+    expect(indexIn(map.filters.get("oap-shown-selected-line"))).toBe("2");
+    expect(indexIn(map.filters.get("oap-shown-selected-point"))).toBe("2");
+    expect(JSON.stringify(map.filters.get("oap-shown-selected-line"))).toContain('"result"');
+    layers.select(undefined);
+    expect(indexIn(map.filters.get("oap-shown-selected-casing"))).toBe("-1");
   });
 
   it("waits for the style, keeps what it was asked to show meanwhile, then says it is ready", () => {

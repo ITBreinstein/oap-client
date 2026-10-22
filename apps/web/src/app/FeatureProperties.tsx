@@ -6,22 +6,35 @@
  * Everything is text. A property value is whatever the server sent, so it is
  * rendered as a React text node — never as HTML, never parsed, and nothing
  * here uses `dangerouslySetInnerHTML`. A nested value is shown as formatted
- * JSON text. Nothing is styled by a property's value.
+ * JSON text. Nothing is styled by a property's value. For reading (#20): a
+ * whole http(s) address is a link, a large number has its digits grouped,
+ * and a short list is words separated by commas (`property-value.ts`).
+ *
+ * The panel sits on the side of the map away from the click, so it does not
+ * cover the shape it is about, which the map outlines meanwhile.
  */
 
 import { Fragment, useId } from "react";
 import { isJsonObject } from "../forms/json.js";
 import type { PlottedFeature } from "../results/plottable.js";
+import { shownValue } from "./property-value.js";
 
-/** One value as text: a string as it is, anything else as JSON. */
+/** One value: a link, words, or JSON text. */
 function Value({ value }: { readonly value: unknown }) {
-  if (typeof value === "string") return <>{value}</>;
-  if (typeof value === "object" && value !== null) {
-    return <pre className="code">{JSON.stringify(value, null, 2)}</pre>;
+  const shown = shownValue(value);
+  switch (shown.kind) {
+    case "link":
+      return (
+        <a href={shown.href} target="_blank" rel="noopener noreferrer">
+          {shown.href}
+          <span className="visually-hidden"> (opens in a new tab)</span>
+        </a>
+      );
+    case "text":
+      return <>{shown.text}</>;
+    case "json":
+      return <pre className="code">{shown.text}</pre>;
   }
-  if (typeof value === "number" || typeof value === "boolean") return <>{String(value)}</>;
-  // What is left of JSON is null.
-  return <>null</>;
 }
 
 function Properties({ origin }: { readonly origin: PlottedFeature["origin"] }) {
@@ -57,9 +70,12 @@ function Properties({ origin }: { readonly origin: PlottedFeature["origin"] }) {
 
 export function FeatureProperties({
   feature,
+  side = "left",
   onClose,
 }: {
   readonly feature: PlottedFeature;
+  /** Which side of the map: the one away from where the shape was clicked. */
+  readonly side?: "left" | "right" | undefined;
   readonly onClose: () => void;
 }) {
   const base = useId();
@@ -68,15 +84,19 @@ export function FeatureProperties({
       className="map-overlay feature-properties"
       aria-labelledby={`${base}-heading`}
       data-testid="feature-properties"
+      data-side={side}
     >
-      <h3 id={`${base}-heading`}>Feature properties</h3>
-      <p className="muted">From the result “{feature.outputId}”.</p>
-      <Properties origin={feature.origin} />
-      <p className="actions">
+      {/* Close in the head, which stays while the properties scroll: always in view. */}
+      <div className="feature-properties-head">
+        <h3 id={`${base}-heading`}>Feature properties</h3>
         <button type="button" className="secondary" onClick={onClose}>
           Close
         </button>
-      </p>
+      </div>
+      <div className="feature-properties-body">
+        <p className="muted">From the result “{feature.outputId}”.</p>
+        <Properties origin={feature.origin} />
+      </div>
     </section>
   );
 }
