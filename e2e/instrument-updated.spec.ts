@@ -584,10 +584,19 @@ for (const { style, updated } of VERSIONS) {
       await expect(page.getByRole("button", { name: "All processes" })).toBeDisabled();
       return;
     }
-    // The link is the page's own address, which names the job.
+    // The link is the page's own address, which names the job, without this
+    // visitor's style and theme (#34): the receiver's page keeps its own.
     await expect(link).toBeVisible();
     const url = await link.inputValue();
-    expect(url).toBe(page.url());
+    const withoutDisplay = (address: string) => {
+      const plain = new URL(address);
+      plain.searchParams.delete("style");
+      plain.searchParams.delete("theme");
+      return plain.toString();
+    };
+    expect(url).toBe(withoutDisplay(page.url()));
+    expect(new URL(url).searchParams.has("style")).toBe(false);
+    expect(new URL(url).searchParams.has("theme")).toBe(false);
     expect(new URL(url).searchParams.get("job")).toMatch(/\S/);
     await expect(page.getByRole("button", { name: "Copy the job’s link" })).toBeVisible();
 
@@ -610,7 +619,7 @@ for (const { style, updated } of VERSIONS) {
       .getByRole("button", { name: "Show the results" })
       .click({ timeout: 45_000 });
     await page.locator('[data-output-id="slept"]').waitFor({ timeout: 45_000 });
-    expect(page.url()).toBe(url);
+    expect(withoutDisplay(page.url())).toBe(url);
   });
 }
 

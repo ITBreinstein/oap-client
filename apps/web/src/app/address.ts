@@ -154,10 +154,22 @@ export function withPlace(search: string, place: Place): string {
   return text === "" ? "" : `?${text}`;
 }
 
+/**
+ * The query of a link to `place` for someone else (#34): the place, and what
+ * else the page was opened with, but not this visitor's own display settings.
+ * The receiver's page keeps its own style and theme.
+ */
+export function sharedSearch(search: string, place: Place): string {
+  const params = new URLSearchParams(search);
+  params.delete("style");
+  params.delete("theme");
+  return withPlace(params.toString(), place);
+}
+
 /** The whole address of `place` on this page, to pass on as a link. */
 export function linkTo(place: Place): string {
   const { origin, pathname, search } = globalThis.location;
-  return `${origin}${pathname}${withPlace(search, place)}`;
+  return `${origin}${pathname}${sharedSearch(search, place)}`;
 }
 
 /**

@@ -10,6 +10,7 @@ import {
   jobUrl,
   placeInSearch,
   samePlace,
+  sharedSearch,
   withPlace,
   wouldLoseWork,
 } from "../../src/app/address.js";
@@ -67,6 +68,19 @@ describe("a job in the address", () => {
 
   it("makes two places different", () => {
     expect(samePlace({ service, process: "p", job: "1" }, { service, process: "p" })).toBe(false);
+  });
+});
+
+describe("sharedSearch", () => {
+  it("leaves out the sender's style and theme, and keeps the rest (#34)", () => {
+    const job = { service: "https://example.org/ogcapi", process: "slow", job: "6f2c" };
+    expect(sharedSearch("?style=instrument-updated&theme=dark", job)).toBe(
+      "?service=https%3A%2F%2Fexample.org%2Fogcapi&process=slow&job=6f2c",
+    );
+    expect(sharedSearch("?theme=light&developer&style=instrument", job)).toBe(
+      "?developer=&service=https%3A%2F%2Fexample.org%2Fogcapi&process=slow&job=6f2c",
+    );
+    expect(placeInSearch(sharedSearch("?style=instrument", job))).toEqual(job);
   });
 });
 
