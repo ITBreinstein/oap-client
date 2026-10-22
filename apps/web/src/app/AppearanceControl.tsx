@@ -5,12 +5,16 @@
  * again; a click elsewhere, or focus moving out of it, closes it and leaves
  * focus where it went.
  *
+ * In the rail it is pinned to the window beside its button (above it, in the
+ * bar at a phone's foot): the rail scrolls when it is taller than the window
+ * (#41), and a scrolling box would clip anything that stands out of it.
+ *
  * The "Style" group is a trial: once one is chosen, delete that fieldset
  * (and `STYLE_LABELS`), and keep "Night mode"
  * (`docs/adr/0002-switchable-styles.md`).
  */
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import {
   STYLE_NAMES,
   THEME_PREFERENCES,
@@ -57,8 +61,46 @@ export function AppearanceControl(props: AppearanceControlProps) {
   const popover = useRef<HTMLDivElement>(null);
 
   // Into the popover on opening, onto the choice already made.
+  // Placed before it is painted, and again when the window changes size.
+  useLayoutEffect(() => {
+    const element = popover.current;
+    if (!open || element === null) return undefined;
+    const place = () => {
+      const rail = button.current?.closest(".app-rail");
+      const at = button.current?.getBoundingClientRect();
+      if (rail === null || rail === undefined || at === undefined) return;
+      const edge = rail.getBoundingClientRect();
+      const bar = edge.width > edge.height;
+      element.style.position = "fixed";
+      element.style.top = "auto";
+      element.style.maxHeight = `${String(Math.max(160, (bar ? edge.top : innerHeight) - 16))}px`;
+      element.style.overflowY = "auto";
+      if (bar) {
+        // Above the bar at the foot, its right edge with the button's.
+        element.style.left = "auto";
+        element.style.right = `${String(Math.max(8, innerWidth - at.right))}px`;
+        element.style.bottom = `${String(innerHeight - edge.top + 8)}px`;
+      } else {
+        // Beside the rail, its foot level with the button's.
+        element.style.right = "auto";
+        element.style.left = `${String(edge.right + 8)}px`;
+        element.style.bottom = `${String(Math.max(8, innerHeight - at.bottom))}px`;
+      }
+    };
+    place();
+    globalThis.addEventListener("resize", place);
+    return () => {
+      globalThis.removeEventListener("resize", place);
+    };
+  }, [open]);
+
   useEffect(() => {
-    if (open) popover.current?.querySelector<HTMLInputElement>("input:checked")?.focus();
+    // Without scrolling: the rail would scroll its own items out of sight.
+    if (open) {
+      popover.current
+        ?.querySelector<HTMLInputElement>("input:checked")
+        ?.focus({ preventScroll: true });
+    }
   }, [open]);
 
   // A press anywhere else closes it. Focus stays where that press put it.

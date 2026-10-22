@@ -1330,3 +1330,35 @@ test("#28 once a linked image is shown, a plain line takes the place of the erro
   );
   await expect(file.locator(".notice")).toHaveCount(0);
 });
+
+for (const style of STYLES) {
+  for (const [width, height] of [
+    [1440, 1000],
+    [390, 844],
+  ] as const) {
+    test(`Appearance opens whole and on top, beside the rail that scrolls (${style}, ${String(width)}×${String(height)})`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height });
+      await open(page, style);
+      await connectTyped(page);
+      await openProcess(page, "Buildings in an area");
+      await page.getByRole("button", { name: "Appearance", exact: true }).click();
+      const popover = page.getByRole("dialog", { name: "Appearance" });
+      await expect(popover).toBeInViewport({ ratio: 1 });
+      // Nothing over it: each corner's point is the popover's own.
+      const covered = await popover.evaluate((element) => {
+        const box = element.getBoundingClientRect();
+        return [
+          [box.left + 4, box.top + 4],
+          [box.right - 4, box.top + 4],
+          [box.left + 4, box.bottom - 4],
+          [box.right - 4, box.bottom - 4],
+        ].filter(([x, y]) => !element.contains(document.elementFromPoint(x ?? 0, y ?? 0)));
+      });
+      expect(covered).toEqual([]);
+      // And the rail's own items are still in view.
+      await expect(page.getByRole("button", { name: "Jobs", exact: true })).toBeInViewport();
+    });
+  }
+}
