@@ -314,7 +314,8 @@ function JobItem({
           </p>
         </>
       )}
-      {job.restored && (
+      {/* STYLE TRIAL (updated Instrument, #33): said once, above the list, not on every row. */}
+      {job.restored && !structured && (
         <p className="hint">From an earlier visit: its status is polled, with no live updates.</p>
       )}
       {message !== undefined && <p className="hint">{message}</p>}
@@ -383,7 +384,9 @@ function JobItem({
                 }
                 onClick={onRerun}
               >
-                {rerunFilled ? "Run again" : "Open the process"}
+                {/* STYLE TRIAL (#33): "Run again" either way in the updated
+                    Instrument; the form says when its inputs weren't kept. */}
+                {rerunFilled || structured ? "Run again" : "Open the process"}
               </button>{" "}
             </>
           )}
@@ -466,10 +469,17 @@ export function JobsPanel(props: JobsPanelProps) {
       data-testid="my-jobs"
     >
       {heading && <h2 id={`${base}-heading`}>My jobs</h2>}
+      {/* Started here, or followed from a link (#32, #14c). */}
       <p className="help">
-        Background jobs started from this browser. Removing one from the list does not stop it on
-        the server.
+        Background jobs started or followed in this browser. Removing one from the list does not
+        stop it on the server.
       </p>
+      {/* STYLE TRIAL (updated Instrument, #33): one line for every job from an earlier visit. */}
+      {props.structured === true && jobs.some((job) => job.restored) && (
+        <p className="hint jobs-earlier" data-testid="jobs-earlier">
+          Jobs from an earlier visit are checked every so often, rather than followed as they run.
+        </p>
+      )}
       {started.length > 0 && <ul>{started.map(item)}</ul>}
       {followed.length > 0 && (
         <>

@@ -185,8 +185,12 @@ describe("Run again in My jobs, in the updated Instrument", () => {
     expect(start).toHaveBeenCalledWith(job);
   });
 
-  it("says it only opens the process when the inputs are from an earlier visit", () => {
-    expect(buttonText(panelWith(false, false).view)).toContain("Open the process");
+  it("keeps Run again for a job from an earlier visit, and says once that such jobs are checked now and then (#33)", () => {
+    const { view } = panelWith(false, false);
+    expect(buttonText(view)).toContain("Run again");
+    expect(buttonText(view)).not.toContain("Open the process");
+    expect(view.querySelectorAll('[data-testid="jobs-earlier"]')).toHaveLength(1);
+    expect(view.textContent).not.toContain("its status is polled");
   });
 
   it("can't be used while a run is under way", () => {

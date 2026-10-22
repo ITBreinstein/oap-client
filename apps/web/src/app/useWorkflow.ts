@@ -90,6 +90,8 @@ export interface WorkflowCommands {
   readonly setValue: (id: string, value: unknown) => void;
   /** "Clear the form" (#10): every input back to what it started with, and forgotten. */
   readonly clearForm: () => void;
+  /** Say something about the open form of this process, as a notice above it (#33). */
+  readonly formNotice: (processId: string, notice: string) => void;
   readonly setMode: (mode: ExecutionMode) => void;
   /** Task 8, T2: ask for one output as a value (as the server prefers) or a link. */
   readonly setTransmission: (outputId: string, transmission: "value" | "reference") => void;
@@ -1117,6 +1119,9 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
         return next;
       });
       dispatch({ type: "set-value", id, value });
+    },
+    formNotice: (processId, notice) => {
+      dispatch({ type: "form-notice", processId, notice });
     },
     clearForm: () => {
       if (state.stage !== "process") return;

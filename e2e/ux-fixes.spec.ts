@@ -1214,3 +1214,47 @@ for (const style of STYLES) {
     await expect(opener).toBeFocused();
   });
 }
+
+for (const style of STYLES) {
+  const updated = style === "instrument-updated";
+  test(`#33 jobs from an earlier visit ${updated ? "are said once, and Run again opens an empty form that says why" : "keep their note on each row"} (${style})`, async ({
+    page,
+  }) => {
+    await requireService(`${RELAY}/healthz`, "the relay");
+    await open(page, style);
+    await page.getByRole("radio", { name: /^pygeoapi[- ]cors /i }).check();
+    await page.getByRole("button", { name: "Connect", exact: true }).click();
+    await openProcess(page, "Slow process");
+    await field(page, "Seconds (optional)").fill("1");
+    await page.getByRole("checkbox", { name: "Run in the background" }).check();
+    for (let run = 0; run < 2; run += 1) {
+      await page.getByRole("button", { name: "Run", exact: true }).click();
+      await expect(page.locator('[data-output-id="slept"]')).toBeVisible({ timeout: 30_000 });
+      await page.getByRole("button", { name: "Change the inputs" }).click();
+    }
+
+    // A reload: both jobs are from an earlier visit now.
+    await page.reload();
+    await page.getByRole("button", { name: /^Jobs/ }).click();
+    const panel = page.getByTestId("my-jobs");
+    await expect(panel.locator("[data-job-row]")).toHaveCount(2);
+    await expect(
+      panel.getByText("Background jobs started or followed in this browser."),
+    ).toBeVisible();
+    await expect(panel.getByTestId("jobs-earlier")).toHaveCount(updated ? 1 : 0);
+    await expect(panel.getByText("From an earlier visit: its status is polled")).toHaveCount(
+      updated ? 0 : 2,
+    );
+    if (!updated) return;
+
+    await panel.getByRole("button", { name: "Run again" }).first().click();
+    // A busy pygeoapi takes its time over the description.
+    await expect(page.getByRole("heading", { level: 2, name: "Slow process" })).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(
+      page.getByText("its inputs weren’t kept: fill in the form to run it again."),
+    ).toBeVisible();
+    await expect(field(page, "Seconds (optional)")).toHaveValue("");
+  });
+}

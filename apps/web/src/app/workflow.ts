@@ -232,6 +232,8 @@ export type WorkflowAction =
       readonly loaded: LoadedReference;
     }
   | { readonly type: "run-failed"; readonly runId: string; readonly error: WorkflowError }
+  /** A word about the form on screen, such as why it is empty (#33). */
+  | { readonly type: "form-notice"; readonly processId: string; readonly notice: string }
   | { readonly type: "edit" };
 
 export const INITIAL_WORKFLOW: Workflow = { stage: "choose-endpoint" };
@@ -508,6 +510,12 @@ export function workflowReducer(state: Workflow, action: WorkflowAction): Workfl
     case "run-failed":
       return state.stage === "running" && state.runId === action.runId
         ? { stage: "process", ...openPart(state), error: action.error }
+        : state;
+
+    case "form-notice":
+      // Only onto the form of the process it was meant for.
+      return state.stage === "process" && state.process.id === action.processId
+        ? { ...state, error: { title: action.notice, notice: true } }
         : state;
 
     case "reference-loaded":

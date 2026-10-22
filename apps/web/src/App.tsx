@@ -243,6 +243,8 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
     values?: FormValues | undefined;
     /** Tick Run in the background once it is open (#25). */
     background?: true | undefined;
+    /** STYLE TRIAL (#33): say the form is empty because the job's inputs weren't kept. */
+    unkept?: true | undefined;
   }>(undefined);
   useEffect(() => {
     const pending = pendingRerun.current;
@@ -254,6 +256,12 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
       return;
     }
     pendingRerun.current = undefined;
+    if (pending.unkept === true) {
+      commands.formNotice(
+        pending.processId,
+        "This job is from an earlier visit, and its inputs weren’t kept: fill in the form to run it again.",
+      );
+    }
     if (pending.values === undefined && pending.background !== true) return;
     for (const [id, value] of Object.entries(pending.values ?? {})) commands.setValue(id, value);
     commands.setMode("async");
@@ -271,7 +279,12 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
   const rerun = (job: JobRow) => {
     const endpoint = endpointOfJob(job);
     if (job.processId === undefined || endpoint === undefined) return;
-    pendingRerun.current = { processId: job.processId, values: sentFor.current.get(job.statusUrl) };
+    const values = sentFor.current.get(job.statusUrl);
+    pendingRerun.current = {
+      processId: job.processId,
+      values,
+      ...(values === undefined ? { unkept: true } : {}),
+    };
     setPanelOpen(undefined);
     commands.openExample(endpoint, job.processId);
   };

@@ -115,3 +115,31 @@ describe("reset-form", () => {
     expect(workflowReducer(result, { type: "reset-form", values: initial })).toBe(result);
   });
 });
+
+describe("form-notice (#33)", () => {
+  const onProcess = (stage: "process" | "result", id: string): Workflow =>
+    ({ stage, plan, values: initial, process: { id } }) as unknown as Workflow;
+
+  it("says a word above the open form of its process", () => {
+    const next = workflowReducer(onProcess("process", "slow"), {
+      type: "form-notice",
+      processId: "slow",
+      notice: "Its inputs weren’t kept.",
+    });
+    expect(next.stage === "process" ? next.error : undefined).toEqual({
+      title: "Its inputs weren’t kept.",
+      notice: true,
+    });
+  });
+
+  it("says nothing on another process's form, or off the form", () => {
+    const other = onProcess("process", "hello-world");
+    expect(workflowReducer(other, { type: "form-notice", processId: "slow", notice: "x" })).toBe(
+      other,
+    );
+    const result = onProcess("result", "slow");
+    expect(workflowReducer(result, { type: "form-notice", processId: "slow", notice: "x" })).toBe(
+      result,
+    );
+  });
+});
