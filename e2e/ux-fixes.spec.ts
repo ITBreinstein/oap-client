@@ -990,3 +990,25 @@ for (const { style, more, shown } of [
     }
   });
 }
+
+for (const style of STYLES) {
+  test(`#42 the line over the title ${style === "instrument-updated" ? "never breaks inside the process id" : "is as it was"} (${style})`, async ({
+    page,
+  }) => {
+    await open(page, style);
+    await connectTyped(page);
+    await openProcess(page, "Area of each feature");
+    const pieces = await page
+      .locator(".process-path-id")
+      .evaluate((id) => ({
+        rects: id.getClientRects().length,
+        display: getComputedStyle(id).display,
+      }));
+    if (style === "instrument-updated") {
+      // One piece, on its own line after the service's "/".
+      expect(pieces.rects).toBe(1);
+    } else {
+      expect(pieces.display).toBe("inline");
+    }
+  });
+}

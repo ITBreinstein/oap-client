@@ -1061,3 +1061,21 @@
     overflow: visible;
   }
 }
+
+/*
+ * The line over a process's title (#42): it breaks after the service's "/",
+ * never inside the process id, which moves to the next line whole. An id
+ * wider than the whole line is cut short with an ellipsis rather than split.
+ */
+[data-variant="updated"] .process-path {
+  overflow-wrap: normal;
+}
+
+[data-variant="updated"] .process-path-id {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
