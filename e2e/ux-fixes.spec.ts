@@ -125,7 +125,7 @@ for (const style of STYLES) {
     await open(page, style, "&developer");
     await connectTyped(page);
     await openProcess(page, "Slow process");
-    await field(page, "Seconds (optional)").fill("20");
+    await field(page, "Seconds (optional)").fill("8");
     await page.getByRole("button", { name: "Run", exact: true }).click();
 
     await expect(page.getByTestId("waited")).toHaveText(/^Waiting for the service: \d+ s$/);
@@ -137,7 +137,7 @@ for (const style of STYLES) {
     await expect(
       page.getByText("Stopped waiting. The service may still finish the run;"),
     ).toBeVisible();
-    await expect(field(page, "Seconds (optional)")).toHaveValue("20");
+    await expect(field(page, "Seconds (optional)")).toHaveValue("8");
     await expect(page.getByRole("button", { name: "Run", exact: true })).toBeEnabled();
     // Recorded as the core records any request that ended without an answer.
     const executions = (await observations(page)).filter((entry) => entry["kind"] === "execution");
@@ -549,7 +549,7 @@ for (const style of STYLES) {
     await page.getByRole("radio", { name: /^pygeoapi[- ]cors /i }).check();
     await page.getByRole("button", { name: "Connect", exact: true }).click();
     await openProcess(page, "Slow process");
-    await field(page, "Seconds (optional)").fill("60");
+    await field(page, "Seconds (optional)").fill("15");
     await page.getByRole("checkbox", { name: "Run in the background" }).check();
     await page.getByRole("button", { name: "Run", exact: true }).click();
     const running = page.locator("[data-job-ref]");
@@ -597,7 +597,7 @@ test("#32 a job followed by its link can't be cancelled, and is listed apart", a
   await page.getByRole("radio", { name: /^pygeoapi[- ]cors /i }).check();
   await page.getByRole("button", { name: "Connect", exact: true }).click();
   await openProcess(page, "Slow process");
-  await field(page, "Seconds (optional)").fill("60");
+  await field(page, "Seconds (optional)").fill("15");
   await page.getByRole("checkbox", { name: "Run in the background" }).check();
   await page.getByRole("button", { name: "Run", exact: true }).click();
   const link = await page.getByRole("textbox", { name: "The job’s link" }).inputValue();
