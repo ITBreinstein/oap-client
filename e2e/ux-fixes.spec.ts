@@ -922,3 +922,40 @@ for (const style of STYLES) {
     await expect(panel.locator(".examples-count")).toHaveText("2 examples");
   });
 }
+
+for (const style of STYLES) {
+  test(`#6 the relay's services stay listed while it is down, and can't be chosen (${style})`, async ({
+    page,
+  }) => {
+    await requireService(`${RELAY}/healthz`, "the relay");
+    let relayDown = false;
+    await page.route(`${RELAY}/endpoints`, (route) =>
+      relayDown ? route.abort("connectionrefused") : route.fallback(),
+    );
+    await open(page, style);
+    // By its key: the updated Instrument names it by its title once read.
+    const listed = page.locator("input[type='radio'][value='pygeoapi-cors']");
+    await expect(listed).toBeEnabled();
+
+    // The relay goes down; back on the start screen its rows are kept.
+    relayDown = true;
+    await connectTyped(page);
+    await page.getByRole("button", { name: "Start", exact: true }).click();
+    await expect(listed).toBeDisabled();
+    await expect(listed).toHaveAccessibleDescription("Temporarily unavailable");
+    await expect(page.getByText("Some services are temporarily unavailable.")).toHaveCount(0);
+
+    // And back up: offered again.
+    relayDown = false;
+    await connectTyped(page);
+    await page.getByRole("button", { name: "Start", exact: true }).click();
+    await expect(listed).toBeEnabled();
+  });
+}
+
+test("#6 with the relay down from the start, one line says so", async ({ page }) => {
+  await page.route(`${RELAY}/endpoints`, (route) => route.abort("connectionrefused"));
+  await open(page, "instrument-updated");
+  await expect(page.getByText("Some services are temporarily unavailable.")).toBeVisible();
+  await expect(page.getByRole("radio", { name: /^pygeoapi[- ]cors /i })).toHaveCount(0);
+});

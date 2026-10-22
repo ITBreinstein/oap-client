@@ -140,8 +140,16 @@ export interface WorkflowView {
   readonly state: Workflow;
   readonly commands: WorkflowCommands;
   readonly snapshot: JobSessionSnapshot | undefined;
-  /** From the relay's `GET /endpoints`; empty without a relay. */
+  /**
+   * From the relay's `GET /endpoints`, as it last answered; empty without a
+   * relay, or while it does not answer.
+   */
   readonly configured: readonly RelayEndpoint[];
+  /**
+   * The endpoints the relay listed earlier this visit, while it does not
+   * answer now (#6): shown, but not offered. Empty otherwise.
+   */
+  readonly unavailable: readonly RelayEndpoint[];
   readonly configuredError: string | undefined;
   readonly fieldErrors: FieldErrors;
   /** A message about the running job that is not a stage change, e.g. a refused cancel. */
@@ -292,6 +300,8 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
   const [state, dispatch] = useReducer(workflowReducer, INITIAL_WORKFLOW);
   const [snapshot, setSnapshot] = useState<JobSessionSnapshot | undefined>();
   const [configured, setConfigured] = useState<RelayEndpoint[]>([]);
+  /** Whether the relay's last answer to `GET /endpoints` is out of date: it did not answer since (#6). */
+  const [configuredStale, setConfiguredStale] = useState(false);
   const [configuredError, setConfiguredError] = useState<string | undefined>();
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>(NO_ERRORS);
   const [jobNotice, setJobNotice] = useState<string | undefined>();
@@ -360,28 +370,41 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
     const created = createJobSession(relayUrl, { acceptedNoticeMs, store: createJobStore() });
     session.current = created;
     const unsubscribe = created.subscribe(setSnapshot);
-    let live = true;
-    if (relayUrl !== undefined && relayUrl !== "") {
-      created
-        .endpoints()
-        .then((list) => {
-          if (live) setConfigured(list);
-        })
-        .catch(() => {
-          if (live) {
-            setConfiguredError(
-              "The relay did not list its endpoints. Type a server's address instead.",
-            );
-          }
-        });
-    }
     return () => {
-      live = false;
       unsubscribe();
       created.dispose();
       if (session.current === created) session.current = undefined;
     };
   }, [relayUrl, acceptedNoticeMs]);
+
+  // The relay's endpoints, read each time the start screen is shown (#6): a
+  // relay that went down since keeps its rows from earlier this visit, shown
+  // as unavailable, and one that is back offers them again. After the effect
+  // above, which made the session this asks.
+  const atStart = state.stage === "choose-endpoint";
+  useEffect(() => {
+    const asking = session.current;
+    if (!atStart || asking === undefined || relayUrl === undefined || relayUrl === "") {
+      return undefined;
+    }
+    let live = true;
+    asking
+      .endpoints()
+      .then((list) => {
+        if (!live) return;
+        setConfigured(list);
+        setConfiguredStale(false);
+        setConfiguredError(undefined);
+      })
+      .catch(() => {
+        if (!live) return;
+        setConfiguredStale(true);
+        setConfiguredError("Some services are temporarily unavailable.");
+      });
+    return () => {
+      live = false;
+    };
+  }, [atStart, relayUrl, acceptedNoticeMs]);
 
   const record = useCallback((observations: readonly FormObservation[]) => {
     for (const observation of observations) {
@@ -1115,8 +1138,10 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
     state,
     commands,
     snapshot,
-    configured,
-    configuredError,
+    configured: configuredStale ? [] : configured,
+    unavailable: configuredStale ? configured : [],
+    // The rows say it themselves while there are some (#6).
+    configuredError: configuredStale && configured.length > 0 ? undefined : configuredError,
     fieldErrors,
     jobNotice,
     dismissAdvertisedBy,

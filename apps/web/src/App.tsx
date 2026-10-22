@@ -413,6 +413,7 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
           // A new link to answer starts the screen afresh, its address filled in.
           key={address.linked?.service ?? ""}
           configured={view.configured}
+          unavailable={view.unavailable}
           configuredError={view.configuredError}
           presets={presets}
           connecting={state.connecting}

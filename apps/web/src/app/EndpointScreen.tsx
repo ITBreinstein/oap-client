@@ -31,6 +31,8 @@ const presetKey = (index: number): string => `preset:${String(index)}`;
 
 export interface EndpointScreenProps {
   readonly configured: readonly RelayEndpoint[];
+  /** Listed earlier this visit, but the relay does not answer now (#6): shown, not offered. */
+  readonly unavailable?: readonly RelayEndpoint[] | undefined;
   readonly configuredError: string | undefined;
   readonly presets: readonly Preset[];
   readonly connecting: EndpointRef | undefined;
@@ -114,7 +116,8 @@ export function EndpointScreen(props: EndpointScreenProps) {
     ...configured.map((entry) => entry.key),
     ...listedPresets.map(({ index }) => presetKey(index)),
   ];
-  const hasChoices = keys.length > 0;
+  const unavailable = props.unavailable ?? [];
+  const hasChoices = keys.length > 0 || unavailable.length > 0;
   // A linked service is picked for the user: its entry when it is a listed
   // one, else the address it fills in.
   const linkedService = linked?.service;
@@ -300,6 +303,26 @@ export function EndpointScreen(props: EndpointScreenProps) {
                     {entry.executeRoute === "relay" && (
                       <span className="choice-note"> Background runs go through the relay.</span>
                     )}
+                  </span>
+                </label>
+              ))}
+              {/* The relay's, while it does not answer (#6): there, but not to be chosen. */}
+              {unavailable.map((entry) => (
+                <label key={entry.key} className="choice choice-card" data-unavailable>
+                  <input
+                    type="radio"
+                    name={`${base}-service`}
+                    value={entry.key}
+                    checked={false}
+                    disabled
+                    aria-describedby={`${base}-unavailable-${entry.key}`}
+                  />{" "}
+                  <span className="choice-body">
+                    <strong className="choice-title">{nameOf(entry)}</strong>{" "}
+                    <span className="choice-url">{entry.baseUrl}</span>
+                    <span className="choice-unavailable" id={`${base}-unavailable-${entry.key}`}>
+                      Temporarily unavailable
+                    </span>
                   </span>
                 </label>
               ))}

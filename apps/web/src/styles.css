@@ -1104,6 +1104,25 @@ label.choice-card:not(:last-of-type) .choice-note {
   white-space: nowrap;
 }
 
+/* A relay service that does not answer now (#6): listed, but not to be chosen. */
+.service-choices label.choice-card[data-unavailable] {
+  cursor: not-allowed;
+}
+
+.service-choices label.choice-card[data-unavailable]:hover {
+  background: var(--surface);
+}
+
+.service-choices label.choice-card[data-unavailable] :is(.choice-title, .choice-url) {
+  color: var(--muted);
+}
+
+.choice-unavailable {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
 .address-field input {
   min-width: 0;
 }
