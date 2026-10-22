@@ -1153,8 +1153,7 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
     snapshot,
     configured: configuredStale ? [] : configured,
     unavailable: configuredStale ? configured : [],
-    // The rows say it themselves while there are some (#6).
-    configuredError: configuredStale && configured.length > 0 ? undefined : configuredError,
+    configuredError,
     fieldErrors,
     jobNotice,
     dismissAdvertisedBy,

@@ -371,7 +371,10 @@ export function EndpointScreen(props: EndpointScreenProps) {
             </fieldset>
           )}
 
-          {configuredError !== undefined && <p className="notice">{configuredError}</p>}
+          {/* Unless rows of the relay's services say so themselves (#6). */}
+          {configuredError !== undefined && unavailable.length === 0 && (
+            <p className="notice">{configuredError}</p>
+          )}
         </form>
       </div>
 

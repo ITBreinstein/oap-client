@@ -30,6 +30,8 @@ afterEach(() => {
   host = undefined;
 });
 
+const DOWN = "Some services are temporarily unavailable.";
+
 function render(updated: boolean, presets: readonly { title: string; url: string }[] = []) {
   const onConnect = vi.fn();
   host = document.createElement("div");
@@ -42,7 +44,7 @@ function render(updated: boolean, presets: readonly { title: string; url: string
         <EndpointScreen
           configured={[]}
           unavailable={[CORS]}
-          configuredError={undefined}
+          configuredError={DOWN}
           presets={presets}
           connecting={undefined}
           error={undefined}
@@ -56,8 +58,9 @@ function render(updated: boolean, presets: readonly { title: string; url: string
 }
 
 describe.each([false, true])("a relay service while the relay is down (updated: %s)", (updated) => {
-  it("is listed, disabled, and says it is temporarily unavailable", () => {
+  it("is listed, disabled, and says it is temporarily unavailable: the line is not needed", () => {
     const { view } = render(updated);
+    expect(view.textContent).not.toContain(DOWN);
     const radio = view.querySelector<HTMLInputElement>("input[value='pygeoapi-cors']");
     expect(radio?.disabled).toBe(true);
     expect(radio?.checked).toBe(false);
@@ -81,10 +84,11 @@ describe.each([false, true])("a relay service while the relay is down (updated: 
 describe("a relay service while the relay is down, with a preset of its address", () => {
   const PRESET = { title: "pygeoapi, with CORS (local)", url: "http://localhost:5080/" };
 
-  it("is left to the preset in the updated Instrument: one row for one service", () => {
+  it("is left to the preset in the updated Instrument: one row for one service, and the line says the rest", () => {
     const { view } = render(true, [PRESET]);
     expect(view.querySelector("input[value='pygeoapi-cors']")).toBeNull();
     expect(view.textContent).toContain("pygeoapi, with CORS (local)");
+    expect(view.textContent).toContain(DOWN);
   });
 
   it("is listed beside it in Instrument as it is, which lists every entry", () => {
