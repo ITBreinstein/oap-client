@@ -203,12 +203,16 @@ test("#25 the technical reason is in the Developer section", async ({ page }) =>
   await expect(page.getByTestId("developer-note")).toContainText("finding 0039");
 });
 
-/** Where focus is: in the open panel, nowhere (the browser's own controls), or in the page behind. */
-async function focusIn(page: Page): Promise<"panel" | "nowhere" | "page"> {
+/**
+ * Where focus is: in the open panel, in the rail (the panels' own tabs), nowhere
+ * (the browser's own controls), or in the page behind.
+ */
+async function focusIn(page: Page): Promise<"panel" | "rail" | "nowhere" | "page"> {
   return page.evaluate(() => {
     const active = document.activeElement;
     if (active === null || active === document.body) return "nowhere";
-    return active.closest(".side-panel[data-open='true']") === null ? "page" : "panel";
+    if (active.closest(".side-panel[data-open='true']") !== null) return "panel";
+    return active.closest(".app-rail") === null ? "page" : "rail";
   });
 }
 
@@ -231,11 +235,25 @@ for (const style of STYLES) {
       await page.keyboard.press("Shift+Tab");
       expect(await focusIn(page)).not.toBe("page");
     }
-    // Escape from wherever focus is, and focus back on the rail's button.
-    await page.locator("body").focus();
+    // Escape from inside it, and focus back on the rail's button. (From the
+    // rail, focus stays where the user put it.)
+    await jobs.getByRole("button", { name: "Close My jobs" }).focus();
     await page.keyboard.press("Escape");
     await expect(jobs).toBeHidden();
     await expect(rail).toBeFocused();
+
+    // Its rail item again: closed, and the other items switch panels.
+    await rail.click();
+    await expect(jobs).toBeVisible();
+    await rail.click();
+    await expect(jobs).toBeHidden();
+    await expect(rail).toHaveAttribute("aria-expanded", "false");
+    await rail.click();
+    await page.getByRole("button", { name: "About", exact: true }).click();
+    await expect(jobs).toBeHidden();
+    await expect(page.getByRole("dialog", { name: "About" })).toBeVisible();
+    await page.getByRole("button", { name: "About", exact: true }).click();
+    await expect(page.getByRole("dialog", { name: "About" })).toBeHidden();
 
     // A press on what the panel covers closes it, and opens nothing.
     await rail.click();

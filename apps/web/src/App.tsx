@@ -384,9 +384,10 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
   }, [stageKey]);
   // The user's own way somewhere else closes any side panel (#35). From
   // inside a panel, its actions close it themselves (an example, Run again,
-  // a job followed); from outside, with the page inert behind it, the only
-  // way is the browser's Back or Forward. Not the page's own moves: a
-  // followed job finishing, or a reload going back to where it was.
+  // a job followed); from outside, with the page inert behind it, the rail
+  // does (its Start and Processes), and so do the browser's Back and Forward here. Not
+  // the page's own moves: a followed job finishing, or a reload going back to
+  // where it was.
   useEffect(() => {
     const onPop = () => {
       setPanelOpen(undefined);
@@ -539,17 +540,27 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
       ? ["Not yet confirmed: the page reads the job's status again, quietly, for a while."]
       : []),
   ];
+  // Start and Processes in the rail are the user going somewhere: an open
+  // side panel closes (§11.2).
+  const leaving = (go: () => void) => () => {
+    setPanelOpen(undefined);
+    go();
+  };
+  const toStage = () => {
+    setPanelOpen(undefined);
+    focusStage();
+  };
   const onConnect =
     state.stage === "choose-endpoint"
-      ? focusStage
+      ? toStage
       : state.stage === "running" && !leaveJob
         ? undefined
-        : commands.disconnect;
+        : leaving(commands.disconnect);
   const onProcesses =
     state.stage === "connected"
-      ? focusStage
+      ? toStage
       : state.stage === "process" || state.stage === "result" || leaveJob
-        ? commands.backToList
+        ? leaving(commands.backToList)
         : undefined;
   const mapElement = (
     <MapBoundary>
@@ -587,7 +598,9 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
                 Skip to content
               </a>
               <AppFrame
-                inert={behind}
+                // The rail stays in reach behind a side panel: its item closes
+                // the panel again, another opens that one instead.
+                inert={offerOpen}
                 appearance={
                   <AppearanceControl
                     appearance={appearance}

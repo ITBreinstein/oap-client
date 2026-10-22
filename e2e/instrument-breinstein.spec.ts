@@ -1,7 +1,8 @@
 /**
  * Instrument in Breinstein's colours, in both themes: the wordmark is a link
  * to the start screen, About opens out of the rail like Examples and Jobs,
- * one panel at a time, and the rail has no Log item.
+ * one panel at a time, the rail item closing its own, and the rail has no Log
+ * item.
  *
  * `config.json` allows https: services only, so the example names a test
  * address, which this spec answers from the local pygeoapi.
@@ -89,7 +90,7 @@ for (const theme of ["light", "dark"] as const) {
       await expect(page.locator("details.developer > summary")).toBeVisible();
     });
 
-    test("one panel at a time: while one is open the rail is out of reach, and closing it gives the rail back", async ({
+    test("one panel at a time: the rail switches between them, and its item closes its own", async ({
       page,
     }) => {
       await instrument(page, theme);
@@ -100,21 +101,23 @@ for (const theme of ["light", "dark"] as const) {
 
       await rail(page, "Examples").click();
       await expect(examples).toBeVisible();
-      // A dialog (#35): the rail behind it can't be reached.
-      await expect(frame).toHaveAttribute("inert", "");
-      await page.keyboard.press("Escape");
-      await expect(examples).toBeHidden();
+      // The page behind is out of reach; the rail, the panels' own tabs, is not.
       await expect(frame).not.toHaveAttribute("inert", "");
+      await expect(page.locator(".layout")).toHaveAttribute("inert", "");
 
       await rail(page, "About").click();
       await expect(about).toBeVisible();
       await expect(examples).toBeHidden();
       await expect(jobs).toBeHidden();
-      await page.getByRole("button", { name: "Close About" }).click();
 
       await rail(page, "Jobs").click();
       await expect(jobs).toBeVisible();
       await expect(about).toBeHidden();
+
+      // Pressed again, its own item closes it.
+      await rail(page, "Jobs").click();
+      await expect(jobs).toBeHidden();
+      await expect(page.locator(".layout")).not.toHaveAttribute("inert", "");
     });
   });
 }

@@ -2,7 +2,9 @@
  * A side panel: Examples, My jobs, About. A dialog while it is open (#35):
  * the page behind it is inert (`App` makes it so), so neither Tab nor a
  * click reaches it; Escape closes it from anywhere, and so does a click on
- * what it covers. One is open at a time (`App` decides).
+ * what it covers. The rail stays in reach, as the panels' own tabs: its item
+ * closes the panel again. Not modal, then. One is open at a time (`App`
+ * decides).
  *
  * Opening moves focus to its heading; closing puts focus back where it was,
  * on the button that opened it, once the page is no longer inert. Closed, it
@@ -63,7 +65,7 @@ export function SidePanel(props: SidePanelProps) {
   }, [open]);
 
   // Escape closes it wherever focus is: the page behind is inert, so focus is
-  // in the panel or nowhere.
+  // in the panel, in the rail, or nowhere.
   useEffect(() => {
     if (!open || props.inert === true) return undefined;
     const onKey = (event: KeyboardEvent) => {
@@ -85,7 +87,6 @@ export function SidePanel(props: SidePanelProps) {
       className={`side-panel${className === undefined ? "" : ` ${className}`}`}
       data-open={open}
       role="dialog"
-      aria-modal={open ? true : undefined}
       aria-labelledby={`${base}-title`}
       inert={!open || props.inert === true}
     >
