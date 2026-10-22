@@ -27,7 +27,9 @@ function json(body: unknown, status = 200): Response {
 beforeEach(() => {
   direct.length = 0;
   vi.stubGlobal("fetch", (input: RequestInfo | URL) => {
-    const url = new URL(input instanceof Request ? input.url : String(input));
+    // Against the page, as a browser's fetch takes a path: the page fetches its own
+    // backdrop picture by one when it is idle, which a slow run reaches mid-test.
+    const url = new URL(input instanceof Request ? input.url : String(input), location.href);
     if (url.origin === NOCORS) {
       direct.push(url.pathname);
       // What a page sees of a server that sends no CORS headers.

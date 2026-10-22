@@ -41,7 +41,9 @@ function tooMany(code: string, retryAfter: string): Response {
 /** The relay and the server, with the relay's answer to a session and to a read given. */
 function stubFetch(answers: { session: () => Response; read: () => Response }): void {
   vi.stubGlobal("fetch", (input: RequestInfo | URL) => {
-    const url = new URL(input instanceof Request ? input.url : String(input));
+    // Against the page, as a browser's fetch takes a path: the page fetches its own
+    // backdrop picture by one when it is idle, which a slow run reaches mid-test.
+    const url = new URL(input instanceof Request ? input.url : String(input), location.href);
     if (url.origin === NOCORS) return Promise.reject(new TypeError("Failed to fetch"));
     if (url.pathname === "/endpoints") {
       return Promise.resolve(

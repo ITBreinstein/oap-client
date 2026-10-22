@@ -53,7 +53,9 @@ beforeEach(() => {
   executes.length = 0;
   serverDown = false;
   vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = new URL(input instanceof Request ? input.url : String(input));
+    // Against the page, as a browser's fetch takes a path: the page fetches its own
+    // backdrop picture by one when it is idle, which a slow run reaches mid-test.
+    const url = new URL(input instanceof Request ? input.url : String(input), location.href);
     // What a browser shows script for a refused preflight, a CORS block or a
     // dead host alike: a TypeError and no response.
     if (serverDown) throw new TypeError("Failed to fetch");
