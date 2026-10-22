@@ -407,10 +407,10 @@
 /*
  * The credit in the picture's lower right corner, quiet: small and muted, on
  * the page's surface at 85% so no word lies on the picture itself (≥ 4.5:1
- * in both themes over pure white and pure black alike). Never under a card:
- * it is in the panel's flow, last, pushed to the foot when the page is short
- * and set below the cards when it is long, as on a phone, where the credit
- * ends the page, at its right.
+ * in both themes over pure white and pure black alike). Never under a card.
+ * On a wide window it stays in the corner; otherwise it is in the panel's
+ * flow, last, pushed to the foot when the page is short and set below the
+ * cards when it is long, as on a phone, where it ends the page, at its right.
  */
 [data-variant="updated"] .panel > .backdrop-credit {
   order: 1;
@@ -445,6 +445,21 @@
   [data-variant="updated"] .panel[data-stage="choose-endpoint"] > .backdrop-credit {
     margin-right: calc(12px - 32px);
     margin-bottom: calc(12px - 16px);
+  }
+}
+
+/*
+ * Wide enough that no card reaches the corner: there the credit stays, still
+ * while the page scrolls under it, as the picture does.
+ */
+@media (min-width: 78rem) {
+  [data-variant="updated"] .panel > .backdrop-credit,
+  [data-variant="updated"] .panel[data-stage="choose-endpoint"] > .backdrop-credit {
+    position: fixed;
+    z-index: 2;
+    right: 12px;
+    bottom: 12px;
+    margin: 0;
   }
 }
 

@@ -789,3 +789,25 @@ for (const size of [
     expect(place).toEqual({ right: 0, aboveHeading: true, firstLine: true });
   });
 }
+
+test("instrument-updated, wide: the credit stays in the window's corner while the page scrolls", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 700 });
+  await open(page, "instrument-updated");
+  await connect(page);
+  const corner = () =>
+    page.locator(".backdrop-credit").evaluate((chip) => {
+      const box = chip.getBoundingClientRect();
+      return {
+        right: Math.round(innerWidth - box.right),
+        bottom: Math.round(innerHeight - box.bottom),
+      };
+    });
+  await expect.poll(corner).toEqual({ right: 12, bottom: 12 });
+  // The process list is longer than the window: scrolled to its end.
+  await page.locator("main.panel").evaluate((panel) => {
+    panel.scrollTop = panel.scrollHeight;
+  });
+  await expect.poll(corner).toEqual({ right: 12, bottom: 12 });
+});
