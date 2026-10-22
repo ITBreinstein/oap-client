@@ -252,13 +252,22 @@
   white-space: nowrap;
 }
 
-/* In an example's row the need has a column of its own after the title, as in the list. */
+/*
+ * In an example's row the need has a column of its own, last and of one
+ * width, as in the process list: every row's need starts at the same place,
+ * whatever the length of its process id before it.
+ */
 [data-variant="updated"] :is(.example-row, .example-card) {
-  grid-template-columns: minmax(0, 1fr) 5.5rem auto;
+  grid-template-columns: minmax(0, 1fr) auto 5.5rem;
 }
 
 [data-variant="updated"] :is(.example-row, .example-card) .needs {
+  grid-column: 3;
+}
+
+[data-variant="updated"] :is(.example-row, .example-card) .example-id {
   grid-column: 2;
+  text-align: right;
 }
 
 [data-variant="updated"] :is(.example-row, .example-card) .example-title,
@@ -907,7 +916,11 @@
   }
 
   [data-variant="updated"] .start :is(.example-row, .example-card) {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) 5.5rem;
+  }
+
+  [data-variant="updated"] .start :is(.example-row, .example-card) .needs {
+    grid-column: 2;
   }
 
   /* One line each: the title, and what it needs. */
