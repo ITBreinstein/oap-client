@@ -204,31 +204,6 @@
     grid-auto-flow: column;
   }
 
-  /* What a process needs first, then the process, as in the examples. */
-  [data-variant="updated"]
-    .process-table:has(.cell-needs[data-known="true"])
-    :is(.process-head, .process-list li) {
-    grid-template-columns: 7rem minmax(0, 1fr);
-  }
-
-  [data-variant="updated"] .process-table:has(.cell-needs[data-known="true"]) .cell-needs,
-  [data-variant="updated"]
-    .process-table:has(.cell-needs[data-known="true"])
-    .process-head
-    .label:nth-child(2) {
-    grid-row: 1;
-    grid-column: 1;
-  }
-
-  [data-variant="updated"] .process-table:has(.cell-needs[data-known="true"]) .cell-process,
-  [data-variant="updated"]
-    .process-table:has(.cell-needs[data-known="true"])
-    .process-head
-    .label:nth-child(1) {
-    grid-row: 1;
-    grid-column: 2;
-  }
-
   [data-variant="updated"] :is(.cell-needs, .process-head .label:nth-child(2)) {
     width: 7rem;
   }
@@ -278,26 +253,38 @@
 }
 
 /*
- * In an example's row the need comes first, in a column of one width, as in
- * the process list: every row's need, and every title after it, starts at
- * the same place. The process id at the row's end.
+ * An example's row: its title, what it needs, its process id. The rows of a
+ * list share one set of columns (a subgrid of the list's), so every row's
+ * need starts at the same place, whatever the length of its title or id.
  */
+[data-variant="updated"] :is(.example-grid, .example-rows) {
+  grid-template-columns: minmax(0, 1fr) 5.5rem auto;
+  column-gap: 0;
+}
+
+[data-variant="updated"] :is(.example-grid, .example-rows) > li {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+}
+
 [data-variant="updated"] :is(.example-row, .example-card) {
-  grid-template-columns: 5.5rem minmax(0, 1fr) auto;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+}
+
+[data-variant="updated"] :is(.example-row, .example-card) .example-title,
+[data-variant="updated"] :is(.example-row, .example-card) .example-service {
+  grid-column: 1;
 }
 
 [data-variant="updated"] :is(.example-row, .example-card) .needs {
-  grid-column: 1;
+  grid-column: 2;
 }
 
 [data-variant="updated"] :is(.example-row, .example-card) .example-id {
   grid-column: 3;
   text-align: right;
-}
-
-[data-variant="updated"] :is(.example-row, .example-card) .example-title,
-[data-variant="updated"] :is(.example-row, .example-card) .example-service {
-  grid-column: 2;
 }
 
 /* ------------------------------------------------- the map, uncovered */
@@ -940,8 +927,8 @@
     display: flex;
   }
 
-  [data-variant="updated"] .start :is(.example-row, .example-card) {
-    grid-template-columns: 5.5rem minmax(0, 1fr);
+  [data-variant="updated"] .start .example-grid {
+    grid-template-columns: minmax(0, 1fr) 5.5rem;
   }
 
   /* One line each: the title, and what it needs. */
