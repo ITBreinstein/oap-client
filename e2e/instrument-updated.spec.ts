@@ -218,9 +218,13 @@ for (const { style, updated } of VERSIONS) {
         await expect(copyOutput).toHaveCount(0);
         return;
       }
+      // A plain value's Copy copies the value (#27); its JSON, folded, has its own.
       await copyOutput.click();
       await expect(page.getByRole("status").filter({ hasText: "Copied" })).toBeVisible();
-      expect(await clipboard()).toBe('{\n\t"id": "echo",\n\t"value": "Hello Geonovum!"\n}');
+      expect(await clipboard()).toBe("Hello Geonovum!");
+      await page.locator('[data-output-id="echo"] summary').click();
+      await page.getByRole("button", { name: "Copy result as JSON", exact: true }).click();
+      await expect.poll(clipboard).toBe('{\n\t"id": "echo",\n\t"value": "Hello Geonovum!"\n}');
     });
   });
 }
@@ -532,9 +536,11 @@ for (const { style, updated } of VERSIONS) {
     );
     await page.getByRole("button", { name: "Change the inputs" }).click();
     // The drawing comes back with its tools in the update; Instrument ends it.
-    await expect(page.locator(".map-pane").getByRole("button", { name: "Add area" })).toHaveCount(
-      updated ? 1 : 0,
-    );
+    await expect(
+      page
+        .getByRole("toolbar", { name: "Drawing tools" })
+        .getByRole("button", { name: "Add area" }),
+    ).toHaveCount(updated ? 1 : 0);
   });
 }
 
@@ -611,7 +617,8 @@ test("instrument-updated: a refused Run's error is in view and has the focus, in
       contentType: "application/json",
       body: JSON.stringify({
         type: "InvalidParameterValue",
-        description: 'The "area" input is 38346 m across; at most 1000 m is searched',
+        // Names no input: the error itself takes the focus (#11 is the other case).
+        description: "The area is 38346 m across; at most 1000 m is searched",
       }),
     }),
   );
@@ -721,7 +728,11 @@ for (const { style, updated } of VERSIONS) {
     expect(asked > 0).toBe(updated);
     // Drawing still works over the fallback.
     await page.getByRole("button", { name: "Draw on the map" }).click();
-    await expect(page.locator(".map-pane").getByRole("button", { name: "Add area" })).toBeVisible();
+    await expect(
+      page
+        .getByRole("toolbar", { name: "Drawing tools" })
+        .getByRole("button", { name: "Add area" }),
+    ).toBeVisible();
   });
 }
 

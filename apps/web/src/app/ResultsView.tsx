@@ -197,9 +197,12 @@ function ResultItem({
       )}
       {/* STYLE TRIAL (#27): one plain value is the answer itself, shown large. */}
       {plain !== undefined && (
-        <p className="result-value" data-plain-value="true">
-          {String(plain)}
-        </p>
+        <div className="code-box result-value-box">
+          <p className="result-value" data-plain-value="true">
+            {String(plain)}
+          </p>
+          <CopyButton name={copyName} text={() => String(plain)} />
+        </div>
       )}
       {result.kind === "json" && (
         // Folded when the map shows it: the shape is the answer there, and
@@ -212,7 +215,11 @@ function ResultItem({
           {updated ? (
             <div className="code-box">
               <pre className="code">{JSON.stringify(result.value, null, "\t")}</pre>
-              <CopyButton name={copyName} text={() => JSON.stringify(result.value, null, "\t")} />
+              <CopyButton
+                // Beneath a plain value, which has "Copy result" of its own (#27).
+                name={plain === undefined ? copyName : `${copyName} as JSON`}
+                text={() => JSON.stringify(result.value, null, "\t")}
+              />
             </div>
           ) : (
             <pre className="code">{JSON.stringify(result.value, null, 2)}</pre>

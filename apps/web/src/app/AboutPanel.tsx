@@ -85,6 +85,10 @@ export function AboutPanel() {
             : "The map is loaded from PDOK, which, like any site a page loads from, sees your IP address and the area you look at."}
         </p>
         <p>
+          When you search for a place above the map, what you type is sent to PDOK’s Locatieserver
+          (Kadaster) as you type, and the place you choose when you choose it.
+        </p>
+        <p>
           Your background jobs and your Appearance setting are kept in this browser only.{" "}
           <strong>Remove from list</strong> in Jobs forgets a run.
         </p>

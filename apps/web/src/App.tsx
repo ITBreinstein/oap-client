@@ -289,6 +289,7 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
   // The drawing tools' place in the form (#18), and the map's view, read on
   // demand: the map sits beside the form, so both are handed over here.
   const [toolsSlot, setToolsSlot] = useState<HTMLElement | undefined>();
+  const drawPresses = useRef(0);
   const viewReader = useRef<(() => MapExtent | undefined) | undefined>(undefined);
   const readView = useCallback((read: (() => MapExtent | undefined) | undefined) => {
     viewReader.current = read;
@@ -303,16 +304,20 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
       fieldId: drawField,
       available: mapAvailable,
       start: (fieldId) => {
-        if (openForm !== undefined) setDrawFor({ form: openForm, fieldId });
+        drawPresses.current += 1;
+        if (openForm !== undefined) {
+          setDrawFor({ form: openForm, fieldId, press: drawPresses.current });
+        }
       },
       stop: () => {
         setDrawFor(undefined);
       },
       toolsSlot,
       setToolsSlot: giveToolsSlot,
+      focusToken: drawFor?.press,
       currentView: () => viewReader.current?.(),
     }),
-    [drawField, mapAvailable, openForm, toolsSlot, giveToolsSlot],
+    [drawField, mapAvailable, openForm, toolsSlot, giveToolsSlot, drawFor?.press],
   );
 
   // Each stage moves focus to its heading, so a keyboard user lands where the

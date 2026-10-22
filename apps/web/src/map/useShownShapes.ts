@@ -73,7 +73,14 @@ export function useShownShapes(
   image: ShownImage | undefined,
   createLayers: CreateShapeLayers = createMapLibreShapeLayers,
   onResultClick?: (index: number) => void,
-): { readonly resultShapes: number; readonly resultImage: boolean } {
+): {
+  readonly resultShapes: number;
+  readonly resultImage: boolean;
+  /** A result is on the map and the map has been moved off it (#16). */
+  readonly resultAway: boolean;
+  /** Move the map back to the result. */
+  readonly showResult: () => void;
+} {
   const layers = useRef<ShapeLayers | undefined>(undefined);
   const latest = useRef({ sets, image, onResultClick });
   useEffect(() => {
@@ -137,8 +144,41 @@ export function useShownShapes(
     }
   }, [key, map]);
 
+  // Whether the result is still in view, each time the map stops moving.
+  const [away, setAway] = useState(false);
+  useEffect(() => {
+    if (map === undefined) return undefined;
+    const check = () => {
+      const current = latest.current;
+      const shapes = [
+        ...current.sets.filter((set) => set.role === "result").flatMap((set) => set.shapes),
+        ...outlineOf(current.image),
+      ];
+      setAway(shapes.length > 0 && !inView(map, shapes));
+    };
+    try {
+      map.on("moveend", check);
+    } catch {
+      return undefined;
+    }
+    return () => {
+      try {
+        map.off("moveend", check);
+      } catch {
+        // Gone already.
+      }
+    };
+  }, [map]);
+
+  const hasResult = resultCount(sets) > 0 || image !== undefined;
   return {
     resultShapes: ready ? resultCount(sets) : 0,
     resultImage: ready && image !== undefined,
+    resultAway: ready && hasResult && away,
+    showResult: () => {
+      const current = latest.current;
+      if (map === undefined) return;
+      moveTo(map, [...current.sets.flatMap((set) => set.shapes), ...outlineOf(current.image)]);
+    },
   };
 }

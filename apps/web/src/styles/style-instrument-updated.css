@@ -905,6 +905,10 @@
 /* ------------------------------------------------- a plain value, large */
 
 /* A result that is one string, number or boolean is the answer itself (#27). */
+[data-variant="updated"] .result-value-box > .result-value {
+  padding-right: 52px;
+}
+
 [data-variant="updated"] .result-value {
   margin: 4px 0 12px;
   font-size: 1.75rem;

@@ -14,7 +14,7 @@
  * Buffer and SAGA's polygon tools take GML or "an object".
  */
 
-import { useContext, useEffect, useId, useState } from "react";
+import { useCallback, useContext, useEffect, useId, useState } from "react";
 import type { ComplexValue } from "../forms/encode.js";
 import type { ComplexControl } from "../forms/plan.js";
 import { refuseJsonObject, refuseSize } from "../forms/upload.js";
@@ -70,6 +70,13 @@ export function ComplexField(props: ControlProps<ComplexControl>) {
   const byReference = current.href !== undefined;
   const base64 = format?.encoding?.toLowerCase() === "base64";
   const drawing = inputId !== undefined && draw.fieldId === inputId;
+  const giveSlot = draw.setToolsSlot;
+  const toolsSlot = useCallback(
+    (element: HTMLDivElement | null) => {
+      giveSlot?.(element);
+    },
+    [giveSlot],
+  );
   const canDraw =
     inputId !== undefined && draw.available && format?.object === true && !byReference;
   const tooMany = useTooManyToEdit(format?.object === true ? (current.value ?? "") : "");
@@ -248,6 +255,8 @@ export function ComplexField(props: ControlProps<ComplexControl>) {
               </button>
             </p>
           )}
+          {/* The drawing tools, right after the Draw button in the tab order (#18). */}
+          {drawing && <div className="map-tools-slot" ref={toolsSlot} />}
         </>
       )}
     </div>

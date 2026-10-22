@@ -71,9 +71,12 @@ built-ins reached transitively, and two consumer smoke tests
 (`pnpm test:smoke`) catch anything that survives both — see
 [Supported environments](packages/core/README.md#supported-environments).
 
-A sixth rule keeps the HTTP boundary in one place: only
-`packages/core/src/http` may call `fetch`. Everything above it works in terms of
-a `ResponseEnvelope` and the classifier's verdict on it.
+A sixth rule keeps the core's HTTP boundary in one place: within
+`packages/core`, only `packages/core/src/http` may call `fetch`. Everything above
+it works in terms of a `ResponseEnvelope` and the classifier's verdict on it.
+The rule is the core's; the web app's own small clients — `config.json`, the
+relay's API, and the place search on PDOK's Locatieserver — call `fetch`
+themselves, through a `fetch` that can be handed in, and check every answer.
 
 ## Interoperability matrix
 

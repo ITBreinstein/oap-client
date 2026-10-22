@@ -182,6 +182,14 @@ export interface MapViewProps {
    * next in the tab order. Over the map when there is none.
    */
   readonly toolsSlot?: HTMLElement | undefined;
+  /** Each new token: the tools take the focus once, as Draw was just pressed (#18). */
+  readonly focusToken?: number | undefined;
+  /**
+   * A place to move the map to, west, south, east, north (#16): each new
+   * `id` moves it once.
+   */
+  readonly goTo?:
+    { readonly id: number; readonly extent: readonly [number, number, number, number] } | undefined;
   readonly createMap?: CreateMap | undefined;
   /** What the map region is called, for a screen reader: the basemap's area and name. */
   readonly label?: string | undefined;
@@ -228,6 +236,8 @@ export function MapView({
   onAvailable,
   onViewReader,
   toolsSlot,
+  focusToken,
+  goTo,
   createMap = createPdokMap,
   label = "Map of the Netherlands (BRT-Achtergrondkaart)",
   createEngine,
@@ -307,9 +317,35 @@ export function MapView({
     };
   }, [map, onViewReader]);
 
+  // A place found (#16): its outline's extent, or around a point, a street's
+  // width either way.
+  const goToId = goTo?.id;
+  const latestGoTo = useRef(goTo);
+  useEffect(() => {
+    latestGoTo.current = goTo;
+  });
+  useEffect(() => {
+    const target = latestGoTo.current;
+    if (map === undefined || target === undefined || goToId === undefined) return;
+    const [west, south, east, north] = target.extent;
+    const pad = 0.002;
+    try {
+      map.fitBounds(
+        [
+          [west - pad, south - pad],
+          [east + pad, north + pad],
+        ],
+        // A short, straight move: not MapLibre's flight, which takes seconds.
+        { padding: 40, maxZoom: 17, linear: true, duration: 600, animate: !prefersReducedMotion() },
+      );
+    } catch {
+      // A map that cannot move still shows where it is.
+    }
+  }, [map, goToId]);
+
   useBoundingBoxDraw(map, draw, createEngine);
   const shapes = useGeometryDraw(map, geometry, createGeometryEngine);
-  const { resultShapes, resultImage } = useShownShapes(
+  const { resultShapes, resultImage, resultAway, showResult } = useShownShapes(
     map,
     shown,
     image,
@@ -317,18 +353,22 @@ export function MapView({
     onResultClick,
   );
   const drawingShapes = geometry.active && map !== undefined;
-  // Drawing starts with the focus on the first tool (#18): again once the
-  // tools have moved beside the field, which makes them anew.
+  // Drawing starts with the focus on the first tool (#18), once for each
+  // press of Draw: not when drawing comes back by itself. Once the tools are
+  // beside the field, which makes them anew.
   const firstTool = useRef<HTMLButtonElement>(null);
+  const focusedFor = useRef<number | undefined>(undefined);
   useEffect(() => {
-    if (!drawingShapes) return;
+    if (!drawingShapes || focusToken === undefined || focusedFor.current === focusToken) return;
+    if (toolsSlot === undefined && firstTool.current === null) return;
     const tool = firstTool.current;
+    if (toolsSlot !== undefined) focusedFor.current = focusToken;
     tool?.focus({ preventScroll: true });
     // In view, beside the field: not when the tools are over the map.
     if (toolsSlot !== undefined && tool !== null && "scrollIntoView" in tool) {
       tool.scrollIntoView({ block: "nearest" });
     }
-  }, [drawingShapes, toolsSlot]);
+  }, [drawingShapes, toolsSlot, focusToken]);
 
   const toolbar = drawingShapes && (
     <div className="map-tools" role="toolbar" aria-label="Drawing tools">
@@ -385,6 +425,11 @@ export function MapView({
         data-result-image={resultImage ? "true" : "false"}
         data-view={view}
       />
+      {resultAway && (
+        <button type="button" className="secondary map-show-result" onClick={showResult}>
+          Show the result
+        </button>
+      )}
       {failure !== undefined && (
         <p className="map-failure">
           The map could not be started ({failure}). Bounding boxes and GeoJSON can still be typed

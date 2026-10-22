@@ -454,7 +454,8 @@ test.describe("the workflow in a browser", () => {
     // Drawing first, then the file.
     await draw.click();
     await polygon.getByLabel("Or load a GeoJSON file").setInputFiles(file);
-    await expect(polygon.getByRole("status")).toHaveText("Loaded 1 shape.");
+    // The field's own word: the drawing tools beside it have one of theirs (#18).
+    await expect(polygon.locator("p.hint[role='status']")).toHaveText("Loaded 1 shape.");
     await page.waitForTimeout(500);
     expect(JSON.parse(await geojson.inputValue())).toEqual(shape);
 

@@ -1051,7 +1051,8 @@
   }
 
   [data-style="instrument"] .map-pane > .map-hint:not(.map-legend) {
-    top: 20px;
+    /* Below "Find a place" (#16). */
+    top: 4.25rem;
     bottom: auto;
     left: 20px;
   }

@@ -27,6 +27,11 @@ export interface DrawTarget {
   readonly toolsSlot?: HTMLElement | undefined;
   /** The field drawing gives the element its tools go in, or takes it back. */
   readonly setToolsSlot?: ((element: HTMLElement | null) => void) | undefined;
+  /**
+   * Changes each time Draw is pressed (#18): the tools take the focus once for
+   * it, and not when drawing comes back by itself after a run.
+   */
+  readonly focusToken?: number | undefined;
   /** What the map shows now (#18), for "Use the current map view"; undefined without a map. */
   readonly currentView?: (() => MapExtent | undefined) | undefined;
 }
@@ -46,6 +51,8 @@ export const DrawContext = createContext<DrawTarget>({
 export interface DrawRequest {
   readonly form: object;
   readonly fieldId: string;
+  /** Which press of Draw this is (#18). */
+  readonly press?: number | undefined;
 }
 
 /**

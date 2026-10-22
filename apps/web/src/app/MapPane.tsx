@@ -43,6 +43,7 @@ import {
 } from "../results/plottable.js";
 import type { RenderableResult } from "../results/renderable.js";
 import { FeatureProperties } from "./FeatureProperties.js";
+import { PlaceSearch } from "./PlaceSearch.js";
 import { shapeBinding } from "./input-shapes.js";
 import type { GeometryDrawProps } from "../map/useGeometryDraw.js";
 import type { DrawTarget } from "./draw.js";
@@ -269,6 +270,10 @@ export function MapPane({
     results !== undefined && picked?.results === results
       ? plottedFeatures(results, maxCoordinates)[picked.index]
       : undefined;
+  // A place chosen in "Find a place" (#16): the map moves to it once.
+  const [goTo, setGoTo] = useState<
+    { readonly id: number; readonly extent: readonly [number, number, number, number] } | undefined
+  >();
   const placed = state.stage === "result" ? mapImage(state.results) : undefined;
   const imageUrl = useDataUrl(placed?.blob);
   const image =
@@ -281,12 +286,19 @@ export function MapPane({
 
   return (
     <aside className="map-pane" aria-label="Map">
+      <PlaceSearch
+        onPlace={(place) => {
+          setGoTo((last) => ({ id: (last?.id ?? 0) + 1, extent: place.extent }));
+        }}
+      />
       <MapView
+        goTo={goTo}
         createMap={basemap?.create}
         label={basemap?.label}
         onAvailable={onAvailable}
         onViewReader={onViewReader}
         toolsSlot={draw.toolsSlot}
+        focusToken={draw.focusToken}
         geometry={geometry}
         shown={shown}
         image={image}
