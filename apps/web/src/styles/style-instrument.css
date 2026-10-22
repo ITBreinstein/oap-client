@@ -44,6 +44,12 @@
   padding: 14px 0 8px;
   background: var(--rail);
   border-right: 1px solid var(--line);
+  /* Taller than the window, a phone on its side: it scrolls, so Appearance
+     and About stay within reach (#41). */
+  max-height: 100dvh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 /* Breinstein's wordmark, in the rail labels' colour; no fill behind it. */

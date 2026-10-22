@@ -786,3 +786,48 @@ for (const size of [
     });
   }
 }
+
+for (const style of STYLES) {
+  test(`#41 a phone on its side: the rail scrolls to Appearance, and the form has the height (${style})`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 844, height: 390 });
+    // With examples, as a deployment has them: the rail has its Examples item.
+    await page.route("**/config.json", (route) =>
+      route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          relay: null,
+          presets: [],
+          examples: [
+            {
+              service: "https://pygeoapi.example.test",
+              process: "hello-world",
+              title: "Hello World",
+              summary: "Type a name; the service greets it back.",
+              needs: "values",
+              featured: true,
+            },
+          ],
+        }),
+      }),
+    );
+    await open(page, style);
+    await connectTyped(page);
+    await openProcess(page, "Buildings in an area");
+    // Appearance, at the rail's foot, within reach: the rail scrolls to it.
+    const appearance = page.getByRole("button", { name: "Appearance", exact: true });
+    await page.locator("header.app-rail").evaluate((rail) => {
+      rail.scrollTop = rail.scrollHeight;
+    });
+    await expect(appearance).toBeInViewport({ ratio: 1 });
+    await appearance.click();
+    await expect(page.getByRole("dialog", { name: "Appearance" })).toBeVisible();
+    await page.keyboard.press("Escape");
+    // The Developer section scrolls with the form instead of holding its foot.
+    const position = await page
+      .locator("details.developer")
+      .evaluate((element) => getComputedStyle(element).position);
+    expect(position).not.toBe("sticky");
+  });
+}

@@ -1034,3 +1034,26 @@
 [data-variant="updated"] .show-on-map {
   margin: 8px 0 0;
 }
+
+/* ------------------------------------------------- a short window */
+
+/*
+ * A phone on its side, or any window under 30rem high (#41): the Developer
+ * section no longer holds the sheet's foot, so the form has the height; it
+ * scrolls with the rest, and Run stays at the foot alone.
+ */
+@media (min-width: 52rem) and (max-height: 30rem) {
+  [data-variant="updated"] .layout:not(.layout-single) .panel:has(> .process-screen),
+  [data-variant="updated"]
+    .layout:not(.layout-single)
+    .panel:has(> .process-screen):has(> .developer[open]) {
+    --developer-bar: 0px;
+  }
+
+  [data-variant="updated"] .layout:not(.layout-single) .panel:has(> .process-screen) > .developer {
+    position: static;
+    height: auto;
+    margin-top: 16px;
+    overflow: visible;
+  }
+}
