@@ -567,8 +567,9 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
               data-relay-stream={view.snapshot?.relay}
               data-developer={developer ? true : undefined}
             >
-              {/* The first stop for a keyboard: past the rail, to the page itself. */}
-              <a className="skip-link" href="#content" inert={behindPanel}>
+              {/* The first stop for a keyboard: past the rail, to the page itself.
+                  Inert with the rest behind a side panel or the relay question (#7). */}
+              <a className="skip-link" href="#content" inert={behind}>
                 Skip to content
               </a>
               <AppFrame

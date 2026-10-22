@@ -834,6 +834,33 @@ for (const style of STYLES) {
 
 // Phase 3.
 
+for (const style of STYLES) {
+  test(`#7 Tab stays in the relay question: the skip link behind it is inert (${style})`, async ({
+    page,
+  }) => {
+    await requireService(`${RELAY}/healthz`, "the relay");
+    await requireService("http://localhost:5081/?f=json", "pygeoapi :5081");
+    await open(page, style);
+    await page.getByRole("radio", { name: /^pygeoapi[- ]nocors[- ]relay /i }).check();
+    await page.getByRole("button", { name: "Connect", exact: true }).click();
+    const offer = page.getByTestId("relay-offer");
+    await expect(offer).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator(".skip-link")).toHaveAttribute("inert", "");
+    for (let press = 0; press < 6; press += 1) {
+      await page.keyboard.press("Tab");
+      const where = await page.evaluate(() => {
+        const active = document.activeElement;
+        if (active === null || active === document.body) return "nowhere";
+        return active.closest("[data-testid='relay-offer']") === null ? "page" : "question";
+      });
+      expect(where).not.toBe("page");
+    }
+    await page.keyboard.press("Escape");
+    await expect(offer).toBeHidden();
+    await expect(page.locator(".skip-link")).not.toHaveAttribute("inert", "");
+  });
+}
+
 test("#37 the tab's title says where the page is", async ({ page }) => {
   await open(page, "instrument");
   await expect(page).toHaveTitle("Connect · Breinstein");
