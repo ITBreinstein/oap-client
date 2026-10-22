@@ -14,6 +14,7 @@
 import { useId, type ReactNode } from "react";
 import { initialValue } from "../forms/defaults.js";
 import { bareObjectHint, isRawJson, type FormValues } from "../forms/encode.js";
+import { limitsStated } from "../forms/limits-stated.js";
 import type {
   CheckboxControl,
   Control,
@@ -45,6 +46,13 @@ export interface ControlProps<C extends Control = Control> {
   readonly label: string;
   /** The plan's input id, for a top-level field only: what the map draws for. */
   readonly inputId?: string | undefined;
+  /**
+   * STYLE TRIAL (updated Instrument, #14): the id of the field's own label,
+   * for a yes/no box with "Yes" beside it, which keeps the field's name.
+   */
+  readonly labelId?: string | undefined;
+  /** STYLE TRIAL (#14): the description already says the limits; the page does not repeat them. */
+  readonly limitsSaid?: boolean | undefined;
 }
 
 function asText(value: unknown): string {
@@ -154,7 +162,28 @@ function SelectInput({
 }
 
 function BooleanInput(props: ControlProps<CheckboxControl>) {
-  const { id, value, required, describedBy, invalid, onChange, label } = props;
+  const { id, value, required, describedBy, invalid, onChange, label, labelId } = props;
+  // STYLE TRIAL (updated Instrument, #14): "Yes" beside the box says what a
+  // tick means. The box is still named by the field's label, which is no
+  // longer tied to it by `for` (two labels would name it "… Yes").
+  if (required && labelId !== undefined) {
+    return (
+      <label className="choice checkbox-yes">
+        <input
+          id={id}
+          type="checkbox"
+          checked={value === true}
+          aria-labelledby={labelId}
+          aria-describedby={describedBy}
+          aria-invalid={invalid === true ? true : undefined}
+          onChange={(event) => {
+            onChange(event.target.checked);
+          }}
+        />{" "}
+        Yes
+      </label>
+    );
+  }
   if (required) {
     return (
       <input
@@ -309,7 +338,9 @@ function ListInput(props: ControlProps<ListControl>) {
       >
         Add a value
       </button>
-      {control.maxItems !== undefined && <span className="help"> Up to {control.maxItems}.</span>}
+      {control.maxItems !== undefined && props.limitsSaid !== true && (
+        <span className="help"> Up to {control.maxItems}.</span>
+      )}
     </div>
   );
 }
@@ -349,10 +380,20 @@ function isGroup(control: Control, required: boolean): boolean {
   );
 }
 
-function hint(field: FieldPlan): string | undefined {
+/** The numbers an input is limited by, which the page says in a line of its own. */
+function limitsOf(control: Control): number[] {
+  if (control.kind === "number") {
+    return [control.min, control.max].filter((limit) => limit !== undefined);
+  }
+  if (control.kind === "text") return control.maxLength === undefined ? [] : [control.maxLength];
+  if (control.kind === "list") return control.maxItems === undefined ? [] : [control.maxItems];
+  return [];
+}
+
+function hint(field: FieldPlan, limitsSaid: boolean): string | undefined {
   const { control } = field;
   const notes: string[] = [];
-  if (control.kind === "number") {
+  if (control.kind === "number" && !limitsSaid) {
     if (control.min !== undefined) {
       notes.push(`${control.minExclusive === true ? "Above" : "At least"} ${String(control.min)}.`);
     }
@@ -360,7 +401,7 @@ function hint(field: FieldPlan): string | undefined {
       notes.push(`${control.maxExclusive === true ? "Below" : "At most"} ${String(control.max)}.`);
     }
   }
-  if (control.kind === "text" && control.maxLength !== undefined) {
+  if (control.kind === "text" && control.maxLength !== undefined && !limitsSaid) {
     notes.push(`At most ${String(control.maxLength)} characters.`);
   }
   if (!field.required) {
@@ -395,7 +436,12 @@ export function FieldView({ field, index, values, error, warnings, onChange }: F
   const base = useId();
   const id = `${base}-field-${String(index)}`;
   const help = field.description;
-  const extra = hint(field);
+  // STYLE TRIAL (updated Instrument, #14): no line of limits the description
+  // already gives, and "Yes" beside a yes/no box.
+  const updated = useUpdated();
+  const limitsSaid = updated && limitsStated(help, limitsOf(field.control));
+  const yesBeside = updated && field.control.kind === "checkbox" && field.required;
+  const extra = hint(field, limitsSaid);
   const warned = error === undefined && warnings !== undefined && warnings.length > 0;
   const describedBy =
     [
@@ -429,6 +475,8 @@ export function FieldView({ field, index, values, error, warnings, onChange }: F
       invalid={error !== undefined}
       label={field.title}
       inputId={field.id}
+      labelId={yesBeside ? `${id}-label` : undefined}
+      limitsSaid={limitsSaid}
       onChange={(next) => {
         onChange(field.id, next);
       }}
@@ -465,7 +513,9 @@ export function FieldView({ field, index, values, error, warnings, onChange }: F
         </fieldset>
       ) : (
         <>
-          <label htmlFor={id}>{title}</label>
+          <label id={`${id}-label`} htmlFor={yesBeside ? undefined : id}>
+            {title}
+          </label>
           {notes}
           {control}
         </>

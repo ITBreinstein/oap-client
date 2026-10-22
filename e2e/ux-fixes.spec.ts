@@ -998,17 +998,50 @@ for (const style of STYLES) {
     await open(page, style);
     await connectTyped(page);
     await openProcess(page, "Area of each feature");
-    const pieces = await page
-      .locator(".process-path-id")
-      .evaluate((id) => ({
-        rects: id.getClientRects().length,
-        display: getComputedStyle(id).display,
-      }));
+    const pieces = await page.locator(".process-path-id").evaluate((id) => ({
+      rects: id.getClientRects().length,
+      display: getComputedStyle(id).display,
+    }));
     if (style === "instrument-updated") {
       // One piece, on its own line after the service's "/".
       expect(pieces.rects).toBe(1);
     } else {
       expect(pieces.display).toBe("inline");
     }
+  });
+}
+
+for (const style of STYLES) {
+  const updated = style === "instrument-updated";
+  test(`#14 the form's details ${updated ? "are tidied" : "are as they were"} (${style})`, async ({
+    page,
+  }) => {
+    await open(page, style);
+    await connectTyped(page);
+    await openProcess(page, "Every input kind");
+    const hint = (id: string) => page.locator(`[data-input-id="${id}"] .hint`);
+    // The description says "at most 20 characters" and "from 1 to 10".
+    await expect(hint("label")).toHaveCount(updated ? 0 : 1);
+    await expect(hint("count")).toHaveCount(updated ? 0 : 1);
+    await expect(page.locator('[data-input-id="tags"] .list > .help')).toHaveCount(updated ? 0 : 1);
+    // A yes/no box says what a tick means, under the same name.
+    const enabled = page.getByRole("checkbox", { name: "Enabled (required)", exact: true });
+    await expect(enabled).toHaveCount(1);
+    await expect(page.locator('[data-input-id="enabled"] .checkbox-yes')).toHaveCount(
+      updated ? 1 : 0,
+    );
+    if (updated) {
+      await page.locator('[data-input-id="enabled"] .checkbox-yes').click();
+      await expect(enabled).toBeChecked();
+    }
+    // The form's small buttons, one size in the update.
+    await field(page, "Label (required)").fill("Barcelona");
+    const heights = await page
+      .locator(".form-body button:not(.copy-button), .clear-form button")
+      .evaluateAll((buttons) =>
+        buttons.map((button) => Math.round(button.getBoundingClientRect().height)),
+      );
+    expect(heights.length).toBeGreaterThan(4);
+    expect(new Set(heights).size === 1).toBe(updated);
   });
 }

@@ -38,7 +38,9 @@
  * `app/panel-width.ts`; #36); on a narrow screen the map is right under the
  * result, which links to it (`App.tsx` `mapUnderResult`, `ProcessScreen`
  * `mapSlot`; #40); the Developer section is there only with `?developer`
- * (`App.tsx`, #38); the map is OpenFreeMap's world, in the
+ * (`App.tsx`, #38); a form leaves out a line of limits its description
+ * already gives, and a yes/no box has "Yes" beside it (`FormFields.tsx`
+ * `limitsSaid`, `labelId`; `forms/limits-stated.ts`; #14); the map is OpenFreeMap's world, in the
  * theme's colours (`App.tsx` `basemap`, `createWorldMap` in `map/MapView.tsx`),
  * and About credits it (`AboutPanel.tsx`); "Change service" comes first in
  * the process list, for the top right corner (`ProcessListScreen.tsx`); JSON is laid out with tabs
@@ -1078,4 +1080,15 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   vertical-align: bottom;
+}
+
+/*
+ * One size for the form's small buttons (#14): Draw on the map for a box,
+ * an area or a complex input, Use the current map view, a list's Add and
+ * Remove, "Type it instead" and Clear the form. Copy keeps its own.
+ */
+[data-variant="updated"] :is(.form-body, .clear-form) button:not(.copy-button) {
+  min-height: 36px;
+  padding: 0 12px;
+  font-size: 0.8125rem;
 }
