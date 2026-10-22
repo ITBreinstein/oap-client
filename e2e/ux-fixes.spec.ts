@@ -614,3 +614,29 @@ test("#32 a job followed by its link can't be cancelled, and is listed apart", a
   // The browser that started it can still cancel it.
   await expect(page.getByRole("button", { name: "Cancel job" })).toBeVisible();
 });
+
+for (const style of STYLES) {
+  test(`#19 a pasted shape is brought into view once it parses (${style})`, async ({ page }) => {
+    await open(page, style);
+    await connectTyped(page);
+    await openProcess(page, "Rotate a polygon a quarter turn");
+    const canvas = page.locator(".map-canvas");
+    await expect(canvas).toHaveAttribute("data-view", /./, { timeout: 15_000 });
+    const before = (await canvas.getAttribute("data-view")) ?? "";
+
+    // Barcelona, far from where the map starts.
+    const box = page.getByRole("textbox", { name: "GeoJSON", exact: true });
+    await box.fill('{"type":"Polygon","coordinates":[[[2.15,41.38],[2.19,41.38],[2.19,41.4]');
+    await page.waitForTimeout(800);
+    // Half typed: nothing to show, so the map stays.
+    expect(await canvas.getAttribute("data-view")).toBe(before);
+    await box.fill(
+      '{"type":"Polygon","coordinates":[[[2.15,41.38],[2.19,41.38],[2.19,41.4],[2.15,41.38]]]}',
+    );
+    await expect
+      .poll(async () => Number(((await canvas.getAttribute("data-view")) ?? "0").split(",")[0]), {
+        timeout: 5_000,
+      })
+      .toBeCloseTo(2.17, 1);
+  });
+}

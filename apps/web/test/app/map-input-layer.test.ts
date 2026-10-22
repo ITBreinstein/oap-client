@@ -10,7 +10,7 @@ import {
   type ServiceDescription,
 } from "@breinstein/oap-client";
 import { describe, expect, it } from "vitest";
-import { leftOffTheMap, shownFor } from "../../src/app/MapPane.js";
+import { boxOutline, leftOffTheMap, shownFor } from "../../src/app/MapPane.js";
 import {
   INITIAL_WORKFLOW,
   workflowReducer,
@@ -121,5 +121,49 @@ describe("the coordinate limit on the input layer (review W3)", () => {
       { name: expect.any(String) as unknown, positions: 4 },
     ]);
     expect(leftOffTheMap(withArea, 4)).toEqual([]);
+  });
+});
+
+describe("a box on the input layer (#19)", () => {
+  const CRS84 = "http://www.opengis.net/def/crs/OGC/1.3/CRS84";
+
+  it("is its outline, in longitude and latitude", () => {
+    expect(boxOutline({ coordinates: [4.885, 52.36, 4.94, 52.38], crs: CRS84 })).toEqual([
+      {
+        type: "Polygon",
+        coordinates: [
+          [
+            [4.885, 52.36],
+            [4.94, 52.36],
+            [4.94, 52.38],
+            [4.885, 52.38],
+            [4.885, 52.36],
+          ],
+        ],
+      },
+    ]);
+  });
+
+  it("is nothing in projected units, half typed, or not a box at all", () => {
+    expect(
+      boxOutline({
+        coordinates: [120000, 480000, 125000, 485000],
+        crs: "http://www.opengis.net/def/crs/EPSG/0/28992",
+      }),
+    ).toEqual([]);
+    expect(boxOutline({ coordinates: [4.885, 52.36, 4.94], crs: CRS84 })).toEqual([]);
+    expect(boxOutline({ rawJson: "{" })).toEqual([]);
+    expect(boxOutline(undefined)).toEqual([]);
+  });
+
+  it("is shown while the form is filled in, but not while it is drawn", () => {
+    const withBox = reduce(
+      connected,
+      { type: "open-process", processId: "breinstein-bbox" },
+      loaded("pygeoapi/breinstein-bbox"),
+      { type: "set-value", id: "bbox", value: { coordinates: [5, 52, 5.1, 52.1], crs: CRS84 } },
+    );
+    expect(inputShapes(shownFor(withBox))).toHaveLength(1);
+    expect(inputShapes(shownFor(withBox, "bbox"))).toEqual([]);
   });
 });

@@ -228,6 +228,35 @@ export function MapView({
     [createMap],
   );
 
+  // Where the map is, once it stops moving: for a test, or a person with the
+  // dev tools, to see where it went (#19).
+  const [view, setView] = useState<string | undefined>();
+  useEffect(() => {
+    if (map === undefined) return undefined;
+    const onMoveEnd = () => {
+      try {
+        const center = map.getCenter();
+        setView(`${center.lng.toFixed(3)},${center.lat.toFixed(3)},${map.getZoom().toFixed(1)}`);
+      } catch {
+        // A map that cannot say where it is is still a map.
+      }
+    };
+    try {
+      map.on("load", onMoveEnd);
+      map.on("moveend", onMoveEnd);
+    } catch {
+      return undefined;
+    }
+    return () => {
+      try {
+        map.off("load", onMoveEnd);
+        map.off("moveend", onMoveEnd);
+      } catch {
+        // Gone already.
+      }
+    };
+  }, [map]);
+
   useBoundingBoxDraw(map, draw, createEngine);
   const shapes = useGeometryDraw(map, geometry, createGeometryEngine);
   const { resultShapes, resultImage } = useShownShapes(
@@ -288,6 +317,7 @@ export function MapView({
         data-drawing={draw.active || geometry.active ? "true" : "false"}
         data-result-shapes={resultShapes}
         data-result-image={resultImage ? "true" : "false"}
+        data-view={view}
       />
       {failure !== undefined && (
         <p className="map-failure">

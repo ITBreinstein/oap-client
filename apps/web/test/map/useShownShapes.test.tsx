@@ -13,7 +13,7 @@ import type {
   ShownImage,
   ShownShapes,
 } from "../../src/map/shape-layers.js";
-import { useShownShapes } from "../../src/map/useShownShapes.js";
+import { INPUT_SETTLE_MS, useShownShapes } from "../../src/map/useShownShapes.js";
 
 interface FakeLayers extends ShapeLayers {
   readonly shown: (readonly ShownShapes[])[];
@@ -191,5 +191,90 @@ describe("useShownShapes", () => {
 
     render(<Harness map={map} sets={[]} layers={layers} />);
     expect(layers.images.at(-1)).toBeUndefined();
+  });
+});
+
+describe("an input set from outside the map (#19)", () => {
+  /** A map showing west, south, east, north, that records where it was moved. */
+  function viewMap(view: [number, number, number, number]) {
+    const fitted: unknown[] = [];
+    return {
+      fitted,
+      map: {
+        fitBounds: (bounds: unknown) => fitted.push(bounds),
+        getBounds: () => ({
+          getWest: () => view[0],
+          getSouth: () => view[1],
+          getEast: () => view[2],
+          getNorth: () => view[3],
+        }),
+      },
+    };
+  }
+  const far: MapShape = { type: "Point", coordinates: [2.17, 41.39] };
+
+  it("moves the map to it once it has settled, not on every change", () => {
+    vi.useFakeTimers();
+    try {
+      const layers = fakeLayers();
+      const { map, fitted } = viewMap([4, 51, 6, 53]);
+      render(<Harness map={map} sets={[{ role: "input", shapes: [drawn] }]} layers={layers} />);
+      render(<Harness map={map} sets={[{ role: "input", shapes: [far] }]} layers={layers} />);
+      act(() => {
+        vi.advanceTimersByTime(INPUT_SETTLE_MS - 1);
+      });
+      expect(fitted).toEqual([]);
+      act(() => {
+        vi.advanceTimersByTime(1);
+      });
+      expect(fitted).toEqual([
+        [
+          [2.17, 41.39],
+          [2.17, 41.39],
+        ],
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("leaves the map where it is when the input is already in view", () => {
+    vi.useFakeTimers();
+    try {
+      const layers = fakeLayers();
+      const { map, fitted } = viewMap([4, 51, 6, 53]);
+      render(<Harness map={map} sets={[{ role: "input", shapes: [drawn] }]} layers={layers} />);
+      act(() => {
+        vi.advanceTimersByTime(INPUT_SETTLE_MS);
+      });
+      expect(fitted).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("leaves it to the result, once there is one", () => {
+    vi.useFakeTimers();
+    try {
+      const layers = fakeLayers();
+      const { map, fitted } = viewMap([4, 51, 6, 53]);
+      render(
+        <Harness
+          map={map}
+          sets={[
+            { role: "input", shapes: [far] },
+            { role: "result", shapes: [turned] },
+          ]}
+          layers={layers}
+        />,
+      );
+      const once = fitted.length;
+      act(() => {
+        vi.advanceTimersByTime(INPUT_SETTLE_MS);
+      });
+      expect(fitted).toHaveLength(once);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

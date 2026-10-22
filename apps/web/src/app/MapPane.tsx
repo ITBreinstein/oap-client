@@ -20,7 +20,8 @@
  */
 
 import { useContext, useState } from "react";
-import { drawableCrs, isDrawableCrs } from "../forms/crs.js";
+import { classifyCrs, drawableCrs, isDrawableCrs } from "../forms/crs.js";
+import { extentOfBbox } from "./shape-size.js";
 import type { BboxValue } from "../forms/encode.js";
 import {
   drawableTypes,
@@ -63,6 +64,35 @@ function toBbox(value: unknown): Bbox | undefined {
     : [west, south, east, north];
 }
 
+/** A box value in longitude and latitude as the polygon it outlines; none otherwise. */
+export function boxOutline(value: unknown): MapShape[] {
+  if (typeof value !== "object" || value === null || !("crs" in value)) return [];
+  const crs: unknown = value.crs;
+  const kind = typeof crs === "string" ? classifyCrs(crs) : "unknown";
+  if (kind !== "crs84" && kind !== "epsg4326" && kind !== "crs84h") return [];
+  const coordinates: unknown = "coordinates" in value ? value.coordinates : undefined;
+  if (!Array.isArray(coordinates)) return [];
+  const numbers = coordinates.filter((entry): entry is number => typeof entry === "number");
+  if (numbers.length !== coordinates.length) return [];
+  const extent = extentOfBbox(numbers);
+  if (extent === undefined) return [];
+  const { west, south, east, north } = extent;
+  return [
+    {
+      type: "Polygon",
+      coordinates: [
+        [
+          [west, south],
+          [east, south],
+          [east, north],
+          [west, north],
+          [west, south],
+        ],
+      ],
+    },
+  ];
+}
+
 function toolsFor(target: GeometryTarget): Tool[] {
   const types = drawableTypes(target);
   return types.includes("Polygon") ? [...types, "Rectangle"] : [...types];
@@ -96,6 +126,9 @@ export function shownFor(
   const input = state.plan.fields.flatMap((field) => {
     if (state.stage === "process" && field.id === drawing) return [];
     const current = Object.hasOwn(state.values, field.id) ? state.values[field.id] : undefined;
+    // A box in longitude and latitude, as its outline (#19): typed, it is on
+    // the map too, as a drawn one is.
+    if (field.control.kind === "bbox") return boxOutline(current);
     const binding = shapeBinding(field, current);
     if (binding === undefined) return [];
     const shapes = shapesOfText(binding.text);
