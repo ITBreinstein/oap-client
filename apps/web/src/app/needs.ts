@@ -20,6 +20,13 @@ export const NEEDS_LABELS: Readonly<Record<Needs, string>> = {
   values: "Just values",
 };
 
+/** STYLE TRIAL: the word the updated Instrument shows beside the mark (#8). */
+export const NEEDS_SHORT: Readonly<Record<Needs, string>> = {
+  area: "Area",
+  data: "Data",
+  values: "Values",
+};
+
 export function isNeeds(value: unknown): value is Needs {
   return NEEDS.some((needs) => needs === value);
 }

@@ -18,7 +18,8 @@
  * `appearance.style` is read: the start screen picks no service for the
  * user (`EndpointScreen.tsx`, `unpicked`), fills in a picked service's
  * address, and shows the featured examples right under the address row
- * (`EndpointScreen.tsx`, #2); the map is OpenFreeMap's world, in the
+ * (`EndpointScreen.tsx`, #2); a need is shown in a word beside its mark,
+ * and nothing where it is not known yet (`NeedsTag.tsx`, `NEEDS_SHORT`, #8); the map is OpenFreeMap's world, in the
  * theme's colours (`App.tsx` `basemap`, `createWorldMap` in `map/MapView.tsx`),
  * and About credits it (`AboutPanel.tsx`); "Change service" comes first in
  * the process list, for the top right corner (`ProcessListScreen.tsx`); JSON is laid out with tabs
@@ -187,6 +188,35 @@
     li {
     grid-template-columns: minmax(0, 1fr) 6.5rem;
   }
+}
+
+/*
+ * What a process needs, in a word beside its mark (#8; NeedsTag): "Area",
+ * "Data", "Values". Where it is not known yet the cell is empty, never a
+ * dash; a screen reader still hears "Not known yet".
+ */
+[data-variant="updated"] .needs {
+  gap: 6px;
+}
+
+[data-variant="updated"] .needs-short {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* In an example's row the need has a column of its own after the title, as in the list. */
+[data-variant="updated"] :is(.example-row, .example-card) {
+  grid-template-columns: minmax(0, 1fr) 5.5rem auto;
+}
+
+[data-variant="updated"] :is(.example-row, .example-card) .needs {
+  grid-column: 2;
+}
+
+[data-variant="updated"] :is(.example-row, .example-card) .example-title,
+[data-variant="updated"] :is(.example-row, .example-card) .example-service {
+  grid-column: 1;
 }
 
 /* ------------------------------------------------- the map, uncovered */
@@ -819,6 +849,10 @@
 @media (max-width: 52rem) {
   [data-variant="updated"] .start .featured-examples {
     display: flex;
+  }
+
+  [data-variant="updated"] .start :is(.example-row, .example-card) {
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
   /* One line each: the title, and what it needs. */
