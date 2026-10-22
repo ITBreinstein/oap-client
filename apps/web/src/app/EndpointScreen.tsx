@@ -116,7 +116,11 @@ export function EndpointScreen(props: EndpointScreenProps) {
     ...configured.map((entry) => entry.key),
     ...listedPresets.map(({ index }) => presetKey(index)),
   ];
-  const unavailable = props.unavailable ?? [];
+  // STYLE TRIAL (#3, #6): in the updated Instrument a service is listed once;
+  // a preset of the same address, reached directly, stands for it meanwhile.
+  const unavailable = (props.unavailable ?? []).filter(
+    (entry) => !updated || !presets.some((preset) => sameService(preset.url, entry.baseUrl)),
+  );
   const hasChoices = keys.length > 0 || unavailable.length > 0;
   // A linked service is picked for the user: its entry when it is a listed
   // one, else the address it fills in.

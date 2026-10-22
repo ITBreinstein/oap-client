@@ -30,7 +30,7 @@ afterEach(() => {
   host = undefined;
 });
 
-function render(updated: boolean) {
+function render(updated: boolean, presets: readonly { title: string; url: string }[] = []) {
   const onConnect = vi.fn();
   host = document.createElement("div");
   document.body.append(host);
@@ -43,7 +43,7 @@ function render(updated: boolean) {
           configured={[]}
           unavailable={[CORS]}
           configuredError={undefined}
-          presets={[]}
+          presets={presets}
           connecting={undefined}
           error={undefined}
           staticOnly={false}
@@ -75,5 +75,22 @@ describe.each([false, true])("a relay service while the relay is down (updated: 
     });
     expect(onConnect).not.toHaveBeenCalled();
     expect(view.querySelector(".field-error")).not.toBeNull();
+  });
+});
+
+describe("a relay service while the relay is down, with a preset of its address", () => {
+  const PRESET = { title: "pygeoapi, with CORS (local)", url: "http://localhost:5080/" };
+
+  it("is left to the preset in the updated Instrument: one row for one service", () => {
+    const { view } = render(true, [PRESET]);
+    expect(view.querySelector("input[value='pygeoapi-cors']")).toBeNull();
+    expect(view.textContent).toContain("pygeoapi, with CORS (local)");
+  });
+
+  it("is listed beside it in Instrument as it is, which lists every entry", () => {
+    const { view } = render(false, [PRESET]);
+    expect(view.querySelector<HTMLInputElement>("input[value='pygeoapi-cors']")?.disabled).toBe(
+      true,
+    );
   });
 });
