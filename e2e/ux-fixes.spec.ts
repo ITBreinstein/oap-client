@@ -1171,3 +1171,38 @@ for (const style of STYLES) {
     await expect(legend.locator(".swatch-input")).toHaveAttribute("data-kind", "line");
   });
 }
+
+for (const style of STYLES) {
+  const updated = style === "instrument-updated";
+  test(`#29 a small image ${updated ? "is shown at 128px, sharp, and opens full size" : "is shown at its own size"} (${style})`, async ({
+    page,
+  }) => {
+    await open(page, style);
+    await connectTyped(page);
+    await openProcess(page, "Generated PNG");
+    await page.getByRole("button", { name: "Run", exact: true }).click();
+    const image = page.getByRole("img", { name: "The image result “image”" }).first();
+    await expect(image).toBeVisible({ timeout: 15_000 });
+    await expect
+      .poll(() => image.evaluate((element: HTMLImageElement) => element.naturalWidth))
+      .toBe(16);
+    // Its rendered size, without the border.
+    expect(await image.evaluate((element: HTMLImageElement) => element.width)).toBe(
+      updated ? 128 : 16,
+    );
+    const opener = page.getByRole("button", { name: "Open “image” full size" });
+    await expect(opener).toHaveCount(updated ? 1 : 0);
+    if (!updated) return;
+    expect(await image.evaluate((element) => getComputedStyle(element).imageRendering)).toBe(
+      "pixelated",
+    );
+    await opener.click();
+    const dialog = page.getByRole("dialog", { name: "The image result “image”" });
+    await expect(dialog).toBeVisible();
+    const large = await dialog.getByRole("img").boundingBox();
+    expect(large?.width ?? 0).toBeGreaterThan(400);
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    await expect(opener).toBeFocused();
+  });
+}

@@ -43,7 +43,8 @@
  * `limitsSaid`, `labelId`; `forms/limits-stated.ts`; #14); JSON that doesn't
  * parse is said under its box in plain words, the parser's for developers
  * (`FormFields.tsx` `boxTrouble`, `JsonTroubleNote.tsx`,
- * `forms/json-trouble.ts`; #13); the map is OpenFreeMap's world, in the
+ * `forms/json-trouble.ts`; #13); a small image is shown at 128px at least,
+ * and opens full size (`ResultImage.tsx`, #29); the map is OpenFreeMap's world, in the
  * theme's colours (`App.tsx` `basemap`, `createWorldMap` in `map/MapView.tsx`),
  * and About credits it (`AboutPanel.tsx`); "Change service" comes first in
  * the process list, for the top right corner (`ProcessListScreen.tsx`); JSON is laid out with tabs
@@ -1094,4 +1095,61 @@
   min-height: 36px;
   padding: 0 12px;
   font-size: 0.8125rem;
+}
+
+/*
+ * A small image result (#29): its longer side at 128px at least
+ * (`ResultImage.tsx` sets the size), its pixels kept sharp rather than
+ * blurred, and a press opens it as large as the window allows.
+ */
+[data-variant="updated"] .result-image[data-enlarged] {
+  box-sizing: content-box;
+  max-width: none;
+  image-rendering: pixelated;
+}
+
+[data-variant="updated"] .image-open {
+  display: inline-block;
+  min-height: 0;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: zoom-in;
+}
+
+[data-variant="updated"] .image-open > .result-image {
+  margin: 0;
+}
+
+[data-variant="updated"] .image-open:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+[data-variant="updated"] .image-dialog {
+  max-width: 95vw;
+  max-height: 95vh;
+  padding: 16px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-card);
+}
+
+[data-variant="updated"] .image-dialog::backdrop {
+  background: rgb(0 0 0 / 55%);
+}
+
+[data-variant="updated"] .image-dialog-picture {
+  display: block;
+  width: min(85vw, calc(85vh - 5rem));
+  height: min(85vw, calc(85vh - 5rem));
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+[data-variant="updated"] .image-dialog .actions {
+  display: flex;
+  justify-content: flex-end;
+  margin: 12px 0 0;
 }

@@ -16,6 +16,7 @@ import { DEFAULT_MAX_BUFFER_BYTES } from "@breinstein/oap-client";
 import { useContext, useId, useState } from "react";
 import { CopyButton } from "./CopyButton.js";
 import { MapLimitsContext } from "./map-limits.js";
+import { ResultImage } from "./ResultImage.js";
 import { saveBlob } from "./save.js";
 import { useDataUrl } from "./useDataUrl.js";
 import { useSpared } from "./developer.js";
@@ -136,9 +137,7 @@ function CsvTable({
 
 function ImagePreview({ blob, outputId }: { readonly blob: Blob; readonly outputId: string }) {
   const url = useDataUrl(blob);
-  return url === undefined ? null : (
-    <img className="result-image" src={url} alt={`The image result “${outputId}”`} />
-  );
+  return url === undefined ? null : <ResultImage src={url} outputId={outputId} />;
 }
 
 function ResultItem({
@@ -336,10 +335,9 @@ function LinkedImage({ href, outputId }: { readonly href: string; readonly outpu
       The browser could not show it as an image. Open the link to see it in a new tab.
     </p>
   ) : (
-    <img
-      className="result-image"
+    <ResultImage
       src={href}
-      alt={`The image result “${outputId}”`}
+      outputId={outputId}
       referrerPolicy="no-referrer"
       onError={() => {
         setFailed(true);
