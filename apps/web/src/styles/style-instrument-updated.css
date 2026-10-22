@@ -15,8 +15,12 @@
  * other way round.
  *
  * What the update does in code, where `useUpdated()` (`app/variant.ts`) or
- * `appearance.style` is read: the start screen fills in a picked service's
- * address (`EndpointScreen.tsx`); JSON is laid out with tabs
+ * `appearance.style` is read: the start screen picks no service for the
+ * user (`EndpointScreen.tsx`, `unpicked`) and fills in a picked service's
+ * address (`EndpointScreen.tsx`); the map is OpenFreeMap's world, in the
+ * theme's colours (`App.tsx` `basemap`, `createWorldMap` in `map/MapView.tsx`),
+ * and About credits it (`AboutPanel.tsx`); "Change service" comes first in
+ * the process list, for the top right corner (`ProcessListScreen.tsx`); JSON is laid out with tabs
  * (`app/json-text.ts`, in `FormFields`, `GeometryField`, `ComplexField`,
  * `MapPane`, `ResultsView`); inputs and outputs have Copy in their boxes
  * (`CopyButton.tsx`: `CopyField` in `FormFields`, `GeometryField`,
