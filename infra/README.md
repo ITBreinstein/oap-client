@@ -250,6 +250,27 @@ each config; the process takes no inputs and fetches nothing. It declares
 `outputTransmission: ["reference"]`, and pygeoapi describes it as `["value"]`
 (finding 0059).
 
+### `breinstein-formats`
+
+One output, `features`, offered in three formats, answered in the one asked
+for (2026-10-23, #F3): an area, given as a bounding box (a small box in
+Utrecht when left out), as one polygon feature in GeoJSON, GML 3.2 or KML.
+Asked for none, it answers GeoJSON. A second output, `count`, is always 1, so
+that the answer for both outputs — a JSON object keyed by output id, with a
+GML or KML `features` as a qualified value carrying its media type — is tested
+as well as the answer for one.
+
+| Asked for `features` alone as          | Answer                                       |
+| -------------------------------------- | -------------------------------------------- |
+| nothing, or `application/geo+json`     | `application/geo+json`, a FeatureCollection  |
+| `application/gml+xml; version=3.2`     | that media type, a WFS 2.0 FeatureCollection |
+| `application/vnd.google-earth.kml+xml` | that media type, a KML document              |
+
+pygeoapi 0.21.0 lets a process see the `outputs` it was asked for
+(`supports_outputs`), which is what makes this possible. It does not let a
+process set a response header, so no pygeoapi process can send
+`Content-Crs`: there is no `breinstein-rd-geojson`.
+
 ## Re-creating the stack after a config change
 
 `up -d` alone will not pick up a change to a mounted config or a new plugin

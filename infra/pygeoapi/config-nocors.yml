@@ -131,6 +131,12 @@ resources:
     type: process
     processor:
       name: breinstein_buildings.BuildingsProcessor
+  # One output offered as GeoJSON, GML and KML, answered in the one asked for
+  # (#F3). Source and rationale: infra/pygeoapi/plugins/breinstein_formats.py.
+  breinstein-formats:
+    type: process
+    processor:
+      name: breinstein_formats.FormatsProcessor
   # One output, always by reference, to a static file on the other instance:
   # :5080, which grants CORS. Source and rationale: infra/pygeoapi/plugins/breinstein_link.py.
   breinstein-link:
