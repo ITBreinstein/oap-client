@@ -301,6 +301,14 @@ test.describe("Weaver's form, as the draft has it, with axe", () => {
           await page.screenshot({ path: "test-results/v2-formats/phase1/link-off-on-draft.png" });
         }
         const { violations } = await new AxeBuilder({ page }).analyze();
+        // Kept with the failure, in the report and the results folder, as the
+        // trace is: what axe found, not only how many.
+        if (violations.length > 0) {
+          await test.info().attach("axe-violations.json", {
+            body: JSON.stringify(violations, null, 2),
+            contentType: "application/json",
+          });
+        }
         expect(
           violations.map((violation) => `${violation.id}: ${violation.nodes.length} nodes`),
         ).toEqual([]);

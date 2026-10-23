@@ -28,8 +28,9 @@ export default defineConfig({
     // `pnpm test:e2e:weaver`: the OGC API - Processes 2.0 draft, against
     // Weaver from infra/compose/weaver.yml. Named, never blocking: the draft
     // still moves, and Weaver's images are amd64 only. Under CI a Weaver that
-    // is not answering fails this lane rather than skipping it.
-    { name: "weaver", testMatch: /weaver\.spec\.ts/ },
+    // is not answering fails this lane rather than skipping it. A failure
+    // keeps its trace, and the axe tests attach what axe found.
+    { name: "weaver", testMatch: /weaver\.spec\.ts/, use: { trace: "retain-on-failure" } },
     // `pnpm capture:observations`: not a test lane. Drives the client against
     // the local stack and saves the matrix's evidence, one export per
     // endpoint. See e2e/observations.capture.ts.
