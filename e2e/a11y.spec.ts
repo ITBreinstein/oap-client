@@ -180,3 +180,22 @@ for (const style of ["instrument", "instrument-updated"] as const) {
     });
   }
 }
+
+// #F3, in a test of its own so the walk above keeps its time: an output
+// offered in several formats, the one asked for said in words, and its result.
+for (const style of ["instrument", "instrument-updated"] as const) {
+  for (const theme of ["light", "dark"] as const) {
+    test(`no axe violations with a format asked for, ${style}, ${theme}`, async ({ page }) => {
+      await open(page, style, theme);
+      await page.getByRole("radio", { name: /Reference pygeoapi/ }).check();
+      await page.getByRole("button", { name: "Connect", exact: true }).click();
+      await expect(page.getByRole("heading", { level: 2, name: "Processes" })).toBeVisible();
+      await openProcess(page, "An area, in a format of your choice");
+      await expect(page.getByTestId("format-line")).toBeVisible();
+      await noViolations(page, "a format asked for");
+      await page.getByRole("button", { name: "Run", exact: true }).click();
+      await expect(page.locator('[data-output-id="features"]')).toBeVisible({ timeout: 30_000 });
+      await noViolations(page, "a result in the format asked for");
+    });
+  }
+}
