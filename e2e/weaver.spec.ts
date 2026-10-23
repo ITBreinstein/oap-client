@@ -11,8 +11,10 @@
  * request a form generated from EchoProcess's own description sends:
  * `arrayInput` and `geometryInput` declare `maxOccurs` above 1 *and* an array
  * schema, which the draft's cardinality rules make arrays of arrays, and
- * Weaver accepts them only flat. So no run started from the form succeeds
- * here. What is tested is what the client controls: the version chosen, the
+ * Weaver accepts them only flat. A minimal CWL process deployed for the lane
+ * would have avoided both, but Weaver will not deploy one without a
+ * `DockerRequirement`, and the lane gives it no Docker. So no run started from
+ * the form succeeds here. What is tested is what the client controls: the version chosen, the
  * request sent in that version's form, and the server's answer shown and
  * recorded, whatever it is.
  *
@@ -196,6 +198,17 @@ test.describe("Weaver, the 2.0 draft", () => {
       status: 422,
       outcome: "error",
     });
+  });
+
+  test("a default run from the form sends no transmissionMode for any output", async ({ page }) => {
+    await connect(page);
+    await fill(page);
+    const sent = executeSent(page);
+    await page.getByRole("button", { name: "Run", exact: true }).click();
+    const body = (await sent).postDataJSON() as { outputs?: Record<string, object> };
+    const selections = Object.values(body.outputs ?? {});
+    expect(selections).toHaveLength(OUTPUTS.length);
+    for (const selection of selections) expect(selection).not.toHaveProperty("transmissionMode");
   });
 
   test("a background run is asked for with respond-async alone, as in 1.0", async ({ page }) => {
