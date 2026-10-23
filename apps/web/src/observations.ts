@@ -202,6 +202,8 @@ export interface RunFacts {
   readonly declaredTransmission: readonly string[];
   /** The outputs asked for by reference. */
   readonly linkOutputs: readonly string[];
+  /** The media type asked for each output that was asked for one (#F3). */
+  readonly formatsAsked?: Readonly<Record<string, string>> | undefined;
 }
 
 function declaredMediaType(result: RenderableResult): string | undefined {

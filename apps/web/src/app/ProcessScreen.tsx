@@ -36,6 +36,7 @@ import { shownOnMap } from "./input-shapes.js";
 import { MapLimitsContext } from "./map-limits.js";
 import { offersLink, namedFieldError } from "./run.js";
 import { linkExpressible, NO_LINK_IN_DRAFT } from "./protocol-version.js";
+import { formatLine, formatsToAsk, formatWords, offeredFormats } from "../results/format-choice.js";
 import type { WorkflowCommands, WorkflowView } from "./useWorkflow.js";
 import type { Workflow } from "./workflow.js";
 
@@ -101,6 +102,61 @@ function About({ state }: { readonly state: Open }) {
         </dd>
       </dl>
     </details>
+  );
+}
+
+/**
+ * #F3: the format asked for each output that offers several, and the way to
+ * pick another before running. The page's own choice is the first it can
+ * show (`results/format-choice.ts`); "Let the service choose" asks for none.
+ * Said in words beside each output, so the choice is never only a selected
+ * option.
+ */
+function OutputFormats({
+  state,
+  onChange,
+}: {
+  readonly state: Open;
+  readonly onChange: WorkflowCommands["setFormat"];
+}) {
+  const base = useId();
+  const { process, formatChoices } = state;
+  const asked = formatsToAsk(process.outputs, formatChoices);
+  const offering = process.outputs
+    .map((output) => ({ output, offered: offeredFormats(output) }))
+    .filter(({ offered }) => offered.length >= 2);
+  if (offering.length === 0) return null;
+  return (
+    <fieldset className="outputs formats">
+      <legend>Formats</legend>
+      {offering.map(({ output, offered }, index) => {
+        const id = `${base}-format-${String(index)}`;
+        const chosen = asked[output.id];
+        return (
+          <div key={output.id} className="field" data-output-format={output.id}>
+            <label htmlFor={id}>Format of “{output.title ?? output.id}”</label>
+            <p id={`${id}-line`} className="help" data-testid="format-line">
+              {formatLine(output, offered, chosen)}
+            </p>
+            <select
+              id={id}
+              value={chosen ?? ""}
+              aria-describedby={`${id}-line`}
+              onChange={(event) => {
+                onChange(output.id, event.target.value === "" ? null : event.target.value);
+              }}
+            >
+              {offered.map((format) => (
+                <option key={format.mediaType} value={format.mediaType}>
+                  {formatWords(format)} ({format.mediaType})
+                </option>
+              ))}
+              <option value="">Let the service choose</option>
+            </select>
+          </div>
+        );
+      })}
+    </fieldset>
   );
 }
 
@@ -976,6 +1032,7 @@ export function ProcessScreen(props: ProcessScreenProps) {
             </p>
           )}
 
+          <OutputFormats state={state} onChange={commands.setFormat} />
           <OutputChoices state={state} developer={developer} onChange={commands.setTransmission} />
 
           {errorCount > 0 && (

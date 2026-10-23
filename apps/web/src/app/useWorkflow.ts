@@ -56,6 +56,7 @@ import {
   type RelayAttempt,
 } from "./route-decision.js";
 import { loadReference as followReference } from "../results/reference.js";
+import { formatsToAsk } from "../results/format-choice.js";
 import { toRenderable, type RenderableResult } from "../results/renderable.js";
 import {
   declaredMediaTypes,
@@ -97,6 +98,8 @@ export interface WorkflowCommands {
   readonly setMode: (mode: ExecutionMode) => void;
   /** Task 8, T2: ask for one output as a value (as the server prefers) or a link. */
   readonly setTransmission: (outputId: string, transmission: "value" | "reference") => void;
+  /** #F3: ask for this media type for one output, or `null` to let the service choose. */
+  readonly setFormat: (outputId: string, mediaType: string | null) => void;
   readonly run: () => void;
   /**
    * "Stop waiting" on a foreground run (#24): abort the request and go back
@@ -697,7 +700,9 @@ export function useWorkflow(
       unfindable.has(backgroundKey(relayEndpointFor(connection.endpoint)))
         ? "sync"
         : state.mode;
-    const request = runRequest(process, plan, state.values, linkOutputs);
+    // #F3: a format for each output that offers several, unless the user chose.
+    const formats = formatsToAsk(process.outputs, state.formatChoices);
+    const request = runRequest(process, plan, state.values, linkOutputs, formats);
     // Package 6: the schema warnings were on screen and do not stop the run;
     // an input whose value could not be checked is recorded, once.
     record(
@@ -718,6 +723,7 @@ export function useWorkflow(
       processId: process.id,
       declaredTransmission: process.outputTransmission,
       linkOutputs,
+      formatsAsked: formats,
     };
     record(
       request.notes.map((note) => ({
@@ -772,6 +778,7 @@ export function useWorkflow(
           outputIds,
           processId: process.id,
           declaredMediaTypes: declaredMediaTypes(process),
+          askedFormats: formats,
         });
         recordResults(results);
         dispatch({ type: "results", runId, results });
@@ -902,6 +909,8 @@ export function useWorkflow(
     const outputIds = state.process.outputs.map((output) => output.id);
     const processId = state.process.id;
     const declared = declaredMediaTypes(state.process);
+    // What this run asked for (#F3); nothing for a job followed from elsewhere.
+    const asked = lastRun.current?.runId === runId ? lastRun.current.formatsAsked : undefined;
     void (async () => {
       try {
         const { envelope } = await connection.client.getResults(jobRef, { status: decided });
@@ -909,6 +918,7 @@ export function useWorkflow(
           outputIds,
           processId,
           declaredMediaTypes: declared,
+          askedFormats: asked,
         });
         recordResults(results);
         dispatch({ type: "results", runId, results });
@@ -1164,6 +1174,9 @@ export function useWorkflow(
     },
     setTransmission: (outputId, transmission) => {
       dispatch({ type: "set-transmission", outputId, transmission });
+    },
+    setFormat: (outputId, mediaType) => {
+      dispatch({ type: "set-format", outputId, mediaType });
     },
     run,
     stopWaiting,

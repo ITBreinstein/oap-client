@@ -30,16 +30,28 @@ import { relayRateLimitIn } from "../relay/relay-fetch.js";
  *
  * An output in `linkOutputs` is asked for by reference (Task 8, T2); the rest
  * stay as the server prefers, exactly as before.
+ *
+ * An output in `formats` is asked for in that media type (#F3), as
+ * `format.mediaType`. Every output is listed whether or not it has one: the
+ * list is what decides the answer's shape (in 1.0 the outputs that come back,
+ * in the 2.0 draft raw or a document), so asking for a format never changes it.
  */
 export function outputSelection(
   process: ProcessDescription,
   linkOutputs: readonly string[] = [],
+  formats: Readonly<Record<string, string>> = {},
 ): Record<string, ExecuteOutputSelection> {
   return Object.fromEntries(
-    process.outputs.map((output) => [
-      output.id,
-      linkOutputs.includes(output.id) ? { transmissionMode: "reference" } : {},
-    ]),
+    process.outputs.map((output) => {
+      const mediaType = formats[output.id];
+      return [
+        output.id,
+        {
+          ...(mediaType === undefined ? {} : { format: { mediaType } }),
+          ...(linkOutputs.includes(output.id) ? { transmissionMode: "reference" as const } : {}),
+        },
+      ];
+    }),
   );
 }
 
@@ -75,9 +87,10 @@ export function runRequest(
   plan: FormPlan,
   values: FormValues,
   linkOutputs: readonly string[] = [],
+  formats: Readonly<Record<string, string>> = {},
 ): RunRequest {
   const { inputs, notes } = toExecuteBody(plan, values);
-  return { inputs, outputs: outputSelection(process, linkOutputs), notes };
+  return { inputs, outputs: outputSelection(process, linkOutputs, formats), notes };
 }
 
 /** The relay's view of an endpoint. A typed URL is always direct (T8). */

@@ -22,6 +22,7 @@ import { useDataUrl } from "./useDataUrl.js";
 import { useSpared } from "./developer.js";
 import { useUpdated } from "./variant.js";
 import { placementWords } from "./placement-words.js";
+import { formatSentLine } from "../results/format-choice.js";
 import {
   isShownImage,
   mapImage,
@@ -172,6 +173,7 @@ function ResultItem({
     status,
     result.kind === "json" || result.kind === "download" ? result.placement : undefined,
   );
+  const sentLine = formatSentLine(result.asked, result.received);
   const imageOnMap = placed?.outputId === result.outputId;
   const boxOfImage = placed?.bboxOutputId === result.outputId;
   return (
@@ -189,6 +191,11 @@ function ResultItem({
       {placementLine !== undefined && (
         <p className="muted" data-testid="placement">
           {placementLine}
+        </p>
+      )}
+      {sentLine !== undefined && (
+        <p className="muted" data-testid="format-sent">
+          {sentLine}
         </p>
       )}
       {status.kind === "too-many" && (
@@ -472,6 +479,7 @@ function ReferenceItem({
   const status = plotStatus(result, maxCoordinates);
   const plot = status.kind;
   const placementLine = placementWords(status, loaded?.placement);
+  const sentLine = formatSentLine(result.asked, result.received);
   const image = shownImage(result);
   const imageOnMap = placed?.outputId === result.outputId;
   const page = loaded === undefined ? undefined : pageLine(loaded);
@@ -513,6 +521,11 @@ function ReferenceItem({
       {placementLine !== undefined && (
         <p className="muted" data-testid="placement">
           {placementLine}
+        </p>
+      )}
+      {sentLine !== undefined && (
+        <p className="muted" data-testid="format-sent">
+          {sentLine}
         </p>
       )}
       {status.kind === "too-many" && (

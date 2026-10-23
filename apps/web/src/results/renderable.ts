@@ -23,7 +23,18 @@ import {
 import { placeGeoJson, readContentCrs, type Placement } from "./crs.js";
 import type { LoadedReference } from "./reference.js";
 
-export type RenderableResult =
+/**
+ * What was asked for and what arrived, for an output the run asked a format
+ * for (#F3). `received` is the media type the output came with: the
+ * response's own for a raw answer, the entry's for one inside a results
+ * document, and absent when nothing said.
+ */
+export interface FormatFacts {
+  readonly asked?: string | undefined;
+  readonly received?: string | undefined;
+}
+
+export type RenderableResult = (
   | {
       readonly kind: "json";
       readonly outputId: string;
@@ -73,7 +84,9 @@ export type RenderableResult =
       readonly rel?: string | undefined;
       readonly title?: string | undefined;
       readonly loaded?: LoadedReference | undefined;
-    };
+    }
+) &
+  FormatFacts;
 
 /**
  * Above this, JSON and text are offered as a download instead of shown. It
@@ -113,6 +126,11 @@ export interface RenderOptions {
   readonly declaredMediaTypes?: Readonly<Record<string, string | undefined>> | undefined;
   readonly displayLimitBytes?: number | undefined;
   readonly parseLimitBytes?: number | undefined;
+  /**
+   * The media type the run asked for each output (#F3), so the result can
+   * say when the service sent something else.
+   */
+  readonly askedFormats?: Readonly<Record<string, string>> | undefined;
 }
 
 const EXTENSIONS: Readonly<Record<string, string>> = {
@@ -270,6 +288,30 @@ function fromEntry(
   };
 }
 
+/** The media type a results-document entry says it is: a link's, or a qualified value's. */
+function entryMediaType(entry: unknown): string | undefined {
+  if (!isRecord(entry)) return undefined;
+  if (typeof entry["href"] === "string" && !("value" in entry)) {
+    return optionalString(entry["type"]) ?? qualifiedMediaType(entry);
+  }
+  return "value" in entry ? qualifiedMediaType(entry) : undefined;
+}
+
+/** Each result with what was asked for it and what arrived, where it was asked a format (#F3). */
+function withFormats(
+  results: RenderableResult[],
+  asked: Readonly<Record<string, string>> | undefined,
+  received: (outputId: string) => string | undefined,
+): RenderableResult[] {
+  if (asked === undefined) return results;
+  return results.map((result) => {
+    const mediaType = asked[result.outputId];
+    if (mediaType === undefined) return result;
+    const arrived = received(result.outputId);
+    return { ...result, asked: mediaType, ...(arrived === undefined ? {} : { received: arrived }) };
+  });
+}
+
 /**
  * A raw JSON body is either one output's value or a results document keyed
  * by output id. It is split only when every key is a declared output and
@@ -334,7 +376,10 @@ export async function toRenderable(
   envelope: ResponseEnvelope,
   options: RenderOptions,
 ): Promise<RenderableResult[]> {
-  return (await render(envelope, options)).results;
+  const { results, entries } = await render(envelope, options);
+  return withFormats(results, options.askedFormats, (outputId) =>
+    entries === undefined ? envelope.mediaType : entryMediaType(entries.get(outputId)),
+  );
 }
 
 /** The results, and the results document's entries when the body was one. */
