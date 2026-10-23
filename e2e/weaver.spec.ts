@@ -152,7 +152,7 @@ async function observations(page: Page): Promise<ExportedObservation[]> {
 test.describe("Weaver, the 2.0 draft", () => {
   test("is spoken to as the draft, because it declares it", async ({ page }) => {
     await connect(page);
-    await expect(page.getByTestId("developer-note").filter({ hasText: "Speaking" })).toHaveText(
+    await expect(page.getByTestId("protocol-version")).toHaveText(
       "Speaking OGC API - Processes 2.0 (draft): the service declares 1.0 and 2.0.",
     );
     // The draft has no transmissionMode: Link is off, and says why.
@@ -236,7 +236,7 @@ test.describe("Weaver, pinned to 1.0 in config.json", () => {
 
   test("is spoken to as 1.0, and a link is asked for 1.0's way", async ({ page }) => {
     await connect(page);
-    await expect(page.getByTestId("developer-note").filter({ hasText: "Speaking" })).toHaveText(
+    await expect(page.getByTestId("protocol-version")).toHaveText(
       "Speaking OGC API - Processes 1.0: pinned in config.json.",
     );
     await expect(page.getByTestId("no-link-reason")).toHaveCount(0);
