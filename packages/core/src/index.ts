@@ -35,8 +35,8 @@ export type {
   HttpErrorClassification,
   OkClassification,
 } from "./http/classify.js";
-export { toProblemDetails } from "./http/problem.js";
-export type { ProblemContext, ProblemDetails } from "./http/problem.js";
+export { ogcExceptionOf, toProblemDetails } from "./http/problem.js";
+export type { OgcException, ProblemContext, ProblemDetails } from "./http/problem.js";
 export { AbortError, BodyTooLargeError, ProcessesError, TransportError } from "./http/errors.js";
 export { isJsonMediaType, parseMediaType } from "./http/media-type.js";
 export type { ParsedMediaType } from "./http/media-type.js";

@@ -58,6 +58,14 @@ export interface JobStatus {
   /** True when {@link rawStatus} was not in the OGC vocabulary. A finding when true. */
   readonly statusRecognised: boolean;
   readonly processId?: string;
+  /** 1.0's `type`, verbatim: `process` on every server seen. */
+  readonly type?: string;
+  /**
+   * The 2.0 draft's `processingEntityType`, verbatim, which the draft requires
+   * in place of `type` and says SHALL be `ogc-api-processes`
+   * (`/req/core/job-success`).
+   */
+  readonly processingEntityType?: string;
   /**
    * 0–100, from `progress` or `percentCompleted`, when the server reported one.
    *

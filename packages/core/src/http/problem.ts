@@ -15,9 +15,68 @@ const KNOWN_MEMBERS: ReadonlySet<string> = new Set([
 /** `about:blank`, an absolute URI, or a relative reference starting with `/`. */
 const URI_SHAPED = /^(?:[a-z][a-z0-9+.-]*:|\/)/i;
 
+/**
+ * The OGC API - Processes exception types the core names, from Part 1's
+ * `…/def/exceptions/ogcapi-processes-1/1.0/{name}`. 1.0 defines the first
+ * three; the 2.0 draft (OGC 18-062r3 at 756b659) adds `result-not-available`
+ * (404, a result that will never be there) and `no-such-output` (400, an
+ * output the process does not have).
+ */
+export type OgcException =
+  | "no-such-process"
+  | "no-such-job"
+  | "result-not-ready"
+  | "result-not-available"
+  | "no-such-output";
+
+const OGC_EXCEPTIONS: ReadonlySet<string> = new Set<OgcException>([
+  "no-such-process",
+  "no-such-job",
+  "result-not-ready",
+  "result-not-available",
+  "no-such-output",
+]);
+
+/**
+ * The OGC exception a problem's `type` names, or undefined.
+ *
+ * **The scheme is not compared.** 1.0 writes these URIs with `http://`; the
+ * draft moved all but one to `https://` and left `no-such-output` on `http://`
+ * (its issue #619). Either spelling names the same exception, so only the host
+ * and the path are read. The version segment is not compared either: the
+ * draft still writes `…/ogcapi-processes-1/1.0/…`.
+ */
+export function ogcExceptionOf(type: string): OgcException | undefined {
+  let url: URL;
+  try {
+    url = new URL(type);
+  } catch {
+    return undefined;
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
+  if (url.hostname.toLowerCase() !== "www.opengis.net") return undefined;
+  const segments = url.pathname.split("/").filter((segment) => segment !== "");
+  const [def, exceptions, family, , name, ...rest] = segments;
+  if (def !== "def" || exceptions !== "exceptions" || family !== "ogcapi-processes-1") {
+    return undefined;
+  }
+  if (rest.length > 0 || name === undefined || !isOgcException(name)) return undefined;
+  return name;
+}
+
+function isOgcException(name: string): name is OgcException {
+  return OGC_EXCEPTIONS.has(name);
+}
+
 export interface ProblemDetails {
   /** RFC 7807 defaults an absent `type` to `about:blank`. */
   readonly type: string;
+  /**
+   * The OGC exception `type` names, whether written `http://` or `https://`.
+   * Absent for any other type: pygeoapi's `NoSuchProcess` is a `code` in
+   * {@link extensions}, not a type, and is not guessed at.
+   */
+  readonly ogcException?: OgcException;
   readonly title: string | undefined;
   /**
    * The status the *body* claims. This is not necessarily the status on the
@@ -120,9 +179,11 @@ export function toProblemDetails(
   }
 
   const claimed = body["status"];
+  const ogcException = type === undefined ? undefined : ogcExceptionOf(type);
 
   return {
     type: type ?? "about:blank",
+    ...(ogcException === undefined ? {} : { ogcException }),
     title,
     // A string status is out of spec and common; it is dropped rather than
     // coerced into a NaN that would look like a real number downstream.
