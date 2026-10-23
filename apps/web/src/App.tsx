@@ -522,8 +522,6 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
       ? undefined
       : jobs.find((job) => job.statusUrl === shownJobRef)?.status?.jobId;
   const developerNotes = [
-    // The version of OGC API - Processes spoken to the connected service, and why.
-    ...(state.stage === "choose-endpoint" ? [] : [versionNote(state.service.capabilities)]),
     ...(state.stage === "process" && state.error?.technical !== undefined
       ? [state.error.technical]
       : []),
@@ -532,6 +530,8 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
     jobs.find((job) => job.statusUrl === shownJobRef)?.confirmation?.state === "pending"
       ? ["Not yet confirmed: the page reads the job's status again, quietly, for a while."]
       : []),
+    // The version of OGC API - Processes spoken to the connected service, and why.
+    ...(state.stage === "choose-endpoint" ? [] : [versionNote(state.service.capabilities)]),
   ];
   // Start and Processes in the rail are the user going somewhere: an open
   // side panel closes (§11.2).
