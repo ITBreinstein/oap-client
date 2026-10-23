@@ -608,4 +608,92 @@ describe("the observation", () => {
       vi.unstubAllGlobals();
     }
   });
+
+  it("records the version as 1.0 by default when it was not told one", async () => {
+    const { sink, seen } = collect();
+    await execute(LIST, "hello-world", {
+      inputs: {},
+      fetch: fakeFetch(json({ value: 1 })).fetch,
+      onObservation: sink,
+    });
+    expect(executionRecord(seen)).toMatchObject({
+      protocolVersion: "1.0",
+      versionSource: "default",
+    });
+  });
+
+  it("records the version it was told, and where that came from", async () => {
+    const { sink, seen } = collect();
+    await execute(LIST, "hello-world", {
+      inputs: {},
+      version: { version: "2.0-draft", source: "declared" },
+      fetch: fakeFetch(json({ value: 1 })).fetch,
+      onObservation: sink,
+    });
+    expect(executionRecord(seen)).toMatchObject({
+      protocolVersion: "2.0-draft",
+      versionSource: "declared",
+    });
+  });
+
+  it("records the media type asked for each output that names one, and nothing else", async () => {
+    const { sink, seen } = collect();
+    await execute(LIST, "p", {
+      inputs: {},
+      outputs: {
+        area: { format: { mediaType: "application/geo+json" } },
+        table: {},
+      },
+      fetch: fakeFetch(json({ value: 1 })).fetch,
+      onObservation: sink,
+    });
+    expect(executionRecord(seen).formatRequested).toEqual({ area: "application/geo+json" });
+
+    const none = collect();
+    await execute(LIST, "p", {
+      inputs: {},
+      outputs: { table: {} },
+      fetch: fakeFetch(json({ value: 1 })).fetch,
+      onObservation: none.sink,
+    });
+    expect(executionRecord(none.seen).formatRequested).toBeUndefined();
+  });
+
+  it("records the Preference-Applied tokens as sent", async () => {
+    const { sink, seen } = collect();
+    // pygeoapi 0.24.0 and master: `wait`, on a synchronous answer.
+    await execute(LIST, "hello-world", {
+      inputs: {},
+      fetch: fakeFetch(json({ value: 1 }, 200, { "Preference-Applied": "wait" })).fetch,
+      onObservation: sink,
+    });
+    expect(executionRecord(seen).preferenceAppliedTokens).toEqual(["wait"]);
+
+    const async = collect();
+    await execute(LIST, "hello-world", {
+      inputs: {},
+      mode: "async",
+      fetch: fakeFetch(
+        json({ jobID: "j", status: "accepted" }, 201, {
+          Location: "https://service.test/oapi/jobs/j",
+          "Preference-Applied": "respond-async, return=representation",
+        }),
+      ).fetch,
+      onObservation: async.sink,
+    });
+    expect(executionRecord(async.seen).preferenceAppliedTokens).toEqual([
+      "respond-async",
+      "return=representation",
+    ]);
+  });
+
+  it("records no tokens when there was no header", async () => {
+    const { sink, seen } = collect();
+    await execute(LIST, "hello-world", {
+      inputs: {},
+      fetch: fakeFetch(json({ value: 1 })).fetch,
+      onObservation: sink,
+    });
+    expect(executionRecord(seen).preferenceAppliedTokens).toBeUndefined();
+  });
 });

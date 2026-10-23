@@ -238,6 +238,71 @@ export class ExecutionTimeoutError extends Error {
   }
 }
 
+/** What the caller asked for, in 1.0's words, that the 2.0 draft cannot say. */
+export type DraftUnsupportedIntent = "raw" | "document" | "reference" | "value";
+
+/**
+ * Why the draft cannot say it.
+ *
+ * - `document-needs-several-outputs`: the draft returns a results document for
+ *   two or more requested outputs; for one it returns the value itself.
+ * - `raw-needs-one-output`: the draft returns one value raw only when one
+ *   output is requested.
+ * - `raw-needs-single-valued-output`: that one output may have more than one
+ *   value, which the draft returns as a JSON list instead.
+ * - `outputs-unknown`: neither an `outputs` block nor a description says how
+ *   many outputs the request asks for.
+ * - `no-transmission-mode`: the draft removed `transmissionMode`, and with it
+ *   any way to ask for a value or a link.
+ */
+export type DraftUnsupportedReason =
+  | "document-needs-several-outputs"
+  | "raw-needs-one-output"
+  | "raw-needs-single-valued-output"
+  | "outputs-unknown"
+  | "no-transmission-mode";
+
+/**
+ * An execute request that cannot be expressed in the 2.0 draft, refused
+ * **before anything is sent**.
+ *
+ * Refused rather than translated loosely or dropped: a `response: "document"`
+ * silently sent without its meaning would come back raw, and a by-reference
+ * request silently sent by value would hand back a value the caller did not
+ * ask for — both looking like the server's doing. Nothing reached the server,
+ * so no job exists and none is orphaned.
+ */
+export class DraftUnsupportedRequestError extends Error {
+  override readonly name = "DraftUnsupportedRequestError";
+  readonly intent: DraftUnsupportedIntent;
+  readonly reason: DraftUnsupportedReason;
+  /** The outputs the request named or implied, when known. Ids only. */
+  readonly outputIds: readonly string[];
+
+  constructor(
+    intent: DraftUnsupportedIntent,
+    reason: DraftUnsupportedReason,
+    outputIds: readonly string[],
+  ) {
+    super(`Not sent: ${DRAFT_REASONS[reason]} (OGC API - Processes 2.0 draft)`);
+    this.intent = intent;
+    this.reason = reason;
+    this.outputIds = Object.freeze([...outputIds]);
+  }
+}
+
+const DRAFT_REASONS: Readonly<Record<DraftUnsupportedReason, string>> = {
+  "document-needs-several-outputs":
+    'a response "document" needs two or more outputs requested; one output comes back as its value',
+  "raw-needs-one-output": 'a response "raw" needs exactly one output requested',
+  "raw-needs-single-valued-output":
+    'a response "raw" needs an output with maxOccurs 1; this one may have several values',
+  "outputs-unknown":
+    "neither an outputs block nor a description says how many outputs are requested",
+  "no-transmission-mode":
+    "the draft has no transmissionMode, so an output cannot be asked for by value or by reference",
+};
+
 /**
  * A job document was JSON of the wrong shape, in one of the two ways this layer
  * treats as fatal: the body is not an object, or it carries no usable `status`.

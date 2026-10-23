@@ -72,6 +72,21 @@ export type { ConformanceClass, ParsedConformance } from "./conformance/parse.js
 export { deriveCapabilities, unknownCapabilities } from "./conformance/capabilities.js";
 export type { ServiceCapabilities } from "./conformance/capabilities.js";
 
+// Versions. Which version of Part 1 to speak is chosen from the conformance
+// declaration before anything is sent; what the 2.0 draft changes on the wire
+// is one dated module. See "Versions" in the README.
+export { chooseProtocolVersion, declaredCoreVersions } from "./conformance/version.js";
+export {
+  DEFAULT_VERSION_CHOICE,
+  isProtocolVersionPreference,
+} from "./vocabulary/protocol-version.js";
+export type {
+  ProtocolVersion,
+  ProtocolVersionPreference,
+  VersionChoice,
+  VersionSource,
+} from "./vocabulary/protocol-version.js";
+
 // Processes: the list and the description, and the types the whole product —
 // the generated form, the draw tool, the execute body, the result renderers —
 // is built on. Preservative, never interpretive: what to *do* with an input
@@ -133,6 +148,7 @@ export {
   isJobDocument,
   resolveExecutionUrl,
 } from "./execution/index.js";
+export { draftExecuteOptions, PROCESSES_2_0_DRAFT } from "./compat/processes-2.0-draft.js";
 export type {
   ExecuteInputValue,
   ExecuteOptions,
@@ -206,6 +222,7 @@ export type {
 // Errors raised above the transport, by the layers that read documents.
 export {
   AmbiguousExecutionResponseError,
+  DraftUnsupportedRequestError,
   ExecutionTimeoutError,
   JobNotFoundError,
   JobPollTimeoutError,
@@ -216,6 +233,7 @@ export {
   NotJsonError,
   ProcessNotFoundError,
 } from "./errors.js";
+export type { DraftUnsupportedIntent, DraftUnsupportedReason } from "./errors.js";
 
 // Observations: what the client saw, redacted at the point of creation.
 export { observe, redactUrl } from "./observations.js";

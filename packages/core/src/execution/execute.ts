@@ -22,8 +22,9 @@ import { AmbiguousExecutionResponseError, ExecutionTimeoutError } from "../error
 import { observe, redactUrl } from "../observations.js";
 import { buildRequest } from "./build-request.js";
 import { classifyExecution, gatherEvidence } from "./classify-execution.js";
-import { preferenceOutcome } from "./preference.js";
+import { preferenceAppliedTokens, preferenceOutcome } from "./preference.js";
 import { DEFAULT_EXECUTE_TIMEOUT_MS, type Execution, type ExecuteOptions } from "./types.js";
+import { DEFAULT_VERSION_CHOICE } from "../vocabulary/protocol-version.js";
 
 /**
  * Start a process.
@@ -63,6 +64,9 @@ export async function execute(
     requestedMode,
     requestedResponse: options.response,
     outputsSupplied: options.outputs !== undefined,
+    protocolVersion: (options.version ?? DEFAULT_VERSION_CHOICE).version,
+    versionSource: (options.version ?? DEFAULT_VERSION_CHOICE).source,
+    formatRequested: formatRequested(options),
     warnings: request.warnings,
     inputIds: request.inputIds,
     inputKinds: request.inputKinds,
@@ -93,6 +97,7 @@ export async function execute(
       disagreedWithRequestedMode: false,
       preferenceApplied: undefined,
       preferenceAppliedHeader: undefined,
+      preferenceAppliedTokens: undefined,
       discoveredVia: undefined,
       locationPresent: false,
       jobIdKnown: false,
@@ -105,6 +110,7 @@ export async function execute(
 
   const elapsedMs = Date.now() - startedAt;
   const preferenceAppliedHeader = envelope.headers.has("preference-applied");
+  const appliedTokens = preferenceAppliedTokens(envelope.headers.get("preference-applied"));
 
   // The headers are in, and the body is still to come: the classifier, the
   // problem check and the evidence all read it. The deadline and the caller's
@@ -125,6 +131,7 @@ export async function execute(
         disagreedWithRequestedMode: false,
         preferenceApplied: undefined,
         preferenceAppliedHeader,
+        preferenceAppliedTokens: appliedTokens,
         discoveredVia: undefined,
         locationPresent: envelope.locationRaw !== undefined,
         jobIdKnown: false,
@@ -172,6 +179,7 @@ export async function execute(
         disagreedWithRequestedMode: false,
         preferenceApplied: undefined,
         preferenceAppliedHeader,
+        preferenceAppliedTokens: appliedTokens,
         discoveredVia: undefined,
         locationPresent: envelope.locationRaw !== undefined,
         jobIdKnown: false,
@@ -205,6 +213,7 @@ export async function execute(
             locationPresent: evidence.locationPresent,
           }),
           preferenceAppliedHeader,
+          preferenceAppliedTokens: appliedTokens,
           discoveredVia: undefined,
           locationPresent: evidence.locationPresent,
           jobIdKnown: false,
@@ -233,6 +242,7 @@ export async function execute(
         locationPresent: evidence.locationPresent,
       }),
       preferenceAppliedHeader,
+      preferenceAppliedTokens: appliedTokens,
       discoveredVia: execution.kind === "job" ? execution.job.discoveredVia : undefined,
       locationPresent: evidence.locationPresent,
       jobIdKnown: execution.kind === "job" && execution.job.jobId !== undefined,
@@ -242,4 +252,17 @@ export async function execute(
 
     return execution;
   }
+}
+
+/**
+ * The media type asked for each output that names one, or undefined when none
+ * does. Output ids and media types only: both are the description's words,
+ * never the user's data.
+ */
+function formatRequested(options: ExecuteOptions): Readonly<Record<string, string>> | undefined {
+  const asked = Object.entries(options.outputs ?? {}).flatMap(([id, selection]) => {
+    const mediaType = selection.format?.mediaType;
+    return mediaType === undefined ? [] : [[id, mediaType] as const];
+  });
+  return asked.length === 0 ? undefined : Object.freeze(Object.fromEntries(asked));
 }

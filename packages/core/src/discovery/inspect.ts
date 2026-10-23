@@ -16,6 +16,7 @@
 
 import { unknownCapabilities, type ServiceCapabilities } from "../conformance/capabilities.js";
 import { deriveCapabilities } from "../conformance/capabilities.js";
+import type { ProtocolVersionPreference } from "../vocabulary/protocol-version.js";
 import { parseConformance } from "../conformance/parse.js";
 import { AbortError, ProcessesError } from "../http/errors.js";
 import { MalformedDocumentError, NotJsonError } from "../errors.js";
@@ -49,6 +50,12 @@ export interface InspectOptions {
    */
   readonly signal?: AbortSignal | undefined;
   readonly onObservation?: ObservationSink | undefined;
+  /**
+   * The version of Part 1 to speak: `"auto"` (the default) chooses from the
+   * conformance declaration; a version pins it, and the capabilities then say
+   * `versionSource: "configured"`.
+   */
+  readonly protocolVersion?: ProtocolVersionPreference | undefined;
 }
 
 /**
@@ -153,7 +160,7 @@ async function readCapabilities(
       usedFormatFallback: document.usedFormatFallback,
     });
 
-    return deriveCapabilities(parsed);
+    return deriveCapabilities(parsed, options.protocolVersion);
   } catch (error) {
     if (isAbort(error)) throw error;
     observe(sink, {
@@ -161,7 +168,7 @@ async function readCapabilities(
       url: redactUrl(url),
       reason: describe(error),
     });
-    return unknownCapabilities();
+    return unknownCapabilities(options.protocolVersion);
   }
 }
 
@@ -203,6 +210,9 @@ export async function inspect(
     dismiss: capabilities.dismiss,
     callback: capabilities.callback,
     jobList: capabilities.jobList,
+    protocolVersion: capabilities.protocolVersion,
+    versionSource: capabilities.versionSource,
+    declaredVersions: capabilities.declaredVersions,
   });
 
   return {
