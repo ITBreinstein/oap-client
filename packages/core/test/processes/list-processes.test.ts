@@ -52,8 +52,8 @@ describe("listProcesses on a single page", () => {
 
     // Task 5 registered `slow` on the pinned server so that asynchronous
     // polling could be tested at all, Task 7 the coverage-gap processes the
-    // form generator needs, and Task 8 a link a page cannot read — see
-    // infra/README.md.
+    // form generator needs, Task 8 a link a page cannot read, and #F3 an
+    // output offered in several formats — see infra/README.md.
     expect(list.processes.map((process) => process.id)).toEqual([
       "hello-world",
       "slow",
@@ -68,6 +68,7 @@ describe("listProcesses on a single page", () => {
       "breinstein-dates",
       "breinstein-feature-area",
       "breinstein-buildings",
+      "breinstein-formats",
       "breinstein-link",
     ]);
     expect(list.pageCount).toBe(1);
