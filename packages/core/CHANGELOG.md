@@ -3,6 +3,54 @@
 Changes to `@breinstein/oap-client` that a consumer has to know about. Started
 at 0.5.0; earlier versions are recorded only in the git history.
 
+## Unreleased
+
+### Added
+
+- **The 2.0 draft (OGC 18-062r3 at commit 756b659), with fallback to 1.0.**
+  The client chooses the version from the conformance declaration before it
+  sends anything; see "Versions" in the README.
+  - `createClient({ protocolVersion })`: `"auto"` (the default), `"1.0"` or
+    `"2.0-draft"`.
+  - `chooseProtocolVersion()`, `declaredCoreVersions()`,
+    `isProtocolVersionPreference()`, `DEFAULT_VERSION_CHOICE`, and the types
+    `ProtocolVersion`, `ProtocolVersionPreference`, `VersionSource`,
+    `VersionChoice`.
+  - `draftExecuteOptions()`, which the client applies on a draft service, and
+    `PROCESSES_2_0_DRAFT`, the commit and date it was written against.
+  - `DraftUnsupportedRequestError`, thrown before sending for a request the
+    draft cannot express.
+  - `ExecuteOptions.version` and `InspectOptions.protocolVersion`, for the
+    free functions. The client's per-call options leave both out: a client
+    chooses its version once, at construction.
+- `ProblemDetails.ogcException` and `ogcExceptionOf()`: the OGC exception a
+  problem's `type` names, in either scheme, including the draft's
+  `result-not-available` and `no-such-output`.
+- `JobStatus.type` and `JobStatus.processingEntityType`, as sent.
+- Observations: `execution` gains `protocolVersion`, `versionSource`,
+  `formatRequested` and `preferenceAppliedTokens`; `capabilities-derived`
+  gains `protocolVersion`, `versionSource` and `declaredVersions`.
+
+### Breaking
+
+- Required members added to exported types. Code that **builds** one of these
+  objects itself, as tests often do, stops compiling until it adds them; code
+  that only reads them is unaffected:
+  - `ServiceCapabilities`: `protocolVersion`, `versionSource`,
+    `declaredVersions`.
+  - `OutputDescription`: `minOccurs`, `maxOccurs`, `multiple`.
+  - The `execution` and `capabilities-derived` members of `Observation`, as
+    above.
+- On a service that declares the 2.0 draft, `client.execute()` with
+  `response`, or with any output's `transmissionMode`, now sends the draft's
+  form of the request or throws `DraftUnsupportedRequestError`, where it used
+  to send 1.0's body. Pin `protocolVersion: "1.0"` to keep the old request.
+
+### Changed
+
+- An output's `minOccurs` and `maxOccurs` are read, and no longer reported in
+  `ParseReport.unrecognisedKeys`.
+
 ## 0.5.0 — 2026-10-21
 
 ### Breaking
