@@ -900,7 +900,23 @@ and pygeoapi (0.24.0 and master) declare 1.0 only. See
   `successful`, its results read with a 200). **Only with an
   `Accept-Language` other than `*`.** Node's `fetch` sends `*` by default,
   and Weaver answers that with a 406; the core does not change the header,
-  so a caller in Node passes a `fetch` that sets it.
+  so a caller in Node passes a `fetch` that sets it, keeping the core's own:
+
+  ```ts
+  import { createClient, type FetchLike } from "@breinstein/oap-client";
+
+  const withLanguage: FetchLike = (input, init) => {
+    const headers = new Headers(init?.headers); // the core's headers, kept
+    headers.set("Accept-Language", "en");
+    return fetch(input, { ...init, headers });
+  };
+
+  const client = createClient({ baseUrl: "http://localhost:5100", fetch: withLanguage });
+  ```
+
+  `test/http/accept-language-example.test.ts` runs this code and checks that
+  `Content-Type` and `Prefer` still go out with it.
+
 - **From the web app, in a browser: no.** The version is chosen and the
   request is sent in the draft's form, but Weaver refuses the request a form
   generated from `EchoProcess`'s description sends (a 422; see below), and
@@ -922,11 +938,13 @@ Where Weaver differs from the pinned draft:
 - It sends no CORS headers, and answers a preflight with 405: a browser
   reaches it only through the relay's read route.
 - It answers `Accept-Language: *`, which means any language, with a 406.
+  The example above is the way round it.
 - `EchoProcess` declares `arrayInput` and `geometryInput` with `maxOccurs`
   above 1 **and** an array schema, which the draft's cardinality section
   encodes as arrays of arrays; Weaver refuses those with a 422 and accepts
   only the flat form. The standard's own example process declares neither
-  input that way.
+  input that way. So a client that follows the draft can't run Weaver's own
+  example process.
 
 ### Not supported
 
