@@ -35,6 +35,7 @@ import { initialValues } from "../forms/defaults.js";
 import { shownOnMap } from "./input-shapes.js";
 import { MapLimitsContext } from "./map-limits.js";
 import { offersLink, namedFieldError } from "./run.js";
+import { linkExpressible, NO_LINK_IN_DRAFT } from "./protocol-version.js";
 import type { WorkflowCommands, WorkflowView } from "./useWorkflow.js";
 import type { Workflow } from "./workflow.js";
 
@@ -120,8 +121,17 @@ function OutputChoices({
   readonly onChange: WorkflowCommands["setTransmission"];
 }) {
   const { process, linkOutputs } = state;
+  const reasonId = useId();
   const allowed = offersLink(process);
+  // The 2.0 draft has no per-output `transmissionMode`, which is what "Link"
+  // is sent as: the choice stays in view, off, with the reason beside it.
+  const expressible = linkExpressible(state.service.capabilities);
   if (process.outputs.length === 0 || (!allowed && !developer)) return null;
+  const reason = !expressible && (
+    <p id={reasonId} className="help" data-testid="no-link-reason">
+      {NO_LINK_IN_DRAFT}
+    </p>
+  );
   if (!allowed) {
     return (
       <fieldset className="outputs developer">
@@ -133,11 +143,14 @@ function OutputChoices({
             : `it declares ${process.outputTransmission.join(", ")}`}
           ). Asking anyway is recorded as going beyond it.
         </p>
+        {reason}
         {process.outputs.map((output) => (
           <label key={output.id} className="choice">
             <input
               type="checkbox"
               checked={linkOutputs.includes(output.id)}
+              disabled={!expressible}
+              aria-describedby={expressible ? undefined : reasonId}
               onChange={(event) => {
                 onChange(output.id, event.target.checked ? "reference" : "value");
               }}
@@ -151,6 +164,7 @@ function OutputChoices({
   return (
     <fieldset className="outputs">
       <legend>Outputs</legend>
+      {reason}
       {process.outputs.map((output) => {
         const link = linkOutputs.includes(output.id);
         return (
@@ -172,6 +186,8 @@ function OutputChoices({
                 type="radio"
                 name={`transmission-${output.id}`}
                 checked={link}
+                disabled={!expressible}
+                aria-describedby={expressible ? undefined : reasonId}
                 onChange={() => {
                   onChange(output.id, "reference");
                 }}
