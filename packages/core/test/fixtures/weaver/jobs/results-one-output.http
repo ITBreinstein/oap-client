@@ -1,0 +1,9 @@
+HTTP/1.1 500 Internal Server Error
+Server: gunicorn
+Date: Fri, 23 Oct 2026 10:43:21 GMT
+Connection: close
+X-Content-Type-Options: nosniff
+Content-Type: application/json
+Content-Length: 230
+
+{"description": "The server has either erred or is incapable of performing the requested operation. Unhandled internal server error.", "code": "Internal Server Error", "error": {"code": 500, "status": "500 Internal Server Error"}}
