@@ -224,6 +224,18 @@ every output, as the web app does; `one-output-request.json` lists one.
   `Access-Control-Allow-Origin`: Weaver sends no CORS headers, so a browser
   reaches it only through the relay's read route.
 
+- `execution/accept-language-star-406.http` — the one-output request of
+  `one-output-request.json`, sent with `Accept-Language: *`, which is what
+  Node's `fetch` sends by default: **406**, "Requested language [*] not in
+  supported languages". RFC 9110 reads `*` as any language. Captured
+  2026-10-23.
+- `deploy/cwl-without-docker-{request,422}.http` — a CWL CommandLineTool
+  deployed through `POST /processes` (Part 2, out of the client's scope; kept
+  as evidence): one string in, `echo`, one string out, and no
+  `DockerRequirement`. **422**: Weaver insists on one of its application
+  requirements — Docker, or a builtin or remote one — before it runs
+  anything. Captured 2026-10-23.
+
 Re-capture by hand against `http://localhost:5100`, as for pygeoapi:
 
     docker compose -f infra/compose/weaver.yml -p oap-weaver up -d --wait

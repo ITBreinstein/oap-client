@@ -858,9 +858,11 @@ Headers are the same in both: `Prefer: respond-async` for an asynchronous run,
 and nothing for a synchronous one. No `return=` and no profile negotiation are
 sent.
 
-Called on its own, `execute()` does not translate: pass the options through
-`draftExecuteOptions()` first, and the version as `version`, as the client
-does.
+Called on its own, `execute()` does not translate, but it does guard: given
+`version` the 2.0 draft, it refuses options that still carry `response` or any
+`transmissionMode`, with `DraftUnsupportedRequestError`, before sending. Pass
+the options through `draftExecuteOptions()` first, and the version as
+`version`, as the client does.
 
 ### What is read, whatever the version
 
@@ -887,8 +889,27 @@ server:
 **Weaver**, `pavics/weaver:latest-manager@sha256:5413e646…` (6.16.0 plus
 master), the one server found that declares the draft's Core class; ZOO-Project
 and pygeoapi (0.24.0 and master) declare 1.0 only. See
-`infra/compose/weaver.yml` and `test/fixtures/weaver/`. Where Weaver differs
-from the pinned draft:
+`infra/compose/weaver.yml` and `test/fixtures/weaver/`.
+
+**Has a run succeeded against a 2.0 server?** As of 2026-10-23:
+
+- **From this core, in Node: yes**, with Weaver's builtin `EchoProcess` and
+  the inputs Weaver's own example uses. Synchronous with one output (`raw`:
+  the value, `text/plain`), synchronous with every output (`document`: a
+  results map), and asynchronous with every output (`201`, the job
+  `successful`, its results read with a 200). **Only with an
+  `Accept-Language` other than `*`.** Node's `fetch` sends `*` by default,
+  and Weaver answers that with a 406; the core does not change the header,
+  so a caller in Node passes a `fetch` that sets it.
+- **From the web app, in a browser: no.** The version is chosen and the
+  request is sent in the draft's form, but Weaver refuses the request a form
+  generated from `EchoProcess`'s description sends (a 422; see below), and
+  `EchoProcess` is the only process this image runs. A minimal CWL process
+  deployed without a `DockerRequirement` would have been the way round that;
+  Weaver refuses to deploy one, with a 422 naming the requirements it
+  insists on (`DockerRequirement`, or a builtin or remote one).
+
+Where Weaver differs from the pinned draft:
 
 - An asynchronous job that asked for **one** output answers `GET …/results`
   with a 500. With every output asked for, it answers 200.
@@ -900,6 +921,12 @@ from the pinned draft:
   `statusInfo.yaml` as its `$schema`.
 - It sends no CORS headers, and answers a preflight with 405: a browser
   reaches it only through the relay's read route.
+- It answers `Accept-Language: *`, which means any language, with a 406.
+- `EchoProcess` declares `arrayInput` and `geometryInput` with `maxOccurs`
+  above 1 **and** an array schema, which the draft's cardinality section
+  encodes as arrays of arrays; Weaver refuses those with a 422 and accepts
+  only the flat form. The standard's own example process declares neither
+  input that way.
 
 ### Not supported
 

@@ -3,7 +3,10 @@
 Changes to `@breinstein/oap-client` that a consumer has to know about. Started
 at 0.5.0; earlier versions are recorded only in the git history.
 
-## Unreleased
+## Unreleased — to be 0.6.0
+
+Contains breaking changes, listed under **Breaking** below: the next release
+is 0.6.0, not a patch.
 
 ### Added
 
@@ -45,6 +48,12 @@ at 0.5.0; earlier versions are recorded only in the git history.
   `response`, or with any output's `transmissionMode`, now sends the draft's
   form of the request or throws `DraftUnsupportedRequestError`, where it used
   to send 1.0's body. Pin `protocolVersion: "1.0"` to keep the old request.
+- `execute()`, called on its own with `version` the 2.0 draft, refuses options
+  that still carry `response` or any `transmissionMode`, with
+  `DraftUnsupportedRequestError`, before sending. It does not translate them:
+  pass the options through `draftExecuteOptions()` first, as the client does.
+  `DraftUnsupportedReason` gains `"response-not-in-draft"`; code that switches
+  over every reason must handle it.
 
 ### Changed
 

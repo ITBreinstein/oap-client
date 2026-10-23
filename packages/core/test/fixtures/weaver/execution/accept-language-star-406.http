@@ -1,0 +1,9 @@
+HTTP/1.1 406 Not Acceptable
+Server: gunicorn
+Date: Fri, 23 Oct 2026 11:38:15 GMT
+Connection: close
+Content-Type: application/json
+Content-Length: 345
+X-Content-Type-Options: nosniff
+
+{"$schema":"https://schemas.opengis.net/ogcapi/common/part1/1.0/openapi/schemas/exception.json","type":"NotAcceptable","title":"Execution request is not acceptable.","detail":"Requested language [*] not in supported languages [['en', 'en-CA', 'en-US', 'fr', 'fr-CA']].","status":406,"cause":{"name":"Accept-Language","in":"headers"},"value":"*"}

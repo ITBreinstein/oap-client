@@ -1,0 +1,20 @@
+POST http://localhost:5100/processes HTTP/1.1
+Content-Type: application/cwl+json
+Accept: application/json
+
+{
+  "cwlVersion": "v1.2",
+  "class": "CommandLineTool",
+  "id": "echo-string",
+  "label": "Echo a string",
+  "baseCommand": "echo",
+  "requirements": [{ "class": "InlineJavascriptRequirement" }],
+  "inputs": { "message": { "type": "string", "inputBinding": { "position": 1 } } },
+  "outputs": {
+    "echoed": {
+      "type": "string",
+      "outputBinding": { "glob": "out.txt", "loadContents": true, "outputEval": "$(self[0].contents.trim())" }
+    }
+  },
+  "stdout": "out.txt"
+}
