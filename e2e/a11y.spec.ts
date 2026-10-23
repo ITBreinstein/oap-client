@@ -196,6 +196,9 @@ for (const style of ["instrument", "instrument-updated"] as const) {
       await page.getByRole("button", { name: "Run", exact: true }).click();
       await expect(page.locator('[data-output-id="features"]')).toBeVisible({ timeout: 30_000 });
       await noViolations(page, "a result in the format asked for");
+      // A request the stand-in route is still forwarding when the test ends
+      // would fail outside any test.
+      await page.unrouteAll({ behavior: "ignoreErrors" });
     });
   }
 }
