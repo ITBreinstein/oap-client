@@ -24,6 +24,7 @@ import {
   type ReferenceOutcome,
   type Representation,
 } from "./results/reference.js";
+import type { CrsSource, KnownCrs, Placement } from "./results/crs.js";
 import type { RenderableResult } from "./results/renderable.js";
 import type { ExecuteRouteObservation } from "./relay/routed-fetch.js";
 
@@ -156,6 +157,15 @@ export interface ResultObservation {
   readonly contentCrs: string | undefined;
   readonly axisSwapped: boolean | undefined;
   /**
+   * The coordinate system the result named, when it named one this page
+   * places (#F1): `CRS84`, `EPSG:4326` or `EPSG:28992`. Absent otherwise.
+   */
+  readonly sourceCrs?: KnownCrs | undefined;
+  /** Where that CRS was read from. Absent when none was named. */
+  readonly crsFrom?: CrsSource | undefined;
+  /** Present, and true, when the result was reprojected to put it on the map. */
+  readonly reprojected?: true | undefined;
+  /**
    * Second record (#28): the href, an image this page could not read, was
    * shown with an `<img>` instead, which a browser loads from anywhere.
    * What the page could read of it is `referenceOutcome`, as ever.
@@ -231,10 +241,42 @@ export function resultObservations(
       referenceOutcome: reference ? "not-followed" : undefined,
       representation: undefined,
       truncated: undefined,
-      contentCrs: undefined,
-      axisSwapped: undefined,
+      contentCrs:
+        result.kind === "json" || result.kind === "download"
+          ? crsUriOf(result.placement)
+          : undefined,
+      axisSwapped:
+        result.kind === "json" || result.kind === "download"
+          ? swappedBy(result.placement)
+          : undefined,
+      ...(result.kind === "json" || result.kind === "download" ? crsFacts(result.placement) : {}),
     };
   });
+}
+
+/** The CRS URI a placement read, when the result named one. */
+function crsUriOf(placement: Placement | undefined): string | undefined {
+  return placement === undefined || placement.kind === "as-sent" ? undefined : placement.uri;
+}
+
+/** Whether placing it swapped its axes; undefined when it named no CRS. */
+function swappedBy(placement: Placement | undefined): boolean | undefined {
+  return placement === undefined || placement.kind === "as-sent"
+    ? undefined
+    : placement.kind === "swapped";
+}
+
+/** `sourceCrs`, `crsFrom` and `reprojected`, for a result that named a CRS (#F1). */
+function crsFacts(
+  placement: Placement | undefined,
+): Pick<ResultObservation, "sourceCrs" | "crsFrom" | "reprojected"> {
+  if (placement === undefined || placement.kind === "as-sent") return {};
+  if (placement.kind === "other") return { crsFrom: placement.from };
+  return {
+    sourceCrs: placement.crs,
+    crsFrom: placement.from,
+    ...(placement.kind === "reprojected" ? { reprojected: true } : {}),
+  };
 }
 
 /** The second record for an output given by reference: what Load found. */
@@ -253,6 +295,7 @@ export function loadedObservation(
     truncated: loaded.page === undefined ? undefined : isTruncated(loaded.page),
     contentCrs: loaded.contentCrs,
     axisSwapped: loaded.axes === undefined ? undefined : loaded.axes === "swapped",
+    ...crsFacts(loaded.placement),
     ...(loaded.image === true && (loaded.outcome === "cors-blocked" || loaded.outcome === "failed")
       ? { shownAsImage: true }
       : {}),

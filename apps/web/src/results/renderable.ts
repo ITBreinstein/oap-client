@@ -20,10 +20,17 @@ import {
   resolveHref,
   type ResponseEnvelope,
 } from "@breinstein/oap-client";
+import { placeGeoJson, readContentCrs, type Placement } from "./crs.js";
 import type { LoadedReference } from "./reference.js";
 
 export type RenderableResult =
-  | { readonly kind: "json"; readonly outputId: string; readonly value: unknown }
+  | {
+      readonly kind: "json";
+      readonly outputId: string;
+      readonly value: unknown;
+      /** Where its GeoJSON goes on the map, from the response's `Content-Crs` (#F1). */
+      readonly placement?: Placement | undefined;
+    }
   | {
       readonly kind: "text";
       readonly outputId: string;
@@ -48,6 +55,8 @@ export type RenderableResult =
        * still read, so GeoJSON can go on the map (`plottable.ts`).
        */
       readonly json?: unknown;
+      /** As for `json`: where `json`'s GeoJSON goes on the map (#F1). */
+      readonly placement?: Placement | undefined;
     }
   | {
       /**
@@ -325,9 +334,26 @@ export async function toRenderable(
   envelope: ResponseEnvelope,
   options: RenderOptions,
 ): Promise<RenderableResult[]> {
+  return (await render(envelope, options)).results;
+}
+
+/** The results, and the results document's entries when the body was one. */
+async function render(
+  envelope: ResponseEnvelope,
+  options: RenderOptions,
+): Promise<{ results: RenderableResult[]; entries?: ReadonlyMap<string, unknown> }> {
+  const results = (list: RenderableResult[]) => ({ results: list });
   const limit = options.displayLimitBytes ?? DEFAULT_DISPLAY_LIMIT_BYTES;
   const single = options.outputIds.length === 1 ? (options.outputIds[0] ?? "result") : "result";
   const { mediaType } = envelope;
+  // The response's Content-Crs names the system of its body (#F1), and so of
+  // a body that is one output's value. Not of the outputs inside a results
+  // document: one header cannot say which of them it is about.
+  const contentCrs = readContentCrs(envelope.contentCrs);
+  const placed = async (value: unknown): Promise<{ placement?: Placement }> =>
+    contentCrs === undefined
+      ? {}
+      : { placement: await placeGeoJson(value, contentCrs, "content-crs") };
   const download = async (
     reason: "not-text" | "too-large",
     json?: unknown,
@@ -339,21 +365,21 @@ export async function toRenderable(
       mediaType,
       filename: envelope.filename ?? defaultFilename(options.processId, single, mediaType),
       reason,
-      ...(json === undefined ? {} : { json }),
+      ...(json === undefined ? {} : { json, ...(await placed(json)) }),
     },
   ];
 
-  if (envelope.bodyTooLarge) return download("too-large");
-  if (!envelope.isJson && !isTextual(mediaType)) return download("not-text");
+  if (envelope.bodyTooLarge) return results(await download("too-large"));
+  if (!envelope.isJson && !isTextual(mediaType)) return results(await download("not-text"));
 
   // The bytes first: they are what a Download saves, and text is only what
   // they decode to cleanly. Bytes that do not decode are not text.
   const bytes = await envelope.arrayBuffer();
   if (bytes.byteLength > (options.parseLimitBytes ?? DEFAULT_PARSE_LIMIT_BYTES)) {
-    return download("too-large");
+    return results(await download("too-large"));
   }
   const text = strictText(bytes, envelope.mediaTypeParams["charset"]);
-  if (text === undefined) return download("not-text");
+  if (text === undefined) return results(await download("not-text"));
   const tooLarge = bytes.byteLength > limit;
   const shownAsText = async (): Promise<RenderableResult[]> => [
     {
@@ -371,20 +397,23 @@ export async function toRenderable(
       value = JSON.parse(text) as unknown;
     } catch {
       // Labelled JSON and is not (ZOO does this, finding 0026): show the text.
-      if (tooLarge) return download("too-large");
-      return shownAsText();
+      if (tooLarge) return results(await download("too-large"));
+      return results(await shownAsText());
     }
     const entries = splitResults(value, options.outputIds);
     if (entries !== undefined) {
-      return entries.map(([id, entry]) =>
-        withinLimit(fromEntry(id, entry, options, envelope.url), limit, options.processId),
-      );
+      return {
+        results: entries.map(([id, entry]) =>
+          withinLimit(fromEntry(id, entry, options, envelope.url), limit, options.processId),
+        ),
+        entries: new Map(entries),
+      };
     }
-    if (tooLarge) return download("too-large", value);
-    return [{ kind: "json", outputId: single, value }];
+    if (tooLarge) return results(await download("too-large", value));
+    return results([{ kind: "json", outputId: single, value, ...(await placed(value)) }]);
   }
 
-  if (tooLarge) return download("too-large");
+  if (tooLarge) return results(await download("too-large"));
 
-  return shownAsText();
+  return results(await shownAsText());
 }

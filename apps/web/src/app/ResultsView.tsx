@@ -21,6 +21,7 @@ import { saveBlob } from "./save.js";
 import { useDataUrl } from "./useDataUrl.js";
 import { useSpared } from "./developer.js";
 import { useUpdated } from "./variant.js";
+import { placementWords } from "./placement-words.js";
 import {
   isShownImage,
   mapImage,
@@ -167,6 +168,10 @@ function ResultItem({
   const plain = updated && result.kind === "json" ? plainValue(result.value) : undefined;
   const status = plotStatus(result, maxCoordinates);
   const plot = status.kind;
+  const placementLine = placementWords(
+    status,
+    result.kind === "json" || result.kind === "download" ? result.placement : undefined,
+  );
   const imageOnMap = placed?.outputId === result.outputId;
   const boxOfImage = placed?.bboxOutputId === result.outputId;
   return (
@@ -181,10 +186,9 @@ function ResultItem({
         <p className="muted">Shown on the map, over the area in “{placed.bboxOutputId}”.</p>
       )}
       {boxOfImage && <p className="muted">The area the image “{placed.outputId}” covers.</p>}
-      {plot === "projected" && (
-        <p className="muted">
-          GeoJSON, but its coordinates are not longitude and latitude, so it is not shown on the
-          map.
+      {placementLine !== undefined && (
+        <p className="muted" data-testid="placement">
+          {placementLine}
         </p>
       )}
       {status.kind === "too-many" && (
@@ -467,6 +471,7 @@ function ReferenceItem({
   const { maxCoordinates } = useContext(MapLimitsContext);
   const status = plotStatus(result, maxCoordinates);
   const plot = status.kind;
+  const placementLine = placementWords(status, loaded?.placement);
   const image = shownImage(result);
   const imageOnMap = placed?.outputId === result.outputId;
   const page = loaded === undefined ? undefined : pageLine(loaded);
@@ -505,16 +510,9 @@ function ReferenceItem({
         )}
       </div>
       {plot === "plotted" && <p className="muted">GeoJSON: shown on the map in blue.</p>}
-      {plot === "plotted" && loaded?.axes === "swapped" && (
-        <p className="muted">
-          Its Content-Crs is EPSG:4326, latitude first: its axes were swapped to put it on the map.
-        </p>
-      )}
-      {plot === "projected" && (
-        <p className="muted">
-          GeoJSON, but not in longitude and latitude
-          {loaded?.contentCrs === undefined ? "" : ` (Content-Crs ${loaded.contentCrs})`}, so it is
-          not shown on the map. Nothing here reprojects.
+      {placementLine !== undefined && (
+        <p className="muted" data-testid="placement">
+          {placementLine}
         </p>
       )}
       {status.kind === "too-many" && (

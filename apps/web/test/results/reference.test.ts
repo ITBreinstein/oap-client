@@ -275,13 +275,13 @@ describe("Content-Crs (T5)", () => {
     expect(readContentCrs("<>")).toBeUndefined();
   });
 
-  it("plots CRS84 or no header as is, swaps EPSG:4326, and plots nothing else", () => {
+  it("plots CRS84 or no header as is, swaps EPSG:4326, reprojects RD New, and nothing else", () => {
     expect(axisHandling(undefined)).toBe("as-is");
     expect(axisHandling("http://www.opengis.net/def/crs/OGC/1.3/CRS84")).toBe("as-is");
     expect(axisHandling("http://www.opengis.net/def/crs/EPSG/0/4326")).toBe("swapped");
     expect(axisHandling("urn:ogc:def:crs:EPSG::4326")).toBe("swapped");
     expect(axisHandling("http://www.opengis.net/def/crs/EPSG/0/4258")).toBe("not-plotted");
-    expect(axisHandling("http://www.opengis.net/def/crs/EPSG/0/28992")).toBe("not-plotted");
+    expect(axisHandling("http://www.opengis.net/def/crs/EPSG/0/28992")).toBe("reprojected");
   });
 
   async function loadedWith(key: string, headers: Record<string, string> = {}) {
@@ -298,13 +298,20 @@ describe("Content-Crs (T5)", () => {
     expect(plotStatus(asResult(loaded)).kind).toBe("projected");
   });
 
-  it("does not plot PDOK's RD New", async () => {
+  it("reprojects PDOK's RD New onto where PDOK's own CRS84 answer puts it (#F1)", async () => {
     const loaded = await loadedWith("pdok/bag-pand-items-epsg28992.http");
     expect(loaded).toMatchObject({
-      axes: "not-plotted",
+      axes: "reprojected",
       contentCrs: "http://www.opengis.net/def/crs/EPSG/0/28992",
+      placement: { kind: "reprojected", crs: "EPSG:28992", from: "content-crs" },
     });
-    expect(plotStatus(asResult(loaded)).kind).toBe("projected");
+    const status = plotStatus(asResult(loaded));
+    if (status.kind !== "plotted") throw new Error(`not plotted: ${status.kind}`);
+    const [first] = status.shapes;
+    if (first?.type !== "Polygon") throw new Error("expected a polygon");
+    const [x = 0, y = 0] = first.coordinates[0]?.[0] ?? [];
+    expect(x).toBeCloseTo(5.12, 1);
+    expect(y).toBeCloseTo(52.09, 1);
   });
 
   it("swaps latitude-first coordinates labelled EPSG:4326 back onto the Netherlands", async () => {

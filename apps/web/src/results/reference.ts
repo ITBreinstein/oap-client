@@ -27,11 +27,11 @@
  *    absent. Then GeoJSON by shape; else a collection, whose GeoJSON items
  *    link is followed once; else an image by media type; else "other".
  *
- * `Content-Crs` decides whether GeoJSON is plotted (T5): absent or CRS84 as
- * it is, EPSG:4326 with its axes swapped, anything else — EPSG:4258, RD New —
- * not at all. A swap is invisible to the coordinate-range check: a Dutch
- * point at (5, 52) swapped is (52, 5), still "in degrees", in Somalia
- * (finding 0051). Nothing reprojects.
+ * `Content-Crs` decides whether GeoJSON is plotted (T5, #F1): absent or
+ * CRS84 as it is, EPSG:4326 with its axes swapped, EPSG:28992 (RD New)
+ * reprojected, anything else — EPSG:4258 among them — not at all. A swap is
+ * invisible to the coordinate-range check: a Dutch point at (5, 52) swapped is
+ * (52, 5), still "in degrees", in Somalia (finding 0051). See `crs.ts`.
  */
 
 import {
@@ -48,7 +48,7 @@ import {
   type Link,
   type ResponseEnvelope,
 } from "@breinstein/oap-client";
-import { classifyCrs } from "../forms/crs.js";
+import { knownCrs, placeGeoJson, readContentCrs, type Placement } from "./crs.js";
 import { shapesIn } from "../forms/geojson.js";
 import { isJsonObject } from "../forms/json.js";
 import { isMixedContent } from "../mixed-content.js";
@@ -67,8 +67,8 @@ export type ReferenceOutcome =
 /** What the href turned out to hold (T5). */
 export type Representation = "geojson" | "collection" | "image" | "other";
 
-/** What `Content-Crs` means for the map (T5). */
-export type AxisHandling = "as-is" | "swapped" | "not-plotted";
+/** What `Content-Crs` means for the map (T5, #F1). */
+export type AxisHandling = "as-is" | "swapped" | "reprojected" | "not-plotted";
 
 /** One page of features, and whether it is all of them (T6). */
 export interface PageInfo {
@@ -96,6 +96,8 @@ export interface LoadedReference {
   /** `Content-Crs` without its angle brackets. */
   readonly contentCrs: string | undefined;
   readonly axes: AxisHandling | undefined;
+  /** Where the GeoJSON goes on the map, in CRS84 (#F1). Undefined for anything but GeoJSON. */
+  readonly placement?: Placement | undefined;
   readonly page: PageInfo | undefined;
   /** The items link followed from a collection. */
   readonly itemsUrl: string | undefined;
@@ -190,25 +192,20 @@ export function routeFor(
     : "direct";
 }
 
-/** `<http://…/CRS84>` → `http://…/CRS84`. */
-export function readContentCrs(header: string | undefined): string | undefined {
-  if (header === undefined) return undefined;
-  const bare = header.trim().replace(/^<\s*/, "").replace(/\s*>$/, "");
-  return bare === "" ? undefined : bare;
-}
+export { readContentCrs } from "./crs.js";
 
 export function axisHandling(contentCrs: string | undefined): AxisHandling {
   if (contentCrs === undefined) return "as-is";
-  switch (classifyCrs(contentCrs)) {
-    case "crs84":
+  switch (knownCrs(contentCrs)) {
+    case "CRS84":
       return "as-is";
-    case "epsg4326":
+    case "EPSG:4326":
       return "swapped";
+    case "EPSG:28992":
+      return "reprojected";
     // CRS84h has a height the map drops, EPSG:4258 is latitude first too, and
-    // anything else may be projected: none is what "as today" covers (T5).
-    case "crs84h":
-    case "other-epsg":
-    case "unknown":
+    // anything else may be projected some other way: none is placed (T5, #F1).
+    case undefined:
       return "not-plotted";
   }
 }
@@ -361,6 +358,7 @@ async function classifyAnswer(
       geojson: value,
       contentCrs,
       axes: axisHandling(contentCrs),
+      placement: await placeGeoJson(value, contentCrs, "content-crs"),
       page: pageOf(value, links),
     });
   }
