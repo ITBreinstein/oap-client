@@ -25,6 +25,8 @@
 import { readFile } from "node:fs/promises";
 import { AxeBuilder } from "@axe-core/playwright";
 import { expect, test, type Page, type Request } from "@playwright/test";
+import type { FetchLike } from "../packages/core/src/index.js";
+import { shapesWithAndWithoutFormats } from "./format-shape.js";
 import { requireService } from "./services.js";
 import { RELAY } from "./servers.js";
 
@@ -177,9 +179,16 @@ test.describe("Weaver, the 2.0 draft", () => {
     await page.getByRole("button", { name: "Run", exact: true }).click();
     const body = (await sent).postDataJSON() as Record<string, unknown>;
 
-    // Nothing extra: no response member, every output as the server prefers.
+    // Nothing extra: no response member, and every output listed, as the
+    // server prefers or (#F3) in the format the page can show where it offers
+    // several.
     expect(body).not.toHaveProperty("response");
-    expect(body["outputs"]).toEqual(Object.fromEntries(OUTPUTS.map((id) => [id, {}])));
+    expect(body["outputs"]).toEqual({
+      ...Object.fromEntries(OUTPUTS.map((id) => [id, {}])),
+      geometryOutput: { format: { mediaType: "application/geo+json" } },
+      imagesOutput: { format: { mediaType: "image/tiff; application=geotiff" } },
+      featureCollectionOutput: { format: { mediaType: "application/geo+json" } },
+    });
     // The draft's arrays of arrays, for an input with maxOccurs above 1 and an array schema.
     expect((body["inputs"] as Record<string, unknown>)["arrayInput"]).toEqual([
       [1, 2],
@@ -314,5 +323,63 @@ test.describe("Weaver's form, as the draft has it, with axe", () => {
         ).toEqual([]);
       });
     }
+  }
+});
+
+/** The core README's wrapped fetch: Weaver answers `Accept-Language: *`, Node's default, with a 406. */
+const withLanguage: FetchLike = (input, init) => {
+  const headers = new Headers(init?.headers); // the core's headers, kept
+  headers.set("Accept-Language", "en");
+  return fetch(input, { ...init, headers });
+};
+
+/** EchoProcess's inputs as Weaver's own example has them: flat, which it accepts. */
+async function weaversOwnInputs(): Promise<Record<string, unknown>> {
+  const request = JSON.parse(
+    await readFile("packages/core/test/fixtures/weaver/execution/one-output-request.json", "utf8"),
+  ) as { inputs: Record<string, unknown> };
+  return request.inputs;
+}
+
+test.describe("asking for a format leaves the answer's shape as it was (Weaver, the draft)", () => {
+  // One at a time: three sync runs at once on this Weaver answered with
+  // unrelated 400s.
+  test.describe.configure({ mode: "serial" });
+
+  // In the draft the number of outputs asked for decides raw or a document;
+  // the web app lists the same outputs with or without a format, so the
+  // answer's shape should not change. Weaver's does where it refuses a format
+  // its own description offers: GeoJSON for `featureCollectionOutput` is a
+  // 422, "Conversion from JSON to application/geo+json is not supported"
+  // (2026-10-23). Those cases are marked as failing because of Weaver: should
+  // Weaver start producing what it offers, they pass, and the lane says so.
+  const cases = [
+    { name: "every output", only: undefined, weaverRefuses: true },
+    {
+      name: "one output that offers GeoJSON, GML and KML",
+      only: ["featureCollectionOutput"],
+      weaverRefuses: true,
+    },
+    { name: "one output offered as GeoTIFF", only: ["imagesOutput"], weaverRefuses: false },
+  ] as const;
+
+  for (const { name, only, weaverRefuses } of cases) {
+    test(name, async () => {
+      test.setTimeout(120_000);
+      test.fail(
+        weaverRefuses,
+        "Weaver refuses application/geo+json for featureCollectionOutput, which it offers",
+      );
+      const pair = await shapesWithAndWithoutFormats({
+        baseUrl: WEAVER,
+        processId: "EchoProcess",
+        inputs: await weaversOwnInputs(),
+        fetch: withLanguage,
+        ...(only === undefined ? {} : { only }),
+      });
+      test.info().annotations.push({ type: "shapes", description: JSON.stringify(pair) });
+      expect(Object.keys(pair.asked).length).toBeGreaterThan(0);
+      expect(pair.with).toEqual(pair.without);
+    });
   }
 });
