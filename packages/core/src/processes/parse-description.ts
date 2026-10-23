@@ -200,9 +200,14 @@ function parseOutput(
   member: Record<string, unknown>,
   report: ParseReport,
 ): OutputDescription {
-  // `minOccurs`/`maxOccurs` are not part of an output, so the shared key list
-  // would report them as unrecognised if a server sent them — which is right.
-  noteUnrecognisedKeys(report, member, ["title", "description", "keywords", "schema"]);
+  // 1.0 gives an output no `minOccurs`/`maxOccurs`; the 2.0 draft does, with
+  // the inputs' defaults of 1 (see `OutputDescription.maxOccurs`). Read here
+  // whatever the version, by the inputs' rules: a 1.0 description simply has
+  // none and gets the defaults.
+  noteUnrecognisedKeys(report, member, KNOWN_IO_KEYS);
+
+  const { cardinality, warnings } = normaliseCardinality(member["minOccurs"], member["maxOccurs"]);
+  for (const warning of warnings) report.warnings.push(`outputs:${id}:${warning}`);
 
   const schema = readSchema(member["schema"], report, `outputs:${id}`);
   const title = optionalString(member["title"]);
@@ -214,6 +219,9 @@ function parseOutput(
     ...(title === undefined ? {} : { title }),
     ...(description === undefined ? {} : { description }),
     ...(keywords === undefined ? {} : { keywords }),
+    minOccurs: cardinality.minOccurs,
+    maxOccurs: cardinality.maxOccurs,
+    multiple: cardinality.multiple,
     schema: schema ?? EMPTY_SCHEMA,
   };
 }
