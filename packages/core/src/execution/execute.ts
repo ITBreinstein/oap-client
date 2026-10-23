@@ -18,7 +18,11 @@ import type { ResponseEnvelope } from "../http/envelope.js";
 import { AbortError, ProcessesError, TransportError } from "../http/errors.js";
 import { withDeadline } from "../http/deadline.js";
 import { send } from "../http/transport.js";
-import { AmbiguousExecutionResponseError, ExecutionTimeoutError } from "../errors.js";
+import {
+  AmbiguousExecutionResponseError,
+  DraftUnsupportedRequestError,
+  ExecutionTimeoutError,
+} from "../errors.js";
 import { observe, redactUrl } from "../observations.js";
 import { buildRequest } from "./build-request.js";
 import { classifyExecution, gatherEvidence } from "./classify-execution.js";
@@ -44,6 +48,7 @@ export async function execute(
   processId: string,
   options: ExecuteOptions = {},
 ): Promise<Execution> {
+  refuseUntranslated(options);
   const sink = options.onObservation;
   const requestedMode = options.mode ?? "sync";
   const timeoutMs = options.timeoutMs ?? DEFAULT_EXECUTE_TIMEOUT_MS;
@@ -251,6 +256,32 @@ export async function execute(
     });
 
     return execution;
+  }
+}
+
+/**
+ * A guard, not a translation: a request said to be in the 2.0 draft must not
+ * carry 1.0's `response` or any `transmissionMode`, which the draft does not
+ * have. `client.execute()` translates through `draftExecuteOptions()` first,
+ * so this throws only for a caller of `execute()` that skipped it — and does
+ * so before anything is sent, rather than sending 1.0's words to a server
+ * told to expect the draft's.
+ */
+function refuseUntranslated(options: ExecuteOptions): void {
+  if (options.version?.version !== "2.0-draft") return;
+  if (options.response !== undefined) {
+    throw new DraftUnsupportedRequestError(
+      options.response,
+      "response-not-in-draft",
+      Object.keys(options.outputs ?? {}),
+    );
+  }
+  for (const [id, selection] of Object.entries(options.outputs ?? {})) {
+    if (selection.transmissionMode !== undefined) {
+      throw new DraftUnsupportedRequestError(selection.transmissionMode, "no-transmission-mode", [
+        id,
+      ]);
+    }
   }
 }
 

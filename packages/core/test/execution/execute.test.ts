@@ -8,7 +8,11 @@
 
 import { describe, expect, it, vi } from "vitest";
 import { execute } from "../../src/execution/execute.js";
-import { AmbiguousExecutionResponseError, ExecutionTimeoutError } from "../../src/errors.js";
+import {
+  AmbiguousExecutionResponseError,
+  DraftUnsupportedRequestError,
+  ExecutionTimeoutError,
+} from "../../src/errors.js";
 import { AbortError, ProcessesError } from "../../src/http/errors.js";
 import { parseDescription } from "../../src/processes/parse-description.js";
 import type { ProcessDescription } from "../../src/processes/types.js";
@@ -695,5 +699,67 @@ describe("the observation", () => {
       onObservation: sink,
     });
     expect(executionRecord(seen).preferenceAppliedTokens).toBeUndefined();
+  });
+});
+
+describe("execute() on its own, told the 2.0 draft: a guard, not a translation", () => {
+  const draft = { version: "2.0-draft", source: "configured" } as const;
+
+  it("refuses 1.0's response member before sending anything", async () => {
+    const fake = fakeFetch(json({ value: 1 }));
+    const outcome = await execute(LIST, "p", {
+      inputs: {},
+      outputs: { a: {} },
+      response: "raw",
+      version: draft,
+      fetch: fake.fetch,
+    }).catch((error: unknown) => error);
+    expect(outcome).toBeInstanceOf(DraftUnsupportedRequestError);
+    expect(outcome).toMatchObject({ intent: "raw", reason: "response-not-in-draft" });
+    expect(fake.calls).toEqual([]);
+  });
+
+  it("refuses any transmissionMode before sending anything, value as well as reference", async () => {
+    for (const transmissionMode of ["value", "reference"] as const) {
+      const fake = fakeFetch(json({ value: 1 }));
+      const outcome = await execute(LIST, "p", {
+        inputs: {},
+        outputs: { a: {}, b: { transmissionMode } },
+        version: draft,
+        fetch: fake.fetch,
+      }).catch((error: unknown) => error);
+      expect(outcome).toMatchObject({
+        intent: transmissionMode,
+        reason: "no-transmission-mode",
+        outputIds: ["b"],
+      });
+      expect(fake.calls).toEqual([]);
+    }
+  });
+
+  it("sends a request with neither, as it is", async () => {
+    const fake = fakeFetch(json({ value: 1 }));
+    await execute(LIST, "p", {
+      inputs: {},
+      outputs: { a: {}, b: {} },
+      version: draft,
+      fetch: fake.fetch,
+    });
+    expect(fake.calls[0]?.init.body).toBe(
+      JSON.stringify({ inputs: {}, outputs: { a: {}, b: {} } }),
+    );
+  });
+
+  it("sends 1.0's response member when told 1.0, or nothing", async () => {
+    for (const version of [{ version: "1.0", source: "declared" } as const, undefined]) {
+      const fake = fakeFetch(json({ value: 1 }));
+      await execute(LIST, "p", {
+        inputs: {},
+        response: "document",
+        version,
+        fetch: fake.fetch,
+      });
+      expect(fake.calls[0]?.init.body).toBe(JSON.stringify({ inputs: {}, response: "document" }));
+    }
   });
 });

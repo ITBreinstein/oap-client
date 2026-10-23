@@ -135,9 +135,11 @@ export interface ExecuteOptions extends ExecuteTransportOptions {
    * came from: recorded on the `execution` observation. Absent, it is 1.0
    * with source `default`.
    *
-   * **It records; it does not translate.** A request for the 2.0 draft goes
-   * through `draftExecuteOptions()` first, which the client does for you. Called
-   * on its own, `execute()` sends the body these options describe.
+   * **It records and guards; it does not translate.** A request for the 2.0
+   * draft goes through `draftExecuteOptions()` first, which the client does
+   * for you. Called on its own with `version` the draft, `execute()` refuses
+   * options that still carry `response` or a `transmissionMode`, with
+   * `DraftUnsupportedRequestError`, before sending.
    */
   readonly version?: VersionChoice | undefined;
 }

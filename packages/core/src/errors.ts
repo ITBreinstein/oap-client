@@ -254,13 +254,16 @@ export type DraftUnsupportedIntent = "raw" | "document" | "reference" | "value";
  *   many outputs the request asks for.
  * - `no-transmission-mode`: the draft removed `transmissionMode`, and with it
  *   any way to ask for a value or a link.
+ * - `response-not-in-draft`: `execute()` was told the draft and handed 1.0's
+ *   `response` member, which `draftExecuteOptions()` would have translated.
  */
 export type DraftUnsupportedReason =
   | "document-needs-several-outputs"
   | "raw-needs-one-output"
   | "raw-needs-single-valued-output"
   | "outputs-unknown"
-  | "no-transmission-mode";
+  | "no-transmission-mode"
+  | "response-not-in-draft";
 
 /**
  * An execute request that cannot be expressed in the 2.0 draft, refused
@@ -301,6 +304,8 @@ const DRAFT_REASONS: Readonly<Record<DraftUnsupportedReason, string>> = {
     "neither an outputs block nor a description says how many outputs are requested",
   "no-transmission-mode":
     "the draft has no transmissionMode, so an output cannot be asked for by value or by reference",
+  "response-not-in-draft":
+    "the draft has no response member; pass the options through draftExecuteOptions() first",
 };
 
 /**
