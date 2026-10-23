@@ -21,6 +21,7 @@
  */
 
 import { readFile } from "node:fs/promises";
+import { AxeBuilder } from "@axe-core/playwright";
 import { expect, test, type Page, type Request } from "@playwright/test";
 import { requireService } from "./services.js";
 import { RELAY } from "./servers.js";
@@ -55,8 +56,8 @@ test.beforeEach(async ({ page }) => {
  * Not the preset of the same address: a typed or preset address is reached
  * directly, and the relay is offered only for a relay endpoint.
  */
-async function connect(page: Page): Promise<void> {
-  await page.getByRole("radio", { name: /^weaver / }).check();
+async function connect(page: Page, entry: RegExp = /^weaver /): Promise<void> {
+  await page.getByRole("radio", { name: entry }).check();
   await page.getByRole("button", { name: "Connect" }).click();
   const offer = page.getByTestId("relay-offer");
   await expect(offer).toBeVisible({ timeout: 30_000 });
@@ -151,7 +152,7 @@ async function observations(page: Page): Promise<ExportedObservation[]> {
 test.describe("Weaver, the 2.0 draft", () => {
   test("is spoken to as the draft, because it declares it", async ({ page }) => {
     await connect(page);
-    await expect(page.getByTestId("developer-note").first()).toHaveText(
+    await expect(page.getByTestId("developer-note").filter({ hasText: "Speaking" })).toHaveText(
       "Speaking OGC API - Processes 2.0 (draft): the service declares 1.0 and 2.0.",
     );
     // The draft has no transmissionMode: Link is off, and says why.
@@ -235,7 +236,7 @@ test.describe("Weaver, pinned to 1.0 in config.json", () => {
 
   test("is spoken to as 1.0, and a link is asked for 1.0's way", async ({ page }) => {
     await connect(page);
-    await expect(page.getByTestId("developer-note").first()).toHaveText(
+    await expect(page.getByTestId("developer-note").filter({ hasText: "Speaking" })).toHaveText(
       "Speaking OGC API - Processes 1.0: pinned in config.json.",
     );
     await expect(page.getByTestId("no-link-reason")).toHaveCount(0);
@@ -257,4 +258,40 @@ test.describe("Weaver, pinned to 1.0 in config.json", () => {
     const execution = (await observations(page)).find((entry) => entry.kind === "execution");
     expect(execution).toMatchObject({ protocolVersion: "1.0", versionSource: "configured" });
   });
+});
+
+/** A map style with nothing to fetch, standing in for OpenFreeMap's, as in a11y.spec.ts. */
+const WORLD_STAND_IN = {
+  version: 8,
+  sources: {},
+  layers: [{ id: "land", type: "background", paint: { "background-color": "#f8f4f0" } }],
+};
+
+test.describe("Weaver's form, as the draft has it, with axe", () => {
+  for (const style of ["instrument", "instrument-updated"]) {
+    for (const theme of ["light", "dark"]) {
+      test(`has no violations with Link off and its reason (${style}, ${theme})`, async ({
+        page,
+      }) => {
+        await page.setViewportSize({ width: 1440, height: 1000 });
+        await page.route("https://tiles.openfreemap.org/**", (route) =>
+          route.fulfill({ contentType: "application/json", body: JSON.stringify(WORLD_STAND_IN) }),
+        );
+        await page.emulateMedia({ reducedMotion: "reduce" });
+        await page.goto(`/?style=${style}&theme=${theme}`);
+        // The updated Instrument names a relay endpoint by its service's title.
+        await connect(page, style === "instrument-updated" ? /^Weaver http/ : /^weaver /);
+        const reason = page.getByTestId("no-link-reason");
+        await reason.scrollIntoViewIfNeeded();
+        await expect(reason).toBeVisible();
+        if (style === "instrument-updated" && theme === "light") {
+          await page.screenshot({ path: "test-results/v2-formats/phase1/link-off-on-draft.png" });
+        }
+        const { violations } = await new AxeBuilder({ page }).analyze();
+        expect(
+          violations.map((violation) => `${violation.id}: ${violation.nodes.length} nodes`),
+        ).toEqual([]);
+      });
+    }
+  }
 });

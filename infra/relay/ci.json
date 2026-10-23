@@ -25,6 +25,14 @@
       "allowPrivateNetwork": true
     },
     {
+      "key": "weaver",
+      "baseUrl": "http://localhost:5100",
+      "executeRoute": "relay",
+      "readRoute": "relay",
+      "callbacks": false,
+      "allowPrivateNetwork": true
+    },
+    {
       "key": "zoo",
       "baseUrl": "http://localhost:5090/ogc-api",
       "executeRoute": "relay",
