@@ -17,14 +17,19 @@ export default defineConfig({
   globalSetup: "./e2e/global-setup.ts",
   projects: [
     // `pnpm test:e2e`: blocks CI. pygeoapi only, from infra/compose.
-    { name: "blocking", testIgnore: /zoo-browser\.spec\.ts/, grepInvert: /@pdok/ },
+    { name: "blocking", testIgnore: /(zoo-browser|weaver)\.spec\.ts/, grepInvert: /@pdok/ },
     // `pnpm test:e2e:pdok`: the tests that reach PDOK (tagged PDOK_LANE in
     // e2e/services.ts). Opt-in: a third party's uptime must not block a merge.
-    { name: "pdok", testIgnore: /zoo-browser\.spec\.ts/, grep: /@pdok/ },
+    { name: "pdok", testIgnore: /(zoo-browser|weaver)\.spec\.ts/, grep: /@pdok/ },
     // `pnpm test:e2e:zoo`: ZOO-Project from a browser. Reports, never blocks:
     // ZOO is a second implementation built from source, and its worker pool
     // runs out as it is used (finding 0044). See .github/workflows/interop.yml.
     { name: "zoo", testMatch: /zoo-browser\.spec\.ts/ },
+    // `pnpm test:e2e:weaver`: the OGC API - Processes 2.0 draft, against
+    // Weaver from infra/compose/weaver.yml. Named, never blocking: the draft
+    // still moves, and Weaver's images are amd64 only. Under CI a Weaver that
+    // is not answering fails this lane rather than skipping it.
+    { name: "weaver", testMatch: /weaver\.spec\.ts/ },
     // `pnpm capture:observations`: not a test lane. Drives the client against
     // the local stack and saves the matrix's evidence, one export per
     // endpoint. See e2e/observations.capture.ts.
