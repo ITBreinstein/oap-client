@@ -34,6 +34,8 @@ import {
   type RunFacts,
 } from "../observations.js";
 import { isMixedContent, pageProtocol } from "../mixed-content.js";
+import type { Preset } from "../config/runtime-config.js";
+import { withPin } from "./protocol-version.js";
 import { createJobStore } from "../jobs/job-store.js";
 import type { RelayEndpoint } from "../relay/contract.js";
 import {
@@ -313,7 +315,14 @@ function cancelledOf(jobs: readonly JobRow[] | undefined): ReadonlyMap<string, s
   return cancelled;
 }
 
-export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: number): WorkflowView {
+/** No presets: nothing pinned, every version read from the service. */
+const NO_PRESETS: readonly Preset[] = [];
+
+export function useWorkflow(
+  relayUrl: string | undefined,
+  acceptedNoticeMs?: number,
+  presets: readonly Preset[] = NO_PRESETS,
+): WorkflowView {
   const [state, dispatch] = useReducer(workflowReducer, INITIAL_WORKFLOW);
   const [snapshot, setSnapshot] = useState<JobSessionSnapshot | undefined>();
   const [configured, setConfigured] = useState<RelayEndpoint[]>([]);
@@ -323,6 +332,12 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>(NO_ERRORS);
   const [jobNotice, setJobNotice] = useState<string | undefined>();
   const [jobMessages, setJobMessages] = useState<ReadonlyMap<string, string>>(() => new Map());
+
+  /** The presets a connection takes its version pin from, as of the last render. */
+  const pinsFrom = useRef(presets);
+  useEffect(() => {
+    pinsFrom.current = presets;
+  }, [presets]);
 
   // Made inside the effect, for the reason AsyncJobPanel gives: StrictMode
   // runs effects twice, and a memoised session would be disposed and reused.
@@ -512,7 +527,9 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
   // CORS-shaped failure on an endpoint that allows it, and tried only from
   // confirmRelay. The attempt's one record is written when it settles.
   const start = useCallback(
-    (endpoint: EndpointRef, openAfter: string | undefined) => {
+    (reached: EndpointRef, openAfter: string | undefined) => {
+      // The version a preset of this address pins, however it was reached.
+      const endpoint = withPin(reached, pinsFrom.current);
       const active = session.current;
       if (active === undefined) return;
       // The relay offer is open: only its answer moves on (review W22). The

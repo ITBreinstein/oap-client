@@ -440,6 +440,9 @@ export function createJobSession(
     let reported: "direct" | "relay" | undefined;
     return createClient({
       baseUrl: endpoint.baseUrl,
+      ...(endpoint.protocolVersion === undefined
+        ? {}
+        : { protocolVersion: endpoint.protocolVersion }),
       // A run's result, sync or async, read whole for its download (review
       // W7). The core sets the limit per client, so the endpoint's other
       // answers share it; an output given by reference does not go through

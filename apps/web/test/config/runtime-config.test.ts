@@ -107,6 +107,43 @@ describe("checkRuntimeConfig — valid", () => {
   });
 });
 
+describe("checkRuntimeConfig — a preset's protocolVersion", () => {
+  it("keeps a pin, and leaves it off a preset that has none", () => {
+    const result = checkRuntimeConfig({
+      presets: [
+        { title: "Pinned", url: "https://a.example.org", protocolVersion: "1.0" },
+        { title: "Read", url: "https://b.example.org" },
+      ],
+    });
+    expect(result).toEqual({
+      ok: true,
+      config: {
+        relayUrl: undefined,
+        presets: [
+          { title: "Pinned", url: "https://a.example.org", protocolVersion: "1.0" },
+          { title: "Read", url: "https://b.example.org" },
+        ],
+      },
+    });
+  });
+
+  it.each(["auto", "1.0", "2.0-draft"])("accepts %s", (protocolVersion) => {
+    const checked = checkRuntimeConfig({
+      presets: [{ title: "A", url: "https://a.example.org", protocolVersion }],
+    });
+    expect(checked.ok).toBe(true);
+  });
+
+  // The relay.url exemption, for the same reason: a loopback address is not
+  // mixed content to a browser, and CI's services are on one.
+  it("accepts http: on a loopback host, as relay.url does", () => {
+    const checked = checkRuntimeConfig({
+      presets: [{ title: "Weaver", url: "http://localhost:5100", protocolVersion: "1.0" }],
+    });
+    expect(checked.ok).toBe(true);
+  });
+});
+
 describe("checkRuntimeConfig — refused whole", () => {
   it.each([
     ["not an object", []],
@@ -128,7 +165,10 @@ describe("checkRuntimeConfig — refused whole", () => {
     ["a javascript: relay url", { relay: { url: "javascript:alert(1)" } }],
     ["presets as an object", { presets: {} }],
     ["an http preset", { presets: [{ title: "A", url: "http://a.example.org" }] }],
-    ["a localhost http preset", { presets: [{ title: "A", url: "http://localhost:5080" }] }],
+    [
+      "a preset with an unknown protocolVersion",
+      { presets: [{ title: "A", url: "https://a.example.org", protocolVersion: "2.0" }] },
+    ],
     ["a preset with an empty title", { presets: [{ title: " ", url: "https://a.example.org" }] }],
     ["a preset with no url", { presets: [{ title: "A" }] }],
     ["a preset with a query", { presets: [{ title: "A", url: "https://a.example.org/?k=1" }] }],

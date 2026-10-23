@@ -19,6 +19,7 @@ import { DeveloperContext } from "./app/developer.js";
 import { sameService, useAddress, wouldLoseWork } from "./app/address.js";
 import { AppFrame, RailItem, type FramePlace } from "./app/AppFrame.js";
 import { DeveloperPanel } from "./app/DeveloperPanel.js";
+import { versionNote } from "./app/protocol-version.js";
 import {
   activeDrawField,
   DrawContext,
@@ -119,7 +120,7 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
       import.meta.env.DEV ? [...DEV_EXAMPLES, ...(config.examples ?? [])] : (config.examples ?? []),
     [config.examples],
   );
-  const view = useWorkflow(relayUrl, config.acceptedNoticeMs);
+  const view = useWorkflow(relayUrl, config.acceptedNoticeMs, presets);
   const mapLimits = useMemo<MapLimits>(
     () => ({
       maxCoordinates: config.maxMapCoordinates ?? DEFAULT_MAX_MAP_COORDINATES,
@@ -521,6 +522,8 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
       ? undefined
       : jobs.find((job) => job.statusUrl === shownJobRef)?.status?.jobId;
   const developerNotes = [
+    // The version of OGC API - Processes spoken to the connected service, and why.
+    ...(state.stage === "choose-endpoint" ? [] : [versionNote(state.service.capabilities)]),
     ...(state.stage === "process" && state.error?.technical !== undefined
       ? [state.error.technical]
       : []),
