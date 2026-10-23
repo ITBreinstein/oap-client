@@ -134,13 +134,28 @@ describe("checkRuntimeConfig — a preset's protocolVersion", () => {
     expect(checked.ok).toBe(true);
   });
 
-  // The relay.url exemption, for the same reason: a loopback address is not
-  // mixed content to a browser, and CI's services are on one.
-  it("accepts http: on a loopback host, as relay.url does", () => {
-    const checked = checkRuntimeConfig({
-      presets: [{ title: "Weaver", url: "http://localhost:5100", protocolVersion: "1.0" }],
-    });
-    expect(checked.ok).toBe(true);
+  // A loopback address is not mixed content to a browser, and CI's services
+  // are on one. Only these three names, though.
+  it.each(["http://localhost:5100", "http://127.0.0.1:5100", "http://[::1]:5100"])(
+    "accepts http: on %s",
+    (url) => {
+      const checked = checkRuntimeConfig({
+        presets: [{ title: "Weaver", url, protocolVersion: "1.0" }],
+      });
+      expect(checked.ok).toBe(true);
+    },
+  );
+
+  it.each([
+    "http://weaver.example.org",
+    "http://192.168.1.10:5100",
+    "http://127.0.0.2:5100",
+    "http://api.localhost:5100",
+    "http://localhost.example.org",
+  ])("still refuses http: on any other host: %s", (url) => {
+    const checked = checkRuntimeConfig({ presets: [{ title: "A", url }] });
+    expect(checked.ok).toBe(false);
+    expect(checked.ok ? "" : checked.problem).toContain("presets[0].url");
   });
 });
 

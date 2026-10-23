@@ -17,7 +17,7 @@
  *   only on a loopback host, the one exemption browsers make too, for local
  *   development and CI.
  * - `presets`: services offered on the start screen, each `https:`, or
- *   `http:` on a loopback host as for `relay.url`. Reached directly, exactly
+ *   `http:` on `localhost`, `127.0.0.1` or `[::1]`. Reached directly, exactly
  *   as if the address had been typed. Optional: `protocolVersion`, one of
  *   `"auto"`, `"1.0"` or `"2.0-draft"`, pins which version of OGC API -
  *   Processes the page speaks to that address, however it is reached; `"auto"`
@@ -172,6 +172,15 @@ function checkRelayUrl(value: unknown): string | { readonly problem: string } {
   return { problem: "relay.url must be https:, or http: on a loopback host" };
 }
 
+/**
+ * The hosts a preset may name over plain `http:`: these three exactly, for
+ * local development and CI. Narrower than what a browser treats as secure
+ * (`isLoopback` also takes `*.localhost` and all of 127.0.0.0/8), on purpose:
+ * a preset is offered to every visitor, and these are the only loopback
+ * names anything here needs.
+ */
+const LOOPBACK_PRESET_HOSTS: ReadonlySet<string> = new Set(["localhost", "127.0.0.1", "[::1]"]);
+
 function checkPresets(value: unknown): Preset[] | { readonly problem: string } {
   if (value === undefined) return [];
   if (!Array.isArray(value)) return { problem: "presets must be a list" };
@@ -187,7 +196,7 @@ function checkPresets(value: unknown): Preset[] | { readonly problem: string } {
     }
     if (typeof url !== "string") return { problem: `${where}.url must be a string` };
     const parsed = plainAbsoluteUrl(url);
-    const loopback = parsed?.protocol === "http:" && isLoopback(parsed.hostname);
+    const loopback = parsed?.protocol === "http:" && LOOPBACK_PRESET_HOSTS.has(parsed.hostname);
     if (parsed?.protocol !== "https:" && !loopback)
       return { problem: `${where}.url must be a plain https: URL, or http: on a loopback host` };
     if (protocolVersion !== undefined && !isProtocolVersionPreference(protocolVersion)) {
