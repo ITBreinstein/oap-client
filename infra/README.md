@@ -24,6 +24,13 @@ interpreter the image does not have), and it refuses, with a 422, the arrays of
 arrays a form generated from `EchoProcess`'s description sends. See
 `e2e/weaver.spec.ts`.
 
+Stop Weaver before running the blocking lane on a laptop
+(`docker compose -f infra/compose/weaver.yml -p oap-weaver stop`). Its API and
+worker hold about 2 GB and run under emulation on Apple Silicon. Beside them,
+pygeoapi answered slowly enough on 2026-10-23 that five of the lane's 5-second
+waits ran out, and all 200 passed once Weaver was stopped. CI runs the two
+lanes in separate jobs.
+
 ZOO keeps its job results in a Docker volume, `zoo-data` (`compose/zoo.yml`),
 not in the pinned checkout, so they do not survive `./infra/zoo/zoo.sh down`,
 which removes the volume. Evidence a finding relies on must be copied into the
