@@ -1,0 +1,7 @@
+POST /ogc-api/processes/SAGA.garden_fractals.1/execution HTTP/1.1
+Host: localhost:5090
+Content-Type: application/json
+Accept: */*
+Content-Length: 153
+
+{"inputs":{"TYPE":"Lines","ANGLE":55,"MINSIZE":30},"outputs":{"RESULT":{"format":{"mediaType":"text/xml"},"transmissionMode":"value"}},"response":"raw"}

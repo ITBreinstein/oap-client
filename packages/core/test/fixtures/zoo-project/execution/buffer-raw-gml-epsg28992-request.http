@@ -1,0 +1,7 @@
+POST /ogc-api/processes/Buffer/execution HTTP/1.1
+Host: localhost:5090
+Content-Type: application/json
+Accept: */*
+Content-Length: 651
+
+{"inputs": {"InputPolygon": {"value": "<ogr:FeatureCollection xmlns:ogr=\"http://ogr.maptools.org/\" xmlns:gml=\"http://www.opengis.net/gml\"><gml:featureMember><ogr:f><ogr:geometryProperty><gml:Polygon srsName=\"urn:ogc:def:crs:EPSG::28992\"><gml:exterior><gml:LinearRing><gml:posList>136600 455700 137000 455700 137000 456100 136600 456100 136600 455700</gml:posList></gml:LinearRing></gml:exterior></gml:Polygon></ogr:geometryProperty></ogr:f></gml:featureMember></ogr:FeatureCollection>", "mediaType": "text/xml"}, "BufferDistance": 10}, "outputs": {"Result": {"format": {"mediaType": "text/xml"}, "transmissionMode": "value"}}, "response": "raw"}

@@ -1,0 +1,19 @@
+HTTP/1.1 200 OK
+Server: gunicorn
+Date: Mon, 26 Oct 2026 09:34:00 GMT
+Connection: keep-alive
+Content-Type: application/json
+X-Powered-By: pygeoapi 0.21.0
+Content-Language: en-US
+Location: http://localhost:5080/jobs/60443712-d120-11f1-a169-92cfb44d974e
+Access-Control-Allow-Origin: *
+Content-Length: 271
+
+{
+    "areas":{
+        "href":"http://localhost:5080/collections/breinstein-rd/items?f=json&crs=http%3A%2F%2Fwww.opengis.net%2Fdef%2Fcrs%2FEPSG%2F0%2F28992",
+        "rel":"related",
+        "type":"application/geo+json",
+        "title":"Three areas in Utrecht"
+    }
+}
