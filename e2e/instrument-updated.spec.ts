@@ -10,6 +10,7 @@ import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures.js";
 import { RELAY } from "./servers.js";
 import { requireService } from "./services.js";
+import { CONNECTED } from "./waits.js";
 
 const PYGEOAPI = "http://localhost:5080";
 const SERVICE = "https://pygeoapi.example.test";
@@ -61,7 +62,9 @@ async function open(page: Page, style: string, more = "") {
 async function connect(page: Page) {
   await page.getByRole("radio", { name: /Reference pygeoapi/ }).check();
   await page.getByRole("button", { name: "Connect", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Hello World", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Hello World", exact: true })).toBeVisible(
+    CONNECTED,
+  );
 }
 
 /** Copy is 44px high to press, and its tooltip says its name on hover and on focus; Escape hides it. */

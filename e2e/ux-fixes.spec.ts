@@ -9,6 +9,7 @@ import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures.js";
 import { RELAY } from "./servers.js";
 import { requireService } from "./services.js";
+import { CONNECTED } from "./waits.js";
 
 const PYGEOAPI = "http://localhost:5080";
 const STYLES = ["instrument", "instrument-updated"] as const;
@@ -34,7 +35,7 @@ async function connectTyped(page: Page) {
   if (await typed.isVisible()) await typed.check();
   await page.getByRole("textbox", { name: "Service address" }).fill(PYGEOAPI);
   await page.getByRole("button", { name: "Connect", exact: true }).click();
-  await expect(page.getByRole("heading", { level: 2, name: "Processes" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Processes" })).toBeVisible(CONNECTED);
 }
 
 async function openProcess(page: Page, title: string) {
@@ -315,7 +316,7 @@ test("#35 opening a process from a panel closes it, and so does Back", async ({ 
   await open(page, "instrument-updated");
   await page.getByRole("radio", { name: /Reference pygeoapi/ }).check();
   await page.getByRole("button", { name: "Connect", exact: true }).click();
-  await expect(page.getByRole("heading", { level: 2, name: "Processes" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Processes" })).toBeVisible(CONNECTED);
 
   // Opening a process from the Examples panel: the panel closes.
   const examples = page.getByRole("dialog", { name: "Examples" });
@@ -1243,6 +1244,9 @@ for (const style of STYLES) {
   test(`#33 jobs from an earlier visit ${updated ? "are said once, and Run again opens an empty form that says why" : "keep their note on each row"} (${style})`, async ({
     page,
   }) => {
+    // Two background runs, a reload and a third opening: each run waits for a
+    // job, and job requests are what a busy pygeoapi answers slowest.
+    test.setTimeout(90_000);
     await requireService(`${RELAY}/healthz`, "the relay");
     await open(page, style);
     await page.getByRole("radio", { name: /^pygeoapi[- ]cors /i }).check();

@@ -11,6 +11,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures.js";
 import { requireService } from "./services.js";
+import { CONNECTED } from "./waits.js";
 
 const PYGEOAPI = "http://localhost:5080";
 const SERVICE = "https://pygeoapi.example.test";
@@ -51,7 +52,7 @@ for (const style of ["instrument", "instrument-updated"]) {
       await page.goto(`/?style=${style}&theme=dark`);
       await page.getByRole("radio", { name: /Reference pygeoapi/ }).check();
       await page.getByRole("button", { name: "Connect", exact: true }).click();
-      await expect(heading(page, "Processes")).toBeVisible();
+      await expect(heading(page, "Processes")).toBeVisible(CONNECTED);
       // The appearance parameters stay; the place is added beside them.
       await expect(page).toHaveURL(
         new RegExp(`\\?style=${style}&theme=dark&service=${encodeURIComponent(SERVICE)}$`),
@@ -92,7 +93,7 @@ for (const style of ["instrument", "instrument-updated"]) {
       expect(asked).toEqual([]);
 
       await page.getByRole("button", { name: "Connect", exact: true }).click();
-      await expect(heading(page, "Hello World")).toBeVisible();
+      await expect(heading(page, "Hello World")).toBeVisible(CONNECTED);
       expect(asked.length).toBeGreaterThan(0);
     });
 
@@ -104,7 +105,7 @@ for (const style of ["instrument", "instrument-updated"]) {
       await page.getByRole("radio", { name: /Reference pygeoapi/ }).check();
       await page.getByRole("button", { name: "Connect", exact: true }).click();
       await page.getByRole("button", { name: "Hello World", exact: true }).click();
-      await expect(heading(page, "Hello World")).toBeVisible();
+      await expect(heading(page, "Hello World")).toBeVisible(CONNECTED);
 
       const asksBeforeLeaving = () =>
         page.evaluate(() => {
