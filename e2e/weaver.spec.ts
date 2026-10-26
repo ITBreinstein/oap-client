@@ -351,12 +351,14 @@ test.describe("asking for a format leaves the answer's shape as it was (Weaver, 
   // answer's shape should not change. Weaver's does where it refuses a format
   // its own description offers: GeoJSON for `featureCollectionOutput` is a
   // 422, "Conversion from JSON to application/geo+json is not supported"
-  // (2026-10-23). Those cases are marked as failing because of Weaver: should
-  // Weaver start producing what it offers, they pass, and the lane says so.
+  // (2026-10-23). Those cases are marked as failing because of Weaver, and
+  // named for the Phase 2 report's note 1, until it has a finding number:
+  // should Weaver start producing what it offers, they pass, and the lane
+  // says so.
   const cases = [
-    { name: "every output", only: undefined, weaverRefuses: true },
+    { name: "every output (Phase 2 note 1)", only: undefined, weaverRefuses: true },
     {
-      name: "one output that offers GeoJSON, GML and KML",
+      name: "one output that offers GeoJSON, GML and KML (Phase 2 note 1)",
       only: ["featureCollectionOutput"],
       weaverRefuses: true,
     },

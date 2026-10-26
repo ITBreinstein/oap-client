@@ -202,3 +202,33 @@ for (const style of ["instrument", "instrument-updated"] as const) {
     });
   }
 }
+
+// Phase 3: GML and KML on the map, the lines that say how they were placed,
+// and GML that names no coordinate system. A test of their own, as above.
+for (const style of ["instrument", "instrument-updated"] as const) {
+  for (const theme of ["light", "dark"] as const) {
+    test(`no axe violations with GML and KML results, ${style}, ${theme}`, async ({ page }) => {
+      await open(page, style, theme);
+      await page.getByRole("radio", { name: /Reference pygeoapi/ }).check();
+      await page.getByRole("button", { name: "Connect", exact: true }).click();
+      await expect(page.getByRole("heading", { level: 2, name: "Processes" })).toBeVisible();
+      await openProcess(page, "An area as KML, with HTML in it");
+      await page.getByRole("button", { name: "Run", exact: true }).click();
+      await expect(page.locator('[data-output-id="placemarks"]')).toHaveAttribute(
+        "data-plotted",
+        "true",
+        { timeout: 30_000 },
+      );
+      await noViolations(page, "a KML result on the map");
+      await open(page, style, theme);
+      await page.getByRole("radio", { name: /Reference pygeoapi/ }).check();
+      await page.getByRole("button", { name: "Connect", exact: true }).click();
+      await openProcess(page, "An area as GML, as ZOO-Project writes it");
+      await page.getByRole("combobox", { name: "srsName" }).selectOption("none");
+      await page.getByRole("button", { name: "Run", exact: true }).click();
+      await expect(page.getByTestId("placement")).toBeVisible({ timeout: 30_000 });
+      await noViolations(page, "GML that names no coordinate system");
+      await page.unrouteAll({ behavior: "ignoreErrors" });
+    });
+  }
+}
