@@ -10,7 +10,10 @@ export default defineConfig({
   outputDir: ".playwright/results",
   fullyParallel: true,
   forbidOnly: CI,
-  reporter: CI ? [["html", { outputFolder: ".playwright/report" }]] : "list",
+  // Beside the usual reporter, every skip and why, at the end (e2e/skip-reporter.ts).
+  reporter: CI
+    ? [["html", { outputFolder: ".playwright/report" }], ["./e2e/skip-reporter.ts"]]
+    : [["list"], ["./e2e/skip-reporter.ts"]],
   use: { baseURL: WEB },
   // Refuses a relay or web build on the lane's ports that this checkout did
   // not make. Runs after the servers below are started, or found running.
