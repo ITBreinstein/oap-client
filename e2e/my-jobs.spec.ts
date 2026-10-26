@@ -94,6 +94,44 @@ test.describe("My jobs", () => {
     expect(deletes).toEqual([]);
   });
 
+  test("a job removed while a reload is still on its way back to it stays removed", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await page.evaluate((key) => {
+      localStorage.removeItem(key);
+    }, STORAGE_KEY);
+    await page.getByRole("radio", { name: /pygeoapi-cors/ }).check();
+    await page.getByRole("button", { name: "Connect" }).click();
+    await page.getByRole("button", { name: "Slow process", exact: true }).click();
+    await page.getByRole("textbox", { name: "Seconds (optional)" }).fill("1");
+    await page.getByRole("checkbox", { name: "Run in the background" }).check();
+    await page.getByRole("button", { name: "Run", exact: true }).click();
+    await expect(page.locator('[data-output-id="slept"]')).toBeVisible({ timeout: 30_000 });
+
+    // The reload goes back to the job by way of its process: slowed here, so
+    // that the job is removed before the page has got back to it.
+    let opened = false;
+    await page.route(`${PYGEOAPI}/processes/slow?f=json`, async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 1_500));
+      opened = true;
+      await route.continue();
+    });
+    await page.reload();
+    await page.getByRole("banner").getByRole("button", { name: /^Jobs/ }).click();
+    await page
+      .getByTestId("my-jobs")
+      .locator("[data-job-row]")
+      .getByRole("button", { name: "Remove from list" })
+      .click();
+    expect(opened).toBe(false);
+    await expect(page.getByRole("heading", { level: 2, name: "Slow process" })).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByTestId("my-jobs")).toHaveCount(0);
+    expect(new URL(page.url()).searchParams.get("job")).toBeNull();
+  });
+
   for (const style of ["instrument", "instrument-updated"] as const) {
     test(`a removed job stays removed after a reload, though its results were on screen (${style})`, async ({
       page,
