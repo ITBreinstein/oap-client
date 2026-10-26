@@ -24,6 +24,8 @@
  */
 
 import type { OutputDescription } from "@breinstein/oap-client";
+import type { RenderableResult } from "./renderable.js";
+import type { SniffedKind } from "./sniff.js";
 
 /** What a media type is to this page, in the order above. */
 export type FormatKind = "geojson" | "gml" | "kml" | "xml" | "geotiff" | "image" | "other";
@@ -227,19 +229,102 @@ export function mediaTypeWords(mediaType: string): string {
   return formatWords({ mediaType, kind: formatKind(mediaType) });
 }
 
+/** What arrived, by its content where the page read it (#F4, #F5) or sniffed it. */
+export interface Arrived {
+  readonly kind: FormatKind;
+  readonly words: string;
+  /** The label said something else (`sniff.ts`). */
+  readonly sniffed: boolean;
+  /** When sniffed, the label, verbatim. */
+  readonly label?: string | undefined;
+}
+
+const SNIFFED: Readonly<Record<SniffedKind, Omit<Arrived, "sniffed">>> = {
+  gml: { kind: "gml", words: "GML" },
+  kml: { kind: "kml", words: "KML" },
+  tiff: { kind: "geotiff", words: "a TIFF image" },
+  png: { kind: "image", words: "PNG" },
+  jpeg: { kind: "image", words: "JPEG" },
+};
+
+/** What a result turned out to be, when the page read or sniffed it; undefined when only its label says. */
+export function arrivedAs(result: RenderableResult): Arrived | undefined {
+  if (result.kind !== "text" && result.kind !== "download") return undefined;
+  if (result.sniffed !== undefined) {
+    return {
+      ...SNIFFED[result.sniffed.kind],
+      sniffed: true,
+      label: result.sniffed.declaredMediaType,
+    };
+  }
+  if (result.geo !== undefined) return { ...SNIFFED[result.geo.parsedAs], sniffed: false };
+  return undefined;
+}
+
 /**
  * What a result says when the service sent another format than the one asked
- * for: "Asked for GeoJSON; the service sent it as application/json." By label,
- * not by content: what the service called it is the evidence, whatever the
- * body turns out to be. Undefined when they agree, or nothing said what arrived.
+ * for, by what arrived (§14 of the brief): the content, where this page read
+ * or sniffed it, and otherwise the label.
+ *
+ * - The asked format, under another label (ZOO's KML labelled JSON):
+ *   "Labelled as JSON, but it's the KML that was asked for." Not another format.
+ * - Another format, sniffed: "Asked for KML; the service sent GML, labelled as JSON."
+ * - Nothing asked, sniffed: "Labelled as JSON, but it is KML."
+ * - Read and matching, under a plainer label (GML as `text/xml`): nothing to say.
+ * - Otherwise by label, as before: "Asked for GeoJSON; the service sent JSON
+ *   (application/json)." Undefined when they agree, or nothing said what arrived.
  */
 export function formatSentLine(
   asked: string | undefined,
   received: string | undefined,
+  arrived?: Arrived,
 ): string | undefined {
+  const labelled = arrived?.label ?? received;
+  if (arrived?.sniffed === true && labelled !== undefined) {
+    const label = mediaTypeWords(labelled);
+    if (asked === undefined) return `Labelled as ${label}, but it is ${arrived.words}.`;
+    if (formatKind(asked) === arrived.kind) {
+      return `Labelled as ${label}, but it's the ${mediaTypeWords(asked)} that was asked for.`;
+    }
+    return `Asked for ${mediaTypeWords(asked)}; the service sent ${arrived.words}, labelled as ${label}.`;
+  }
   if (asked === undefined || received === undefined) return undefined;
   if (essenceOf(asked) === essenceOf(received)) return undefined;
+  if (arrived !== undefined && formatKind(asked) === arrived.kind) return undefined;
   const words = mediaTypeWords(received);
   const sent = words === received ? received : `${words} (${received})`;
   return `Asked for ${mediaTypeWords(asked)}; the service sent ${sent}.`;
+}
+
+/**
+ * Whether an output's description declares base64 for what is asked of it:
+ * the branch with the asked media type, or any branch when nothing is asked.
+ * ZOO declares its KML and TIFF so, and sends them as they are (`sniff.ts`).
+ */
+export function declaresBase64(output: OutputDescription, asked: string | undefined): boolean {
+  const branches = encodingsIn(output.schema);
+  return branches.some(
+    ({ mediaType, encoding }) =>
+      encoding.toLowerCase() === "base64" &&
+      (asked === undefined ||
+        (mediaType !== undefined && essenceOf(mediaType) === essenceOf(asked))),
+  );
+}
+
+/** Every `{contentMediaType, contentEncoding}` with an encoding, in a schema and its branches. */
+function encodingsIn(schema: unknown, depth = 0): { mediaType?: string; encoding: string }[] {
+  if (!isRecord(schema) || depth > 4) return [];
+  const found: { mediaType?: string; encoding: string }[] = [];
+  const encoding = schema["contentEncoding"];
+  const mediaType = schema["contentMediaType"];
+  if (typeof encoding === "string") {
+    found.push({ encoding, ...(typeof mediaType === "string" ? { mediaType } : {}) });
+  }
+  for (const key of ["oneOf", "anyOf", "allOf"]) {
+    const branches = schema[key];
+    if (Array.isArray(branches)) {
+      for (const branch of branches as unknown[]) found.push(...encodingsIn(branch, depth + 1));
+    }
+  }
+  return found;
 }

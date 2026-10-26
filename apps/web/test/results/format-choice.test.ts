@@ -8,6 +8,7 @@ import { parseDescription, type OutputDescription } from "@breinstein/oap-client
 import { describe, expect, it } from "vitest";
 import { outputSelection } from "../../src/app/run.js";
 import {
+  declaresBase64,
   formatKind,
   formatLine,
   formatSentLine,
@@ -200,6 +201,38 @@ describe("the words", () => {
     expect(formatLine(many, offeredFormats(many), "application/geo+json")).toBe(
       "Asked for GeoJSON, for each of its values; the service also offers XML.",
     );
+  });
+
+  it("goes by what arrived where the page read or sniffed it (§14 item 5)", () => {
+    const kml = "application/vnd.google-earth.kml+xml";
+    const label = "application/json;charset=UTF-8";
+    const sniffedKml = { kind: "kml", words: "KML", sniffed: true, label } as const;
+    const sniffedGml = { kind: "gml", words: "GML", sniffed: true, label } as const;
+    expect(formatSentLine(kml, "application/json", sniffedKml)).toBe(
+      "Labelled as JSON, but it's the KML that was asked for.",
+    );
+    expect(formatSentLine(kml, "application/json", sniffedGml)).toBe(
+      "Asked for KML; the service sent GML, labelled as JSON.",
+    );
+    expect(formatSentLine(undefined, undefined, sniffedKml)).toBe(
+      "Labelled as JSON, but it is KML.",
+    );
+    // GML asked as application/gml+xml, arriving as text/xml and read as GML: nothing to say.
+    expect(
+      formatSentLine("application/gml+xml; version=3.2", "text/xml", {
+        kind: "gml",
+        words: "GML",
+        sniffed: false,
+      }),
+    ).toBeUndefined();
+  });
+
+  it("finds base64 declared for the format asked, as ZOO declares its KML", () => {
+    const [result] = saga.outputs;
+    if (result === undefined) throw new Error("no output");
+    expect(declaresBase64(result, "application/vnd.google-earth.kml+xml")).toBe(true);
+    expect(declaresBase64(result, "text/xml")).toBe(false);
+    expect(declaresBase64(result, undefined)).toBe(true);
   });
 
   it("says when the service sent another format, by its label", () => {

@@ -16,6 +16,7 @@ import type { FieldPlan, FormPlan } from "../forms/plan.js";
 import type { EndpointRef, WorkflowError } from "./workflow.js";
 import type { RelayEndpoint } from "../relay/contract.js";
 import { relayRateLimitIn } from "../relay/relay-fetch.js";
+import { declaresBase64 } from "../results/format-choice.js";
 
 /**
  * Every declared output, with no format and no transmission mode: the
@@ -74,6 +75,20 @@ export function declaredMediaTypes(
       return [output.id, typeof mediaType === "string" ? mediaType : undefined];
     }),
   );
+}
+
+/**
+ * The outputs whose description declares base64 for the format asked of
+ * them, or for any format when none was asked: a raw body that is nothing
+ * else is tried as base64 (`results/sniff.ts`).
+ */
+export function base64Outputs(
+  process: ProcessDescription,
+  formats: Readonly<Record<string, string>> = {},
+): string[] {
+  return process.outputs
+    .filter((output) => declaresBase64(output, formats[output.id]))
+    .map((output) => output.id);
 }
 
 export interface RunRequest {

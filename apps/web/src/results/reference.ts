@@ -49,6 +49,7 @@ import {
   type ResponseEnvelope,
 } from "@breinstein/oap-client";
 import { knownCrs, placeGeoJson, readContentCrs, type Placement } from "./crs.js";
+import { readLabelledXml, sniffXml, xmlLabel, type GeoRead } from "./sniff.js";
 import { shapesIn } from "../forms/geojson.js";
 import { isJsonObject } from "../forms/json.js";
 import { isMixedContent } from "../mixed-content.js";
@@ -64,8 +65,8 @@ export type ReferenceOutcome =
   | "mixed-content"
   | "failed";
 
-/** What the href turned out to hold (T5). */
-export type Representation = "geojson" | "collection" | "image" | "other";
+/** What the href turned out to hold (T5), GML and KML read for the map among it (#F4, #F5). */
+export type Representation = "geojson" | "collection" | "image" | "gml" | "kml" | "other";
 
 /** What `Content-Crs` means for the map (T5, #F1). */
 export type AxisHandling = "as-is" | "swapped" | "reprojected" | "not-plotted";
@@ -107,6 +108,8 @@ export interface LoadedReference {
    * read it, it is shown as an image all the same.
    */
   readonly image?: true | undefined;
+  /** GML or KML read for the map, or refused with a reason (#F4, #F5). */
+  readonly geo?: GeoRead | undefined;
 }
 
 export interface ReferenceEndpoint {
@@ -330,6 +333,20 @@ async function classifyAnswer(
     const blob = await envelope.blob();
     return ended({ outcome: "ok", route, mediaType, representation: "image", blob });
   }
+  // Labelled as XML, GML or KML: read for the map when it is GML or KML.
+  if (xmlLabel(envelope.mediaType) !== undefined) {
+    const text = await envelope.text();
+    const blob = await envelope.blob();
+    const geo = await readLabelledXml(text, envelope.mediaType);
+    return ended({
+      outcome: "ok",
+      route,
+      mediaType,
+      representation: geo?.ok === true ? geo.parsedAs : "other",
+      blob,
+      ...(geo === undefined ? {} : { geo }),
+    });
+  }
   if (!mayBeJson(envelope.mediaType)) {
     const blob = await envelope.blob();
     return ended({ outcome: "ok", route, mediaType, representation: "other", blob });
@@ -343,7 +360,16 @@ async function classifyAnswer(
   try {
     value = JSON.parse(text) as unknown;
   } catch {
-    return ended({ outcome: "ok", route, mediaType, representation: "other", blob });
+    // Labelled JSON and GML or KML underneath (finding 0026): read it, as for a value.
+    const geo = await sniffXml(text);
+    return ended({
+      outcome: "ok",
+      route,
+      mediaType,
+      representation: geo?.ok === true ? geo.parsedAs : "other",
+      blob,
+      ...(geo === undefined ? {} : { geo }),
+    });
   }
 
   const links = collectLinks(envelope, readBodyLinks(value));

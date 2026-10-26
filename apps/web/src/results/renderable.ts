@@ -22,6 +22,15 @@ import {
 } from "@breinstein/oap-client";
 import { placeGeoJson, readContentCrs, type Placement } from "./crs.js";
 import type { LoadedReference } from "./reference.js";
+import {
+  base64Bytes,
+  magicOf,
+  readLabelledXml,
+  sniffXml,
+  SNIFFED_MEDIA_TYPES,
+  type GeoRead,
+  type Sniffed,
+} from "./sniff.js";
 
 /**
  * What was asked for and what arrived, for an output the run asked a format
@@ -52,6 +61,10 @@ export type RenderableResult = (
        * taken from inside a results document, which has no bytes of its own.
        */
       readonly blob?: Blob | undefined;
+      /** GML or KML, read for the map (#F4, #F5), or refused with a reason. */
+      readonly geo?: GeoRead | undefined;
+      /** What the bytes turned out to be, when the label said otherwise. */
+      readonly sniffed?: Sniffed | undefined;
     }
   | {
       readonly kind: "download";
@@ -68,6 +81,10 @@ export type RenderableResult = (
       readonly json?: unknown;
       /** As for `json`: where `json`'s GeoJSON goes on the map (#F1). */
       readonly placement?: Placement | undefined;
+      /** GML or KML too large to show, still read for the map (#F4, #F5). */
+      readonly geo?: GeoRead | undefined;
+      /** What the bytes turned out to be, when the label said otherwise. */
+      readonly sniffed?: Sniffed | undefined;
     }
   | {
       /**
@@ -131,6 +148,12 @@ export interface RenderOptions {
    * say when the service sent something else.
    */
   readonly askedFormats?: Readonly<Record<string, string>> | undefined;
+  /**
+   * Outputs whose description declares base64 for what was asked
+   * (`format-choice.ts`): a body that is neither JSON nor anything sniffing
+   * knows is tried as base64 once (§11 of the brief).
+   */
+  readonly base64Outputs?: readonly string[] | undefined;
 }
 
 const EXTENSIONS: Readonly<Record<string, string>> = {
@@ -144,6 +167,8 @@ const EXTENSIONS: Readonly<Record<string, string>> = {
   "image/png": "png",
   "image/jpeg": "jpg",
   "image/tiff": "tif",
+  "application/gml+xml": "gml",
+  "application/vnd.google-earth.kml+xml": "kml",
   "application/zip": "zip",
   "application/pdf": "pdf",
 };
@@ -176,12 +201,14 @@ export function isCsv(mediaType: string | undefined): boolean {
   return mediaType !== undefined && essence(mediaType) === "text/csv";
 }
 
-/** Text a person can read: `text/*` and XML. HTML counts, and is shown as source. */
+/**
+ * Text a person can read: `text/*` and XML, parameters or not. HTML counts,
+ * and is shown as source.
+ */
 export function isTextual(mediaType: string | undefined): boolean {
   if (mediaType === undefined) return false;
-  return (
-    mediaType.startsWith("text/") || mediaType === "application/xml" || mediaType.endsWith("+xml")
-  );
+  const type = essence(mediaType);
+  return type.startsWith("text/") || type === "application/xml" || type.endsWith("+xml");
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -369,7 +396,15 @@ function withinLimit(result: RenderableResult, limit: number, processId: string)
     filename: defaultFilename(processId, result.outputId, mediaType),
     reason: "too-large",
     ...(result.kind === "json" ? { json: result.value } : {}),
+    ...(result.kind === "text" && result.geo !== undefined ? { geo: result.geo } : {}),
   };
+}
+
+/** A text output read for the map when it is labelled as XML, GML or KML (#F4, #F5). */
+async function withGeo(result: RenderableResult): Promise<RenderableResult> {
+  if (result.kind !== "text") return result;
+  const geo = await readLabelledXml(result.value, result.mediaType);
+  return geo === undefined ? result : { ...result, geo };
 }
 
 export async function toRenderable(
@@ -402,6 +437,7 @@ async function render(
   const download = async (
     reason: "not-text" | "too-large",
     json?: unknown,
+    geo?: GeoRead,
   ): Promise<RenderableResult[]> => [
     {
       kind: "download",
@@ -411,6 +447,7 @@ async function render(
       filename: envelope.filename ?? defaultFilename(options.processId, single, mediaType),
       reason,
       ...(json === undefined ? {} : { json, ...(await placed(json)) }),
+      ...(geo === undefined ? {} : { geo }),
     },
   ];
 
@@ -424,15 +461,83 @@ async function render(
     return results(await download("too-large"));
   }
   const text = strictText(bytes, envelope.mediaTypeParams["charset"]);
-  if (text === undefined) return results(await download("not-text"));
   const tooLarge = bytes.byteLength > limit;
-  const shownAsText = async (): Promise<RenderableResult[]> => [
+
+  // Labelled JSON and not JSON (finding 0026): what the bytes are, from the
+  // closed list in `sniff.ts`, after the limits above. The label is kept.
+  const sniffed = (kind: Sniffed["kind"], base64: boolean): Sniffed => ({
+    kind,
+    declaredMediaType: envelope.headers.get("content-type") ?? mediaType ?? "",
+    ...(base64 ? { base64: true } : {}),
+  });
+  const sniffedResult = (
+    found: Uint8Array,
+    as: Sniffed,
+    read?: { text: string; geo: GeoRead },
+  ): RenderableResult[] => {
+    const type = SNIFFED_MEDIA_TYPES[as.kind];
+    const blob = new Blob([found.slice()], { type });
+    const filename = envelope.filename ?? defaultFilename(options.processId, single, type);
+    if (read === undefined || found.byteLength > limit) {
+      return [
+        {
+          kind: "download",
+          outputId: single,
+          blob,
+          mediaType: type,
+          filename,
+          reason: read === undefined ? "not-text" : "too-large",
+          ...(read === undefined ? {} : { geo: read.geo }),
+          sniffed: as,
+        },
+      ];
+    }
+    return [
+      {
+        kind: "text",
+        outputId: single,
+        value: read.text,
+        mediaType: type,
+        blob,
+        geo: read.geo,
+        sniffed: as,
+      },
+    ];
+  };
+  const sniff = async (): Promise<RenderableResult[] | undefined> => {
+    const raw = new Uint8Array(bytes);
+    const magic = magicOf(raw);
+    if (magic !== undefined) return sniffedResult(raw, sniffed(magic, false));
+    if (text !== undefined) {
+      const geo = await sniffXml(text);
+      if (geo !== undefined) return sniffedResult(raw, sniffed(geo.parsedAs, false), { text, geo });
+    }
+    // Declared base64 and sent as it is (ZOO's KML and TIFF): the bytes were
+    // looked at first, above; only now is base64 tried.
+    if (text === undefined || options.base64Outputs?.includes(single) !== true) return undefined;
+    const decoded = base64Bytes(text);
+    if (decoded === undefined) return undefined;
+    const inner = magicOf(decoded);
+    if (inner !== undefined) return sniffedResult(decoded, sniffed(inner, true));
+    const decodedText = strictText(decoded.slice().buffer, undefined);
+    const geo = decodedText === undefined ? undefined : await sniffXml(decodedText);
+    return geo === undefined || decodedText === undefined
+      ? undefined
+      : sniffedResult(decoded, sniffed(geo.parsedAs, true), { text: decodedText, geo });
+  };
+
+  if (text === undefined) {
+    const found = envelope.isJson ? await sniff() : undefined;
+    return results(found ?? (await download("not-text")));
+  }
+  const shownAsText = async (geo?: GeoRead): Promise<RenderableResult[]> => [
     {
       kind: "text",
       outputId: single,
       value: text,
       mediaType: mediaType ?? "text/plain",
       blob: await envelope.blob(),
+      ...(geo === undefined ? {} : { geo }),
     },
   ];
 
@@ -441,15 +546,23 @@ async function render(
     try {
       value = JSON.parse(text) as unknown;
     } catch {
-      // Labelled JSON and is not (ZOO does this, finding 0026): show the text.
+      const found = await sniff();
+      if (found !== undefined) return results(found);
+      // Labelled JSON and is not, nor anything sniffing knows: show the text.
       if (tooLarge) return results(await download("too-large"));
       return results(await shownAsText());
     }
     const entries = splitResults(value, options.outputIds);
     if (entries !== undefined) {
       return {
-        results: entries.map(([id, entry]) =>
-          withinLimit(fromEntry(id, entry, options, envelope.url), limit, options.processId),
+        results: await Promise.all(
+          entries.map(async ([id, entry]) =>
+            withinLimit(
+              await withGeo(fromEntry(id, entry, options, envelope.url)),
+              limit,
+              options.processId,
+            ),
+          ),
         ),
         entries: new Map(entries),
       };
@@ -458,7 +571,9 @@ async function render(
     return results([{ kind: "json", outputId: single, value, ...(await placed(value)) }]);
   }
 
-  if (tooLarge) return results(await download("too-large"));
+  // Labelled as XML, GML or KML: read for the map, whether shown or too large to show.
+  const geo = await readLabelledXml(text, mediaType);
+  if (tooLarge) return results(await download("too-large", undefined, geo));
 
-  return results(await shownAsText());
+  return results(await shownAsText(geo));
 }

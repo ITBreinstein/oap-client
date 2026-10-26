@@ -219,7 +219,7 @@ describe("classification by evidence (T5)", () => {
     expect(new Uint8Array((await loaded.blob?.arrayBuffer()) ?? new ArrayBuffer(0))).toEqual(png);
   });
 
-  it("does not try to parse XML: GML is 'other'", async () => {
+  it("reads GML behind a reference for the map (#F4): it was 'other' before Phase 3", async () => {
     const url = "http://localhost:5090/temp//ZOO_DATA_Buffer_Result_0.xml";
     const loaded = await loadReference(
       { href: url },
@@ -230,9 +230,11 @@ describe("classification by evidence (T5)", () => {
     );
     expect(loaded).toMatchObject({
       outcome: "ok",
-      representation: "other",
+      representation: "gml",
       mediaType: "application/xml",
+      geo: { ok: true, parsedAs: "gml", placement: { kind: "crs84", crs: "EPSG:4326" } },
     });
+    expect(plotStatus(asResult(loaded)).kind).toBe("plotted");
   });
 
   it("takes an image by its media type", async () => {
@@ -291,6 +293,42 @@ describe("Content-Crs (T5)", () => {
       { endpoint: PYGEOAPI, fetch: fakeFetch({ [url]: () => responseOf(key, headers) }) },
     );
   }
+
+  it("reprojects breinstein-rd's RD New onto pygeoapi's own CRS84 answer, within 1 mm (#F1)", async () => {
+    // The local collection behind breinstein-rd-link, asked for in EPSG:28992
+    // (as stored, with Content-Crs) and in CRS84 (reprojected by pygeoapi's
+    // pyproj). Both sides use the seven-parameter shift; RDNAPTRANS™ can
+    // differ from it by decimetres.
+    const rd = await loadedWith("pygeoapi/features/breinstein-rd-items-epsg28992.http");
+    const crs84 = await loadedWith("pygeoapi/features/breinstein-rd-items-crs84.http");
+    expect(rd).toMatchObject({
+      contentCrs: "http://www.opengis.net/def/crs/EPSG/0/28992",
+      placement: { kind: "reprojected" },
+    });
+    expect(crs84).toMatchObject({ contentCrs: "http://www.opengis.net/def/crs/OGC/1.3/CRS84" });
+    const flat = (loaded: LoadedReference) => {
+      const status = plotStatus(asResult(loaded));
+      if (status.kind !== "plotted") throw new Error(`not plotted: ${status.kind}`);
+      return status.shapes.flatMap((shape) =>
+        shape.type === "Point"
+          ? [shape.coordinates]
+          : shape.type === "LineString"
+            ? shape.coordinates
+            : shape.coordinates.flat(),
+      );
+    };
+    const ours = flat(rd);
+    const theirs = flat(crs84);
+    expect(ours).toHaveLength(theirs.length);
+    ours.forEach(([lon = 0, lat = 0], index) => {
+      const [lon2 = 0, lat2 = 0] = theirs[index] ?? [];
+      const metres = Math.hypot(
+        (lon - lon2) * 111_320 * Math.cos((lat * Math.PI) / 180),
+        (lat - lat2) * 110_574,
+      );
+      expect(metres).toBeLessThan(0.001);
+    });
+  });
 
   it("does not plot PDOK's EPSG:4258, which is latitude first", async () => {
     const loaded = await loadedWith("pdok/bag-pand-items-epsg4258.http");

@@ -12,8 +12,8 @@
  * EPSG:4326 is latitude first, as the EPSG register has it; GML writes some
  * spellings longitude first, and that is the GML parser's rule, not this one.
  *
- * Where a CRS comes from is recorded beside it. In this phase, only a
- * response's `Content-Crs`. A result with no CRS named is never guessed at
+ * Where a CRS comes from is recorded beside it: a response's `Content-Crs`,
+ * a GML `srsName` (`gml.ts`), or KML. A result with no CRS named is never guessed at
  * from the size of its numbers: RD New metres sent with nothing to say so
  * stay off the map, and the result says the service did not say.
  *
@@ -25,8 +25,12 @@
 /** The three systems this page places. */
 export type KnownCrs = "CRS84" | "EPSG:4326" | "EPSG:28992";
 
-/** Where a result's CRS was read from. Later phases add GML's `srsName` and GeoTIFF's geokeys. */
-export type CrsSource = "content-crs";
+/**
+ * Where a result's CRS was read from: a response's `Content-Crs`, a GML
+ * geometry's `srsName` (#F4), or KML itself, which is always longitude and
+ * latitude (#F5). Phase 4 adds GeoTIFF's geokeys.
+ */
+export type CrsSource = "content-crs" | "gml-srsname" | "kml";
 
 const OGC_CRS84 =
   /^(?:https?:\/\/www\.opengis\.net\/def\/crs\/OGC\/[\d.]+\/|urn:ogc:def:crs:OGC:[\d.]*:|OGC:)?CRS84$/i;
@@ -166,9 +170,12 @@ export function readContentCrs(header: string | undefined): string | undefined {
  * - `crs84`, `swapped`, `reprojected`: one of the three; `value` is the GeoJSON
  *   in CRS84 to plot. The result as shown stays as the server sent it.
  * - `other`: a CRS this page does not place.
+ * - `unstated`: a format that names its CRS where it is, and this result did
+ *   not (GML with no `srsName`). Never plotted, whatever its numbers.
  */
 export type Placement =
   | { readonly kind: "as-sent" }
+  | { readonly kind: "unstated"; readonly from: CrsSource }
   | {
       readonly kind: "crs84" | "swapped" | "reprojected";
       readonly crs: KnownCrs;

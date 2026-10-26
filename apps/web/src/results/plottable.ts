@@ -84,16 +84,37 @@ function inDegrees(shape: Shape): boolean {
   return positions.every(([x = 0, y = 0]) => Math.abs(x) <= 180 && Math.abs(y) <= 90);
 }
 
-/** The JSON a result holds: shown, read and too large to show, or loaded from its reference. */
+/** GML or KML the result was read as, when it was read (#F4, #F5). */
+function geoOf(result: RenderableResult) {
+  if (result.kind === "text" || result.kind === "download") {
+    return result.geo?.ok === true ? result.geo : undefined;
+  }
+  if (result.kind === "reference" && result.loaded?.outcome === "ok") {
+    return result.loaded.geo?.ok === true ? result.loaded.geo : undefined;
+  }
+  return undefined;
+}
+
+/**
+ * The GeoJSON a result holds: shown, read and too large to show, loaded from
+ * its reference, or read from GML or KML (#F4, #F5).
+ */
 function jsonOf(result: RenderableResult): unknown {
+  const geo = geoOf(result);
+  if (geo !== undefined) return geo.geojson;
   if (result.kind === "json") return result.value;
   if (result.kind === "download") return result.json;
   if (result.kind === "reference" && result.loaded?.outcome === "ok") return result.loaded.geojson;
   return undefined;
 }
 
-/** Where the result's GeoJSON goes, from the CRS it named (#F1); undefined when it named none. */
-function placementOf(result: RenderableResult): Placement | undefined {
+/**
+ * Where the result's GeoJSON goes, from the CRS it named (#F1) or its GML
+ * `srsName` or KML; undefined when it named none.
+ */
+export function placementOf(result: RenderableResult): Placement | undefined {
+  const geo = geoOf(result);
+  if (geo !== undefined) return geo.placement;
   if (result.kind === "json" || result.kind === "download") return result.placement;
   if (result.kind === "reference") return result.loaded?.placement;
   return undefined;
@@ -112,6 +133,10 @@ export function plotStatus(
   const placement = placementOf(result);
   if (placement?.kind === "other") {
     return shapesWithOriginIn(sent)?.length ? { kind: "projected" } : { kind: "not-geojson" };
+  }
+  // GML with no srsName: never placed, whatever its numbers (#F4).
+  if (placement?.kind === "unstated") {
+    return shapesWithOriginIn(sent)?.length ? { kind: "crs-unstated" } : { kind: "not-geojson" };
   }
   const value = placement === undefined || placement.kind === "as-sent" ? sent : placement.value;
   const found = shapesWithOriginIn(value);

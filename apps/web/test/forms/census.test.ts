@@ -68,7 +68,7 @@ describe("census over the committed fixtures", () => {
     expect(census(Object.keys(FIXTURE_DESCRIPTIONS).sort())).toMatchInlineSnapshot(`
       {
         "controls": {
-          "bbox": 4,
+          "bbox": 6,
           "checkbox": 6,
           "complex": 15,
           "geometry": 4,
@@ -77,15 +77,15 @@ describe("census over the committed fixtures", () => {
           "list:number": 1,
           "list:text": 4,
           "number": 18,
-          "select": 5,
+          "select": 7,
           "text": 28,
         },
-        "descriptions": 36,
+        "descriptions": 39,
         "diagnostics": {
           "contradictory-schema": 1,
           "unsupported-keyword": 6,
         },
-        "inputs": 91,
+        "inputs": 95,
       }
     `);
   });

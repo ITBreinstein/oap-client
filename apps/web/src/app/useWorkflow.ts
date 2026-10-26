@@ -59,6 +59,7 @@ import { loadReference as followReference } from "../results/reference.js";
 import { formatsToAsk } from "../results/format-choice.js";
 import { toRenderable, type RenderableResult } from "../results/renderable.js";
 import {
+  base64Outputs,
   declaredMediaTypes,
   rateLimitMessage,
   relayEndpointFor,
@@ -779,6 +780,7 @@ export function useWorkflow(
           processId: process.id,
           declaredMediaTypes: declaredMediaTypes(process),
           askedFormats: formats,
+          base64Outputs: base64Outputs(process, formats),
         });
         recordResults(results);
         dispatch({ type: "results", runId, results });
@@ -919,6 +921,7 @@ export function useWorkflow(
           processId,
           declaredMediaTypes: declared,
           askedFormats: asked,
+          base64Outputs: base64Outputs(state.process, asked),
         });
         recordResults(results);
         dispatch({ type: "results", runId, results });
