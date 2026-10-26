@@ -14,6 +14,7 @@ import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures.js";
 import { RELAY } from "./servers.js";
 import { requireService } from "./services.js";
+import { CONNECTED } from "./waits.js";
 
 const PYGEOAPI = "http://localhost:5080";
 const SERVICE = "https://pygeoapi.example.test";
@@ -117,10 +118,20 @@ test.beforeEach(async () => {
   await requireService(`${RELAY}/healthz`, "the relay");
 });
 
+/** Connected to the reference pygeoapi, its process list on screen. */
+async function connectReference(page: Page) {
+  await page.getByRole("radio", { name: /Reference pygeoapi/ }).check();
+  await page.getByRole("button", { name: "Connect", exact: true }).click();
+  await expect(page.getByRole("heading", { level: 2, name: "Processes" })).toBeVisible(CONNECTED);
+}
+
+// The walk, in five parts per style and theme: every state of the one long
+// test it was, which under load ran past 90 s on axe alone (2026-10-26).
 for (const style of ["instrument", "instrument-updated"] as const) {
   for (const theme of ["light", "dark"] as const) {
-    test(`no axe violations, ${style}, ${theme}`, async ({ page }) => {
-      test.setTimeout(90_000);
+    const walk = `no axe violations, ${style}, ${theme}`;
+
+    test(`${walk}: the start screen, Appearance and the relay question`, async ({ page }) => {
       await open(page, style, theme);
       await noViolations(page, "the start screen");
 
@@ -135,11 +146,11 @@ for (const style of ["instrument", "instrument-updated"] as const) {
       await page.getByRole("button", { name: "Connect", exact: true }).click();
       await expect(page.getByTestId("relay-confirm")).toBeVisible({ timeout: 20_000 });
       await noViolations(page, "the relay question");
-      await page.keyboard.press("Escape");
+    });
 
-      await page.getByRole("radio", { name: /Reference pygeoapi/ }).check();
-      await page.getByRole("button", { name: "Connect", exact: true }).click();
-      await expect(page.getByRole("heading", { level: 2, name: "Processes" })).toBeVisible();
+    test(`${walk}: the process list, Examples, My jobs and About`, async ({ page }) => {
+      await open(page, style, theme);
+      await connectReference(page);
       await noViolations(page, "the process list");
 
       for (const [item, name] of [
@@ -153,7 +164,11 @@ for (const style of ["instrument", "instrument-updated"] as const) {
         await page.keyboard.press("Escape");
         await expect(page.getByRole("dialog", { name })).toBeHidden();
       }
+    });
 
+    test(`${walk}: a form, a form the page refused, dates`, async ({ page }) => {
+      await open(page, style, theme);
+      await connectReference(page);
       await openProcess(page, "Every input kind");
       await noViolations(page, "a form");
       await page.getByRole("button", { name: "Run", exact: true }).click();
@@ -163,16 +178,23 @@ for (const style of ["instrument", "instrument-updated"] as const) {
       await toList(page);
       await openProcess(page, "Dates and times");
       await noViolations(page, "a date and a date-time");
+    });
 
-      await toList(page);
+    test(`${walk}: drawing on the map`, async ({ page }) => {
+      await open(page, style, theme);
+      await connectReference(page);
       await openProcess(page, "Buildings in an area");
       await page.locator(".map-pane canvas").waitFor();
       await page.getByRole("button", { name: "Draw on the map" }).click();
       await expect(page.getByRole("button", { name: "Stop drawing" })).toBeVisible();
       await noViolations(page, "drawing on the map");
-      await page.getByRole("button", { name: "Stop drawing" }).click();
+    });
 
-      await toList(page);
+    test(`${walk}: a result`, async ({ page }) => {
+      // A run: connecting, the form, and up to 30 s for the result.
+      test.setTimeout(60_000);
+      await open(page, style, theme);
+      await connectReference(page);
       await openProcess(page, "Area of each feature");
       await page.getByRole("textbox", { name: "Value (JSON)" }).fill(JSON.stringify(ONE_PLOT));
       await page.getByRole("button", { name: "Run", exact: true }).click();
