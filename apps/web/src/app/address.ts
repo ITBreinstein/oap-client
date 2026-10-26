@@ -20,7 +20,8 @@
  * A job removed from My jobs is not named again: "Remove from list" takes it
  * out of the address at once, in place, and the address leaves it out from
  * then on, even while its results stay on screen. Otherwise a reload would
- * follow the job from the address and list it again.
+ * follow the job from the address and list it again. A reload still on its way
+ * back to the job when it is removed does not follow it either.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -417,6 +418,9 @@ export function useAddress(state: Workflow, commands: WorkflowCommands): Address
   const removeJob = (statusUrl: string) => {
     commands.removeJob(statusUrl);
     removed.current.add(statusUrl);
+    // A reload may still be on its way back to this job, to follow it once its
+    // process is open: it would list the job again. Not any more.
+    if (following.current?.statusUrl === statusUrl) following.current = undefined;
     const shown = placeInSearch(globalThis.location.search);
     const kept = withoutRemoved(shown, removed.current);
     if (samePlace(kept, shown)) return;
