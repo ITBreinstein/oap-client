@@ -55,6 +55,10 @@ reliability task (2026-10-26):
 - **A slow service gets 20 s** before its tests are skipped, locally as in CI,
   and every run ends with a list of what it skipped and why
   (`e2e/skip-reporter.ts`). Locally a skip is still a skip, never a pass.
+- **Keep the machine awake.** A Mac that goes to idle sleep mid-run stops
+  every worker and the servers with it; the tests that were running time out
+  together when it wakes (16 minutes asleep, six failures, 2026-10-26). Run a
+  long local lane under `caffeinate -i pnpm test:e2e`.
 - **Retries are off.** A test that only passes on a second try is flaky, and
   is reported as a failure.
 
