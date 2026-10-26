@@ -775,7 +775,7 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
                     }
                     dismissAdvertisedFor={view.dismissAdvertisedFor}
                     messages={view.jobMessages}
-                    onRemove={commands.removeJob}
+                    onRemove={address.removeJob}
                     onDismiss={commands.dismissJob}
                   />
                 </SidePanel>
