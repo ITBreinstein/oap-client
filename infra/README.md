@@ -29,7 +29,11 @@ Stop Weaver before running the blocking lane on a laptop
 worker hold about 2 GB and run under emulation on Apple Silicon. Beside them,
 pygeoapi answered slowly enough on 2026-10-23 that five of the lane's 5-second
 waits ran out, and all 200 passed once Weaver was stopped. CI runs the two
-lanes in separate jobs.
+lanes in separate jobs. Keep Weaver stopped unless its lane is running.
+
+Give Docker at least 6 GB of memory when running Weaver. With less, Docker
+Desktop stopped every container at once on 2026-10-23 (all exited 137) while
+Weaver ran beside pygeoapi and ZOO.
 
 ZOO keeps its job results in a Docker volume, `zoo-data` (`compose/zoo.yml`),
 not in the pinned checkout, so they do not survive `./infra/zoo/zoo.sh down`,
@@ -269,7 +273,55 @@ as well as the answer for one.
 pygeoapi 0.21.0 lets a process see the `outputs` it was asked for
 (`supports_outputs`), which is what makes this possible. It does not let a
 process set a response header, so no pygeoapi process can send
-`Content-Crs`: there is no `breinstein-rd-geojson`.
+`Content-Crs`: there is no `breinstein-rd-geojson`. `breinstein-rd-link`
+below is what takes its place.
+
+### `breinstein-gml`
+
+GML 2 shaped as ZOO-Project's OGR services return it (2026-10-26, #F4): an
+`ogr:FeatureCollection` of `gml:featureMember`s, `gml:coordinates` with commas,
+labelled `text/xml`. One polygon, the area given (a small box in Utrecht when
+left out), and its centre as a point, each with two simple properties. The
+`crs` input picks the `srsName`, as ZOO's answers have them:
+
+| `crs`                 | `srsName`    | Coordinates                                    |
+| --------------------- | ------------ | ---------------------------------------------- |
+| `EPSG:4326` (default) | `EPSG:4326`  | longitude first, as GML 2 writes the bare code |
+| `EPSG:28992`          | `EPSG:28992` | RD New, by pyproj, to the millimetre           |
+| `none`                | none         | longitude first, with nothing to say so        |
+
+The first two are the same area, so a client can be checked to put them in the
+same place; the third is ZOO's `Centroid`, which names no system at all.
+
+### `breinstein-kml`
+
+KML as tools write it (2026-10-26, #F5): four Placemarks in a Folder — a
+polygon whose `description` is HTML with a script and an image in it, a point
+with `ExtendedData` `Data` pairs, a line with `SchemaData`, and a
+`MultiGeometry` of two points. Every coordinate carries an altitude. Labelled
+`application/vnd.google-earth.kml+xml`.
+
+### `breinstein-rd-link` and the `breinstein-rd` collection
+
+A pygeoapi process cannot send `Content-Crs`; pygeoapi's OGC API - Features
+can (2026-10-26, #F1). `breinstein-rd` is a features collection of three fixed
+features in Utrecht — a polygon, a line and a point — stored in RD New
+([pygeoapi/data/breinstein-rd.geojson](pygeoapi/data/breinstein-rd.geojson),
+mounted by `compose/pygeoapi.yml`) and offered in RD New and CRS84. Asked for
+with `crs=http://www.opengis.net/def/crs/EPSG/0/28992`, pygeoapi answers as
+stored, with `Content-Crs: <http://www.opengis.net/def/crs/EPSG/0/28992>`;
+asked for nothing, it reprojects to CRS84 with pyproj, by the same
+seven-parameter shift the web client uses (0.17 mm apart).
+
+`breinstein-rd-link` returns one output, always by reference: a link to that
+query, in RD New by default or in CRS84 (its `crs` input). The link's target is
+set per instance in the YAML, as for `breinstein-link`. Everything stays on
+the local server: the blocking lane does not need the network.
+
+A side effect worth knowing: with a features collection configured, pygeoapi
+declares ten OGC API - Features conformance classes beside the Processes ones.
+`packages/core/test/fixtures/pygeoapi/conformance.json` was re-captured with
+them.
 
 ## Re-creating the stack after a config change
 
