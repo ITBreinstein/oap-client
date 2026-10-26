@@ -4,7 +4,7 @@
  * The local pygeoapi lists enough processes for the search box to show.
  */
 
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures.js";
 import { requireService } from "./services.js";
 
 const PYGEOAPI = "http://localhost:5080";

@@ -6,7 +6,8 @@
  * address, which this spec answers from the local pygeoapi.
  */
 
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./fixtures.js";
 import { RELAY } from "./servers.js";
 import { requireService } from "./services.js";
 
