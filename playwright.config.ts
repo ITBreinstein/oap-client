@@ -20,10 +20,23 @@ export default defineConfig({
   globalSetup: "./e2e/global-setup.ts",
   projects: [
     // `pnpm test:e2e`: blocks CI. pygeoapi only, from infra/compose.
-    { name: "blocking", testIgnore: /zoo-browser\.spec\.ts/, grepInvert: /@pdok/ },
+    // Before the lanes that use the lane's pygeoapi, and only those: its job
+    // stores are kept small (e2e/job-store.setup.ts).
+    { name: "pygeoapi-jobs", testMatch: /job-store\.setup\.ts/ },
+    {
+      name: "blocking",
+      testIgnore: /zoo-browser\.spec\.ts/,
+      grepInvert: /@pdok/,
+      dependencies: ["pygeoapi-jobs"],
+    },
     // `pnpm test:e2e:pdok`: the tests that reach PDOK (tagged PDOK_LANE in
     // e2e/services.ts). Opt-in: a third party's uptime must not block a merge.
-    { name: "pdok", testIgnore: /zoo-browser\.spec\.ts/, grep: /@pdok/ },
+    {
+      name: "pdok",
+      testIgnore: /zoo-browser\.spec\.ts/,
+      grep: /@pdok/,
+      dependencies: ["pygeoapi-jobs"],
+    },
     // `pnpm test:e2e:zoo`: ZOO-Project from a browser. Reports, never blocks:
     // ZOO is a second implementation built from source, and its worker pool
     // runs out as it is used (finding 0044). See .github/workflows/interop.yml.

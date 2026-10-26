@@ -10,7 +10,6 @@
  */
 
 import { relayBuild, webBuild } from "./fingerprint.js";
-import { pruneFinishedJobs, prunedLine } from "./job-store.js";
 import { RELAY, WEB } from "./servers.js";
 
 async function reported(url: string, read: (response: Response) => Promise<unknown>) {
@@ -48,17 +47,4 @@ export default async function globalSetup(): Promise<void> {
     (await response.text()).trim(),
   );
   if (webFound !== web) refuse("web build", WEB, webFound, web);
-
-  // The lane's pygeoapi job stores, kept small (e2e/job-store.ts). A server
-  // that is not up is left to requireService to report.
-  for (const [name, base] of [
-    ["pygeoapi :5080", "http://localhost:5080"],
-    ["pygeoapi :5081", "http://localhost:5081"],
-  ] as const) {
-    try {
-      console.log(prunedLine(name, await pruneFinishedJobs(base)));
-    } catch (error) {
-      console.log(`${name}: job store not checked (${String(error)}).`);
-    }
-  }
 }

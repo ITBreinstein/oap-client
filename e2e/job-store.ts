@@ -10,7 +10,8 @@
  * laptop's lane slows down over a day in a way CI, which starts empty, never
  * does.
  *
- * Before a lane starts, a store above {@link JOB_STORE_THRESHOLD} jobs has its
+ * Before the blocking and PDOK lanes (`job-store.setup.ts`, a setup project
+ * they depend on), a store above {@link JOB_STORE_THRESHOLD} jobs has its
  * finished jobs dismissed (`DELETE /jobs/{id}`, the standard's own way),
  * oldest first. Only the lane's own servers, `:5080` and `:5081`; only jobs
  * whose status is final (`successful`, `failed`, `dismissed`); and only those

@@ -47,7 +47,8 @@ reliability task (2026-10-26):
   request sent 2.0 s after the one before. A stock pygeoapi still keeps 2 s.
 - **The job store is kept small.** Every lane run adds about 80 jobs to
   pygeoapi's one TinyDB file, and every job request parses the whole file
-  under one lock. Before a lane starts, `e2e/job-store.ts` dismisses the
+  under one lock. Before the blocking and PDOK lanes (never the ZOO or Weaver
+  lane, which may run beside them), `e2e/job-store.ts` dismisses the
   finished jobs on `:5080` and `:5081` that finished more than 15 minutes ago,
   once a server holds more than 300, and prints how many and how long
   (1 000 jobs: 14 s). Recreating the container empties it at once.
