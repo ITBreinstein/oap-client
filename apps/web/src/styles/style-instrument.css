@@ -312,8 +312,16 @@
   gap: 36px;
 }
 
+/*
+ * The start screen's column: the address row, the known services, the
+ * examples and the notes all end at one edge.
+ */
+[data-style="instrument"] {
+  --start-column: 760px;
+}
+
 [data-style="instrument"] .address-field {
-  max-width: 720px;
+  max-width: var(--start-column);
 }
 
 [data-style="instrument"] .address-field > label,
@@ -340,7 +348,7 @@
 
 /* The known services: a table, the radio as its status dot. */
 [data-style="instrument"] .service-choices {
-  max-width: 760px;
+  max-width: var(--start-column);
 }
 
 [data-style="instrument"] .service-choices .connect-line strong {
@@ -422,7 +430,7 @@
 [data-style="instrument"] .how-it-works,
 [data-style="instrument"] .about-access,
 [data-style="instrument"] .start-card form > .notice {
-  max-width: 760px;
+  max-width: var(--start-column);
 }
 
 [data-style="instrument"] ol.steps li::before {
@@ -432,7 +440,7 @@
 
 /* Featured examples: compact rows in one table, as the panel lists them. */
 [data-style="instrument"] .featured-examples {
-  max-width: 760px;
+  max-width: var(--start-column);
 }
 
 [data-style="instrument"] .example-grid {

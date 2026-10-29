@@ -121,6 +121,24 @@ test.describe("proportions", () => {
           updated ? ["8px", "6px", "4px", "2px"] : ["6px", "6px", "4px", "4px"],
         );
       });
+
+      test("the address row ends where the lists do, its error too (#3)", async ({ page }) => {
+        await open(page, style);
+        const right = (selector: string) =>
+          page
+            .locator(selector)
+            .first()
+            .evaluate((element) => Math.round(element.getBoundingClientRect().right));
+        const edge = await right(".service-choices");
+        expect(await right(".input-with-button button")).toBe(edge);
+        expect(await right(".featured-examples")).toBe(edge);
+
+        await page.route("https://unreachable.example.test/**", (route) => route.abort());
+        await page.getByRole("textbox").first().fill("https://unreachable.example.test");
+        await page.getByRole("button", { name: "Connect", exact: true }).click();
+        await expect(page.locator(".address-field .error-box")).toBeVisible();
+        expect(await right(".address-field .error-box")).toBe(edge);
+      });
     });
   }
 });
