@@ -81,6 +81,7 @@ const polygon: GeometryControl = {
   kind: "geometry",
   wrapper: "geometry",
   geometryTypes: ["Polygon"],
+  recognisedBy: "format",
 };
 const PREVIOUS = { geojson: '{"type":"Polygon","coordinates":[[[4,52],[5,52],[5,53],[4,52]]]}' };
 

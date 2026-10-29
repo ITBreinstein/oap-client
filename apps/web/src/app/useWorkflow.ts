@@ -28,6 +28,7 @@ import { schemaWarnings } from "../forms/schema-warnings.js";
 import { validateForm, type FieldErrors } from "../forms/validate.js";
 import {
   formObservationsFor,
+  geometryObservationsFor,
   loadedObservation,
   resultObservations,
   type FormObservation,
@@ -294,7 +295,9 @@ function formObservationsOf(
       code: "bbox-projected-crs-only" as const,
       keyword: undefined,
       crs,
+      recognisedBy: undefined,
     })),
+    ...geometryObservationsFor(endpoint, process.id, plan.fields),
   ];
 }
 
@@ -692,6 +695,7 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
         code: "schema-not-checked",
         keyword,
         crs: undefined,
+        recognisedBy: undefined,
       })),
     );
     const runId = newRunId();
@@ -711,6 +715,7 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
         code: note.code,
         keyword: undefined,
         crs: note.crs,
+        recognisedBy: undefined,
       })),
     );
     setJobNotice(undefined);

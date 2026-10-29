@@ -103,29 +103,54 @@ const cases: readonly { name: string; schema: unknown; expected: Control }[] = [
   {
     name: "geojson-geometry format",
     schema: { format: "geojson-geometry" },
-    expected: { kind: "geometry", wrapper: "geometry", geometryTypes: ALL_GEOMETRIES },
+    expected: {
+      kind: "geometry",
+      wrapper: "geometry",
+      geometryTypes: ALL_GEOMETRIES,
+      recognisedBy: "format",
+    },
   },
   {
     name: "a single geometry type in the format",
     schema: { format: "geojson-polygon" },
-    expected: { kind: "geometry", wrapper: "geometry", geometryTypes: ["Polygon"] },
+    expected: {
+      kind: "geometry",
+      wrapper: "geometry",
+      geometryTypes: ["Polygon"],
+      recognisedBy: "format",
+    },
   },
   {
     name: "geojson-feature-collection format",
     schema: { format: "geojson-feature-collection" },
-    expected: { kind: "geometry", wrapper: "feature-collection", geometryTypes: ALL_GEOMETRIES },
+    expected: {
+      kind: "geometry",
+      wrapper: "feature-collection",
+      geometryTypes: ALL_GEOMETRIES,
+      recognisedBy: "format",
+    },
   },
   {
     name: "a $ref to the well-known geometry schema",
     schema: {
       $ref: "http://schemas.opengis.net/ogcapi/features/part1/1.0/openapi/schemas/geometryGeoJSON.yaml",
     },
-    expected: { kind: "geometry", wrapper: "geometry", geometryTypes: ALL_GEOMETRIES },
+    expected: {
+      kind: "geometry",
+      wrapper: "geometry",
+      geometryTypes: ALL_GEOMETRIES,
+      recognisedBy: "ref",
+    },
   },
   {
     name: "the GeoJSON media type alone",
     schema: { type: "object", contentMediaType: "application/geo+json" },
-    expected: { kind: "geometry", wrapper: "geometry", geometryTypes: ALL_GEOMETRIES },
+    expected: {
+      kind: "geometry",
+      wrapper: "geometry",
+      geometryTypes: ALL_GEOMETRIES,
+      recognisedBy: "contentMediaType",
+    },
   },
   {
     // Changed: the plan now also records the default CRS (R5) and the
@@ -169,7 +194,12 @@ describe("matcher chain", () => {
   it("resolves an array of geometries", () => {
     expect(controlFor({ type: "array", items: { format: "geojson-geometry" } })).toEqual({
       kind: "list",
-      item: { kind: "geometry", wrapper: "geometry", geometryTypes: ALL_GEOMETRIES },
+      item: {
+        kind: "geometry",
+        wrapper: "geometry",
+        geometryTypes: ALL_GEOMETRIES,
+        recognisedBy: "format",
+      },
     });
   });
 

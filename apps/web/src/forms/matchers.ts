@@ -200,6 +200,37 @@ interface GeometryHint {
   readonly geometryTypes: readonly GeometryType[];
 }
 
+const GEOJSON_MEDIA_TYPE = "application/geo+json";
+
+/** What a GeoJSON type name says: `FeatureCollection`, `Feature`, `Geometry` or one geometry type. */
+function hintFromTypeName(name: string): GeometryHint | undefined {
+  if (name === "FeatureCollection") {
+    return { wrapper: "feature-collection", geometryTypes: GEOMETRY_TYPES };
+  }
+  if (name === "Feature") return { wrapper: "feature", geometryTypes: GEOMETRY_TYPES };
+  if (name === "Geometry") return { wrapper: "geometry", geometryTypes: GEOMETRY_TYPES };
+  const specific = GEOMETRY_TYPES.find((type) => type === name);
+  return specific === undefined ? undefined : { wrapper: "geometry", geometryTypes: [specific] };
+}
+
+/**
+ * The GeoJSON project's own schemas, `https://geojson.org/schema/Polygon.json`
+ * and its siblings. The standard's example `featureCollectionInput` (clause 8)
+ * refers to `FeatureCollection.json`.
+ */
+const GEOJSON_ORG_SCHEMA = /^https?:\/\/geojson\.org\/schema\/([A-Za-z]+)\.json$/;
+
+/** Hints that hold together, as `allOf` members must: one wrapper, the types all of them allow. */
+function together(hints: readonly GeometryHint[]): GeometryHint | undefined {
+  const [first] = hints;
+  if (first === undefined) return { wrapper: "geometry", geometryTypes: GEOMETRY_TYPES };
+  if (!hints.every((hint) => hint.wrapper === first.wrapper)) return undefined;
+  const geometryTypes = first.geometryTypes.filter((type) =>
+    hints.every((hint) => hint.geometryTypes.includes(type)),
+  );
+  return geometryTypes.length === 0 ? undefined : { wrapper: first.wrapper, geometryTypes };
+}
+
 /** `geojson-geometry`, `geojson-feature`, `geojson-polygon`, … */
 function hintFromFormat(format: string): GeometryHint | undefined {
   if (!format.toLowerCase().startsWith("geojson-")) return undefined;
@@ -228,22 +259,60 @@ function hintFromRef(ref: string): GeometryHint | undefined {
   if (target.includes("geometrygeojson")) {
     return { wrapper: "geometry", geometryTypes: GEOMETRY_TYPES };
   }
-  return undefined;
+  const [document = ""] = ref.split("#");
+  const named = GEOJSON_ORG_SCHEMA.exec(document)?.[1];
+  return named === undefined ? undefined : hintFromTypeName(named);
 }
 
-const matchGeometry: Matcher = (schema) => {
+/** A format hint or a GeoJSON `$ref` on this one schema object, the format first. */
+function ownHint(
+  schema: JsonObject,
+): (GeometryHint & { readonly recognisedBy: "format" | "ref" }) | undefined {
   const format = readString(schema, "format");
   const byFormat = format === undefined ? undefined : hintFromFormat(format);
-  if (byFormat !== undefined) return { kind: "geometry", ...byFormat };
+  if (byFormat !== undefined) return { ...byFormat, recognisedBy: "format" };
 
   const ref = readString(schema, "$ref");
   const byRef = ref === undefined ? undefined : hintFromRef(ref);
-  if (byRef !== undefined) return { kind: "geometry", ...byRef };
+  return byRef === undefined ? undefined : { ...byRef, recognisedBy: "ref" };
+}
+
+/**
+ * #G1: the standard's own form, `allOf: [{ format: "geojson-geometry" }, { $ref:
+ * "…/geometryGeoJSON.yaml" }]` (clause 8). Every member has to say GeoJSON — a
+ * format hint, a GeoJSON `$ref`, or the GeoJSON media type, which says nothing
+ * about the wrapper — and together they must name one wrapper. A member that
+ * says anything else leaves the `allOf` to the refusal.
+ */
+function allOfHint(schema: JsonObject): GeometryHint | undefined {
+  const members = readArray(schema, "allOf");
+  if (members === undefined || members.length === 0) return undefined;
+  const hints: GeometryHint[] = [];
+  for (const member of members) {
+    if (!isJsonObject(member)) return undefined;
+    const hint = ownHint(member);
+    if (hint !== undefined) hints.push(hint);
+    else if (readString(member, "contentMediaType") !== GEOJSON_MEDIA_TYPE) return undefined;
+  }
+  return together(hints);
+}
+
+const matchGeometry: Matcher = (schema) => {
+  const own = ownHint(schema);
+  if (own !== undefined) return { kind: "geometry", ...own };
+
+  const inAllOf = allOfHint(schema);
+  if (inAllOf !== undefined) return { kind: "geometry", ...inAllOf, recognisedBy: "allOf" };
 
   // A media type alone does not say whether the server wants a bare geometry or
   // a feature. We assume a geometry; which servers disagree is a finding.
-  if (readString(schema, "contentMediaType") === "application/geo+json") {
-    return { kind: "geometry", wrapper: "geometry", geometryTypes: GEOMETRY_TYPES };
+  if (readString(schema, "contentMediaType") === GEOJSON_MEDIA_TYPE) {
+    return {
+      kind: "geometry",
+      wrapper: "geometry",
+      geometryTypes: GEOMETRY_TYPES,
+      recognisedBy: "contentMediaType",
+    };
   }
   return undefined;
 };

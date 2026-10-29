@@ -84,7 +84,19 @@ export interface GeometryControl {
   readonly wrapper: GeometryWrapper;
   /** Which geometries the drawing tool should offer. */
   readonly geometryTypes: readonly GeometryType[];
+  /** Which pattern in the schema said GeoJSON: recorded, so the matrix can tell them apart. */
+  readonly recognisedBy: GeometryRecognisedBy;
 }
+
+/**
+ * How a geometry input was recognised, by schema keyword:
+ *
+ * - `format`: a `geojson-*` format hint.
+ * - `ref`: a `$ref` to a GeoJSON schema document.
+ * - `contentMediaType`: `application/geo+json` and nothing more.
+ * - `allOf`: a format hint or `$ref` inside `allOf` (#G1).
+ */
+export type GeometryRecognisedBy = "format" | "ref" | "contentMediaType" | "allOf";
 
 /** How many numbers a bounding box has: 2D is four, 3D is six (`bbox.yaml`). */
 export type BboxDimension = 4 | 6;
