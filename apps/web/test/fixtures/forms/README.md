@@ -19,7 +19,7 @@ repository that declares no licence.
 | Endpoint | `http://localhost:5090/ogc-api`, started with `./infra/zoo/zoo.sh up` |
 | Captured | 2026-10-08                                                            |
 
-| Directory                          | Process                   | What the request sends                                                                          | ZOO's answer                                                 |
+| Directory                          | Process                   | What the request sends                                                                          | The server's answer                                          |
 | ---------------------------------- | ------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | `zoo-inline-csv/`                  | `SAGA.table_tools.3`      | two CSV tables inline, UTF-8, joined on their first column; three booleans                      | `200`, the joined table (`execute.response.json`)            |
 | `zoo-inline-las/`                  | `SAGA.pointcloud_tools.4` | a nine-point LAS 1.2 file inline, base64, made by `make-las.py`; two enums and a number         | `500`, a kernel segfault (finding 0070)                      |
