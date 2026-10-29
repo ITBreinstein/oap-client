@@ -11,7 +11,7 @@
  * is server-chosen text and may contain anything.
  */
 
-import { useId, type ReactNode } from "react";
+import { useContext, useId, type ReactNode } from "react";
 import { initialValue } from "../forms/defaults.js";
 import { bareObjectHint, isRawJson, type FormValues } from "../forms/encode.js";
 import { jsonTrouble, type JsonTrouble } from "../forms/json-trouble.js";
@@ -32,6 +32,7 @@ import { ComplexField } from "./ComplexField.js";
 import { GeometryField } from "./GeometryField.js";
 import { CopyField } from "./CopyButton.js";
 import { DateTimeField } from "./DateTimeField.js";
+import { DrawContext } from "./draw.js";
 import { formatJsonText } from "./json-text.js";
 import { JsonTroubleNote } from "./JsonTroubleNote.js";
 import { useUpdated } from "./variant.js";
@@ -47,8 +48,13 @@ export interface ControlProps<C extends Control = Control> {
   readonly onChange: (value: unknown) => void;
   /** The label text, for inputs inside a group that need their own. */
   readonly label: string;
-  /** The plan's input id, for a top-level field only: what the map draws for. */
+  /**
+   * The plan's input id, for a top-level field — and for each row of a
+   * repeatable geometry field, with its `row`: what the map draws for.
+   */
   readonly inputId?: string | undefined;
+  /** For a row of a repeatable geometry field, its index in the list. */
+  readonly row?: number | undefined;
   /**
    * STYLE TRIAL (updated Instrument, #14): the id of the field's own label,
    * for a yes/no box with "Yes" beside it, which keeps the field's name.
@@ -297,7 +303,10 @@ function JsonInput({
  * where the list's first row did.
  */
 function ListInput(props: ControlProps<ListControl>) {
-  const { id, control, value, required, onChange, label } = props;
+  const { id, control, value, required, onChange, label, inputId } = props;
+  const draw = useContext(DrawContext);
+  // A geometry row draws on the map, one row at a time, named by its index.
+  const drawsRows = inputId !== undefined && control.item.kind === "geometry";
   const items: readonly unknown[] = Array.isArray(value)
     ? value
     : value === undefined
@@ -325,11 +334,15 @@ function ListInput(props: ControlProps<ListControl>) {
               onChange={(next) => {
                 replace(index, next);
               }}
+              {...(drawsRows ? { inputId, row: index } : {})}
             />
             <button
               type="button"
               className="secondary"
               onClick={() => {
+                // Rows are known by their index, and every row after this one
+                // moves up: drawing for any of them would now go to the wrong one.
+                if (drawsRows && draw.fieldId === inputId) draw.stop();
                 onChange(items.filter((_, at) => at !== index));
               }}
             >

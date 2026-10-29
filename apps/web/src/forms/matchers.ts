@@ -8,9 +8,11 @@
  * because the standard's own bounding box is an `allOf` of the format hint and
  * a `$ref` to `bbox.yaml` (N1), and a complex input is a `oneOf` of encodings
  * (T3) — refusing either as an unsupported keyword would drop the two commonest
- * shapes in the testbed.
+ * shapes in the testbed. GeoJSON has three more such patterns, each bounded and
+ * named: a hint inside `allOf` (#G1), structure alone (#G3), a `oneOf` of
+ * GeoJSON branches (#G2), and one GeoJSON branch among text encodings (#G2b).
  *
- * This is deliberately not a JSON Schema implementation. Beyond those two
+ * This is deliberately not a JSON Schema implementation. Beyond those
  * recognised patterns, `allOf`, `anyOf`, `oneOf`, conditionals and remote
  * `$ref` are detected and refused, not approximated: a wrong control is worse
  * than an honest JSON editor, and the refusal is recorded as a finding.
@@ -200,6 +202,37 @@ interface GeometryHint {
   readonly geometryTypes: readonly GeometryType[];
 }
 
+const GEOJSON_MEDIA_TYPE = "application/geo+json";
+
+/** What a GeoJSON type name says: `FeatureCollection`, `Feature`, `Geometry` or one geometry type. */
+function hintFromTypeName(name: string): GeometryHint | undefined {
+  if (name === "FeatureCollection") {
+    return { wrapper: "feature-collection", geometryTypes: GEOMETRY_TYPES };
+  }
+  if (name === "Feature") return { wrapper: "feature", geometryTypes: GEOMETRY_TYPES };
+  if (name === "Geometry") return { wrapper: "geometry", geometryTypes: GEOMETRY_TYPES };
+  const specific = GEOMETRY_TYPES.find((type) => type === name);
+  return specific === undefined ? undefined : { wrapper: "geometry", geometryTypes: [specific] };
+}
+
+/**
+ * The GeoJSON project's own schemas, `https://geojson.org/schema/Polygon.json`
+ * and its siblings. The standard's example `featureCollectionInput` (clause 8)
+ * refers to `FeatureCollection.json`.
+ */
+const GEOJSON_ORG_SCHEMA = /^https?:\/\/geojson\.org\/schema\/([A-Za-z]+)\.json$/;
+
+/** Hints that hold together, as `allOf` members must: one wrapper, the types all of them allow. */
+function together(hints: readonly GeometryHint[]): GeometryHint | undefined {
+  const [first] = hints;
+  if (first === undefined) return { wrapper: "geometry", geometryTypes: GEOMETRY_TYPES };
+  if (!hints.every((hint) => hint.wrapper === first.wrapper)) return undefined;
+  const geometryTypes = first.geometryTypes.filter((type) =>
+    hints.every((hint) => hint.geometryTypes.includes(type)),
+  );
+  return geometryTypes.length === 0 ? undefined : { wrapper: first.wrapper, geometryTypes };
+}
+
 /** `geojson-geometry`, `geojson-feature`, `geojson-polygon`, … */
 function hintFromFormat(format: string): GeometryHint | undefined {
   if (!format.toLowerCase().startsWith("geojson-")) return undefined;
@@ -228,24 +261,210 @@ function hintFromRef(ref: string): GeometryHint | undefined {
   if (target.includes("geometrygeojson")) {
     return { wrapper: "geometry", geometryTypes: GEOMETRY_TYPES };
   }
-  return undefined;
+  const [document = ""] = ref.split("#");
+  const named = GEOJSON_ORG_SCHEMA.exec(document)?.[1];
+  return named === undefined ? undefined : hintFromTypeName(named);
 }
 
-const matchGeometry: Matcher = (schema) => {
+/** A format hint or a GeoJSON `$ref` on this one schema object, the format first. */
+function ownHint(
+  schema: JsonObject,
+): (GeometryHint & { readonly recognisedBy: "format" | "ref" }) | undefined {
   const format = readString(schema, "format");
   const byFormat = format === undefined ? undefined : hintFromFormat(format);
-  if (byFormat !== undefined) return { kind: "geometry", ...byFormat };
+  if (byFormat !== undefined) return { ...byFormat, recognisedBy: "format" };
 
   const ref = readString(schema, "$ref");
   const byRef = ref === undefined ? undefined : hintFromRef(ref);
-  if (byRef !== undefined) return { kind: "geometry", ...byRef };
+  return byRef === undefined ? undefined : { ...byRef, recognisedBy: "ref" };
+}
+
+/**
+ * #G1: the standard's own form, `allOf: [{ format: "geojson-geometry" }, { $ref:
+ * "…/geometryGeoJSON.yaml" }]` (clause 8). Every member has to say GeoJSON — a
+ * format hint, a GeoJSON `$ref`, or the GeoJSON media type, which says nothing
+ * about the wrapper — and together they must name one wrapper. A member that
+ * says anything else leaves the `allOf` to the refusal.
+ */
+function allOfHint(schema: JsonObject): GeometryHint | undefined {
+  const members = readArray(schema, "allOf");
+  if (members === undefined || members.length === 0) return undefined;
+  const hints: GeometryHint[] = [];
+  for (const member of members) {
+    if (!isJsonObject(member)) return undefined;
+    const hint = ownHint(member);
+    if (hint !== undefined) hints.push(hint);
+    else if (readString(member, "contentMediaType") !== GEOJSON_MEDIA_TYPE) return undefined;
+  }
+  return together(hints);
+}
+
+const matchGeometry: Matcher = (schema) => {
+  const own = ownHint(schema);
+  if (own !== undefined) return { kind: "geometry", ...own };
+
+  const inAllOf = allOfHint(schema);
+  if (inAllOf !== undefined) return { kind: "geometry", ...inAllOf, recognisedBy: "allOf" };
 
   // A media type alone does not say whether the server wants a bare geometry or
   // a feature. We assume a geometry; which servers disagree is a finding.
-  if (readString(schema, "contentMediaType") === "application/geo+json") {
-    return { kind: "geometry", wrapper: "geometry", geometryTypes: GEOMETRY_TYPES };
+  if (readString(schema, "contentMediaType") === GEOJSON_MEDIA_TYPE) {
+    return {
+      kind: "geometry",
+      wrapper: "geometry",
+      geometryTypes: GEOMETRY_TYPES,
+      recognisedBy: "contentMediaType",
+    };
   }
   return undefined;
+};
+
+// ---------------------------------------------------------------------------
+// Structural GeoJSON (#G3)
+
+/** Keywords that make a schema more than the object it describes. */
+const COMPOSITION_KEYWORDS: readonly string[] = ["allOf", "anyOf", "oneOf", "not", "$ref"];
+
+/**
+ * The one type name an object schema's `type` property allows: an `enum` of
+ * exactly one string, or a `const`. The schema itself, if it says, is an object.
+ */
+function typeNameOf(schema: JsonObject): string | undefined {
+  const types = readTypes(schema);
+  if (types.length > 0 && !(types.length === 1 && types[0] === "object")) return undefined;
+  const property = readObject(schema, "properties")?.["type"];
+  if (!isJsonObject(property)) return undefined;
+  const named = "const" in property ? [property["const"]] : readArray(property, "enum");
+  const [name] = named ?? [];
+  return named?.length === 1 && typeof name === "string" ? name : undefined;
+}
+
+function describes(schema: JsonObject, property: string): boolean {
+  return isJsonObject(readObject(schema, "properties")?.[property]);
+}
+
+/** A geometry described member by member: its one type, and its `coordinates` (or `geometries`). */
+function structuralGeometry(schema: unknown): GeometryType | undefined {
+  if (!isJsonObject(schema)) return undefined;
+  const name = typeNameOf(schema);
+  const type = GEOMETRY_TYPES.find((candidate) => candidate === name);
+  if (type === undefined) return undefined;
+  return describes(schema, type === "GeometryCollection" ? "geometries" : "coordinates")
+    ? type
+    : undefined;
+}
+
+/** A Feature's `geometry`: one structural geometry, or a `oneOf` of nothing else. */
+function featureGeometryTypes(schema: unknown): readonly GeometryType[] | undefined {
+  const one = structuralGeometry(schema);
+  if (one !== undefined) return [one];
+  if (!isJsonObject(schema)) return undefined;
+  const branches = readArray(schema, "oneOf");
+  if (branches === undefined || branches.length === 0) return undefined;
+  if (COMPOSITION_KEYWORDS.some((keyword) => keyword !== "oneOf" && keyword in schema)) {
+    return undefined;
+  }
+  const types = branches.map(structuralGeometry);
+  if (types.some((type) => type === undefined)) return undefined;
+  return GEOMETRY_TYPES.filter((type) => types.includes(type));
+}
+
+/**
+ * A Feature, with a structural `geometry`. Its `properties` must not require
+ * anything: a drawn feature is sent with `properties: {}`, which would break it.
+ */
+function structuralFeature(schema: unknown): readonly GeometryType[] | undefined {
+  if (!isJsonObject(schema) || typeNameOf(schema) !== "Feature") return undefined;
+  const members = readObject(schema, "properties");
+  const featureProperties = members?.["properties"];
+  if (isJsonObject(featureProperties) && (readArray(featureProperties, "required") ?? []).length) {
+    return undefined;
+  }
+  return featureGeometryTypes(members?.["geometry"]);
+}
+
+/** A FeatureCollection, whose `features` are an array of structural Features. */
+function structuralCollection(schema: JsonObject): readonly GeometryType[] | undefined {
+  if (typeNameOf(schema) !== "FeatureCollection") return undefined;
+  const features = readObject(schema, "properties")?.["features"];
+  if (!isJsonObject(features)) return undefined;
+  if (!readTypes(features).includes("array") && !("items" in features)) return undefined;
+  return structuralFeature(features["items"]);
+}
+
+/**
+ * GeoJSON told by its structure alone: no format, no `$ref`, an object whose
+ * `type` property names one GeoJSON type. A fixed depth — collection, feature,
+ * geometry, its `oneOf` — so nothing here recurses.
+ */
+function structuralHint(schema: JsonObject): GeometryHint | undefined {
+  const geometry = structuralGeometry(schema);
+  if (geometry !== undefined) return { wrapper: "geometry", geometryTypes: [geometry] };
+  const feature = structuralFeature(schema);
+  if (feature !== undefined) return { wrapper: "feature", geometryTypes: feature };
+  const collection = structuralCollection(schema);
+  if (collection !== undefined) {
+    return { wrapper: "feature-collection", geometryTypes: collection };
+  }
+  return undefined;
+}
+
+/**
+ * #G3. Runs after the bbox matcher, so R11 holds: a bbox is an object of only
+ * `bbox` and `crs`, and has no `type` property naming a GeoJSON type.
+ */
+const matchStructural: Matcher = (schema) => {
+  if (COMPOSITION_KEYWORDS.some((keyword) => keyword in schema)) return undefined;
+  const hint = structuralHint(schema);
+  return hint === undefined ? undefined : { kind: "geometry", ...hint, recognisedBy: "structural" };
+};
+
+// ---------------------------------------------------------------------------
+// A oneOf of GeoJSON (#G2)
+
+/**
+ * One `oneOf` branch on its own: GeoJSON by format, `$ref`, `allOf` (#G1) or
+ * structure (#G3). Whatever it says must hold together, so a
+ * `format: "geojson-geometry"` branch whose `type` is `Polygon` is a polygon.
+ */
+function branchHint(branch: unknown): GeometryHint | undefined {
+  if (!isJsonObject(branch)) return undefined;
+  const hints = [ownHint(branch), allOfHint(branch), structuralHint(branch)].filter(
+    (hint): hint is GeometryHint => hint !== undefined,
+  );
+  return hints.length === 0 ? undefined : together(hints);
+}
+
+/**
+ * A `oneOf` whose every branch is GeoJSON in one wrapper — the Beleidsnormen
+ * API's `Polygon` or `MultiPolygon` — is one geometry input taking either.
+ * Branches in different wrappers are refused: the map would not know which to
+ * send.
+ */
+const matchGeoJsonOneOf: Matcher = (schema) => {
+  const branches = readArray(schema, "oneOf");
+  if (branches === undefined || branches.length === 0) return undefined;
+  if (COMPOSITION_KEYWORDS.some((keyword) => keyword !== "oneOf" && keyword in schema)) {
+    return undefined;
+  }
+  const hints: GeometryHint[] = [];
+  for (const branch of branches) {
+    const hint = branchHint(branch);
+    if (hint === undefined) return undefined;
+    hints.push(hint);
+  }
+  const [first] = hints;
+  if (first === undefined || !hints.every((hint) => hint.wrapper === first.wrapper)) {
+    return undefined;
+  }
+  return {
+    kind: "geometry",
+    wrapper: first.wrapper,
+    geometryTypes: GEOMETRY_TYPES.filter((type) =>
+      hints.some((hint) => hint.geometryTypes.includes(type)),
+    ),
+    recognisedBy: "oneOf-geojson",
+  };
 };
 
 // ---------------------------------------------------------------------------
@@ -315,6 +534,39 @@ const matchComplex: Matcher = (schema) => {
     if (!duplicate) formats.push(format);
   }
   return { kind: "complex", formats, byReference: true };
+};
+
+// ---------------------------------------------------------------------------
+// GeoJSON among text encodings (#G2b)
+
+/**
+ * The standard's own `geometryInput` (clause 8): a `oneOf` of exactly one
+ * GeoJSON branch and text encodings — GML, KML — as `matchComplex` reads them.
+ * The map can only make the GeoJSON one, so the control draws for that, and
+ * names the others by media type for the field to mention. Any branch that is
+ * neither, or a second GeoJSON one, leaves the `oneOf` to the refusal.
+ */
+const matchMixedOneOf: Matcher = (schema) => {
+  const branches = readArray(schema, "oneOf");
+  if (branches === undefined || branches.length < 2) return undefined;
+  if (COMPOSITION_KEYWORDS.some((keyword) => keyword !== "oneOf" && keyword in schema)) {
+    return undefined;
+  }
+  let geojson: GeometryHint | undefined;
+  const otherFormats: string[] = [];
+  for (const branch of branches) {
+    const hint = branchHint(branch);
+    if (hint !== undefined) {
+      if (geojson !== undefined) return undefined;
+      geojson = hint;
+      continue;
+    }
+    const format = complexFormat(branch);
+    if (format === undefined || format.object) return undefined;
+    if (!otherFormats.includes(format.label)) otherFormats.push(format.label);
+  }
+  if (geojson === undefined) return undefined;
+  return { kind: "geometry", ...geojson, recognisedBy: "oneOf-mixed", otherFormats };
 };
 
 // ---------------------------------------------------------------------------
@@ -488,6 +740,9 @@ const matchArray: Matcher = (schema, ctx) =>
 export const MATCHERS: readonly Matcher[] = [
   matchBbox,
   matchGeometry,
+  matchStructural,
+  matchGeoJsonOneOf,
+  matchMixedOneOf,
   matchComplex,
   matchUnsupportedKeyword,
   matchConst,

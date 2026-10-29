@@ -317,11 +317,16 @@ function encodeControl(control: Control, value: unknown, how: Encoding): unknown
       // the process unopened (finding 0052); that is the server's to fix.
       //
       // A geometry control exists only where the description said GeoJSON — a
-      // `geojson-*` format, a `$ref` to a GeoJSON schema, or
+      // `geojson-*` format, a `$ref` to a GeoJSON schema, its structure, or
       // `contentMediaType: application/geo+json` (`matchers.ts`) — so the
       // qualified value says so too: stating the format is what a qualified
       // value is for. A complex input's bare `type: "object"` branch says
       // nothing of the kind, and gets no media type.
+      //
+      // Where GeoJSON is one of several formats (`oneOf-mixed`, the standard's
+      // `geometryInput`), naming it is required, not only allowed:
+      // /req/core/process-execute-input-mixed-type has the qualified value's
+      // format say which of the schema's choices this value is.
       const geojson = isGeoJsonText(value)
         ? parseRaw({ rawJson: value.geojson }, how.parse)
         : value;
