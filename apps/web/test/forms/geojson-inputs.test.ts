@@ -10,8 +10,9 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { toExecuteBody } from "../../src/forms/encode.js";
 import { resolveFormPlan } from "../../src/forms/resolve.js";
-import { controlFor, fixtureProcess } from "./helpers.js";
+import { controlFor, fixtureProcess, planFor } from "./helpers.js";
 
 const GEOMETRY_GEOJSON =
   "http://schemas.opengis.net/ogcapi/features/part1/1.0/openapi/schemas/geometryGeoJSON.yaml";
@@ -321,5 +322,104 @@ describe("#G2: a oneOf of GeoJSON geometries", () => {
       kind: "list",
       item: { kind: "json" },
     });
+  });
+});
+
+/** Clause 8's `geometryInput`, verbatim. */
+const GEOMETRY_INPUT = {
+  oneOf: [
+    {
+      type: "string",
+      contentMediaType: "application/gml+xml; version=3.2",
+      contentSchema: "http://schemas.opengis.net/gml/3.2.1/geometryBasic2d.xsd",
+    },
+    { allOf: [{ format: "geojson-geometry" }, { $ref: GEOMETRY_GEOJSON }] },
+  ],
+};
+
+describe("#G2b: GeoJSON as one format among text encodings", () => {
+  it("draws for geometryInput's GeoJSON branch and names the others (from the standard's example, not observed)", () => {
+    expect(controlFor(GEOMETRY_INPUT)).toEqual({
+      kind: "geometry",
+      wrapper: "geometry",
+      geometryTypes: EVERY_GEOMETRY,
+      recognisedBy: "oneOf-mixed",
+      otherFormats: ["application/gml+xml; version=3.2"],
+    });
+  });
+
+  it("reads featureCollectionInput the same way (from the standard's example, not observed)", () => {
+    expect(
+      controlFor({
+        oneOf: [
+          { type: "string", contentMediaType: "application/gml+xml; version=3.2" },
+          {
+            type: "string",
+            contentSchema: "https://schemas.opengis.net/kml/2.3/ogckml23.xsd",
+            contentMediaType: "application/vnd.google-earth.kml+xml",
+          },
+          {
+            allOf: [
+              { format: "geojson-feature-collection" },
+              { $ref: "https://geojson.org/schema/FeatureCollection.json" },
+            ],
+          },
+        ],
+      }),
+    ).toMatchObject({
+      kind: "geometry",
+      wrapper: "feature-collection",
+      otherFormats: ["application/gml+xml; version=3.2", "application/vnd.google-earth.kml+xml"],
+    });
+  });
+
+  it("refuses two GeoJSON branches beside an encoding: which would be drawn is not said", () => {
+    expect(
+      controlFor({
+        oneOf: [
+          { format: "geojson-polygon" },
+          { format: "geojson-feature" },
+          { type: "string", contentMediaType: "application/gml+xml" },
+        ],
+      }).kind,
+    ).toBe("json");
+  });
+
+  it("refuses a bare object branch beside the GeoJSON one, and a branch that is no encoding", () => {
+    expect(controlFor({ oneOf: [{ format: "geojson-point" }, { type: "object" }] }).kind).toBe(
+      "json",
+    );
+    expect(
+      controlFor({ oneOf: [{ format: "geojson-point" }, { type: "string", minLength: 3 }] }).kind,
+    ).toBe("json");
+  });
+
+  it("leaves a oneOf of encodings alone a complex input (T3)", () => {
+    expect(
+      controlFor({
+        oneOf: [
+          { type: "string", contentMediaType: "application/gml+xml" },
+          { type: "string", contentMediaType: "application/geo+json" },
+        ],
+      }).kind,
+    ).toBe("complex");
+  });
+
+  it("sends the drawn GeoJSON as a qualified value that names its format (/req/core/process-execute-input-mixed-type)", () => {
+    const plan = planFor({ geometryInput: { schema: GEOMETRY_INPUT } });
+    const polygon = {
+      type: "Polygon",
+      coordinates: [
+        [
+          [5.1, 52.1],
+          [5.2, 52.1],
+          [5.2, 52.2],
+          [5.1, 52.1],
+        ],
+      ],
+    };
+    expect(
+      toExecuteBody(plan, { geometryInput: { geojson: JSON.stringify(polygon) } }).inputs,
+    ).toEqual({ geometryInput: { value: polygon, mediaType: "application/geo+json" } });
   });
 });

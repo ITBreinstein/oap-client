@@ -9,8 +9,8 @@
  * a `$ref` to `bbox.yaml` (N1), and a complex input is a `oneOf` of encodings
  * (T3) — refusing either as an unsupported keyword would drop the two commonest
  * shapes in the testbed. GeoJSON has three more such patterns, each bounded and
- * named: a hint inside `allOf` (#G1), structure alone (#G3), and a `oneOf` of
- * GeoJSON branches (#G2).
+ * named: a hint inside `allOf` (#G1), structure alone (#G3), a `oneOf` of
+ * GeoJSON branches (#G2), and one GeoJSON branch among text encodings (#G2b).
  *
  * This is deliberately not a JSON Schema implementation. Beyond those
  * recognised patterns, `allOf`, `anyOf`, `oneOf`, conditionals and remote
@@ -537,6 +537,39 @@ const matchComplex: Matcher = (schema) => {
 };
 
 // ---------------------------------------------------------------------------
+// GeoJSON among text encodings (#G2b)
+
+/**
+ * The standard's own `geometryInput` (clause 8): a `oneOf` of exactly one
+ * GeoJSON branch and text encodings — GML, KML — as `matchComplex` reads them.
+ * The map can only make the GeoJSON one, so the control draws for that, and
+ * names the others by media type for the field to mention. Any branch that is
+ * neither, or a second GeoJSON one, leaves the `oneOf` to the refusal.
+ */
+const matchMixedOneOf: Matcher = (schema) => {
+  const branches = readArray(schema, "oneOf");
+  if (branches === undefined || branches.length < 2) return undefined;
+  if (COMPOSITION_KEYWORDS.some((keyword) => keyword !== "oneOf" && keyword in schema)) {
+    return undefined;
+  }
+  let geojson: GeometryHint | undefined;
+  const otherFormats: string[] = [];
+  for (const branch of branches) {
+    const hint = branchHint(branch);
+    if (hint !== undefined) {
+      if (geojson !== undefined) return undefined;
+      geojson = hint;
+      continue;
+    }
+    const format = complexFormat(branch);
+    if (format === undefined || format.object) return undefined;
+    if (!otherFormats.includes(format.label)) otherFormats.push(format.label);
+  }
+  if (geojson === undefined) return undefined;
+  return { kind: "geometry", ...geojson, recognisedBy: "oneOf-mixed", otherFormats };
+};
+
+// ---------------------------------------------------------------------------
 // Refusals
 
 const matchUnsupportedKeyword: Matcher = (schema, ctx) => {
@@ -709,6 +742,7 @@ export const MATCHERS: readonly Matcher[] = [
   matchGeometry,
   matchStructural,
   matchGeoJsonOneOf,
+  matchMixedOneOf,
   matchComplex,
   matchUnsupportedKeyword,
   matchConst,

@@ -86,6 +86,12 @@ export interface GeometryControl {
   readonly geometryTypes: readonly GeometryType[];
   /** Which pattern in the schema said GeoJSON: recorded, so the matrix can tell them apart. */
   readonly recognisedBy: GeometryRecognisedBy;
+  /**
+   * The input's other formats, by media type, when the schema offers GeoJSON
+   * as one branch among text encodings (`oneOf-mixed`). The map makes GeoJSON
+   * only, so that is what is sent; the field says the others exist.
+   */
+  readonly otherFormats?: readonly string[] | undefined;
 }
 
 /**
@@ -96,10 +102,11 @@ export interface GeometryControl {
  * - `contentMediaType`: `application/geo+json` and nothing more.
  * - `allOf`: a format hint or `$ref` inside `allOf` (#G1).
  * - `oneOf-geojson`: a `oneOf` whose every branch is GeoJSON (#G2).
+ * - `oneOf-mixed`: a `oneOf` of one GeoJSON branch and text encodings (#G2b).
  * - `structural`: an object whose `type` property names one GeoJSON type (#G3).
  */
 export type GeometryRecognisedBy =
-  "format" | "ref" | "contentMediaType" | "allOf" | "oneOf-geojson" | "structural";
+  "format" | "ref" | "contentMediaType" | "allOf" | "oneOf-geojson" | "oneOf-mixed" | "structural";
 
 /** How many numbers a bounding box has: 2D is four, 3D is six (`bbox.yaml`). */
 export type BboxDimension = 4 | 6;

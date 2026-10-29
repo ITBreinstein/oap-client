@@ -462,7 +462,9 @@ describe("complex inputs (T3)", () => {
     expect(plan.diagnostics[0]).toMatchObject({ code: "unsupported-keyword", keyword: "oneOf" });
   });
 
-  it("refuses a oneOf with a $ref branch (the standard's own geometryInput)", () => {
+  it("draws for the GeoJSON branch of the standard's own geometryInput (#G2b, from the standard's example, not observed)", () => {
+    // Changed: this was refused as a JSON editor. One GeoJSON branch among
+    // text encodings is now a geometry control that names the other formats.
     const control = controlFor({
       oneOf: [
         { type: "string", contentMediaType: "application/gml+xml; version=3.2" },
@@ -476,7 +478,11 @@ describe("complex inputs (T3)", () => {
         },
       ],
     });
-    expect(control.kind).toBe("json");
+    expect(control).toMatchObject({
+      kind: "geometry",
+      recognisedBy: "oneOf-mixed",
+      otherFormats: ["application/gml+xml; version=3.2"],
+    });
   });
 
   it("refuses a oneOf of branches carrying anything but encoding keywords", () => {

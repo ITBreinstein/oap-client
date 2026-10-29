@@ -65,6 +65,8 @@ export function GeometryField(props: ControlProps<GeometryControl>) {
   // An area input can take the map's view as its area (#18).
   const canView =
     inputId !== undefined && draw.available && drawableTypes(control).includes("Polygon");
+  // A oneOf of GeoJSON among other formats (#G2b): the field says they exist.
+  const others = control.otherFormats ?? [];
   const tooMany = useTooManyToEdit(text);
   const size = useMemo(() => sizeOfGeoJsonText(text), [text]);
   // A value too large to edit — loaded or pasted while drawing — ends drawing.
@@ -80,6 +82,18 @@ export function GeometryField(props: ControlProps<GeometryControl>) {
   return (
     <div className="geometry">
       <p className="help">{describeTarget(control)}</p>
+      {others.length > 0 && (
+        <p className="help" data-testid="other-formats">
+          The service also accepts this input as{" "}
+          {others.map((format, index) => (
+            <span key={format}>
+              {index === 0 ? "" : index === others.length - 1 ? " or " : ", "}
+              <code>{format}</code>
+            </span>
+          ))}
+          . The page sends GeoJSON, the one format the map can make.
+        </p>
+      )}
       <p>
         <label htmlFor={`${base}-geojson`}>GeoJSON</label>
         <CopyField text={text} name={`Copy ${label}`} multiline>

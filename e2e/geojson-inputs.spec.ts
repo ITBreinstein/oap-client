@@ -3,7 +3,8 @@
  * `breinstein-area-what-if` on the local pygeoapi, which copies its shapes:
  * an area that is a `oneOf` of Polygon and MultiPolygon (#G2), and a
  * repeatable FeatureCollection of points told by its structure alone (#G3),
- * drawn one row at a time (3.4).
+ * drawn one row at a time (3.4). And the standard's own `geometryInput`, GeoJSON
+ * among text encodings (#G2b), put on that process's area input.
  *
  * No test here reaches the Beleidsnormen API: it sends no CORS headers, and
  * it is another party's dev server.
@@ -173,6 +174,96 @@ for (const style of STYLES) {
       await points.getByRole("button", { name: "Add a value" }).click();
       await points.getByRole("button", { name: "Draw on the map, value 2" }).click();
       await expect(points.getByRole("button", { name: "Stop drawing, value 2" })).toBeVisible();
+      const { violations } = await new AxeBuilder({ page }).analyze();
+      expect(
+        violations.map((violation) => `${violation.id}: ${violation.nodes.length}`),
+        "axe violations",
+      ).toEqual([]);
+    });
+  }
+}
+
+/**
+ * The standard's `geometryInput` (clause 8), put on the area input: no server
+ * in the testbed sends it, so the description is rewritten on its way in, as
+ * `workflow.spec.ts` does for ZOO's Buffer.
+ */
+async function asGeometryInput(page: Page) {
+  await page.route(
+    (url) => url.pathname === "/processes/breinstein-area-what-if",
+    async (route) => {
+      const response = await route.fetch();
+      const description = (await response.json()) as {
+        inputs: Record<string, { schema: unknown }>;
+      };
+      const geometry = description.inputs["geometry"];
+      if (geometry !== undefined) {
+        geometry.schema = {
+          oneOf: [
+            {
+              type: "string",
+              contentMediaType: "application/gml+xml; version=3.2",
+              contentSchema: "http://schemas.opengis.net/gml/3.2.1/geometryBasic2d.xsd",
+            },
+            {
+              allOf: [
+                { format: "geojson-geometry" },
+                {
+                  $ref: "http://schemas.opengis.net/ogcapi/features/part1/1.0/openapi/schemas/geometryGeoJSON.yaml",
+                },
+              ],
+            },
+          ],
+        };
+      }
+      await route.fulfill({ response, json: description });
+    },
+  );
+}
+
+for (const style of STYLES) {
+  test(`the standard's geometryInput: the field names GML too, and GeoJSON is sent naming its format (${style})`, async ({
+    page,
+  }) => {
+    await asGeometryInput(page);
+    await open(page, style);
+    await openProcess(page);
+    const area = page.locator('[data-input-id="geometry"]');
+    await expect(area).toHaveAttribute("data-control", "geometry");
+    await expect(area.getByTestId("other-formats")).toHaveText(
+      "The service also accepts this input as application/gml+xml; version=3.2. The page sends GeoJSON, the one format the map can make.",
+    );
+    const polygon = {
+      type: "Polygon",
+      coordinates: [
+        [
+          [5.118, 52.089],
+          [5.124, 52.089],
+          [5.124, 52.093],
+          [5.118, 52.089],
+        ],
+      ],
+    };
+    await area.getByRole("textbox", { name: "GeoJSON", exact: true }).fill(JSON.stringify(polygon));
+    const sent = page.waitForRequest(
+      (request) =>
+        request.method() === "POST" && request.url().includes("/breinstein-area-what-if/execution"),
+    );
+    await page.getByRole("button", { name: "Run", exact: true }).click();
+    expect(((await sent).postDataJSON() as { inputs: unknown }).inputs).toEqual({
+      geometry: { value: polygon, mediaType: "application/geo+json" },
+    });
+    await expect(page.locator('[data-output-id="result"]')).toContainText('"points_as": "absent"');
+  });
+
+  for (const theme of ["light", "dark"] as const) {
+    test(`no axe violations on the geometryInput field and its note, ${style}, ${theme}`, async ({
+      page,
+    }) => {
+      await asGeometryInput(page);
+      await open(page, style, theme);
+      await openProcess(page);
+      await expect(page.getByTestId("other-formats")).toBeVisible();
       const { violations } = await new AxeBuilder({ page }).analyze();
       expect(
         violations.map((violation) => `${violation.id}: ${violation.nodes.length}`),
