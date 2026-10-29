@@ -37,6 +37,7 @@ export interface GeometryDrawProps {
 
 export interface GeometryDrawControls extends GeometryDrawState {
   place(tool: Tool): void;
+  stopPlacing(): void;
   deleteSelected(): void;
 }
 
@@ -112,6 +113,7 @@ export function useGeometryDraw(
   return {
     ...state,
     place: (tool) => engine.current?.place(tool),
+    stopPlacing: () => engine.current?.stopPlacing(),
     deleteSelected: () => engine.current?.deleteSelected(),
   };
 }

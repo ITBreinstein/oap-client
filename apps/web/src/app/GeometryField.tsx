@@ -57,6 +57,8 @@ export function GeometryField(props: ControlProps<GeometryControl>) {
   const [message, setMessage] = useState<string | undefined>();
   const text = isGeoJsonText(value) ? value.geojson : "";
   const drawing = inputId !== undefined && draw.fieldId === inputId && draw.row === row;
+  // Points keep coming for an input that holds several (3.4): the field says so.
+  const severalPoints = holdsSeveral(control) && drawableTypes(control).includes("Point");
   // In a repeatable field, each row's controls say which row they are for, in
   // their name: the visible words first, so the name still holds what is seen.
   const named = (words: string) =>
@@ -233,6 +235,8 @@ export function GeometryField(props: ControlProps<GeometryControl>) {
       {canDraw && (
         <p className="help draw-hint">
           Drawing needs a mouse or touch. You can also paste GeoJSON or use the current map view.
+          {severalPoints &&
+            " With Add point, each click on the map adds a point, until you press Esc, choose another tool or Stop drawing."}
         </p>
       )}
     </div>

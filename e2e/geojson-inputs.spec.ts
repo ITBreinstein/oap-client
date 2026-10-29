@@ -109,12 +109,18 @@ for (const style of STYLES) {
     await points.getByRole("button", { name: "Draw on the map, value 1" }).click();
     // The tools take the focus, as for one geometry field (#18).
     await expect(tools(page).getByRole("button", { name: "Add point" })).toBeFocused();
-    // One inside the area, one outside it, clear of the map's search box.
-    // A tool places one shape, then editing resumes: Add point for each.
-    for (const point of [at(0.5, 0.5), at(0.75, 0.3)]) {
-      await tools(page).getByRole("button", { name: "Add point" }).click();
-      await clickAll(page, [point]);
-    }
+    // One press of Add point, then a click for each point (3.4): one inside
+    // the area, one outside it, clear of the map's search box.
+    const addPoint = tools(page).getByRole("button", { name: "Add point" });
+    await addPoint.click();
+    await expect(page.locator(".map-tools [role=status]")).toHaveText(
+      "Each click adds a point. Press Esc, choose another tool, or Stop drawing to stop adding points.",
+    );
+    await clickAll(page, [at(0.5, 0.5), at(0.75, 0.3)]);
+    await expect(addPoint).toHaveAttribute("aria-pressed", "true");
+    // Esc stops adding points, and drawing goes back to editing.
+    await page.keyboard.press("Escape");
+    await expect(addPoint).toHaveAttribute("aria-pressed", "false");
     const row = points.getByRole("textbox", { name: "GeoJSON, value 1" });
     const types = async () =>
       (JSON.parse((await row.inputValue()) || '{"features":[]}') as FeatureCollection).features.map(
