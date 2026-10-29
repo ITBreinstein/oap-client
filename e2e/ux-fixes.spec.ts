@@ -712,7 +712,7 @@ for (const style of STYLES) {
   });
 }
 
-test("#36 the form's width can be changed with the keys and by dragging, between 400 and 640px", async ({
+test("#36 the form's width can be changed with the keys and by dragging, between 440 and 640px", async ({
   page,
 }) => {
   await open(page, "instrument-updated");
@@ -721,13 +721,13 @@ test("#36 the form's width can be changed with the keys and by dragging, between
   const handle = page.getByRole("separator", { name: "Width of the form" });
   const panel = page.locator("main.panel");
   const width = async () => Math.round((await panel.boundingBox())?.width ?? 0);
-  expect(await width()).toBe(400);
+  expect(await width()).toBe(440);
 
   await handle.focus();
   await page.keyboard.press("ArrowRight");
   await page.keyboard.press("ArrowRight");
-  await expect(handle).toHaveAttribute("aria-valuenow", "432");
-  await expect.poll(width).toBe(432);
+  await expect(handle).toHaveAttribute("aria-valuenow", "472");
+  await expect.poll(width).toBe(472);
   await page.keyboard.press("End");
   await expect.poll(width).toBe(640);
 

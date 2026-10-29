@@ -997,7 +997,7 @@
 
 /*
  * The edge between the form and the map, to drag or move with the arrow keys
- * (#36; PanelHandle.tsx): 400 to 640px. A thin line, a wider target.
+ * (#36; PanelHandle.tsx): 440 to 640px. A thin line, a wider target.
  */
 [data-variant="updated"] .panel-handle-region {
   position: absolute;

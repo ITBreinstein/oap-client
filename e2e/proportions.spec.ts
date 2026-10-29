@@ -213,6 +213,35 @@ test.describe("proportions", () => {
         expect(beside.find((button) => button.name === "Run")?.role).toBe("primary");
       });
 
+      test("beside the map, a box's coordinates fit: labels on one line, buttons in one row (#5)", async ({
+        page,
+      }) => {
+        await open(page, style);
+        await connect(page);
+        await page.getByRole("button", { name: "Bounding box to feature", exact: true }).click();
+        await page.locator(".map-pane canvas").waitFor();
+        const box = page.locator(".bbox").first();
+        const lines = await box.locator("label").evaluateAll((labels) =>
+          labels
+            .filter((label) => /longitude|latitude/i.test(label.textContent ?? ""))
+            .map((label) => {
+              const range = document.createRange();
+              range.selectNodeContents(label);
+              const tops = new Set([...range.getClientRects()].map((rect) => Math.round(rect.top)));
+              return { label: label.textContent, lines: tops.size };
+            }),
+        );
+        expect(lines).toHaveLength(4);
+        for (const { label, lines: count } of lines) expect(count, label ?? "").toBe(1);
+        const tops = await box
+          .locator(".actions button")
+          .evaluateAll((buttons) =>
+            buttons.map((button) => Math.round(button.getBoundingClientRect().top)),
+          );
+        expect(tops.length).toBe(3);
+        expect(new Set(tops).size).toBe(1);
+      });
+
       test("My jobs' buttons are one size (#4)", async ({ page }) => {
         await requireService(`${RELAY}/healthz`, "the relay");
         // Through the relay: only it can name a job pygeoapi starts for a page.

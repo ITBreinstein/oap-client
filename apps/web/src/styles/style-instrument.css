@@ -859,7 +859,8 @@
 
 @media (min-width: 52rem) {
   [data-style="instrument"] .layout:not(.layout-single) {
-    --panel-width: 400px;
+    /* A box's four coordinates two to a row, each label on one line. */
+    --panel-width: 440px;
   }
 
   [data-style="instrument"] .layout:not(.layout-single) .panel {
