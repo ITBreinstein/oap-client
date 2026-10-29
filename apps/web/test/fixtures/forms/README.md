@@ -1,7 +1,9 @@
 # Execute requests sent to a real server
 
 Four process descriptions captured from the pinned ZOO-Project, each paired with
-an execute request we wrote and sent to it, and one hand-written description.
+an execute request we wrote and sent to it, one from the Beleidsnormen API (a
+dev server run by another party, captured 2026-10-29 at 10:54 UTC; the request
+was sent at 11:02 UTC), and one hand-written description.
 They let the encoder be tested against requests a server was actually sent, not
 only against our reading of the specification. The idea and the harness are
 Sam's; the test that uses them is `../../forms/captured-requests.test.ts`.
@@ -17,13 +19,14 @@ repository that declares no licence.
 | Endpoint | `http://localhost:5090/ogc-api`, started with `./infra/zoo/zoo.sh up` |
 | Captured | 2026-10-08                                                            |
 
-| Directory                          | Process                   | What the request sends                                                                  | ZOO's answer                                         |
-| ---------------------------------- | ------------------------- | --------------------------------------------------------------------------------------- | ---------------------------------------------------- |
-| `zoo-inline-csv/`                  | `SAGA.table_tools.3`      | two CSV tables inline, UTF-8, joined on their first column; three booleans              | `200`, the joined table (`execute.response.json`)    |
-| `zoo-inline-las/`                  | `SAGA.pointcloud_tools.4` | a nine-point LAS 1.2 file inline, base64, made by `make-las.py`; two enums and a number | `500`, a kernel segfault (finding 0070)              |
-| `zoo-inline-geojson-polygons/`     | `SAGA.shapes_polygons.5`  | a GeoJSON FeatureCollection of three squares, as the `type: object` branch; four others | `200` with no output: `{}` (finding 0071)            |
-| `zoo-linked-gml/`                  | `Contains`                | a polygon and a point by reference: `square.gml` and `point.gml`, fetched from GitHub   | `200`, `{"Result":true}`                             |
-| `hand-written-undocumented-array/` | none                      | an array input with no `items`, entered item by item                                    | not sent: no reference server declares such an input |
+| Directory                          | Process                   | What the request sends                                                                          | ZOO's answer                                                 |
+| ---------------------------------- | ------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `zoo-inline-csv/`                  | `SAGA.table_tools.3`      | two CSV tables inline, UTF-8, joined on their first column; three booleans                      | `200`, the joined table (`execute.response.json`)            |
+| `zoo-inline-las/`                  | `SAGA.pointcloud_tools.4` | a nine-point LAS 1.2 file inline, base64, made by `make-las.py`; two enums and a number         | `500`, a kernel segfault (finding 0070)                      |
+| `zoo-inline-geojson-polygons/`     | `SAGA.shapes_polygons.5`  | a GeoJSON FeatureCollection of three squares, as the `type: object` branch; four others         | `200` with no output: `{}` (finding 0071)                    |
+| `zoo-linked-gml/`                  | `Contains`                | a polygon and a point by reference: `square.gml` and `point.gml`, fetched from GitHub           | `200`, `{"Result":true}`                                     |
+| `hand-written-undocumented-array/` | none                      | an array input with no `items`, entered item by item                                            | not sent: no reference server declares such an input         |
+| `beleidsnormen-one-row-list/`      | `rustplekken`             | an area, and one row of `nieuwe_bankjes`: a FeatureCollection of two points, as an array of one | `200`, the benches not read: the same result as without them |
 
 `description.json` is the server's answer to `GET /processes/{id}`, and
 `execute.response.json` its answer to the execute. `execute.request.json` is
