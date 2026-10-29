@@ -1,14 +1,14 @@
-beleidsnormen/afstand_voorzieningen — needs values
+beleidsnormen/afstand_voorzieningen — needs area
   beleidsnormen/afstand_voorzieningen/output_crs → select
   beleidsnormen/afstand_voorzieningen/voorzieningstype → select
   beleidsnormen/afstand_voorzieningen/parameters → json [no control for type `object`] · unsupported-type
-  beleidsnormen/afstand_voorzieningen/nieuwe_huisarts → list<json [no control for type `object`]> · unsupported-type
-  beleidsnormen/afstand_voorzieningen/nieuwe_ziekenhuis → list<json [no control for type `object`]> · unsupported-type
-  beleidsnormen/afstand_voorzieningen/nieuwe_tandarts → list<json [no control for type `object`]> · unsupported-type
-  beleidsnormen/afstand_voorzieningen/nieuwe_middelbare_school → list<json [no control for type `object`]> · unsupported-type
-  beleidsnormen/afstand_voorzieningen/nieuwe_basisschool → list<json [no control for type `object`]> · unsupported-type
-  beleidsnormen/afstand_voorzieningen/nieuwe_sportvoorziening → list<json [no control for type `object`]> · unsupported-type
-  beleidsnormen/afstand_voorzieningen/nieuwe_buurthuis → list<json [no control for type `object`]> · unsupported-type
+  beleidsnormen/afstand_voorzieningen/nieuwe_huisarts → list<geometry (feature-collection, Point)>
+  beleidsnormen/afstand_voorzieningen/nieuwe_ziekenhuis → list<geometry (feature-collection, Point)>
+  beleidsnormen/afstand_voorzieningen/nieuwe_tandarts → list<geometry (feature-collection, Point)>
+  beleidsnormen/afstand_voorzieningen/nieuwe_middelbare_school → list<geometry (feature-collection, Point)>
+  beleidsnormen/afstand_voorzieningen/nieuwe_basisschool → list<geometry (feature-collection, Point)>
+  beleidsnormen/afstand_voorzieningen/nieuwe_sportvoorziening → list<geometry (feature-collection, Point)>
+  beleidsnormen/afstand_voorzieningen/nieuwe_buurthuis → list<geometry (feature-collection, Point)>
   beleidsnormen/afstand_voorzieningen/geometry → json [`oneOf` is outside the supported JSON Schema subset] · unsupported-keyword
 beleidsnormen/beleidsnorm — needs values
   beleidsnormen/beleidsnorm/beleidsnorm → list<json [`anyOf` is outside the supported JSON Schema subset]> · unsupported-keyword
@@ -22,8 +22,8 @@ beleidsnormen/echo — needs area
   beleidsnormen/echo/pause → number
 beleidsnormen/geluidsbelasting — needs values
   beleidsnormen/geluidsbelasting/geometry → json [`oneOf` is outside the supported JSON Schema subset] · unsupported-keyword
-beleidsnormen/laadmogelijkheden — needs values
-  beleidsnormen/laadmogelijkheden/nieuwe_laadpalen → list<json [no control for type `object`]> · unsupported-type
+beleidsnormen/laadmogelijkheden — needs area
+  beleidsnormen/laadmogelijkheden/nieuwe_laadpalen → list<geometry (feature-collection, Point)>
   beleidsnormen/laadmogelijkheden/output_crs → list<select>
   beleidsnormen/laadmogelijkheden/geometry → list<json [`oneOf` is outside the supported JSON Schema subset]> · unsupported-keyword
 beleidsnormen/oppervlakte_voorzieningen — needs values
@@ -33,21 +33,21 @@ beleidsnormen/oppervlakte_voorzieningen — needs values
   beleidsnormen/oppervlakte_voorzieningen/geometry → json [`oneOf` is outside the supported JSON Schema subset] · unsupported-keyword
 beleidsnormen/regel_30 — needs values
   beleidsnormen/regel_30/geometry → json [`oneOf` is outside the supported JSON Schema subset] · unsupported-keyword
-beleidsnormen/regel_300 — needs values
+beleidsnormen/regel_300 — needs area
   beleidsnormen/regel_300/output_crs → select
   beleidsnormen/regel_300/groenpercentage → number
   beleidsnormen/regel_300/schaduwpercentage → number
   beleidsnormen/regel_300/minimale_grootte → number
   beleidsnormen/regel_300/maximale_groenafstand → number
-  beleidsnormen/regel_300/nieuwe_bankjes → list<json [no control for type `object`]> · unsupported-type
-  beleidsnormen/regel_300/nieuwe_grasvelden → list<json [no control for type `object`]> · unsupported-type
-  beleidsnormen/regel_300/nieuwe_struiken → list<json [no control for type `object`]> · unsupported-type
-  beleidsnormen/regel_300/nieuwe_bomen → list<json [no control for type `object`]> · unsupported-type
+  beleidsnormen/regel_300/nieuwe_bankjes → list<geometry (feature-collection, Point)>
+  beleidsnormen/regel_300/nieuwe_grasvelden → list<geometry (feature-collection, Polygon|MultiPolygon)>
+  beleidsnormen/regel_300/nieuwe_struiken → list<geometry (feature-collection, Polygon|MultiPolygon)>
+  beleidsnormen/regel_300/nieuwe_bomen → list<geometry (feature-collection, Point|Polygon|MultiPolygon)>
   beleidsnormen/regel_300/geometry → json [`oneOf` is outside the supported JSON Schema subset] · unsupported-keyword
-beleidsnormen/rustplekken — needs values
+beleidsnormen/rustplekken — needs area
   beleidsnormen/rustplekken/output_crs → select
   beleidsnormen/rustplekken/parameters → json [no control for type `object`] · unsupported-type
-  beleidsnormen/rustplekken/nieuwe_bankjes → list<json [no control for type `object`]> · unsupported-type
+  beleidsnormen/rustplekken/nieuwe_bankjes → list<geometry (feature-collection, Point)>
   beleidsnormen/rustplekken/geometry → json [`oneOf` is outside the supported JSON Schema subset] · unsupported-keyword
 beleidsnormen/stedelijkheid — needs values
   beleidsnormen/stedelijkheid/output_crs → select

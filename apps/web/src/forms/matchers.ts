@@ -318,6 +318,106 @@ const matchGeometry: Matcher = (schema) => {
 };
 
 // ---------------------------------------------------------------------------
+// Structural GeoJSON (#G3)
+
+/** Keywords that make a schema more than the object it describes. */
+const COMPOSITION_KEYWORDS: readonly string[] = ["allOf", "anyOf", "oneOf", "not", "$ref"];
+
+/**
+ * The one type name an object schema's `type` property allows: an `enum` of
+ * exactly one string, or a `const`. The schema itself, if it says, is an object.
+ */
+function typeNameOf(schema: JsonObject): string | undefined {
+  const types = readTypes(schema);
+  if (types.length > 0 && !(types.length === 1 && types[0] === "object")) return undefined;
+  const property = readObject(schema, "properties")?.["type"];
+  if (!isJsonObject(property)) return undefined;
+  const named = "const" in property ? [property["const"]] : readArray(property, "enum");
+  const [name] = named ?? [];
+  return named?.length === 1 && typeof name === "string" ? name : undefined;
+}
+
+function describes(schema: JsonObject, property: string): boolean {
+  return isJsonObject(readObject(schema, "properties")?.[property]);
+}
+
+/** A geometry described member by member: its one type, and its `coordinates` (or `geometries`). */
+function structuralGeometry(schema: unknown): GeometryType | undefined {
+  if (!isJsonObject(schema)) return undefined;
+  const name = typeNameOf(schema);
+  const type = GEOMETRY_TYPES.find((candidate) => candidate === name);
+  if (type === undefined) return undefined;
+  return describes(schema, type === "GeometryCollection" ? "geometries" : "coordinates")
+    ? type
+    : undefined;
+}
+
+/** A Feature's `geometry`: one structural geometry, or a `oneOf` of nothing else. */
+function featureGeometryTypes(schema: unknown): readonly GeometryType[] | undefined {
+  const one = structuralGeometry(schema);
+  if (one !== undefined) return [one];
+  if (!isJsonObject(schema)) return undefined;
+  const branches = readArray(schema, "oneOf");
+  if (branches === undefined || branches.length === 0) return undefined;
+  if (COMPOSITION_KEYWORDS.some((keyword) => keyword !== "oneOf" && keyword in schema)) {
+    return undefined;
+  }
+  const types = branches.map(structuralGeometry);
+  if (types.some((type) => type === undefined)) return undefined;
+  return GEOMETRY_TYPES.filter((type) => types.includes(type));
+}
+
+/**
+ * A Feature, with a structural `geometry`. Its `properties` must not require
+ * anything: a drawn feature is sent with `properties: {}`, which would break it.
+ */
+function structuralFeature(schema: unknown): readonly GeometryType[] | undefined {
+  if (!isJsonObject(schema) || typeNameOf(schema) !== "Feature") return undefined;
+  const members = readObject(schema, "properties");
+  const featureProperties = members?.["properties"];
+  if (isJsonObject(featureProperties) && (readArray(featureProperties, "required") ?? []).length) {
+    return undefined;
+  }
+  return featureGeometryTypes(members?.["geometry"]);
+}
+
+/** A FeatureCollection, whose `features` are an array of structural Features. */
+function structuralCollection(schema: JsonObject): readonly GeometryType[] | undefined {
+  if (typeNameOf(schema) !== "FeatureCollection") return undefined;
+  const features = readObject(schema, "properties")?.["features"];
+  if (!isJsonObject(features)) return undefined;
+  if (!readTypes(features).includes("array") && !("items" in features)) return undefined;
+  return structuralFeature(features["items"]);
+}
+
+/**
+ * GeoJSON told by its structure alone: no format, no `$ref`, an object whose
+ * `type` property names one GeoJSON type. A fixed depth — collection, feature,
+ * geometry, its `oneOf` — so nothing here recurses.
+ */
+function structuralHint(schema: JsonObject): GeometryHint | undefined {
+  const geometry = structuralGeometry(schema);
+  if (geometry !== undefined) return { wrapper: "geometry", geometryTypes: [geometry] };
+  const feature = structuralFeature(schema);
+  if (feature !== undefined) return { wrapper: "feature", geometryTypes: feature };
+  const collection = structuralCollection(schema);
+  if (collection !== undefined) {
+    return { wrapper: "feature-collection", geometryTypes: collection };
+  }
+  return undefined;
+}
+
+/**
+ * #G3. Runs after the bbox matcher, so R11 holds: a bbox is an object of only
+ * `bbox` and `crs`, and has no `type` property naming a GeoJSON type.
+ */
+const matchStructural: Matcher = (schema) => {
+  if (COMPOSITION_KEYWORDS.some((keyword) => keyword in schema)) return undefined;
+  const hint = structuralHint(schema);
+  return hint === undefined ? undefined : { kind: "geometry", ...hint, recognisedBy: "structural" };
+};
+
+// ---------------------------------------------------------------------------
 // Complex inputs: one value, alternative encodings (T3)
 
 /** What an encoding branch may carry. Anything else is a different kind of `oneOf`. */
@@ -557,6 +657,7 @@ const matchArray: Matcher = (schema, ctx) =>
 export const MATCHERS: readonly Matcher[] = [
   matchBbox,
   matchGeometry,
+  matchStructural,
   matchComplex,
   matchUnsupportedKeyword,
   matchConst,

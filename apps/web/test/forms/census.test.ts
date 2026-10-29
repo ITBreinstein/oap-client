@@ -73,7 +73,8 @@ describe("census over the committed fixtures", () => {
           "complex": 15,
           "geometry": 4,
           "json": 14,
-          "list:json": 18,
+          "list:geometry": 13,
+          "list:json": 5,
           "list:number": 1,
           "list:select": 3,
           "list:text": 4,
@@ -85,7 +86,7 @@ describe("census over the committed fixtures", () => {
         "diagnostics": {
           "contradictory-schema": 1,
           "unsupported-keyword": 15,
-          "unsupported-type": 17,
+          "unsupported-type": 4,
         },
         "inputs": 130,
       }
