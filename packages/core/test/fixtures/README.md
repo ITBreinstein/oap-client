@@ -63,6 +63,9 @@ the versions are recorded here rather than left to a commit message.
                 with breinstein-link)                                 2026-09-26
               execution/breinstein-inputs-{base64-not-decoded,
                 array-passed-through}.http  (finding 0052)            2026-10-02
+              processes/breinstein-area-what-if.json,
+              process-list.json  (re-captured; all fifteen, now
+                with breinstein-area-what-if)                         2026-10-29
 
 The `breinstein-*` descriptions are processes this repository adds to the
 pinned image (see `infra/README.md`). They are the only descriptions a browser

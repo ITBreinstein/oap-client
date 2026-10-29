@@ -71,9 +71,9 @@ describe("census over the committed fixtures", () => {
           "bbox": 4,
           "checkbox": 6,
           "complex": 15,
-          "geometry": 14,
+          "geometry": 15,
           "json": 4,
-          "list:geometry": 14,
+          "list:geometry": 15,
           "list:json": 4,
           "list:number": 1,
           "list:select": 3,
@@ -82,13 +82,13 @@ describe("census over the committed fixtures", () => {
           "select": 11,
           "text": 28,
         },
-        "descriptions": 46,
+        "descriptions": 47,
         "diagnostics": {
           "contradictory-schema": 1,
           "unsupported-keyword": 4,
           "unsupported-type": 4,
         },
-        "inputs": 130,
+        "inputs": 132,
       }
     `);
   });

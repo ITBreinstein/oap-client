@@ -62,6 +62,9 @@ beleidsnormen/zonal_stats — needs area
   beleidsnormen/zonal_stats/geometry → geometry (geometry, Polygon|MultiPolygon) · map
 pygeoapi/breinstein-aerial — needs area
   pygeoapi/breinstein-aerial/area → geometry (geometry, Polygon) · map
+pygeoapi/breinstein-area-what-if — needs area
+  pygeoapi/breinstein-area-what-if/geometry → geometry (geometry, Polygon|MultiPolygon) · map
+  pygeoapi/breinstein-area-what-if/nieuwe_punten → list<geometry (feature-collection, Point)> · map
 pygeoapi/breinstein-async-only — needs values
   pygeoapi/breinstein-async-only/seconds → number
   pygeoapi/breinstein-async-only/message → text
