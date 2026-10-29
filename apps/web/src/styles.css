@@ -226,11 +226,13 @@ legend,
 /*
  * A clicked shape's properties: a head with Close that stays, and what
  * scrolls under it. Clear of what sits at the map's foot (the legend, the
- * scale, "Show the result").
+ * scale, "Show the result"). Within its half of the map, so it stays on the
+ * side away from the click (#20) however narrow the map.
  */
 .map-pane .feature-properties {
   display: flex;
   flex-direction: column;
+  max-width: min(24rem, calc(50% - 2 * var(--map-inset)));
   max-height: calc(100% - 4rem - 6rem);
   padding: 0;
   overflow: hidden;
