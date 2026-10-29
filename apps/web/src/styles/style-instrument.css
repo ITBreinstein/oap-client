@@ -111,7 +111,19 @@
 [data-style="instrument"] .rail-item[aria-expanded="true"] {
   color: var(--text-strong);
   background: var(--rail-hover);
-  box-shadow: inset 2px 0 0 var(--accent-ink);
+}
+
+/* Its bar: an element of its own, clear of the corners an inset shadow would curl round. */
+[data-style="instrument"] .rail-item[aria-current="page"]::before,
+[data-style="instrument"] .rail-item[aria-expanded="true"]::before {
+  content: "";
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 0;
+  width: 2px;
+  background: var(--accent-ink);
+  border-radius: 0 2px 2px 0;
 }
 
 [data-style="instrument"] .rail-item:disabled {
@@ -210,9 +222,15 @@
     border-radius: 0;
   }
 
-  [data-style="instrument"] .rail-item[aria-current="page"],
-  [data-style="instrument"] .rail-item[aria-expanded="true"] {
-    box-shadow: inset 0 2px 0 var(--accent-ink);
+  /* In the bar at the foot, square-cornered: the bar runs along the top edge. */
+  [data-style="instrument"] .rail-item[aria-current="page"]::before,
+  [data-style="instrument"] .rail-item[aria-expanded="true"]::before {
+    top: 0;
+    right: 0;
+    bottom: auto;
+    width: auto;
+    height: 2px;
+    border-radius: 0;
   }
 
   [data-style="instrument"] .rail-end {
@@ -348,11 +366,6 @@
 
 [data-style="instrument"] label.choice-card:hover {
   background: var(--surface-hover);
-}
-
-[data-style="instrument"] label.choice-card:has(input:checked) {
-  background: var(--surface-hover);
-  box-shadow: inset 2px 0 0 var(--accent-ink);
 }
 
 [data-style="instrument"] label.choice-card input[type="radio"] {

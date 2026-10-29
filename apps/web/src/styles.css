@@ -1112,8 +1112,22 @@ label.choice-card:hover {
 
 label.choice-card:has(input:checked) {
   position: relative;
-  box-shadow: inset 3px 0 0 var(--accent-ink);
   background: var(--surface-hover);
+}
+
+/*
+ * The chosen one's bar: an element of its own, clear of the rounded corners
+ * at the list's ends. An inset shadow would follow the corner's curve.
+ */
+label.choice-card:has(input:checked)::before {
+  content: "";
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 0;
+  width: 2px;
+  background: var(--accent-ink);
+  border-radius: 0 2px 2px 0;
 }
 
 .choice-body {
