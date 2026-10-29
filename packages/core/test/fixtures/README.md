@@ -164,6 +164,26 @@ the evidence, these are the samples it is checked against:
   declared with a string `enum` (finding 0056); `Gdal_Warp`, optional booleans
   with no default.
 
+## `beleidsnormen/`
+
+A Dutch testbed server: the DTP Beleidsnormen API (dev), built on Analyze's
+OGC API Processes gateway. **A dev server; it may change**: it is run by
+another party, so its descriptions can differ tomorrow from what is kept here.
+Only what it serves to anyone is kept, never another party's job documents.
+
+    server    https://ca-dtp-beleidsnormenapi-dev.mangosand-ad64f45c.westeurope.azurecontainerapps.io/api
+              (`server: Kestrel`; declares Processes 1.0 core, ogc-process-description,
+              json, oas30, job-list, callback, dismiss)
+    captured  landing-page.json, conformance.json,
+              process-list.json  (first page: ten, `next` to offset 10),
+              process-list-offset-10.json  (the other two),
+              processes/*.json  (all twelve)              2026-10-29 10:54 UTC
+
+Every `geometry` input is a `oneOf` of a structural GeoJSON `Polygon` and
+`MultiPolygon`, each branch with `format: "geojson-geometry"` and
+`contentMediaType: "application/geo+json"`. The `nieuwe_*` inputs are
+structural FeatureCollections with no `format`, repeatable without bound.
+
 ## `pdok/`
 
 Not a server under test: the third-party OGC API Features service that
