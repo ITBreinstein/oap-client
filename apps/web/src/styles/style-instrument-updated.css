@@ -497,6 +497,8 @@
   margin: 0;
   padding: 0;
   border: none;
+  /* Square, or the rule would curl up at its ends. */
+  border-radius: 0;
 }
 
 [data-variant="updated"] .appearance-popover fieldset + fieldset {

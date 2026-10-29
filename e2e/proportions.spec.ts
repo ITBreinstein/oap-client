@@ -403,6 +403,7 @@ test.describe("proportions", () => {
             const legend = set.querySelector("legend")?.getBoundingClientRect();
             return {
               borders: [style.borderTopWidth, style.borderLeftWidth],
+              radius: style.borderTopLeftRadius,
               // How far the group's name is below its top edge, the rule's line.
               nameBelowTop: Math.round((legend?.top ?? 0) - set.getBoundingClientRect().top),
             };
@@ -415,6 +416,8 @@ test.describe("proportions", () => {
         }
         expect(groups[0]?.borders).toEqual(["0px", "0px"]);
         expect(groups[1]?.borders).toEqual(["1px", "0px"]);
+        // A straight rule: no corner for it to curl round.
+        expect(groups[1]?.radius).toBe("0px");
         // Under the rule, after the 12px padding: not on it.
         expect(groups[1]?.nameBelowTop).toBeGreaterThanOrEqual(12);
       });
