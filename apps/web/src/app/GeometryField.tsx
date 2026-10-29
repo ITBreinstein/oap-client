@@ -49,14 +49,18 @@ function describeTarget(control: GeometryControl): string {
 }
 
 export function GeometryField(props: ControlProps<GeometryControl>) {
-  const { control, value, onChange, inputId, label } = props;
+  const { control, value, onChange, inputId, row, label } = props;
   // STYLE TRIAL: the updated Instrument lays GeoJSON out with tabs.
   const updated = useUpdated();
   const draw = useContext(DrawContext);
   const base = useId();
   const [message, setMessage] = useState<string | undefined>();
   const text = isGeoJsonText(value) ? value.geojson : "";
-  const drawing = inputId !== undefined && draw.fieldId === inputId;
+  const drawing = inputId !== undefined && draw.fieldId === inputId && draw.row === row;
+  // In a repeatable field, each row's controls say which row they are for, in
+  // their name: the visible words first, so the name still holds what is seen.
+  const named = (words: string) =>
+    row === undefined ? undefined : `${words}, value ${String(row + 1)}`;
   const canDraw = inputId !== undefined && draw.available && drawableTypes(control).length > 0;
   // An area input can take the map's view as its area (#18).
   const canView =
@@ -81,6 +85,7 @@ export function GeometryField(props: ControlProps<GeometryControl>) {
         <CopyField text={text} name={`Copy ${label}`} multiline>
           <textarea
             id={`${base}-geojson`}
+            aria-label={named("GeoJSON")}
             className="code"
             aria-invalid={props.invalid === true ? true : undefined}
             aria-describedby={props.boxTrouble === undefined ? undefined : `${props.id}-error`}
@@ -112,6 +117,7 @@ export function GeometryField(props: ControlProps<GeometryControl>) {
         <label htmlFor={`${base}-file`}>Or load a GeoJSON file</label>
         <input
           id={`${base}-file`}
+          aria-label={named("Or load a GeoJSON file")}
           type="file"
           accept=".geojson,.json,application/geo+json,application/json"
           onChange={(event) => {
@@ -167,11 +173,13 @@ export function GeometryField(props: ControlProps<GeometryControl>) {
             type="button"
             className={drawing ? "" : "secondary"}
             aria-pressed={drawing}
+            aria-label={named(drawing ? "Stop drawing" : "Draw on the map")}
+            data-row={row}
             disabled={tooMany !== undefined}
             aria-describedby={tooMany === undefined ? undefined : `${base}-too-many`}
             onClick={() => {
               if (drawing) draw.stop();
-              else draw.start(inputId);
+              else draw.start(inputId, row);
             }}
           >
             {drawing ? "Stop drawing" : "Draw on the map"}
@@ -181,6 +189,7 @@ export function GeometryField(props: ControlProps<GeometryControl>) {
           <button
             type="button"
             className="secondary"
+            aria-label={named("Use the current map view")}
             onClick={() => {
               const view = draw.currentView?.();
               if (view === undefined) return;
@@ -197,6 +206,7 @@ export function GeometryField(props: ControlProps<GeometryControl>) {
         <button
           type="button"
           className="secondary"
+          aria-label={named("Clear")}
           onClick={() => {
             setMessage(undefined);
             set("");

@@ -2,13 +2,13 @@ beleidsnormen/afstand_voorzieningen — needs area
   beleidsnormen/afstand_voorzieningen/output_crs → select
   beleidsnormen/afstand_voorzieningen/voorzieningstype → select
   beleidsnormen/afstand_voorzieningen/parameters → json [no control for type `object`] · unsupported-type
-  beleidsnormen/afstand_voorzieningen/nieuwe_huisarts → list<geometry (feature-collection, Point)>
-  beleidsnormen/afstand_voorzieningen/nieuwe_ziekenhuis → list<geometry (feature-collection, Point)>
-  beleidsnormen/afstand_voorzieningen/nieuwe_tandarts → list<geometry (feature-collection, Point)>
-  beleidsnormen/afstand_voorzieningen/nieuwe_middelbare_school → list<geometry (feature-collection, Point)>
-  beleidsnormen/afstand_voorzieningen/nieuwe_basisschool → list<geometry (feature-collection, Point)>
-  beleidsnormen/afstand_voorzieningen/nieuwe_sportvoorziening → list<geometry (feature-collection, Point)>
-  beleidsnormen/afstand_voorzieningen/nieuwe_buurthuis → list<geometry (feature-collection, Point)>
+  beleidsnormen/afstand_voorzieningen/nieuwe_huisarts → list<geometry (feature-collection, Point)> · map
+  beleidsnormen/afstand_voorzieningen/nieuwe_ziekenhuis → list<geometry (feature-collection, Point)> · map
+  beleidsnormen/afstand_voorzieningen/nieuwe_tandarts → list<geometry (feature-collection, Point)> · map
+  beleidsnormen/afstand_voorzieningen/nieuwe_middelbare_school → list<geometry (feature-collection, Point)> · map
+  beleidsnormen/afstand_voorzieningen/nieuwe_basisschool → list<geometry (feature-collection, Point)> · map
+  beleidsnormen/afstand_voorzieningen/nieuwe_sportvoorziening → list<geometry (feature-collection, Point)> · map
+  beleidsnormen/afstand_voorzieningen/nieuwe_buurthuis → list<geometry (feature-collection, Point)> · map
   beleidsnormen/afstand_voorzieningen/geometry → geometry (geometry, Polygon|MultiPolygon) · map
 beleidsnormen/beleidsnorm — needs area
   beleidsnormen/beleidsnorm/beleidsnorm → list<json [`anyOf` is outside the supported JSON Schema subset]> · unsupported-keyword
@@ -23,9 +23,9 @@ beleidsnormen/echo — needs area
 beleidsnormen/geluidsbelasting — needs area
   beleidsnormen/geluidsbelasting/geometry → geometry (geometry, Polygon|MultiPolygon) · map
 beleidsnormen/laadmogelijkheden — needs area
-  beleidsnormen/laadmogelijkheden/nieuwe_laadpalen → list<geometry (feature-collection, Point)>
+  beleidsnormen/laadmogelijkheden/nieuwe_laadpalen → list<geometry (feature-collection, Point)> · map
   beleidsnormen/laadmogelijkheden/output_crs → list<select>
-  beleidsnormen/laadmogelijkheden/geometry → list<geometry (geometry, Polygon|MultiPolygon)>
+  beleidsnormen/laadmogelijkheden/geometry → list<geometry (geometry, Polygon|MultiPolygon)> · map
 beleidsnormen/oppervlakte_voorzieningen — needs area
   beleidsnormen/oppervlakte_voorzieningen/output_crs → select
   beleidsnormen/oppervlakte_voorzieningen/voorzieningstype → list<select>
@@ -39,15 +39,15 @@ beleidsnormen/regel_300 — needs area
   beleidsnormen/regel_300/schaduwpercentage → number
   beleidsnormen/regel_300/minimale_grootte → number
   beleidsnormen/regel_300/maximale_groenafstand → number
-  beleidsnormen/regel_300/nieuwe_bankjes → list<geometry (feature-collection, Point)>
-  beleidsnormen/regel_300/nieuwe_grasvelden → list<geometry (feature-collection, Polygon|MultiPolygon)>
-  beleidsnormen/regel_300/nieuwe_struiken → list<geometry (feature-collection, Polygon|MultiPolygon)>
-  beleidsnormen/regel_300/nieuwe_bomen → list<geometry (feature-collection, Point|Polygon|MultiPolygon)>
+  beleidsnormen/regel_300/nieuwe_bankjes → list<geometry (feature-collection, Point)> · map
+  beleidsnormen/regel_300/nieuwe_grasvelden → list<geometry (feature-collection, Polygon|MultiPolygon)> · map
+  beleidsnormen/regel_300/nieuwe_struiken → list<geometry (feature-collection, Polygon|MultiPolygon)> · map
+  beleidsnormen/regel_300/nieuwe_bomen → list<geometry (feature-collection, Point|Polygon|MultiPolygon)> · map
   beleidsnormen/regel_300/geometry → geometry (geometry, Polygon|MultiPolygon) · map
 beleidsnormen/rustplekken — needs area
   beleidsnormen/rustplekken/output_crs → select
   beleidsnormen/rustplekken/parameters → json [no control for type `object`] · unsupported-type
-  beleidsnormen/rustplekken/nieuwe_bankjes → list<geometry (feature-collection, Point)>
+  beleidsnormen/rustplekken/nieuwe_bankjes → list<geometry (feature-collection, Point)> · map
   beleidsnormen/rustplekken/geometry → geometry (geometry, Polygon|MultiPolygon) · map
 beleidsnormen/stedelijkheid — needs area
   beleidsnormen/stedelijkheid/output_crs → select

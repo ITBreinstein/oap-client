@@ -47,7 +47,7 @@ import { hasProperties } from "./property-value.js";
 import { legendKind, legendNoun, shapeKinds } from "./shape-words.js";
 import { PlaceSearch } from "./PlaceSearch.js";
 import { useWide } from "./useWide.js";
-import { shapeBinding } from "./input-shapes.js";
+import { fieldTexts, shapeBinding } from "./input-shapes.js";
 import type { GeometryDrawProps } from "../map/useGeometryDraw.js";
 import type { DrawTarget } from "./draw.js";
 import { MapLimitsContext, tooManyToEdit } from "./map-limits.js";
@@ -107,9 +107,10 @@ function toolsFor(target: GeometryTarget): Tool[] {
  * loaded, typed or drawn — and, once it is in, what came back.
  *
  * Shown while the form is being filled in too, so a loaded file is seen
- * before it is sent. The field the map is drawing for is left out: the draw
- * mode shows that one itself, editable, and showing it twice would put a
- * stale copy under the one being edited.
+ * before it is sent. The field the map is drawing for is left out — for a
+ * repeatable geometry field, only the row being drawn (`drawingRow`): the draw
+ * mode shows that one itself, editable, and showing it twice would put a stale
+ * copy under the one being edited.
  *
  * Derived from the workflow on every render, never stored: when another
  * process is opened its fresh values hold no geometry, and a field that is
@@ -123,20 +124,22 @@ export function shownFor(
   state: Workflow,
   drawing?: string,
   maxCoordinates: number = Number.POSITIVE_INFINITY,
+  drawingRow?: number,
 ): readonly ShownShapes[] {
   if (state.stage !== "process" && state.stage !== "running" && state.stage !== "result") {
     return [];
   }
   const input = state.plan.fields.flatMap((field) => {
-    if (state.stage === "process" && field.id === drawing) return [];
+    const drawn = state.stage === "process" && field.id === drawing;
+    if (drawn && drawingRow === undefined) return [];
     const current = Object.hasOwn(state.values, field.id) ? state.values[field.id] : undefined;
     // A box in longitude and latitude, as its outline (#19): typed, it is on
     // the map too, as a drawn one is.
     if (field.control.kind === "bbox") return boxOutline(current);
-    const binding = shapeBinding(field, current);
-    if (binding === undefined) return [];
-    const shapes = shapesOfText(binding.text);
-    return positionCount(shapes) > maxCoordinates ? [] : shapes;
+    return fieldTexts(field, current, drawn ? drawingRow : undefined).flatMap(({ text }) => {
+      const shapes = shapesOfText(text);
+      return positionCount(shapes) > maxCoordinates ? [] : shapes;
+    });
   });
   const result = state.stage === "result" ? plottedShapes(state.results, maxCoordinates) : [];
   return [
@@ -158,10 +161,11 @@ export function leftOffTheMap(state: Workflow, maxCoordinates: number): LeftOff[
   }
   const inputs = state.plan.fields.flatMap((field) => {
     const current = Object.hasOwn(state.values, field.id) ? state.values[field.id] : undefined;
-    const binding = shapeBinding(field, current);
-    if (binding === undefined) return [];
-    const positions = positionCount(shapesOfText(binding.text));
-    return positions > maxCoordinates ? [{ name: field.title, positions }] : [];
+    return fieldTexts(field, current).flatMap(({ text, row }) => {
+      const positions = positionCount(shapesOfText(text));
+      const name = row === undefined ? field.title : `${field.title}, value ${String(row + 1)}`;
+      return positions > maxCoordinates ? [{ name, positions }] : [];
+    });
   });
   const results =
     state.stage === "result"
@@ -218,7 +222,15 @@ export function MapPane({
     typeof current.crs === "string"
       ? current.crs
       : undefined;
-  const shapes = field === undefined ? undefined : shapeBinding(field, current);
+  // A repeatable geometry field draws for one row at a time (`draw.row`).
+  const row = field?.control.kind === "list" ? draw.row : undefined;
+  const shapes = field === undefined ? undefined : shapeBinding(field, current, row);
+  const drawingName =
+    field === undefined
+      ? ""
+      : row === undefined
+        ? `“${field.title}”`
+        : `“${field.title}”, value ${String(row + 1)}`;
   const { maxCoordinates, maxEditableCoordinates } = useContext(MapLimitsContext);
   // STYLE TRIAL: the updated Instrument writes drawn GeoJSON laid out with tabs.
   const updated = useUpdated();
@@ -260,6 +272,7 @@ export function MapPane({
     state,
     field === undefined || !editable ? undefined : draw.fieldId,
     maxCoordinates,
+    row,
   );
   const leftOff = leftOffTheMap(state, maxCoordinates);
   // A click picks a result shape by its index among the plotted ones — the
@@ -298,7 +311,12 @@ export function MapPane({
     requestAnimationFrame(() => {
       const back = document.querySelector<HTMLElement>(`[data-input-id="${CSS.escape(id)}"]`);
       if (back !== null && "scrollIntoView" in back) back.scrollIntoView({ block: "center" });
-      back?.querySelector<HTMLElement>("button[aria-pressed]")?.focus({ preventScroll: true });
+      // A repeatable field has a Draw button per row: back to the one pressed.
+      const button =
+        row === undefined
+          ? "button[aria-pressed]"
+          : `button[aria-pressed][data-row="${String(row)}"]`;
+      back?.querySelector<HTMLElement>(button)?.focus({ preventScroll: true });
     });
   };
   const clearDrawn = () => {
@@ -329,8 +347,8 @@ export function MapPane({
   return (
     <aside className="map-pane" aria-label="Map" ref={pane} data-drawing-here={drawingHere}>
       {drawingHere && (
-        <div className="draw-bar" role="group" aria-label={`Drawing “${field.title}”`}>
-          <span className="draw-bar-title">Drawing “{field.title}”</span>
+        <div className="draw-bar" role="group" aria-label={`Drawing ${drawingName}`}>
+          <span className="draw-bar-title">Drawing {drawingName}</span>
           <button type="button" className="secondary" onClick={clearDrawn}>
             Clear
           </button>
