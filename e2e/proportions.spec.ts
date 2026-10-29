@@ -419,6 +419,30 @@ test.describe("proportions", () => {
         expect(groups[1]?.nameBelowTop).toBeGreaterThanOrEqual(12);
       });
 
+      test("what lies over the map keeps one inset, as its zoom buttons do (#13c)", async ({
+        page,
+      }) => {
+        await open(page, style);
+        await connect(page);
+        await page.getByRole("button", { name: "Bounding box to feature", exact: true }).click();
+        await page.locator(".map-pane canvas").waitFor();
+        await page.locator(".maplibregl-ctrl-top-right .maplibregl-ctrl").waitFor();
+        const insets = await page.evaluate(() => {
+          const rect = (selector: string) =>
+            document.querySelector(selector)?.getBoundingClientRect();
+          const map = rect(".map-pane");
+          const search = rect(".place-search");
+          const zoom = rect(".maplibregl-ctrl-top-right .maplibregl-ctrl");
+          if (map === undefined || search === undefined || zoom === undefined) return undefined;
+          return {
+            search: [Math.round(search.top - map.top), Math.round(search.left - map.left)],
+            zoom: [Math.round(zoom.top - map.top), Math.round(map.right - zoom.right)],
+          };
+        });
+        expect(insets?.search).toEqual([10, 10]);
+        expect(insets?.zoom).toEqual([10, 10]);
+      });
+
       test("My jobs' buttons are one size (#4)", async ({ page }) => {
         await requireService(`${RELAY}/healthz`, "the relay");
         // Through the relay: only it can name a job pygeoapi starts for a page.

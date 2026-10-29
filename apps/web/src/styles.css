@@ -11,6 +11,11 @@
   --panel-width: 30rem;
   /* A side panel's width, and how far Examples moves the start screen over. */
   --side-panel-width: 380px;
+  /*
+   * How far what lies over the map keeps from its edge: MapLibre's own zoom
+   * buttons and scale bar sit 10px in.
+   */
+  --map-inset: 10px;
   font-family: var(--font-ui);
   font-size: 16px;
   line-height: 1.5;
@@ -186,8 +191,8 @@ legend,
 .map-tools {
   position: absolute;
   z-index: 1;
-  top: 0.75rem;
-  left: 0.75rem;
+  top: var(--map-inset);
+  left: var(--map-inset);
   right: 3.5rem;
   display: flex;
   flex-wrap: wrap;
@@ -204,8 +209,8 @@ legend,
 .map-overlay {
   position: absolute;
   z-index: 1;
-  top: 0.75rem;
-  left: 0.75rem;
+  top: var(--map-inset);
+  left: var(--map-inset);
   max-width: min(24rem, calc(100% - 5rem));
   max-height: calc(100% - 6.5rem);
   overflow: auto;
@@ -376,8 +381,8 @@ pre.code {
 .place-search {
   position: absolute;
   z-index: 3;
-  top: 0.75rem;
-  left: 0.75rem;
+  top: var(--map-inset);
+  left: var(--map-inset);
   width: min(22rem, calc(100% - 4.5rem));
 }
 
@@ -419,9 +424,10 @@ pre.code {
   border-radius: var(--r-item);
 }
 
+/* Under "Find a place" (2.5rem high), 0.75rem clear of it. */
 .map-pane .map-overlay,
 .map-view > .map-tools {
-  top: 4rem;
+  top: calc(var(--map-inset) + 3.25rem);
 }
 
 /*

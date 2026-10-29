@@ -1073,10 +1073,10 @@
   }
 
   [data-style="instrument"] .map-pane > .map-hint:not(.map-legend) {
-    /* Below "Find a place" (#16). */
-    top: 4.25rem;
+    /* Below "Find a place" (#16, 2.5rem high), 1rem clear of it, at its edge. */
+    top: calc(var(--map-inset) + 3.5rem);
     bottom: auto;
-    left: 20px;
+    left: var(--map-inset);
   }
 }
 
