@@ -469,6 +469,22 @@
   }
 }
 
+/*
+ * On a phone, every page on the picture is framed alike, Start included: a
+ * 12px edge of picture round the card, 16px inside it, so the content keeps
+ * its width (proportions #12).
+ */
+@media (max-width: 40rem) {
+  [data-variant="updated"] .layout-single .panel {
+    padding: 12px;
+  }
+
+  [data-variant="updated"]
+    :is(.start, .layout-single .process-screen, .layout-single .process-list-screen) {
+    padding: 16px;
+  }
+}
+
 /* ------------------------------------------------- the process page */
 
 /*

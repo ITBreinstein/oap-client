@@ -347,6 +347,48 @@ test.describe("proportions", () => {
         expect(seen[2]).toEqual(seen[0]);
       });
 
+      test(`on a phone, ${updated ? "every page has one frame" : "the frame is as it was"} (#12)`, async ({
+        page,
+      }) => {
+        await page.setViewportSize({ width: 390, height: 844 });
+        await open(page, style);
+        const padding = (selector: string) =>
+          page
+            .locator(selector)
+            .first()
+            .evaluate((element) => {
+              const style = getComputedStyle(element);
+              return [style.paddingTop, style.paddingRight, style.paddingBottom, style.paddingLeft];
+            });
+        expect(await padding(".layout-single .panel")).toEqual(Array(4).fill("12px"));
+        expect(await padding(".start")).toEqual(
+          updated ? Array(4).fill("16px") : ["20px", "18px", "20px", "18px"],
+        );
+
+        await connect(page);
+        await page.getByRole("button", { name: "Hello World", exact: true }).click();
+        await page.getByRole("textbox", { name: /Name/ }).fill("Geonovum");
+        await page.getByRole("button", { name: "Run", exact: true }).click();
+        await page.getByRole("button", { name: "Change the inputs" }).waitFor();
+        const panel = await padding(".layout-single .panel");
+        const card = await padding(".layout-single .process-screen");
+        expect([panel[1], panel[3]]).toEqual(updated ? ["12px", "12px"] : ["20px", "20px"]);
+        expect(card).toEqual(updated ? Array(4).fill("16px") : ["20px", "24px", "20px", "24px"]);
+
+        // The JSON, unfolded where the update shows the plain value first.
+        const json = page.locator(".result details").first();
+        if (!(await json.evaluate((fold) => (fold as HTMLDetailsElement).open))) {
+          await json.locator("> summary").click();
+        }
+        const widths = await page.evaluate(() => ({
+          result: Math.round(document.querySelector(".result")?.getBoundingClientRect().width ?? 0),
+          json: Math.round(
+            document.querySelector(".result pre")?.getBoundingClientRect().width ?? 0,
+          ),
+        }));
+        expect(widths).toEqual(updated ? { result: 332, json: 306 } : { result: 300, json: 274 });
+      });
+
       test("My jobs' buttons are one size (#4)", async ({ page }) => {
         await requireService(`${RELAY}/healthz`, "the relay");
         // Through the relay: only it can name a job pygeoapi starts for a page.
