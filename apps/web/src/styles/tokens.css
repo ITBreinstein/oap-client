@@ -46,6 +46,16 @@
   --r-item: 6px;
   --r-control: 4px;
   --r-tag: 4px;
+  /*
+   * Buttons, by what they do: the screen's one main action (Connect, Run),
+   * every other button, and a field's own toolbar. Icon-only buttons are
+   * 44px, as a finger needs.
+   */
+  --button-height-primary: 48px;
+  --button-height: 40px;
+  --button-height-compact: 36px;
+  --button-text-primary: 0.9375rem;
+  --button-text: 0.8125rem;
 }
 
 /*

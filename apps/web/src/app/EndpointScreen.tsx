@@ -173,7 +173,7 @@ export function EndpointScreen(props: EndpointScreenProps) {
   };
 
   const connectButton = (
-    <button type="submit" disabled={connecting !== undefined}>
+    <button type="submit" className="primary" disabled={connecting !== undefined}>
       Connect
     </button>
   );

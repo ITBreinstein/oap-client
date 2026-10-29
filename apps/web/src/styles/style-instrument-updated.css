@@ -1112,9 +1112,9 @@
  * Remove, "Type it instead" and Clear the form. Copy keeps its own.
  */
 [data-variant="updated"] :is(.form-body, .clear-form) button:not(.copy-button) {
-  min-height: 36px;
-  padding: 0 12px;
-  font-size: 0.8125rem;
+  min-height: var(--button-height-compact);
+  padding-block: 0;
+  padding-inline: 12px;
 }
 
 /*

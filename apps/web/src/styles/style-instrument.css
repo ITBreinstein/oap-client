@@ -334,16 +334,8 @@
 }
 
 [data-style="instrument"] .input-with-button input {
-  min-height: 48px;
   padding: 0 14px;
   font-size: 0.9375rem;
-}
-
-[data-style="instrument"] .input-with-button button {
-  min-height: 48px;
-  padding: 0 22px;
-  font-size: 0.9375rem;
-  font-weight: 800;
 }
 
 /* The known services: a table, the radio as its status dot. */
@@ -413,11 +405,6 @@
 
 [data-style="instrument"] .choice-access[data-route="relay"] {
   color: var(--warning);
-}
-
-[data-style="instrument"] .featured-head .browse-all {
-  min-height: 40px;
-  font-size: 0.8125rem;
 }
 
 [data-style="instrument"] .how-it-works,
@@ -826,9 +813,6 @@
 
 /* After a result, both ways on are outlined: Run was the screen's one primary. */
 [data-style="instrument"] .next-steps button {
-  min-height: 38px;
-  padding: 0 12px;
-  font-size: 0.8125rem;
   color: var(--text);
   background: var(--surface);
   border-color: var(--line-strong);
@@ -993,9 +977,6 @@
 
   /* A box's and an area's: one look, drawing or not (#17). */
   [data-style="instrument"] :is(.geometry, .bbox) .actions button {
-    min-height: 36px;
-    padding: 0 12px;
-    font-size: 0.8125rem;
     color: var(--text-secondary);
     background: var(--surface);
     border-color: var(--line-strong);
@@ -1039,10 +1020,6 @@
   [data-style="instrument"] .layout:not(.layout-single) .run-bar button[type="submit"] {
     grid-column: 2;
     grid-row: 1 / span 2;
-    min-height: 46px;
-    padding: 0 22px;
-    font-size: 0.9375rem;
-    font-weight: 800;
   }
 
   [data-style="instrument"] .layout:not(.layout-single) .developer {

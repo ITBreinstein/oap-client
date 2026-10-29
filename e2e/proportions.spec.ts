@@ -9,6 +9,7 @@
  */
 
 import { expect, test, type Page } from "@playwright/test";
+import { RELAY } from "./servers.js";
 import { requireService } from "./services.js";
 
 const PYGEOAPI = "http://localhost:5080";
@@ -83,6 +84,55 @@ function barOf(page: Page, selector: string) {
     });
 }
 
+/**
+ * Every visible button by its role, with its height and text size. Rows,
+ * links, icons, the rail and the map's own controls size themselves.
+ */
+function buttonsByRole(page: Page, updated: boolean) {
+  return page.evaluate((updated) => {
+    const own =
+      ".rail-item, .appearance-button, .link, .copy-button, .panel-close, .example-card, .example-row, .filter, .image-open, [class*='maplibregl']";
+    const compact = updated
+      ? ":is(.geometry, .bbox) .actions button, :is(.form-body, .clear-form) button"
+      : ":is(.geometry, .bbox) .actions button";
+    return [...document.querySelectorAll("button")]
+      .filter(
+        (button) =>
+          button.checkVisibility({ visibilityProperty: true }) &&
+          button.getBoundingClientRect().width > 0 &&
+          !button.matches(own),
+      )
+      .map((button) => ({
+        name: (button.getAttribute("aria-label") ?? button.textContent ?? "").trim(),
+        role: button.matches(".primary")
+          ? ("primary" as const)
+          : button.matches(compact)
+            ? ("compact" as const)
+            : ("secondary" as const),
+        height: Math.round(button.getBoundingClientRect().height * 10) / 10,
+        size: getComputedStyle(button).fontSize,
+      }));
+  }, updated);
+}
+
+const SIZES = {
+  primary: { height: 48, size: "15px" },
+  secondary: { height: 40, size: "13px" },
+  compact: { height: 36, size: "13px" },
+} as const;
+
+/** Each button is its role's size, and none is a size that went: 38, 40.4, 46. */
+async function expectButtonSizes(page: Page, updated: boolean, where: string) {
+  const buttons = await buttonsByRole(page, updated);
+  expect(buttons.length, where).toBeGreaterThan(0);
+  for (const button of buttons) {
+    const label = `${where}: ${button.name} (${button.role})`;
+    expect([38, 40.4, 46], label).not.toContain(button.height);
+    expect({ height: button.height, size: button.size }, label).toEqual(SIZES[button.role]);
+  }
+  return buttons;
+}
+
 test.describe("proportions", () => {
   test.beforeEach(async ({ page }) => {
     await requireService(`${PYGEOAPI}/?f=json`, "pygeoapi :5080");
@@ -138,6 +188,50 @@ test.describe("proportions", () => {
         await page.getByRole("button", { name: "Connect", exact: true }).click();
         await expect(page.locator(".address-field .error-box")).toBeVisible();
         expect(await right(".address-field .error-box")).toBe(edge);
+      });
+
+      test("buttons are one size per role, on a result and beside the map (#4)", async ({
+        page,
+      }) => {
+        await open(page, style);
+        await expectButtonSizes(page, updated, "start");
+        await connect(page);
+        await page.getByRole("button", { name: "Hello World", exact: true }).click();
+        await page.getByRole("textbox", { name: /Name/ }).fill("Geonovum");
+        const form = await expectButtonSizes(page, updated, "form");
+        expect(form.find((button) => button.name === "Run")?.role).toBe("primary");
+        await page.getByRole("button", { name: "Run", exact: true }).click();
+        await page.getByRole("button", { name: "Change the inputs" }).waitFor();
+        const result = await expectButtonSizes(page, updated, "result");
+        expect(result.filter((button) => button.role === "secondary").length).toBeGreaterThan(1);
+
+        await page.getByRole("button", { name: "Processes", exact: true }).click();
+        await page.getByRole("button", { name: "Bounding box to feature", exact: true }).click();
+        await page.locator(".map-pane canvas").waitFor();
+        const beside = await expectButtonSizes(page, updated, "beside the map");
+        expect(beside.filter((button) => button.role === "compact").length).toBeGreaterThan(0);
+        expect(beside.find((button) => button.name === "Run")?.role).toBe("primary");
+      });
+
+      test("My jobs' buttons are one size (#4)", async ({ page }) => {
+        await requireService(`${RELAY}/healthz`, "the relay");
+        // Through the relay: only it can name a job pygeoapi starts for a page.
+        await page.goto(`/?style=${style}&theme=light`);
+        await page.evaluate(() => {
+          localStorage.clear();
+        });
+        await page.reload();
+        await page.getByRole("radio", { name: /^pygeoapi[- ]cors /i }).check();
+        await page.getByRole("button", { name: "Connect", exact: true }).click();
+        await page.getByRole("button", { name: "Slow process", exact: true }).click();
+        await page.getByRole("textbox", { name: "Seconds (optional)" }).fill("1");
+        await page.getByRole("checkbox", { name: "Run in the background" }).check();
+        await page.getByRole("button", { name: "Run", exact: true }).click();
+        await expect(page.locator('[data-output-id="slept"]')).toBeVisible({ timeout: 30_000 });
+        await page.getByRole("banner").getByRole("button", { name: /^Jobs/ }).click();
+        await expect(page.getByTestId("my-jobs").locator("[data-job-row]")).toHaveCount(1);
+        const buttons = await expectButtonSizes(page, updated, "My jobs");
+        expect(buttons.map((button) => button.name)).toContain("Remove from list");
       });
     });
   }

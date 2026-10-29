@@ -38,6 +38,11 @@ const SHAPE_TOKENS = [
   "--r-item",
   "--r-control",
   "--r-tag",
+  "--button-height-primary",
+  "--button-height",
+  "--button-height-compact",
+  "--button-text-primary",
+  "--button-text",
 ];
 
 /** Outermost first: a card holds items, an item controls, a control tags. */

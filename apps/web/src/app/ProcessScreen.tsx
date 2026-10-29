@@ -1016,7 +1016,9 @@ export function ProcessScreen(props: ProcessScreenProps) {
                 Prefer: respond-async
               </code>
             )}
-            <button type="submit">{onlyAsync ? "Run in the background" : "Run"}</button>
+            <button type="submit" className="primary">
+              {onlyAsync ? "Run in the background" : "Run"}
+            </button>
           </div>
         </form>
       )}

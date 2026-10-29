@@ -712,12 +712,18 @@ textarea.code {
   flex: 1;
 }
 
+/*
+ * A button's size is its role's (tokens.css): this, every button's; Connect
+ * and Run are `.primary`; a field's own toolbar is compact. One that is a
+ * row, a link or an icon sets its own.
+ */
 button,
 a.button {
   display: inline-block;
-  min-height: 2.5rem;
+  min-height: var(--button-height);
   padding: 0.45rem 0.9rem;
   font: inherit;
+  font-size: var(--button-text);
   font-weight: 600;
   color: var(--accent-text);
   background: var(--accent);
@@ -744,9 +750,26 @@ button.secondary:hover:not(:disabled) {
   border-color: var(--accent-ink);
 }
 
+/* The screen's one main action: Connect, Run. */
+button.primary {
+  min-height: var(--button-height-primary);
+  padding-block: 0;
+  padding-inline: 22px;
+  font-size: var(--button-text-primary);
+  font-weight: 800;
+}
+
+/* Compact: the buttons of a field's own toolbar (a box's, an area's). */
+:is(.geometry, .bbox) .actions button {
+  min-height: var(--button-height-compact);
+  padding-block: 0;
+  padding-inline: 12px;
+}
+
 button.link {
   min-height: 0;
   padding: 0;
+  font-size: inherit;
   color: var(--accent-ink);
   background: none;
   border: none;
@@ -1207,18 +1230,16 @@ label.choice-card:not(:last-of-type) .choice-note {
   gap: 10px;
 }
 
+/* The address beside Connect, as tall as the button. */
 .input-with-button input {
   flex: 1;
-  min-height: 52px;
+  min-height: var(--button-height-primary);
   padding: 0 16px;
   font-size: 1.0625rem;
 }
 
 .input-with-button button {
   flex: none;
-  min-height: 52px;
-  padding: 0 26px;
-  font-size: 1.0625rem;
 }
 
 .connect-target {
@@ -1918,9 +1939,7 @@ button.secondary.panel-close {
 }
 
 .browse-all {
-  min-height: 44px;
   padding: 0 16px;
-  font-size: 0.9375rem;
   color: var(--text);
   border-color: var(--line-strong);
 }
@@ -1956,6 +1975,8 @@ button.secondary.panel-close {
   align-items: flex-start;
   gap: 0.3rem;
   width: 100%;
+  /* A row of the list, not a button to look at: the text's own size. */
+  font-size: inherit;
   font-weight: normal;
   text-align: left;
   color: var(--text);
