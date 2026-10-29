@@ -1047,13 +1047,15 @@
   /*
    * The request log lies over the map's foot, out of the sheet, folded: clear
    * of the scale bar under it, level with the legend at the other corner.
+   * As wide as what it shows, so folded it stays clear of the legend.
    */
   [data-style="instrument"] .layout:not(.layout-single) .request-log {
     position: fixed;
     z-index: 3;
     left: calc(var(--rail-width) + var(--panel-width) + 20px);
     bottom: 40px;
-    width: min(560px, calc(100vw - var(--rail-width) - var(--panel-width) - 40px));
+    width: fit-content;
+    max-width: min(560px, calc(100vw - var(--rail-width) - var(--panel-width) - 40px));
     max-height: 40vh;
     margin: 0;
     padding: 12px 14px;

@@ -274,13 +274,16 @@ test.describe("proportions", () => {
           await expect(page.locator("details.developer .request-log li").first()).toBeVisible();
           return;
         }
-        const overlap = await page.evaluate(() => {
-          const a = document.querySelector(".request-log")?.getBoundingClientRect();
-          const b = document.querySelector(".maplibregl-ctrl-scale")?.getBoundingClientRect();
-          if (a === undefined || b === undefined) return undefined;
-          return a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
-        });
-        expect(overlap).toBe(false);
+        // Folded, it touches neither the scale bar under it nor the legend beside it.
+        for (const other of [".maplibregl-ctrl-scale", ".map-pane > .map-legend"]) {
+          const overlap = await page.evaluate((other) => {
+            const a = document.querySelector(".request-log")?.getBoundingClientRect();
+            const b = document.querySelector(other)?.getBoundingClientRect();
+            if (a === undefined || b === undefined) return undefined;
+            return a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+          }, other);
+          expect(overlap, other).toBe(false);
+        }
         await log.locator("summary").click();
         await expect(log.locator("li").first()).toBeVisible();
       });

@@ -299,6 +299,7 @@
   [data-variant="updated"] .layout:not(.layout-single) .request-log {
     position: static;
     width: auto;
+    max-width: none;
     max-height: none;
     margin: 16px 22px 0;
     background: var(--surface);
