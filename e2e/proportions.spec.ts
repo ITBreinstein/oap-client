@@ -106,6 +106,21 @@ test.describe("proportions", () => {
           expect(bar.bottom, selector).toBe("8px");
         }
       });
+
+      test(`corners ${updated ? "step down" : "stay as they were"} from card to tag (#2)`, async ({
+        page,
+      }) => {
+        await open(page, style);
+        const radii = await page.evaluate(() => {
+          const root = getComputedStyle(document.documentElement);
+          return ["--r-card", "--r-item", "--r-control", "--r-tag"].map((name) =>
+            root.getPropertyValue(name).trim(),
+          );
+        });
+        expect(radii).toEqual(
+          updated ? ["8px", "6px", "4px", "2px"] : ["6px", "6px", "4px", "4px"],
+        );
+      });
     });
   }
 });

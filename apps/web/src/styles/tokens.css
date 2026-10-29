@@ -11,6 +11,9 @@
  * - a **colour** block per theme, `[data-style="instrument"][data-theme=…]`:
  *   colours and shadows. Never a size.
  *
+ * A version on trial may add a shape block of its own,
+ * `[data-style="instrument"][data-variant=…]`, overriding shapes only.
+ *
  * Contrast: text at least 4.5:1 and field borders at least 3:1 against what
  * they sit on; `test/styles/tokens.test.ts` checks both for every block.
  *
@@ -43,6 +46,17 @@
   --r-item: 6px;
   --r-control: 4px;
   --r-tag: 4px;
+}
+
+/*
+ * STYLE TRIAL (updated Instrument): one radius step per nesting level, so a
+ * box inside a card has smaller corners than the card. Shapes only.
+ */
+[data-style="instrument"][data-variant="updated"] {
+  --r-card: 8px;
+  --r-item: 6px;
+  --r-control: 4px;
+  --r-tag: 2px;
 }
 
 /* ------------------------------------------------------- Instrument colours */

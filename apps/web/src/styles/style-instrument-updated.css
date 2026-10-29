@@ -9,6 +9,11 @@
  * delete this file. Either way, delete the second entry of `STYLE_NAMES`
  * (`app/appearance.ts`) and `data-variant` (ADR 0002).
  *
+ * Tokens only the update has: its own shape block in `tokens.css`,
+ * `[data-style="instrument"][data-variant="updated"]`, one radius step per
+ * nesting level (card 8, item 6, control 4, tag 2). Keep its values in the
+ * shape block, or delete it.
+ *
  * Markup only the update shows, hidden by default in `styles.css`: the words
  * in `app/Versioned.tsx` (`.when-updated`), used once, for a job that can't
  * be cancelled. Keep the update's words and delete the component, or the

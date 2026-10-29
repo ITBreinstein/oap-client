@@ -40,6 +40,9 @@ const SHAPE_TOKENS = [
   "--r-tag",
 ];
 
+/** Outermost first: a card holds items, an item controls, a control tags. */
+const RADII = ["--r-card", "--r-item", "--r-control", "--r-tag"];
+
 const COLOUR_TOKENS = [
   "--page",
   "--surface",
@@ -246,6 +249,35 @@ describe("tokens.css", () => {
         expect(failures).toEqual([]);
       });
     }
+
+    // A version on trial may override shapes in a block of its own (ADR 0002).
+    const variants = tokenRules.filter((rule) =>
+      rule.selectors.some((selector) =>
+        selector.startsWith(`[data-style="${style}"][data-variant=`),
+      ),
+    );
+
+    it(`${style}: a version's own block holds shapes only, and no colour`, () => {
+      for (const variant of variants) {
+        for (const [token, value] of declarations(variant.body)) {
+          expect(SHAPE_TOKENS.includes(token), `${token} is no shape`).toBe(true);
+          expect(value).not.toMatch(/#[0-9a-f]{3,8}\b|rgb\(/i);
+        }
+      }
+    });
+
+    it(`${style}: corners never grow from card to item to control to tag, in every version`, () => {
+      const shape = block(`[data-style="${style}"]`);
+      const versions = [
+        shape,
+        ...variants.map((variant) => new Map([...shape, ...declarations(variant.body)])),
+      ];
+      for (const shapes of versions) {
+        const radii = RADII.map((token) => parseFloat(shapes.get(token) ?? ""));
+        for (const radius of radii) expect(Number.isFinite(radius)).toBe(true);
+        expect(radii).toEqual([...radii].sort((a, b) => b - a));
+      }
+    });
   }
 });
 
