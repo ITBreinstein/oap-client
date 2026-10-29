@@ -389,6 +389,36 @@ test.describe("proportions", () => {
         expect(widths).toEqual(updated ? { result: 332, json: 306 } : { result: 300, json: 274 });
       });
 
+      test(`the Appearance menu ${updated ? "has one rule between its groups, above the name" : "keeps its boxes"} (#13a)`, async ({
+        page,
+      }) => {
+        await open(page, style);
+        await page
+          .getByRole("banner")
+          .getByRole("button", { name: /Appearance/ })
+          .click();
+        const groups = await page.locator(".appearance-popover fieldset").evaluateAll((sets) =>
+          sets.map((set) => {
+            const style = getComputedStyle(set);
+            const legend = set.querySelector("legend")?.getBoundingClientRect();
+            return {
+              borders: [style.borderTopWidth, style.borderLeftWidth],
+              // How far the group's name is below its top edge, the rule's line.
+              nameBelowTop: Math.round((legend?.top ?? 0) - set.getBoundingClientRect().top),
+            };
+          }),
+        );
+        expect(groups).toHaveLength(2);
+        if (!updated) {
+          for (const group of groups) expect(group.borders).toEqual(["1px", "1px"]);
+          return;
+        }
+        expect(groups[0]?.borders).toEqual(["0px", "0px"]);
+        expect(groups[1]?.borders).toEqual(["1px", "0px"]);
+        // Under the rule, after the 12px padding: not on it.
+        expect(groups[1]?.nameBelowTop).toBeGreaterThanOrEqual(12);
+      });
+
       test("My jobs' buttons are one size (#4)", async ({ page }) => {
         await requireService(`${RELAY}/healthz`, "the relay");
         // Through the relay: only it can name a job pygeoapi starts for a page.

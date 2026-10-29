@@ -485,6 +485,37 @@
   }
 }
 
+/* ------------------------------------------------- the Appearance menu */
+
+/*
+ * Two groups in one box, without a box round each: a rule between them,
+ * above the second one's name. A legend is drawn on its fieldset's top
+ * border, so a rule there would run through it; floated into the group,
+ * the legend is laid out as an ordinary line, under the rule.
+ */
+[data-variant="updated"] .appearance-popover fieldset {
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+[data-variant="updated"] .appearance-popover fieldset + fieldset {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+[data-variant="updated"] .appearance-popover legend {
+  float: left;
+  width: 100%;
+  margin: 0 0 4px;
+  padding: 0;
+}
+
+[data-variant="updated"] .appearance-popover legend + * {
+  clear: left;
+}
+
 /* ------------------------------------------------- the process page */
 
 /*
