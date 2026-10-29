@@ -457,7 +457,7 @@
 
 /* Over the content, never beside it: the start screen stays where it is. */
 [data-style="instrument"] {
-  --examples-width: 420px;
+  --side-panel-width: 420px;
 }
 
 [data-style="instrument"] .app-body:has(> .examples-panel[data-open="true"]) {
@@ -476,14 +476,20 @@
   transform: translateX(-100%);
 }
 
-[data-style="instrument"] .examples-panel .side-panel-head {
-  padding: 20px 20px 0;
+/* Every panel's title row: Examples, My jobs and About alike. */
+[data-style="instrument"] .side-panel-head {
+  padding: 20px 20px 12px;
 }
 
-[data-style="instrument"] .examples-panel .side-panel-head h2 {
+[data-style="instrument"] .side-panel-head h2 {
   font-size: 1.25rem;
   font-weight: 800;
   letter-spacing: -0.015em;
+}
+
+/* Examples' filters follow at once. */
+[data-style="instrument"] .examples-panel .side-panel-head {
+  padding-bottom: 0;
 }
 
 [data-style="instrument"] .examples-tools {
@@ -1162,20 +1168,9 @@
 
 /* ------------------------------------------------------------ About */
 
-/* Out of the rail like Examples, at its width. */
-[data-style="instrument"] .about-panel {
-  width: min(var(--examples-width), 100%);
-}
-
+/* Out of the rail like Examples; its sections draw their own rules. */
 [data-style="instrument"] .about-panel .side-panel-head {
-  padding: 20px 20px 12px;
   border-bottom: none;
-}
-
-[data-style="instrument"] .about-panel .side-panel-head h2 {
-  font-size: 1.25rem;
-  font-weight: 800;
-  letter-spacing: -0.015em;
 }
 
 /* The sections carry their own padding and rules. */

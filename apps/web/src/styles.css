@@ -9,8 +9,8 @@
 
 :root {
   --panel-width: 30rem;
-  /* The Examples panel's width, and how far it moves the start screen over. */
-  --examples-width: 380px;
+  /* A side panel's width, and how far Examples moves the start screen over. */
+  --side-panel-width: 380px;
   font-family: var(--font-ui);
   font-size: 16px;
   line-height: 1.5;
@@ -1571,7 +1571,7 @@ ol.steps li .help {
  */
 @media (min-width: 64rem) {
   .app-body:has(> .examples-panel[data-open="true"]) {
-    --dock: var(--examples-width);
+    --dock: var(--side-panel-width);
   }
 }
 
@@ -1828,7 +1828,7 @@ ol.steps li .help {
   bottom: 0;
   display: flex;
   flex-direction: column;
-  width: min(27rem, 100%);
+  width: min(var(--side-panel-width), 100%);
   color: var(--text);
   background: var(--surface);
   border-left: 1px solid var(--line-strong);
@@ -1899,10 +1899,6 @@ button.secondary.panel-close {
   flex: none;
   padding: 0.75rem 1.25rem 1rem;
   border-top: 1px solid var(--line);
-}
-
-.examples-panel {
-  width: min(var(--examples-width), 100%);
 }
 
 .panel-close .icon {

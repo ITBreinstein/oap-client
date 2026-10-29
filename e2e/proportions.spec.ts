@@ -310,6 +310,43 @@ test.describe("proportions", () => {
         expect(await night.evaluate((input) => getComputedStyle(input).accentColor)).toBe(accent);
       });
 
+      test("Examples, My jobs and About open alike: width, title and where it sits (#10)", async ({
+        page,
+      }) => {
+        await open(page, style);
+        const rail = page.getByRole("banner");
+        const seen = [];
+        for (const [item, title] of [
+          [/^Examples/, "Examples"],
+          [/^Jobs/, "My jobs"],
+          [/^About/, "About"],
+        ] as const) {
+          await rail.getByRole("button", { name: item }).click();
+          const panel = page.getByRole("dialog", { name: title });
+          await expect(panel).toBeVisible();
+          // Once the slide is over.
+          await expect
+            .poll(() => panel.evaluate((element) => getComputedStyle(element).transform))
+            .toBe("none");
+          seen.push(
+            await panel.evaluate((element) => {
+              const heading = element.querySelector("h2");
+              return {
+                width: Math.round(element.getBoundingClientRect().width),
+                size: heading === null ? "" : getComputedStyle(heading).fontSize,
+                top: Math.round(heading?.getBoundingClientRect().top ?? 0),
+              };
+            }),
+          );
+          await page.keyboard.press("Escape");
+          await expect(panel).toBeHidden();
+        }
+        expect(seen[0]?.width).toBe(420);
+        expect(seen[0]?.size).toBe("20px");
+        expect(seen[1]).toEqual(seen[0]);
+        expect(seen[2]).toEqual(seen[0]);
+      });
+
       test("My jobs' buttons are one size (#4)", async ({ page }) => {
         await requireService(`${RELAY}/healthz`, "the relay");
         // Through the relay: only it can name a job pygeoapi starts for a page.
