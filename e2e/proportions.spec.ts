@@ -242,6 +242,49 @@ test.describe("proportions", () => {
         expect(new Set(tops).size).toBe(1);
       });
 
+      test(`the request log is ${updated ? "open in the Developer section" : "folded, clear of the scale bar"} (#7, #8)`, async ({
+        page,
+      }) => {
+        // The update's request log is in the Developer section: `?developer`.
+        await open(page, style, updated ? "&developer" : "");
+        await connect(page);
+        await page.getByRole("button", { name: "Bounding box to feature", exact: true }).click();
+        await page.locator(".map-pane canvas").waitFor();
+        for (const [label, value] of [
+          ["West", "4.2"],
+          ["South", "52.0"],
+          ["East", "4.4"],
+          ["North", "52.1"],
+        ] as const) {
+          await page.getByRole("textbox", { name: new RegExp(`^${label}`) }).fill(value);
+        }
+        await page.getByRole("button", { name: "Run", exact: true }).click();
+        await page.getByRole("button", { name: "Change the inputs" }).waitFor();
+
+        const developer = page.locator("details.developer");
+        if (updated && !(await developer.evaluate((fold) => (fold as HTMLDetailsElement).open))) {
+          await developer.locator("> summary").click();
+        }
+        const log = page.getByRole("region", { name: "Requests to this service", exact: true });
+        await expect(log).toBeVisible();
+        await expect(log.locator("summary")).toHaveText(/^Requests to this service \(\d+\)$/);
+        const details = log.locator("details");
+        await expect(details).toHaveJSProperty("open", updated);
+        if (updated) {
+          await expect(page.locator("details.developer .request-log li").first()).toBeVisible();
+          return;
+        }
+        const overlap = await page.evaluate(() => {
+          const a = document.querySelector(".request-log")?.getBoundingClientRect();
+          const b = document.querySelector(".maplibregl-ctrl-scale")?.getBoundingClientRect();
+          if (a === undefined || b === undefined) return undefined;
+          return a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+        });
+        expect(overlap).toBe(false);
+        await log.locator("summary").click();
+        await expect(log.locator("li").first()).toBeVisible();
+      });
+
       test("My jobs' buttons are one size (#4)", async ({ page }) => {
         await requireService(`${RELAY}/healthz`, "the relay");
         // Through the relay: only it can name a job pygeoapi starts for a page.

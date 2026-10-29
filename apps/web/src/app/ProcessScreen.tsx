@@ -445,41 +445,47 @@ function ResultStrip({
 
 /**
  * The requests this page made to the service, newest last, as the session
- * recorded them.
+ * recorded them: folded, with how many there were, unless `open`.
  */
 export function RequestLog({
   entries,
   endpoint,
+  open = false,
 }: {
   readonly entries: readonly SessionObservation[];
   readonly endpoint: string;
+  /** Unfolded, for where it is in a fold already (the Developer section). */
+  readonly open?: boolean;
 }) {
   const base = useId();
-  const requests = requestLog(entries, endpoint, 12);
+  const all = requestLog(entries, endpoint, Number.POSITIVE_INFINITY);
+  const requests = all.slice(-12);
   return (
     <section className="request-log" aria-labelledby={`${base}-log`}>
-      <h3 id={`${base}-log`} className="label">
-        Requests to this service
-      </h3>
-      <ol>
-        {requests.length === 0 && <li className="mono muted">Nothing sent yet.</li>}
-        {requests.map((request, index) => (
-          // The same request can repeat (a poll): its place is its identity.
-          <li key={index} className="mono">
-            <span className="request-method">{request.method}</span>{" "}
-            {/* The path under the service's address: the address is the page's already. */}
-            <span className="request-url" title={request.url}>
-              {pathUnder(request.url, endpoint)}
-            </span>{" "}
-            <span
-              className="request-status"
-              data-ok={request.status !== undefined && request.status < 400}
-            >
-              {request.status === undefined ? "—" : String(request.status)}
-            </span>
-          </li>
-        ))}
-      </ol>
+      <details open={open}>
+        <summary className="label">
+          <span id={`${base}-log`}>Requests to this service</span> ({all.length})
+        </summary>
+        <ol>
+          {requests.length === 0 && <li className="mono muted">Nothing sent yet.</li>}
+          {requests.map((request, index) => (
+            // The same request can repeat (a poll): its place is its identity.
+            <li key={index} className="mono">
+              <span className="request-method">{request.method}</span>{" "}
+              {/* The path under the service's address: the address is the page's already. */}
+              <span className="request-url" title={request.url}>
+                {pathUnder(request.url, endpoint)}
+              </span>{" "}
+              <span
+                className="request-status"
+                data-ok={request.status !== undefined && request.status < 400}
+              >
+                {request.status === undefined ? "—" : String(request.status)}
+              </span>
+            </li>
+          ))}
+        </ol>
+      </details>
     </section>
   );
 }

@@ -698,6 +698,7 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
                             <RequestLog
                               entries={view.snapshot?.observations ?? []}
                               endpoint={redactUrl(state.endpoint.baseUrl)}
+                              open
                             />
                           ) : undefined
                         }

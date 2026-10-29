@@ -59,7 +59,7 @@
  * `MapPane`, `ResultsView`); inputs and outputs have Copy in their boxes
  * (`CopyButton.tsx`: `CopyField` in `FormFields`, `GeometryField`,
  * `ComplexField`; `CopyButton` in `ResultsView`); the request log is in the developer
- * section (`ProcessScreen`, `App.tsx`); My jobs has `structured` rows and
+ * section, unfolded there (`ProcessScreen`, `App.tsx`, `RequestLog` `open`); My jobs has `structured` rows and
  * "Run again" (`JobsPanel.tsx`, `JobFacts`; the inputs, kept in memory for
  * the visit, in `App.tsx`); a background job shows its link and can be left
  * for another process, and My jobs shows a job here (`ProcessScreen`,
@@ -72,8 +72,8 @@
 /* ------------------------------------------------- the rail, easier to read */
 
 /* Labels at 12px, not 10: the rail widens to hold them. */
-[data-variant="updated"] .app-rail {
-  width: 84px;
+[data-variant="updated"] {
+  --rail-width: 84px;
 }
 
 [data-variant="updated"] .rail-item,
