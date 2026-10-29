@@ -247,9 +247,9 @@ export function MapPane({
           active: true,
           tools: toolsFor(shapes.target),
           several: holdsSeveral(shapes.target),
-          // One area: drawing starts on "Add area" (#17); "Add box" stays a click away.
+          // Areas only, one or several (a Polygon or a MultiPolygon): drawing
+          // starts on "Add area" (#17); "Add box" stays a click away.
           startWith:
-            !holdsSeveral(shapes.target) &&
             drawableTypes(shapes.target).length === 1 &&
             drawableTypes(shapes.target)[0] === "Polygon"
               ? "Polygon"
