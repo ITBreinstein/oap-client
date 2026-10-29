@@ -8,9 +8,11 @@
  * because the standard's own bounding box is an `allOf` of the format hint and
  * a `$ref` to `bbox.yaml` (N1), and a complex input is a `oneOf` of encodings
  * (T3) — refusing either as an unsupported keyword would drop the two commonest
- * shapes in the testbed.
+ * shapes in the testbed. GeoJSON has three more such patterns, each bounded and
+ * named: a hint inside `allOf` (#G1), structure alone (#G3), and a `oneOf` of
+ * GeoJSON branches (#G2).
  *
- * This is deliberately not a JSON Schema implementation. Beyond those two
+ * This is deliberately not a JSON Schema implementation. Beyond those
  * recognised patterns, `allOf`, `anyOf`, `oneOf`, conditionals and remote
  * `$ref` are detected and refused, not approximated: a wrong control is worse
  * than an honest JSON editor, and the refusal is recorded as a finding.
@@ -418,6 +420,54 @@ const matchStructural: Matcher = (schema) => {
 };
 
 // ---------------------------------------------------------------------------
+// A oneOf of GeoJSON (#G2)
+
+/**
+ * One `oneOf` branch on its own: GeoJSON by format, `$ref`, `allOf` (#G1) or
+ * structure (#G3). Whatever it says must hold together, so a
+ * `format: "geojson-geometry"` branch whose `type` is `Polygon` is a polygon.
+ */
+function branchHint(branch: unknown): GeometryHint | undefined {
+  if (!isJsonObject(branch)) return undefined;
+  const hints = [ownHint(branch), allOfHint(branch), structuralHint(branch)].filter(
+    (hint): hint is GeometryHint => hint !== undefined,
+  );
+  return hints.length === 0 ? undefined : together(hints);
+}
+
+/**
+ * A `oneOf` whose every branch is GeoJSON in one wrapper — the Beleidsnormen
+ * API's `Polygon` or `MultiPolygon` — is one geometry input taking either.
+ * Branches in different wrappers are refused: the map would not know which to
+ * send.
+ */
+const matchGeoJsonOneOf: Matcher = (schema) => {
+  const branches = readArray(schema, "oneOf");
+  if (branches === undefined || branches.length === 0) return undefined;
+  if (COMPOSITION_KEYWORDS.some((keyword) => keyword !== "oneOf" && keyword in schema)) {
+    return undefined;
+  }
+  const hints: GeometryHint[] = [];
+  for (const branch of branches) {
+    const hint = branchHint(branch);
+    if (hint === undefined) return undefined;
+    hints.push(hint);
+  }
+  const [first] = hints;
+  if (first === undefined || !hints.every((hint) => hint.wrapper === first.wrapper)) {
+    return undefined;
+  }
+  return {
+    kind: "geometry",
+    wrapper: first.wrapper,
+    geometryTypes: GEOMETRY_TYPES.filter((type) =>
+      hints.some((hint) => hint.geometryTypes.includes(type)),
+    ),
+    recognisedBy: "oneOf-geojson",
+  };
+};
+
+// ---------------------------------------------------------------------------
 // Complex inputs: one value, alternative encodings (T3)
 
 /** What an encoding branch may carry. Anything else is a different kind of `oneOf`. */
@@ -658,6 +708,7 @@ export const MATCHERS: readonly Matcher[] = [
   matchBbox,
   matchGeometry,
   matchStructural,
+  matchGeoJsonOneOf,
   matchComplex,
   matchUnsupportedKeyword,
   matchConst,

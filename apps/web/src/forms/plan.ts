@@ -95,9 +95,11 @@ export interface GeometryControl {
  * - `ref`: a `$ref` to a GeoJSON schema document.
  * - `contentMediaType`: `application/geo+json` and nothing more.
  * - `allOf`: a format hint or `$ref` inside `allOf` (#G1).
+ * - `oneOf-geojson`: a `oneOf` whose every branch is GeoJSON (#G2).
  * - `structural`: an object whose `type` property names one GeoJSON type (#G3).
  */
-export type GeometryRecognisedBy = "format" | "ref" | "contentMediaType" | "allOf" | "structural";
+export type GeometryRecognisedBy =
+  "format" | "ref" | "contentMediaType" | "allOf" | "oneOf-geojson" | "structural";
 
 /** How many numbers a bounding box has: 2D is four, 3D is six (`bbox.yaml`). */
 export type BboxDimension = 4 | 6;

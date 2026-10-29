@@ -9,30 +9,30 @@ beleidsnormen/afstand_voorzieningen — needs area
   beleidsnormen/afstand_voorzieningen/nieuwe_basisschool → list<geometry (feature-collection, Point)>
   beleidsnormen/afstand_voorzieningen/nieuwe_sportvoorziening → list<geometry (feature-collection, Point)>
   beleidsnormen/afstand_voorzieningen/nieuwe_buurthuis → list<geometry (feature-collection, Point)>
-  beleidsnormen/afstand_voorzieningen/geometry → json [`oneOf` is outside the supported JSON Schema subset] · unsupported-keyword
-beleidsnormen/beleidsnorm — needs values
+  beleidsnormen/afstand_voorzieningen/geometry → geometry (geometry, Polygon|MultiPolygon) · map
+beleidsnormen/beleidsnorm — needs area
   beleidsnormen/beleidsnorm/beleidsnorm → list<json [`anyOf` is outside the supported JSON Schema subset]> · unsupported-keyword
   beleidsnormen/beleidsnorm/new_geometry_objects → list<json [`anyOf` is outside the supported JSON Schema subset]> · unsupported-keyword
-  beleidsnormen/beleidsnorm/geometry → json [`oneOf` is outside the supported JSON Schema subset] · unsupported-keyword
+  beleidsnormen/beleidsnorm/geometry → geometry (geometry, Polygon|MultiPolygon) · map
 beleidsnormen/echo — needs area
   beleidsnormen/echo/stringInput → text
   beleidsnormen/echo/arrayInput → list<number>
   beleidsnormen/echo/boundingBoxInput → bbox · map
   beleidsnormen/echo/mixedInput → json [`oneOf` is outside the supported JSON Schema subset] · unsupported-keyword
   beleidsnormen/echo/pause → number
-beleidsnormen/geluidsbelasting — needs values
-  beleidsnormen/geluidsbelasting/geometry → json [`oneOf` is outside the supported JSON Schema subset] · unsupported-keyword
+beleidsnormen/geluidsbelasting — needs area
+  beleidsnormen/geluidsbelasting/geometry → geometry (geometry, Polygon|MultiPolygon) · map
 beleidsnormen/laadmogelijkheden — needs area
   beleidsnormen/laadmogelijkheden/nieuwe_laadpalen → list<geometry (feature-collection, Point)>
   beleidsnormen/laadmogelijkheden/output_crs → list<select>
-  beleidsnormen/laadmogelijkheden/geometry → list<json [`oneOf` is outside the supported JSON Schema subset]> · unsupported-keyword
-beleidsnormen/oppervlakte_voorzieningen — needs values
+  beleidsnormen/laadmogelijkheden/geometry → list<geometry (geometry, Polygon|MultiPolygon)>
+beleidsnormen/oppervlakte_voorzieningen — needs area
   beleidsnormen/oppervlakte_voorzieningen/output_crs → select
   beleidsnormen/oppervlakte_voorzieningen/voorzieningstype → list<select>
   beleidsnormen/oppervlakte_voorzieningen/parameters → json [no control for type `object`] · unsupported-type
-  beleidsnormen/oppervlakte_voorzieningen/geometry → json [`oneOf` is outside the supported JSON Schema subset] · unsupported-keyword
-beleidsnormen/regel_30 — needs values
-  beleidsnormen/regel_30/geometry → json [`oneOf` is outside the supported JSON Schema subset] · unsupported-keyword
+  beleidsnormen/oppervlakte_voorzieningen/geometry → geometry (geometry, Polygon|MultiPolygon) · map
+beleidsnormen/regel_30 — needs area
+  beleidsnormen/regel_30/geometry → geometry (geometry, Polygon|MultiPolygon) · map
 beleidsnormen/regel_300 — needs area
   beleidsnormen/regel_300/output_crs → select
   beleidsnormen/regel_300/groenpercentage → number
@@ -43,23 +43,23 @@ beleidsnormen/regel_300 — needs area
   beleidsnormen/regel_300/nieuwe_grasvelden → list<geometry (feature-collection, Polygon|MultiPolygon)>
   beleidsnormen/regel_300/nieuwe_struiken → list<geometry (feature-collection, Polygon|MultiPolygon)>
   beleidsnormen/regel_300/nieuwe_bomen → list<geometry (feature-collection, Point|Polygon|MultiPolygon)>
-  beleidsnormen/regel_300/geometry → json [`oneOf` is outside the supported JSON Schema subset] · unsupported-keyword
+  beleidsnormen/regel_300/geometry → geometry (geometry, Polygon|MultiPolygon) · map
 beleidsnormen/rustplekken — needs area
   beleidsnormen/rustplekken/output_crs → select
   beleidsnormen/rustplekken/parameters → json [no control for type `object`] · unsupported-type
   beleidsnormen/rustplekken/nieuwe_bankjes → list<geometry (feature-collection, Point)>
-  beleidsnormen/rustplekken/geometry → json [`oneOf` is outside the supported JSON Schema subset] · unsupported-keyword
-beleidsnormen/stedelijkheid — needs values
+  beleidsnormen/rustplekken/geometry → geometry (geometry, Polygon|MultiPolygon) · map
+beleidsnormen/stedelijkheid — needs area
   beleidsnormen/stedelijkheid/output_crs → select
-  beleidsnormen/stedelijkheid/geometry → json [`oneOf` is outside the supported JSON Schema subset] · unsupported-keyword
-beleidsnormen/woningvoorraad — needs values
+  beleidsnormen/stedelijkheid/geometry → geometry (geometry, Polygon|MultiPolygon) · map
+beleidsnormen/woningvoorraad — needs area
   beleidsnormen/woningvoorraad/output_crs → select
-  beleidsnormen/woningvoorraad/geometry → json [`oneOf` is outside the supported JSON Schema subset] · unsupported-keyword
+  beleidsnormen/woningvoorraad/geometry → geometry (geometry, Polygon|MultiPolygon) · map
   beleidsnormen/woningvoorraad/parameters → list<json [no control for type `object`]> · unsupported-type
   beleidsnormen/woningvoorraad/woningtype → list<select>
-beleidsnormen/zonal_stats — needs values
+beleidsnormen/zonal_stats — needs area
   beleidsnormen/zonal_stats/statistiek → list<json [`oneOf` is outside the supported JSON Schema subset]> · unsupported-keyword
-  beleidsnormen/zonal_stats/geometry → json [`oneOf` is outside the supported JSON Schema subset] · unsupported-keyword
+  beleidsnormen/zonal_stats/geometry → geometry (geometry, Polygon|MultiPolygon) · map
 pygeoapi/breinstein-aerial — needs area
   pygeoapi/breinstein-aerial/area → geometry (geometry, Polygon) · map
 pygeoapi/breinstein-async-only — needs values

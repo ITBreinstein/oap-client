@@ -260,3 +260,66 @@ describe("#G3: GeoJSON told by its structure", () => {
     ).toMatchObject({ kind: "geometry", wrapper: "feature" });
   });
 });
+
+describe("#G2: a oneOf of GeoJSON geometries", () => {
+  it("reads the Beleidsnormen API's Polygon-or-MultiPolygon as one area input", () => {
+    const plan = resolveFormPlan(fixtureProcess("beleidsnormen/regel_30"));
+    expect(plan.fields[0]?.control).toEqual({
+      kind: "geometry",
+      wrapper: "geometry",
+      geometryTypes: ["Polygon", "MultiPolygon"],
+      recognisedBy: "oneOf-geojson",
+    });
+    expect(plan.diagnostics).toEqual([]);
+  });
+
+  it("keeps a repeatable one a list of them", () => {
+    const plan = resolveFormPlan(fixtureProcess("beleidsnormen/laadmogelijkheden"));
+    expect(plan.fields.find((field) => field.id === "geometry")?.control).toMatchObject({
+      kind: "list",
+      item: { kind: "geometry", geometryTypes: ["Polygon", "MultiPolygon"] },
+    });
+  });
+
+  it("counts a branch by its $ref, its allOf or its structure, too", () => {
+    expect(
+      controlFor({
+        oneOf: [
+          { $ref: "https://geojson.org/schema/Point.json" },
+          { allOf: [{ format: "geojson-linestring" }, { $ref: GEOMETRY_GEOJSON }] },
+          geometrySchema("Polygon"),
+        ],
+      }),
+    ).toMatchObject({
+      kind: "geometry",
+      wrapper: "geometry",
+      geometryTypes: ["Point", "LineString", "Polygon"],
+    });
+  });
+
+  it("refuses branches in different wrappers", () => {
+    const control = controlFor({
+      oneOf: [{ format: "geojson-polygon" }, { format: "geojson-feature" }],
+    });
+    expect(control.kind).toBe("json");
+  });
+
+  it("refuses a branch that says one thing by its format and another by its structure", () => {
+    const control = controlFor({
+      oneOf: [{ ...geometrySchema("Polygon"), format: "geojson-point" }],
+    });
+    expect(control.kind).toBe("json");
+  });
+
+  it("refuses a oneOf with any branch that is not GeoJSON", () => {
+    expect(controlFor({ oneOf: [geometrySchema("Point"), { type: "string" }] }).kind).toBe("json");
+  });
+
+  it("leaves named alternatives that are not geometries to the JSON editor", () => {
+    const plan = resolveFormPlan(fixtureProcess("beleidsnormen/zonal_stats"));
+    expect(plan.fields.find((field) => field.id === "statistiek")?.control).toMatchObject({
+      kind: "list",
+      item: { kind: "json" },
+    });
+  });
+});
