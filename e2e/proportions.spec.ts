@@ -285,6 +285,31 @@ test.describe("proportions", () => {
         await expect(log.locator("li").first()).toBeVisible();
       });
 
+      test("radios and checkboxes are in the main colour (#9)", async ({ page }) => {
+        await open(page, style);
+        const accent = await page.evaluate(() => {
+          // --accent resolved to a colour, as accent-color computes it.
+          const probe = document.createElement("span");
+          probe.style.color = "var(--accent)";
+          document.body.append(probe);
+          const colour = getComputedStyle(probe).color;
+          probe.remove();
+          return colour;
+        });
+        const radio = page.getByRole("radio", { name: /Reference pygeoapi/ });
+        expect(await radio.evaluate((input) => getComputedStyle(input).accentColor)).toBe(accent);
+        await connect(page);
+        await page.getByRole("button", { name: "Hello World", exact: true }).click();
+        const box = page.getByRole("checkbox", { name: "Run in the background" });
+        expect(await box.evaluate((input) => getComputedStyle(input).accentColor)).toBe(accent);
+        await page
+          .getByRole("banner")
+          .getByRole("button", { name: /Appearance/ })
+          .click();
+        const night = page.getByRole("radio", { name: "Off", exact: true });
+        expect(await night.evaluate((input) => getComputedStyle(input).accentColor)).toBe(accent);
+      });
+
       test("My jobs' buttons are one size (#4)", async ({ page }) => {
         await requireService(`${RELAY}/healthz`, "the relay");
         // Through the relay: only it can name a job pygeoapi starts for a page.

@@ -216,6 +216,9 @@ const PAIRS: readonly (readonly [string, string, number])[] = [
   ["--text", "--error-surface", 4.5],
   ["--field-border", "--field", 3],
   ["--field-border", "--surface", 3],
+  // A ticked radio or checkbox is filled with --accent (accent-color).
+  ["--accent", "--field", 3],
+  ["--accent", "--surface", 3],
   ["--focus", "--surface", 3],
   ["--focus", "--page", 3],
   ["--selected-line", "--surface", 3],

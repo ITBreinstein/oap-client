@@ -257,6 +257,11 @@
   line-height: 1.2;
 }
 
+/* Radios and checkboxes, ticked, in the main colour rather than the browser's blue. */
+[data-style="instrument"] {
+  accent-color: var(--accent);
+}
+
 /* One accent-filled control per screen: everything else is outlined. */
 [data-style="instrument"] button.secondary,
 [data-style="instrument"] a.button.secondary {
@@ -1016,7 +1021,6 @@
   [data-style="instrument"] .layout:not(.layout-single) .run-bar input[type="checkbox"] {
     width: 16px;
     height: 16px;
-    accent-color: var(--accent);
   }
 
   [data-style="instrument"] .layout:not(.layout-single) .run-hint {
