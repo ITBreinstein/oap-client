@@ -1,0 +1,74 @@
+{
+  "method": "POST",
+  "url": "https://ca-dtp-beleidsnormenapi-dev.mangosand-ad64f45c.westeurope.azurecontainerapps.io/api/processes/rustplekken/execution",
+  "headers": {
+    "Content-Type": "application/json",
+    "Accept": "application/json"
+  },
+  "body": {
+    "inputs": {
+      "geometry": {
+        "value": {
+          "type": "Polygon",
+          "coordinates": [
+            [
+              [
+                4.7417542,
+                52.6297588
+              ],
+              [
+                4.746185,
+                52.6297828
+              ],
+              [
+                4.7461457,
+                52.6324788
+              ],
+              [
+                4.7417147,
+                52.6324548
+              ],
+              [
+                4.7417542,
+                52.6297588
+              ]
+            ]
+          ]
+        },
+        "mediaType": "application/geo+json"
+      },
+      "nieuwe_bankjes": [
+        {
+          "value": {
+            "type": "FeatureCollection",
+            "features": [
+              {
+                "type": "Feature",
+                "properties": {},
+                "geometry": {
+                  "type": "Point",
+                  "coordinates": [
+                    4.744,
+                    52.6305
+                  ]
+                }
+              },
+              {
+                "type": "Feature",
+                "properties": {},
+                "geometry": {
+                  "type": "Point",
+                  "coordinates": [
+                    4.7452,
+                    52.6318
+                  ]
+                }
+              }
+            ]
+          },
+          "mediaType": "application/geo+json"
+        }
+      ]
+    }
+  }
+}

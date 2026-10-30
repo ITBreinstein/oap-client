@@ -103,29 +103,54 @@ const cases: readonly { name: string; schema: unknown; expected: Control }[] = [
   {
     name: "geojson-geometry format",
     schema: { format: "geojson-geometry" },
-    expected: { kind: "geometry", wrapper: "geometry", geometryTypes: ALL_GEOMETRIES },
+    expected: {
+      kind: "geometry",
+      wrapper: "geometry",
+      geometryTypes: ALL_GEOMETRIES,
+      recognisedBy: "format",
+    },
   },
   {
     name: "a single geometry type in the format",
     schema: { format: "geojson-polygon" },
-    expected: { kind: "geometry", wrapper: "geometry", geometryTypes: ["Polygon"] },
+    expected: {
+      kind: "geometry",
+      wrapper: "geometry",
+      geometryTypes: ["Polygon"],
+      recognisedBy: "format",
+    },
   },
   {
     name: "geojson-feature-collection format",
     schema: { format: "geojson-feature-collection" },
-    expected: { kind: "geometry", wrapper: "feature-collection", geometryTypes: ALL_GEOMETRIES },
+    expected: {
+      kind: "geometry",
+      wrapper: "feature-collection",
+      geometryTypes: ALL_GEOMETRIES,
+      recognisedBy: "format",
+    },
   },
   {
     name: "a $ref to the well-known geometry schema",
     schema: {
       $ref: "http://schemas.opengis.net/ogcapi/features/part1/1.0/openapi/schemas/geometryGeoJSON.yaml",
     },
-    expected: { kind: "geometry", wrapper: "geometry", geometryTypes: ALL_GEOMETRIES },
+    expected: {
+      kind: "geometry",
+      wrapper: "geometry",
+      geometryTypes: ALL_GEOMETRIES,
+      recognisedBy: "ref",
+    },
   },
   {
     name: "the GeoJSON media type alone",
     schema: { type: "object", contentMediaType: "application/geo+json" },
-    expected: { kind: "geometry", wrapper: "geometry", geometryTypes: ALL_GEOMETRIES },
+    expected: {
+      kind: "geometry",
+      wrapper: "geometry",
+      geometryTypes: ALL_GEOMETRIES,
+      recognisedBy: "contentMediaType",
+    },
   },
   {
     // Changed: the plan now also records the default CRS (R5) and the
@@ -169,7 +194,12 @@ describe("matcher chain", () => {
   it("resolves an array of geometries", () => {
     expect(controlFor({ type: "array", items: { format: "geojson-geometry" } })).toEqual({
       kind: "list",
-      item: { kind: "geometry", wrapper: "geometry", geometryTypes: ALL_GEOMETRIES },
+      item: {
+        kind: "geometry",
+        wrapper: "geometry",
+        geometryTypes: ALL_GEOMETRIES,
+        recognisedBy: "format",
+      },
     });
   });
 
@@ -432,7 +462,9 @@ describe("complex inputs (T3)", () => {
     expect(plan.diagnostics[0]).toMatchObject({ code: "unsupported-keyword", keyword: "oneOf" });
   });
 
-  it("refuses a oneOf with a $ref branch (the standard's own geometryInput)", () => {
+  it("draws for the GeoJSON branch of the standard's own geometryInput (#G2b, from the standard's example, not observed)", () => {
+    // Changed: this was refused as a JSON editor. One GeoJSON branch among
+    // text encodings is now a geometry control that names the other formats.
     const control = controlFor({
       oneOf: [
         { type: "string", contentMediaType: "application/gml+xml; version=3.2" },
@@ -446,7 +478,11 @@ describe("complex inputs (T3)", () => {
         },
       ],
     });
-    expect(control.kind).toBe("json");
+    expect(control).toMatchObject({
+      kind: "geometry",
+      recognisedBy: "oneOf-mixed",
+      otherFormats: ["application/gml+xml; version=3.2"],
+    });
   });
 
   it("refuses a oneOf of branches carrying anything but encoding keywords", () => {

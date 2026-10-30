@@ -42,6 +42,7 @@ function fakeEngine(): FakeEngine {
       return engine;
     },
     place: (tool) => calls.push(`place:${tool}`),
+    stopPlacing: () => calls.push("stop-placing"),
     show: (shapes) => calls.push(`show:${String(shapes.length)}`),
     deleteSelected: () => calls.push("delete"),
     onChange: (next) => {

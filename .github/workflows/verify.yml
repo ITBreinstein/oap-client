@@ -7,8 +7,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
+      # Node is pinned to the exact version, in every workflow: a floating `24`
+      # moved to 24.22.1 on 2026-10-29 and broke a relay streaming test that
+      # passed on 24.21.0. Move the pin on purpose, with the suite green.
       - uses: actions/setup-node@v4
-        with: { node-version: 24, cache: pnpm }
+        with: { node-version: 24.21.0, cache: pnpm }
       - run: pnpm install --frozen-lockfile
       - run: pnpm verify
       - run: pnpm test:smoke
@@ -42,7 +45,7 @@ jobs:
         with: { node-version: 18 }
       - run: echo "SMOKE_NODE=$(command -v node)" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
-        with: { node-version: 24, cache: pnpm }
+        with: { node-version: 24.21.0, cache: pnpm }
       - run: pnpm install --frozen-lockfile
       - run: pnpm test:smoke
 
