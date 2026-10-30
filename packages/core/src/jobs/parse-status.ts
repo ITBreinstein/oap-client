@@ -25,31 +25,17 @@ import { collectLinks, readBodyLinks, resolveBodyLinks } from "../links/resolve.
 import { MalformedJobDocumentError } from "../errors.js";
 import type { ObservationSink } from "../observations.js";
 import { isTerminalState, toJobState, type JobState, type JobStatus } from "./types.js";
+import { JOB_DOCUMENT_MEMBERS } from "../vocabulary/job-status.js";
 
-/**
- * Top-level members this layer models. Anything else is recorded by name —
- * vendor extension or v2 draft, and either way not something to drop silently.
+/*
+ * The members this layer models are `JOB_DOCUMENT_MEMBERS`, shared with the
+ * execution classifier. Anything else is recorded by name — vendor extension
+ * or draft, and either way not something to drop silently.
  *
  * pygeoapi's `parameters` is the live example: it appears on every job document
  * and is always `null`, and it is not in the standard's `statusInfo`. It shows
  * up in `unrecognisedKeys`, which is the point of the list.
  */
-const KNOWN_MEMBERS: ReadonlySet<string> = new Set([
-  "jobID",
-  "id",
-  "status",
-  "message",
-  "created",
-  "started",
-  "finished",
-  "updated",
-  "progress",
-  "percentCompleted",
-  "processID",
-  "type",
-  "links",
-  "exception",
-]);
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -186,6 +172,10 @@ export function parseJobStatus(body: unknown, options: ParseJobStatusOptions): J
   if (jobId === undefined) warnings.push("no-job-id");
 
   const processId = stringOrUndefined(body["processID"]);
+  // 1.0's `type` and the draft's `processingEntityType`, each as sent: Weaver
+  // sends both, pygeoapi and ZOO only `type`.
+  const type = stringOrUndefined(body["type"]);
+  const processingEntityType = stringOrUndefined(body["processingEntityType"]);
   const progress = readProgress(body, warnings);
   const message = stringOrUndefined(body["message"]);
   const exception = readException(body);
@@ -199,7 +189,7 @@ export function parseJobStatus(body: unknown, options: ParseJobStatusOptions): J
         resolveBodyLinks(documentUrl, rawLinks, options.sink)
       : collectLinks(options.envelope, rawLinks, options.sink);
 
-  const unrecognisedKeys = Object.keys(body).filter((key) => !KNOWN_MEMBERS.has(key));
+  const unrecognisedKeys = Object.keys(body).filter((key) => !JOB_DOCUMENT_MEMBERS.has(key));
 
   return {
     // A job with no discoverable id is still a job worth showing; the empty
@@ -209,6 +199,8 @@ export function parseJobStatus(body: unknown, options: ParseJobStatusOptions): J
     rawStatus,
     statusRecognised: recognised,
     ...(processId === undefined ? {} : { processId }),
+    ...(type === undefined ? {} : { type }),
+    ...(processingEntityType === undefined ? {} : { processingEntityType }),
     ...(progress === undefined ? {} : { progress }),
     ...(message === undefined ? {} : { message }),
     ...readTimestamps(body),

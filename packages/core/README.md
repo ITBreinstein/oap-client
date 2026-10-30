@@ -795,6 +795,172 @@ jobs and let them pick. Until a server sends
 `Access-Control-Expose-Headers: Location`, asynchronous execution needs either
 that recovery or the relay.
 
+## Versions
+
+The client speaks **OGC API - Processes - Part 1: Core 1.0.0**, the published
+standard, and the **2.0 draft** (OGC 18-062r3), and chooses between them per
+service, before it sends anything.
+
+**"2.0" here means the draft at one commit:**
+[`756b659`](https://github.com/opengeospatial/ogcapi-processes/tree/756b65935bee47ebc4b460ab8213a7fb378af542/core)
+of `opengeospatial/ogcapi-processes`, 2026-10-20. It is called `"2.0-draft"`
+everywhere in the API, because it is not a published standard and is still
+moving. Every difference the client acts on is in one dated module,
+`src/compat/processes-2.0-draft.ts`, which names that commit; when the draft
+moves, that file is what gets re-read.
+
+### How the version is chosen
+
+From the conformance declaration, once per client:
+
+| The service declares                       | The client speaks | `versionSource` |
+| ------------------------------------------ | ----------------- | --------------- |
+| `…/ogcapi-processes-1/2.0/conf/core`       | `2.0-draft`       | `declared`      |
+| that and `…/1.0/conf/core` (Weaver does)   | `2.0-draft`       | `declared`      |
+| `…/ogcapi-processes-1/1.0/conf/core`       | `1.0`             | `declared`      |
+| neither, or no readable conformance at all | `1.0`             | `default`       |
+
+Either scheme counts: the draft writes its classes with `https://`, its own
+example and Weaver with `http://`. Pin a version with
+`createClient({ baseUrl, protocolVersion: "1.0" })` (or `"2.0-draft"`), and
+`versionSource` is `configured`. The choice is on
+`ServiceCapabilities.protocolVersion` and `versionSource`, beside
+`declaredVersions`, and on every `execution` and `capabilities-derived`
+observation.
+
+**Fallback is a choice, never a retry.** Executing is not idempotent: a
+request sent as the draft and then re-sent as 1.0 may have started two jobs.
+So "falls back to 1.0" means only that 1.0 is chosen when the draft is not
+declared.
+
+### What differs on the wire
+
+Only the execute body. `ExecuteOptions` keeps 1.0's words for callers, and the
+client translates them for the draft:
+
+| You ask                        | 1.0 sends                | The draft sends                                             |
+| ------------------------------ | ------------------------ | ----------------------------------------------------------- |
+| nothing (the usual case)       | `inputs`, your `outputs` | the same: nothing extra                                     |
+| `response: "raw"`              | `response: "raw"`        | no `response`; needs exactly one output, with `maxOccurs` 1 |
+| `response: "document"`         | `response: "document"`   | no `response`; needs two or more outputs                    |
+| an output's `transmissionMode` | `transmissionMode`       | nothing: the draft has no such member                       |
+
+In the draft the number of requested outputs decides the answer's shape — one
+output with `maxOccurs` 1 comes back as its value
+(`/req/core/process-execute-sync-one`), two or more as a results document
+(`/req/core/process-execute-sync-many-json`) — so `raw` and `document` are kept
+by checking that count. A request the draft cannot express — `document` for
+one output, `raw` for several or for an output with `maxOccurs` above 1, any
+`transmissionMode` — throws `DraftUnsupportedRequestError` **before anything
+is sent**, naming the intent and the reason. It is never dropped silently.
+
+Headers are the same in both: `Prefer: respond-async` for an asynchronous run,
+and nothing for a synchronous one. No `return=` and no profile negotiation are
+sent.
+
+Called on its own, `execute()` does not translate, but it does guard: given
+`version` the 2.0 draft, it refuses options that still carry `response` or any
+`transmissionMode`, with `DraftUnsupportedRequestError`, before sending. Pass
+the options through `draftExecuteOptions()` first, and the version as
+`version`, as the client does.
+
+### What is read, whatever the version
+
+What comes back is classified by what arrives, so these hold for every
+server:
+
+- **Outputs' `minOccurs`/`maxOccurs`.** New in the draft, read by the inputs'
+  rules, 1 when absent. The draft states no requirement for an output's
+  default; it is the `default: 1` of `schemaAndOccurrences.yaml`, which inputs
+  and outputs share.
+- **The status document's new members.** `processingEntityType` is read beside
+  1.0's `type`, and `id` beside `jobID`. `profileEntityType`, `request`,
+  `title`, `description`, `keywords` and `metadata` are known members, no
+  longer recorded as unrecognised. The draft adds no status values.
+- **Exception types.** `ProblemDetails.ogcException` names
+  `no-such-process`, `no-such-job`, `result-not-ready`, and the draft's
+  `result-not-available` and `no-such-output`, whether the `type` is written
+  `http://` or `https://`.
+- **`Preference-Applied`.** Its tokens are recorded as written, on the
+  `execution` observation's `preferenceAppliedTokens`.
+
+### Tested against
+
+**Weaver**, `pavics/weaver:latest-manager@sha256:5413e646…` (6.16.0 plus
+master), the one server found that declares the draft's Core class; ZOO-Project
+and pygeoapi (0.24.0 and master) declare 1.0 only. See
+`infra/compose/weaver.yml` and `test/fixtures/weaver/`.
+
+**Has a run succeeded against a 2.0 server?** As of 2026-10-23:
+
+- **From this core, in Node: yes**, with Weaver's builtin `EchoProcess` and
+  the inputs Weaver's own example uses. Synchronous with one output (`raw`:
+  the value, `text/plain`), synchronous with every output (`document`: a
+  results map), and asynchronous with every output (`201`, the job
+  `successful`, its results read with a 200). **Only with an
+  `Accept-Language` other than `*`.** Node's `fetch` sends `*` by default,
+  and Weaver answers that with a 406; the core does not change the header,
+  so a caller in Node passes a `fetch` that sets it, keeping the core's own:
+
+  ```ts
+  import { createClient, type FetchLike } from "@breinstein/oap-client";
+
+  const withLanguage: FetchLike = (input, init) => {
+    const headers = new Headers(init?.headers); // the core's headers, kept
+    headers.set("Accept-Language", "en");
+    return fetch(input, { ...init, headers });
+  };
+
+  const client = createClient({ baseUrl: "http://localhost:5100", fetch: withLanguage });
+  ```
+
+  `test/http/accept-language-example.test.ts` runs this code and checks that
+  `Content-Type` and `Prefer` still go out with it.
+
+- **From the web app, in a browser: no.** The version is chosen and the
+  request is sent in the draft's form, but Weaver refuses the request a form
+  generated from `EchoProcess`'s description sends (a 422; see below), and
+  `EchoProcess` is the only process this image runs. A minimal CWL process
+  deployed without a `DockerRequirement` would have been the way round that;
+  Weaver refuses to deploy one, with a 422 naming the requirements it
+  insists on (`DockerRequirement`, or a builtin or remote one).
+
+Where Weaver differs from the pinned draft:
+
+- An asynchronous job that asked for **one** output answers `GET …/results`
+  with a 500. With every output asked for, it answers 200.
+- Its outputs declare no `maxOccurs`, so each has one value by the draft's
+  default, and two of them come back as arrays.
+- Its process descriptions still carry `outputTransmission`, which the draft
+  removed.
+- Its status document carries both versions' members and names 1.0's
+  `statusInfo.yaml` as its `$schema`.
+- It sends no CORS headers, and answers a preflight with 405: a browser
+  reaches it only through the relay's read route.
+- It answers `Accept-Language: *`, which means any language, with a 406.
+  The example above is the way round it.
+- `EchoProcess` declares `arrayInput` and `geometryInput` with `maxOccurs`
+  above 1 **and** an array schema, which the draft's cardinality section
+  encodes as arrays of arrays; Weaver refuses those with a 422 and accepts
+  only the flat form. The standard's own example process declares neither
+  input that way. So a client that follows the draft can't run Weaver's own
+  example process.
+
+### Not supported
+
+- `Prefer: return=minimal|representation`, which in the draft only chooses
+  between inline values and links inside a JSON document, as a recommendation.
+- Content negotiation by profile (`ogc-results`, `ogc-values`).
+- The per-output endpoints, `/jobs/{jobID}/results/{outputID}[/{N}]`.
+- Parts 2, 3 and 4: deploying processes, workflows and job management.
+
+**Known limit:** the relay's asynchronous execute route sends a fixed
+`Prefer: respond-async`, so a `return=` preference would not pass through it.
+The client sends none, so nothing is lost today.
+
+Open issues on the draft that touch what is read here: #450 (`jobID` or `id`),
+#618 (`http` or `https` URIs), #619 (exception types) and #620 (dismissal).
+
 ## Supported environments
 
 - **ESM only.** No CommonJS build is published. There is no `main` field — a CJS

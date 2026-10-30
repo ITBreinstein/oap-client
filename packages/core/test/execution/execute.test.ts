@@ -8,7 +8,11 @@
 
 import { describe, expect, it, vi } from "vitest";
 import { execute } from "../../src/execution/execute.js";
-import { AmbiguousExecutionResponseError, ExecutionTimeoutError } from "../../src/errors.js";
+import {
+  AmbiguousExecutionResponseError,
+  DraftUnsupportedRequestError,
+  ExecutionTimeoutError,
+} from "../../src/errors.js";
 import { AbortError, ProcessesError } from "../../src/http/errors.js";
 import { parseDescription } from "../../src/processes/parse-description.js";
 import type { ProcessDescription } from "../../src/processes/types.js";
@@ -606,6 +610,156 @@ describe("the observation", () => {
       expect(executionRecord(answered.seen)).toHaveProperty("crossOrigin", undefined);
     } finally {
       vi.unstubAllGlobals();
+    }
+  });
+
+  it("records the version as 1.0 by default when it was not told one", async () => {
+    const { sink, seen } = collect();
+    await execute(LIST, "hello-world", {
+      inputs: {},
+      fetch: fakeFetch(json({ value: 1 })).fetch,
+      onObservation: sink,
+    });
+    expect(executionRecord(seen)).toMatchObject({
+      protocolVersion: "1.0",
+      versionSource: "default",
+    });
+  });
+
+  it("records the version it was told, and where that came from", async () => {
+    const { sink, seen } = collect();
+    await execute(LIST, "hello-world", {
+      inputs: {},
+      version: { version: "2.0-draft", source: "declared" },
+      fetch: fakeFetch(json({ value: 1 })).fetch,
+      onObservation: sink,
+    });
+    expect(executionRecord(seen)).toMatchObject({
+      protocolVersion: "2.0-draft",
+      versionSource: "declared",
+    });
+  });
+
+  it("records the media type asked for each output that names one, and nothing else", async () => {
+    const { sink, seen } = collect();
+    await execute(LIST, "p", {
+      inputs: {},
+      outputs: {
+        area: { format: { mediaType: "application/geo+json" } },
+        table: {},
+      },
+      fetch: fakeFetch(json({ value: 1 })).fetch,
+      onObservation: sink,
+    });
+    expect(executionRecord(seen).formatRequested).toEqual({ area: "application/geo+json" });
+
+    const none = collect();
+    await execute(LIST, "p", {
+      inputs: {},
+      outputs: { table: {} },
+      fetch: fakeFetch(json({ value: 1 })).fetch,
+      onObservation: none.sink,
+    });
+    expect(executionRecord(none.seen).formatRequested).toBeUndefined();
+  });
+
+  it("records the Preference-Applied tokens as sent", async () => {
+    const { sink, seen } = collect();
+    // pygeoapi 0.24.0 and master: `wait`, on a synchronous answer.
+    await execute(LIST, "hello-world", {
+      inputs: {},
+      fetch: fakeFetch(json({ value: 1 }, 200, { "Preference-Applied": "wait" })).fetch,
+      onObservation: sink,
+    });
+    expect(executionRecord(seen).preferenceAppliedTokens).toEqual(["wait"]);
+
+    const async = collect();
+    await execute(LIST, "hello-world", {
+      inputs: {},
+      mode: "async",
+      fetch: fakeFetch(
+        json({ jobID: "j", status: "accepted" }, 201, {
+          Location: "https://service.test/oapi/jobs/j",
+          "Preference-Applied": "respond-async, return=representation",
+        }),
+      ).fetch,
+      onObservation: async.sink,
+    });
+    expect(executionRecord(async.seen).preferenceAppliedTokens).toEqual([
+      "respond-async",
+      "return=representation",
+    ]);
+  });
+
+  it("records no tokens when there was no header", async () => {
+    const { sink, seen } = collect();
+    await execute(LIST, "hello-world", {
+      inputs: {},
+      fetch: fakeFetch(json({ value: 1 })).fetch,
+      onObservation: sink,
+    });
+    expect(executionRecord(seen).preferenceAppliedTokens).toBeUndefined();
+  });
+});
+
+describe("execute() on its own, told the 2.0 draft: a guard, not a translation", () => {
+  const draft = { version: "2.0-draft", source: "configured" } as const;
+
+  it("refuses 1.0's response member before sending anything", async () => {
+    const fake = fakeFetch(json({ value: 1 }));
+    const outcome = await execute(LIST, "p", {
+      inputs: {},
+      outputs: { a: {} },
+      response: "raw",
+      version: draft,
+      fetch: fake.fetch,
+    }).catch((error: unknown) => error);
+    expect(outcome).toBeInstanceOf(DraftUnsupportedRequestError);
+    expect(outcome).toMatchObject({ intent: "raw", reason: "response-not-in-draft" });
+    expect(fake.calls).toEqual([]);
+  });
+
+  it("refuses any transmissionMode before sending anything, value as well as reference", async () => {
+    for (const transmissionMode of ["value", "reference"] as const) {
+      const fake = fakeFetch(json({ value: 1 }));
+      const outcome = await execute(LIST, "p", {
+        inputs: {},
+        outputs: { a: {}, b: { transmissionMode } },
+        version: draft,
+        fetch: fake.fetch,
+      }).catch((error: unknown) => error);
+      expect(outcome).toMatchObject({
+        intent: transmissionMode,
+        reason: "no-transmission-mode",
+        outputIds: ["b"],
+      });
+      expect(fake.calls).toEqual([]);
+    }
+  });
+
+  it("sends a request with neither, as it is", async () => {
+    const fake = fakeFetch(json({ value: 1 }));
+    await execute(LIST, "p", {
+      inputs: {},
+      outputs: { a: {}, b: {} },
+      version: draft,
+      fetch: fake.fetch,
+    });
+    expect(fake.calls[0]?.init.body).toBe(
+      JSON.stringify({ inputs: {}, outputs: { a: {}, b: {} } }),
+    );
+  });
+
+  it("sends 1.0's response member when told 1.0, or nothing", async () => {
+    for (const version of [{ version: "1.0", source: "declared" } as const, undefined]) {
+      const fake = fakeFetch(json({ value: 1 }));
+      await execute(LIST, "p", {
+        inputs: {},
+        response: "document",
+        version,
+        fetch: fake.fetch,
+      });
+      expect(fake.calls[0]?.init.body).toBe(JSON.stringify({ inputs: {}, response: "document" }));
     }
   });
 });

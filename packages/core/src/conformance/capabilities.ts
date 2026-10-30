@@ -13,6 +13,12 @@
  */
 
 import type { ParsedConformance } from "./parse.js";
+import { chooseProtocolVersion, declaredCoreVersions } from "./version.js";
+import type {
+  ProtocolVersion,
+  ProtocolVersionPreference,
+  VersionSource,
+} from "../vocabulary/protocol-version.js";
 
 /** The specification family these capabilities are read from. */
 const PROCESSES_FAMILY = "ogcapi-processes";
@@ -68,6 +74,18 @@ export interface ServiceCapabilities {
    * the server that needs it.
    */
   readonly jobList: boolean;
+  /**
+   * The version of Part 1 the client speaks to this service, chosen before
+   * anything is sent. See `conformance/version.ts` for the rules.
+   */
+  readonly protocolVersion: ProtocolVersion;
+  /** Whether {@link protocolVersion} was declared, assumed, or configured. */
+  readonly versionSource: VersionSource;
+  /**
+   * The versions of Part 1 whose Core class the service declared (`"1.0"`,
+   * `"2.0"`), whatever was chosen. Weaver declares both.
+   */
+  readonly declaredVersions: readonly string[];
   /** Every URI as received, including ones we could not parse. */
   readonly rawConformance: readonly string[];
 }
@@ -89,8 +107,12 @@ function declares(parsed: ParsedConformance, name: string): boolean {
  * findings this project exists to collect — and a client that refuses to try
  * would never discover it.
  */
-export function deriveCapabilities(parsed: ParsedConformance): ServiceCapabilities {
+export function deriveCapabilities(
+  parsed: ParsedConformance,
+  preference: ProtocolVersionPreference = "auto",
+): ServiceCapabilities {
   const core = declares(parsed, "core");
+  const { version, source } = chooseProtocolVersion(parsed, preference);
 
   return {
     sync: core,
@@ -98,6 +120,9 @@ export function deriveCapabilities(parsed: ParsedConformance): ServiceCapabiliti
     dismiss: declares(parsed, "dismiss"),
     callback: declares(parsed, "callback"),
     jobList: declares(parsed, "job-list"),
+    protocolVersion: version,
+    versionSource: source,
+    declaredVersions: declaredCoreVersions(parsed),
     rawConformance: parsed.raw,
   };
 }
@@ -109,13 +134,19 @@ export function deriveCapabilities(parsed: ParsedConformance): ServiceCapabiliti
  * Degraded, not dead. The caller can still list processes — and a UI that greys
  * out every optional button is a far better outcome than discovery throwing.
  */
-export function unknownCapabilities(): ServiceCapabilities {
+export function unknownCapabilities(
+  preference: ProtocolVersionPreference = "auto",
+): ServiceCapabilities {
+  const { version, source } = chooseProtocolVersion(undefined, preference);
   return {
     sync: false,
     async: false,
     dismiss: false,
     callback: false,
     jobList: false,
+    protocolVersion: version,
+    versionSource: source,
+    declaredVersions: Object.freeze([]),
     rawConformance: Object.freeze([]),
   };
 }

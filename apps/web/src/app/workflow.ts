@@ -28,6 +28,7 @@ import type {
   ExecutionMode,
   ProcessDescription,
   ProcessList,
+  ProtocolVersionPreference,
   ServiceDescription,
 } from "@breinstein/oap-client";
 import type { FormValues } from "../forms/encode.js";
@@ -51,8 +52,14 @@ export type EndpointRef =
       readonly callbacks: boolean;
       /** The process ids to list, when the configuration names some. Absent: all. */
       readonly processes?: readonly string[] | undefined;
+      /** A pin from `config.json`'s preset of this address; see `protocol-version.ts`. */
+      readonly protocolVersion?: ProtocolVersionPreference | undefined;
     }
-  | { readonly source: "typed"; readonly baseUrl: string };
+  | {
+      readonly source: "typed";
+      readonly baseUrl: string;
+      readonly protocolVersion?: ProtocolVersionPreference | undefined;
+    };
 
 /** Said to the user. What happened, and what to do next (T11). */
 export interface WorkflowError {

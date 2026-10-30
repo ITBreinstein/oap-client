@@ -112,6 +112,15 @@ export type Observation =
       readonly dismiss: boolean;
       readonly callback: boolean;
       readonly jobList: boolean;
+      /**
+       * The version of Part 1 the client will speak, chosen before anything is
+       * sent. Spelled out rather than imported, so this module stays a leaf.
+       */
+      readonly protocolVersion: "1.0" | "2.0-draft";
+      /** `declared`, `default` (nothing usable declared) or `configured` (pinned by the caller). */
+      readonly versionSource: "declared" | "default" | "configured";
+      /** The versions whose Core class the service declared, e.g. `["1.0", "2.0"]`. */
+      readonly declaredVersions: readonly string[];
     }
   | {
       readonly kind: "link-skipped";
@@ -222,6 +231,19 @@ export type Observation =
        * correlation visible in the matrix rather than only in a stack trace.
        */
       readonly outputsSupplied: boolean;
+      /**
+       * The version of Part 1 the request was written in, and why: `declared`
+       * by the service, the `default` for want of a declaration, or
+       * `configured` by the caller. Spelled out rather than imported, so this
+       * module stays a leaf.
+       */
+      readonly protocolVersion: "1.0" | "2.0-draft";
+      readonly versionSource: "declared" | "default" | "configured";
+      /**
+       * Output id to the media type asked for it, for each output whose
+       * selection named one; undefined when none did.
+       */
+      readonly formatRequested: Readonly<Record<string, string>> | undefined;
       readonly status: number | undefined;
       readonly mediaType: string | undefined;
       /**
@@ -247,6 +269,12 @@ export type Observation =
        * means "not sent, or hidden".
        */
       readonly preferenceAppliedHeader: boolean | undefined;
+      /**
+       * The header's tokens as written (`respond-async`, `return=minimal`,
+       * `wait`), when it was readable; undefined when it was not, or no
+       * response arrived.
+       */
+      readonly preferenceAppliedTokens: readonly string[] | undefined;
       /** Which route reached the job. Undefined unless one was created. */
       readonly discoveredVia: "location-header" | "body-link" | undefined;
       /**

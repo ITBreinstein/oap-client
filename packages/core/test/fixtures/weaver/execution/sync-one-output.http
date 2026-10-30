@@ -1,0 +1,51 @@
+HTTP/1.1 200 OK
+Server: gunicorn
+Date: Fri, 23 Oct 2026 10:43:14 GMT
+Connection: close
+Content-Type: text/plain; charset=UTF-8
+Content-Length: 6
+Content-Location: http://localhost:5100/processes/EchoProcess/jobs/8bfe86ef-7a15-4c63-8b79-8b2adcafdab5/results
+Link: <http://localhost:5100/processes/EchoProcess/jobs/8bfe86ef-7a15-4c63-8b79-8b2adcafdab5>; rel="status"; type="application/json"; title="Job status."; hreflang=en-CA
+Link: <http://localhost:5100/processes/EchoProcess/jobs/8bfe86ef-7a15-4c63-8b79-8b2adcafdab5>; rel="monitor"; type="application/json"; title="Job monitoring location."; hreflang=en-CA
+Link: <http://localhost:5100/jobs/8bfe86ef-7a15-4c63-8b79-8b2adcafdab5?f=json>; rel="alternate"; type="application/json"; title="Job status generic endpoint."; hreflang=en-CA
+Link: <http://localhost:5100/jobs>; rel="https://www.opengis.net/def/rel/ogc/1.0/job-list"; type="application/json"; title="List of submitted jobs."; hreflang=en-CA
+Link: <http://localhost:5100/processes/EchoProcess/jobs/execution>; rel="https://www.opengis.net/def/rel/ogc/1.0/execute"; type="application/json"; title="New job submission endpoint for the corresponding process."; hreflang=en-CA
+Link: <http://localhost:5100/processes/EchoProcess/jobs/8bfe86ef-7a15-4c63-8b79-8b2adcafdab5/definition>; rel="definition"; type="application/json"; title="Submitted job inputs, selected outputs, and parametrization for process execution."; hreflang=en-CA
+Link: <http://localhost:5100/jobs/8bfe86ef-7a15-4c63-8b79-8b2adcafdab5?f=html>; rel="alternate"; type="text/html"; title="HTML Job Status"; hreflang=en-CA
+Link: <http://localhost:5100/processes/EchoProcess/jobs/8bfe86ef-7a15-4c63-8b79-8b2adcafdab5/outputs>; rel="outputs"; type="application/json"; title="Job outputs of successful process execution (extended outputs with metadata)."; hreflang=en-CA
+Link: <http://localhost:5100/processes/EchoProcess/jobs/8bfe86ef-7a15-4c63-8b79-8b2adcafdab5/results>; rel="https://www.opengis.net/def/rel/ogc/1.0/results"; type="application/json"; title="Job results of successful process execution (direct output values mapping)."; hreflang=en-CA
+Link: <http://localhost:5100/processes/EchoProcess/jobs/8bfe86ef-7a15-4c63-8b79-8b2adcafdab5/statistics>; rel="statistics"; type="application/json"; title="Job statistics collected following process execution."; hreflang=en-CA
+Link: <http://localhost:5100/processes/EchoProcess/jobs/8bfe86ef-7a15-4c63-8b79-8b2adcafdab5/prov>; rel="provenance"; type="application/json"; title="Job provenance collected following process execution."; hreflang=en-CA
+Link: <http://localhost:5100/processes/EchoProcess/jobs/8bfe86ef-7a15-4c63-8b79-8b2adcafdab5/prov?f=PROV-TURTLE>; rel="https://www.w3.org/ns/prov"; type="text/turtle"; title="Job provenance collected following process execution."; hreflang=en-CA
+Link: <http://localhost:5100/processes/EchoProcess/jobs/8bfe86ef-7a15-4c63-8b79-8b2adcafdab5/prov?f=PROV-XML>; rel="https://www.w3.org/ns/prov"; type="application/provenance+xml"; title="Job provenance collected following process execution."; hreflang=en-CA
+Link: <http://localhost:5100/processes/EchoProcess/jobs/8bfe86ef-7a15-4c63-8b79-8b2adcafdab5/prov?f=PROV-JSONLD>; rel="https://www.w3.org/ns/prov"; type="application/ld+json"; title="Job provenance collected following process execution."; hreflang=en-CA
+Link: <http://localhost:5100/processes/EchoProcess/jobs/8bfe86ef-7a15-4c63-8b79-8b2adcafdab5/prov?f=PROV-JSON>; rel="https://www.w3.org/ns/prov"; type="application/provenance+json"; title="Job provenance collected following process execution."; hreflang=en-CA
+Link: <http://localhost:5100/processes/EchoProcess/jobs/8bfe86ef-7a15-4c63-8b79-8b2adcafdab5/prov?f=PROV-N>; rel="https://www.w3.org/ns/prov"; type="text/provenance-notation"; title="Job provenance collected following process execution."; hreflang=en-CA
+Link: <http://localhost:5100/processes/EchoProcess/jobs/8bfe86ef-7a15-4c63-8b79-8b2adcafdab5/prov?f=PROV-NT>; rel="https://www.w3.org/ns/prov"; type="application/n-triples"; title="Job provenance collected following process execution."; hreflang=en-CA
+Link: <http://localhost:5100/processes/EchoProcess/jobs/8bfe86ef-7a15-4c63-8b79-8b2adcafdab5/results/arrayOutput?f=application/json>; rel="output"; type="application/json"; title="Link to job 'arrayOutput' result in 'application/json'"; hreflang=en-CA
+Link: <http://localhost:5100/processes/EchoProcess/jobs/8bfe86ef-7a15-4c63-8b79-8b2adcafdab5/results/arrayOutput?f=text/csv>; rel="output"; type="text/csv"; title="Link to job 'arrayOutput' result in 'text/csv'"; hreflang=en-CA
+Link: <http://localhost:5100/processes/EchoProcess/jobs/8bfe86ef-7a15-4c63-8b79-8b2adcafdab5/results/arrayOutput?f=application/xml>; rel="output"; type="application/xml"; title="Link to job 'arrayOutput' result in 'application/xml'"; hreflang=en-CA
+Link: <http://localhost:5100/processes/EchoProcess/jobs/8bfe86ef-7a15-4c63-8b79-8b2adcafdab5/results/arrayOutput?f=application/yaml>; rel="output"; type="application/yaml"; title="Link to job 'arrayOutput' result in 'application/yaml'"; hreflang=en-CA
+Link: <http://localhost:5100/processes/EchoProcess/jobs/8bfe86ef-7a15-4c63-8b79-8b2adcafdab5/results/complexObjectOutput?f=application/json>; rel="output"; type="application/json"; title="Link to job 'complexObjectOutput' result in 'application/json'"; hreflang=en-CA
+Link: <http://localhost:5100/processes/EchoProcess/jobs/8bfe86ef-7a15-4c63-8b79-8b2adcafdab5/results/complexObjectOutput?f=text/csv>; rel="output"; type="text/csv"; title="Link to job 'complexObjectOutput' result in 'text/csv'"; hreflang=en-CA
+Link: <http://localhost:5100/processes/EchoProcess/jobs/8bfe86ef-7a15-4c63-8b79-8b2adcafdab5/results/complexObjectOutput?f=application/xml>; rel="output"; type="application/xml"; title="Link to job 'complexObjectOutput' result in 'application/xml'"; hreflang=en-CA
+Link: <http://localhost:5100/processes/EchoProcess/jobs/8bfe86ef-7a15-4c63-8b79-8b2adcafdab5/results/complexObjectOutput?f=application/yaml>; rel="output"; type="application/yaml"; title="Link to job 'complexObjectOutput' result in 'application/yaml'"; hreflang=en-CA
+Link: <http://localhost:5100/processes/EchoProcess/jobs/8bfe86ef-7a15-4c63-8b79-8b2adcafdab5/results/geometryOutput?f=application/json>; rel="output"; type="application/json"; title="Link to job 'geometryOutput' result in 'application/json'"; hreflang=en-CA
+Link: <http://localhost:5100/processes/EchoProcess/jobs/8bfe86ef-7a15-4c63-8b79-8b2adcafdab5/results/geometryOutput?f=text/csv>; rel="output"; type="text/csv"; title="Link to job 'geometryOutput' result in 'text/csv'"; hreflang=en-CA
+Link: <http://localhost:5100/processes/EchoProcess/jobs/8bfe86ef-7a15-4c63-8b79-8b2adcafdab5/results/geometryOutput?f=application/xml>; rel="output"; type="application/xml"; title="Link to job 'geometryOutput' result in 'application/xml'"; hreflang=en-CA
+Link: <http://localhost:5100/processes/EchoProcess/jobs/8bfe86ef-7a15-4c63-8b79-8b2adcafdab5/results/geometryOutput?f=application/yaml>; rel="output"; type="application/yaml"; title="Link to job 'geometryOutput' result in 'application/yaml'"; hreflang=en-CA
+Link: <http://localhost:5100/processes/EchoProcess/jobs/8bfe86ef-7a15-4c63-8b79-8b2adcafdab5/results/imagesOutput?f=application/json>; rel="output"; type="application/json"; title="Link to job 'imagesOutput' result in 'application/json'"; hreflang=en-CA
+Link: <http://localhost:5100/processes/EchoProcess/jobs/8bfe86ef-7a15-4c63-8b79-8b2adcafdab5/results/imagesOutput?f=text/csv>; rel="output"; type="text/csv"; title="Link to job 'imagesOutput' result in 'text/csv'"; hreflang=en-CA
+Link: <http://localhost:5100/processes/EchoProcess/jobs/8bfe86ef-7a15-4c63-8b79-8b2adcafdab5/results/imagesOutput?f=application/xml>; rel="output"; type="application/xml"; title="Link to job 'imagesOutput' result in 'application/xml'"; hreflang=en-CA
+Link: <http://localhost:5100/processes/EchoProcess/jobs/8bfe86ef-7a15-4c63-8b79-8b2adcafdab5/results/imagesOutput?f=application/yaml>; rel="output"; type="application/yaml"; title="Link to job 'imagesOutput' result in 'application/yaml'"; hreflang=en-CA
+Link: <http://localhost:5100/processes/EchoProcess/jobs/8bfe86ef-7a15-4c63-8b79-8b2adcafdab5/results/featureCollectionOutput?f=application/json>; rel="output"; type="application/json"; title="Link to job 'featureCollectionOutput' result in 'application/json'"; hreflang=en-CA
+Link: <http://localhost:5100/processes/EchoProcess/jobs/8bfe86ef-7a15-4c63-8b79-8b2adcafdab5/results/featureCollectionOutput?f=text/csv>; rel="output"; type="text/csv"; title="Link to job 'featureCollectionOutput' result in 'text/csv'"; hreflang=en-CA
+Link: <http://localhost:5100/processes/EchoProcess/jobs/8bfe86ef-7a15-4c63-8b79-8b2adcafdab5/results/featureCollectionOutput?f=application/xml>; rel="output"; type="application/xml"; title="Link to job 'featureCollectionOutput' result in 'application/xml'"; hreflang=en-CA
+Link: <http://localhost:5100/processes/EchoProcess/jobs/8bfe86ef-7a15-4c63-8b79-8b2adcafdab5/results/featureCollectionOutput?f=application/yaml>; rel="output"; type="application/yaml"; title="Link to job 'featureCollectionOutput' result in 'application/yaml'"; hreflang=en-CA
+Link: <http://localhost:5100/processes/EchoProcess/jobs/8bfe86ef-7a15-4c63-8b79-8b2adcafdab5/logs>; rel="logs"; type="application/json"; title="List of collected job logs during process execution."; hreflang=en-CA
+Link: <http://localhost:5100/processes/EchoProcess/jobs/8bfe86ef-7a15-4c63-8b79-8b2adcafdab5/logs>; rel="https://www.opengis.net/def/rel/ogc/1.0/log"; type="application/json"; title="List of collected job logs during process execution."; hreflang=en-CA
+Link: <http://localhost:5100/processes/EchoProcess/jobs/8bfe86ef-7a15-4c63-8b79-8b2adcafdab5/results>; rel="self"; type="application/json"; title="Job results of successful process execution (direct output values mapping)."; hreflang=en-CA
+Link: <http://localhost:5100/processes/EchoProcess/jobs/8bfe86ef-7a15-4c63-8b79-8b2adcafdab5>; rel="up"; type="application/json"; title="Job status details."; hreflang=en-CA
+X-Content-Type-Options: nosniff
+
+Value1

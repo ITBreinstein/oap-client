@@ -211,6 +211,60 @@ no `numberMatched` and no `next` link — a whole answer on one page. Its header
 and member layout are those of `bag-pand-items-default-page.http`, which is the
 same query without `limit`: 10 features and a cursor `next`.
 
+## `weaver/`
+
+    server    pavics/weaver:latest-manager@sha256:5413e646…, with latest-worker
+              @sha256:a06d5f85… and mongo:7.0 — infra/compose/weaver.yml
+              (6.16.0 plus master to about 868d357f)
+    port      5100
+    captured  landing-page.json, conformance.json,
+              processes/EchoProcess.json, execution/*, jobs/*         2026-10-23
+
+The one server found that declares the OGC API - Processes 2.0 draft's Core
+class (`http://www.opengis.net/spec/ogcapi-processes-1/2.0/conf/core`, beside 68
+classes of 1.0). Every capture here is the builtin `EchoProcess`, with the
+inputs in `execution/*-request.json`: `sync-every-output-request.json` lists
+every output, as the web app does; `one-output-request.json` lists one.
+
+- `execution/sync-one-output.http` — one output, `Accept: */*`: the value raw,
+  `text/plain`, as `/req/core/process-execute-sync-one` says.
+  `…-accept-json.http` is the same request with `Accept: application/json`:
+  a JSON map, `{"stringOutput":"Value1"}` — content negotiation, not a
+  deviation.
+- `execution/sync-every-output.http` — every output: a results map, with
+  `geometryOutput` and `imagesOutput` as arrays although the description gives
+  no output a `maxOccurs`, so by the draft's default each has one value.
+- `execution/async-*.http`, `jobs/status-*.http` — `201` with `Location` and
+  `Preference-Applied: respond-async`; the status document carries both 1.0's
+  `jobID` and `type` and the draft's `id` and `processingEntityType`, under a
+  `$schema` naming 1.0's `statusInfo.yaml`.
+- `jobs/results-one-output.http` — **500**, `TypeError` in Weaver's
+  `get_job_results_response`: the results of an async job that asked for one
+  output cannot be read. `jobs/results-every-output.http`, the same job with
+  every output asked for, answers 200.
+- `execution/preflight-execute.http` — `405` to a CORS preflight, and
+  `execution/get-with-origin.http` — a 200 with no
+  `Access-Control-Allow-Origin`: Weaver sends no CORS headers, so a browser
+  reaches it only through the relay's read route.
+
+- `execution/accept-language-star-406.http` — the one-output request of
+  `one-output-request.json`, sent with `Accept-Language: *`, which is what
+  Node's `fetch` sends by default: **406**, "Requested language [*] not in
+  supported languages". RFC 9110 reads `*` as any language. Captured
+  2026-10-23.
+- `deploy/cwl-without-docker-{request,422}.http` — a CWL CommandLineTool
+  deployed through `POST /processes` (Part 2, out of the client's scope; kept
+  as evidence): one string in, `echo`, one string out, and no
+  `DockerRequirement`. **422**: Weaver insists on one of its application
+  requirements — Docker, or a builtin or remote one — before it runs
+  anything. Captured 2026-10-23.
+
+Re-capture by hand against `http://localhost:5100`, as for pygeoapi:
+
+    docker compose -f infra/compose/weaver.yml -p oap-weaver up -d --wait
+    curl -sSf -H 'Accept: application/json' -o weaver/conformance.json \
+      http://localhost:5100/conformance
+
 ## `*/execution/`
 
 Captured 2026-09-01 against both servers, with `curl -isS -X POST` and

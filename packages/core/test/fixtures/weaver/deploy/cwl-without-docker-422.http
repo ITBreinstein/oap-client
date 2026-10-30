@@ -1,0 +1,9 @@
+HTTP/1.1 422 Unprocessable Entity
+Server: gunicorn
+Date: Fri, 23 Oct 2026 11:37:40 GMT
+Connection: close
+X-Content-Type-Options: nosniff
+Content-Type: application/json
+Content-Length: 1028
+
+{"description": "Unable to process the contained instructions. Invalid package/reference definition. Loading generated error: [Invalid package/reference definition. Validate requirements and hints generated error: [Invalid package requirement. One supported requirement amongst ['BuiltinRequirement', 'DockerGpuRequirement', 'DockerRequirement', 'ESGF-CWTRequirement', 'OGCAPIRequirement', 'WPS1Requirement', 'weaver:BuiltinRequirement', 'weaver:ESGF-CWTRequirement', 'weaver:OGCAPIRequirement', 'weaver:WPS1Requirement'] is expected. Detected package specification ['InlineJavascriptRequirement'] did not provide any of the mandatory requirements. If a script definition is indented for this application, the 'DockerRequirement' requirement can be used to provide a suitable execution environment with needed dependencies. Refer to 'https://pavics-weaver.readthedocs.io//en/latest/package.html#script-application' for examples.].].", "code": "Unprocessable Entity", "error": {"code": 422, "status": "422 Unprocessable Entity"}}

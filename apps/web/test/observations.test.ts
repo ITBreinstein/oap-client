@@ -26,6 +26,9 @@ const capabilities: SessionObservation = {
     dismiss: false,
     callback: false,
     jobList: true,
+    protocolVersion: "1.0",
+    versionSource: "declared",
+    declaredVersions: ["1.0"],
   },
 };
 const form = (endpoint: string, processId: string): SessionObservation => ({

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { preferenceOutcome, type ClassifiedAnswer } from "../../src/execution/preference.js";
+import {
+  preferenceAppliedTokens,
+  preferenceOutcome,
+  type ClassifiedAnswer,
+} from "../../src/execution/preference.js";
 import type { ExecutionMode } from "../../src/execution/types.js";
 import type { PreferenceOutcome } from "../../src/observations.js";
 
@@ -76,5 +80,28 @@ const TABLE: readonly (readonly [string, ExecutionMode, ClassifiedAnswer, Prefer
 describe("preferenceOutcome", () => {
   it.each(TABLE)("%s → %s", (_, mode, answer, expected) => {
     expect(preferenceOutcome(mode, answer)).toBe(expected);
+  });
+});
+
+describe("preferenceAppliedTokens", () => {
+  it("is undefined when no header was readable", () => {
+    expect(preferenceAppliedTokens(null)).toBeUndefined();
+  });
+
+  it("keeps every token as written, trimmed", () => {
+    // ZOO-Project, latest, async with a return preference: it echoes both.
+    expect(preferenceAppliedTokens("respond-async, return=representation")).toEqual([
+      "respond-async",
+      "return=representation",
+    ]);
+  });
+
+  it("keeps a token this client never sends: pygeoapi's `wait` on a sync answer", () => {
+    expect(preferenceAppliedTokens("wait")).toEqual(["wait"]);
+  });
+
+  it("drops empty entries", () => {
+    expect(preferenceAppliedTokens(" , respond-async,,")).toEqual(["respond-async"]);
+    expect(preferenceAppliedTokens("")).toEqual([]);
   });
 });

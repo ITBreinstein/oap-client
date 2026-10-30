@@ -1,0 +1,19 @@
+HTTP/1.1 405 Method Not Allowed
+Server: gunicorn
+Date: Fri, 23 Oct 2026 10:43:18 GMT
+Connection: close
+Allow: GET, POST
+X-Content-Type-Options: nosniff
+Content-Type: text/html; charset=UTF-8
+Content-Length: 189
+
+<html>
+ <head>
+  <title>405 Method Not Allowed</title>
+ </head>
+ <body>
+  <h1>405 Method Not Allowed</h1>
+  The method OPTIONS is not allowed for this resource. <br/><br/>
+
+ </body>
+</html>

@@ -14,6 +14,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ProcessScreen } from "../../src/app/ProcessScreen.js";
 import { ResultsView } from "../../src/app/ResultsView.js";
+import { UpdatedContext } from "../../src/app/variant.js";
 import type { WorkflowCommands } from "../../src/app/useWorkflow.js";
 import { workflowReducer, type Workflow, type WorkflowAction } from "../../src/app/workflow.js";
 import { initialValues } from "../../src/forms/defaults.js";
@@ -204,12 +205,30 @@ describe("the Value/Link choice (T2)", () => {
   };
   const processes: ProcessList = { processes: [], links: [], pageCount: 1, truncated: false };
 
-  function openState(key: string): Extract<Workflow, { stage: "process" }> {
+  /** The same service, spoken to as the 2.0 draft, which has no `transmissionMode`. */
+  const draftService: ServiceDescription = {
+    ...service,
+    capabilities: {
+      ...unknownCapabilities(),
+      protocolVersion: "2.0-draft",
+      versionSource: "declared",
+    },
+  };
+
+  function openState(key: string, draft = false): Extract<Workflow, { stage: "process" }> {
     const process = fixtureProcess(key);
     const plan = resolveFormPlan(process);
+    const connectedTo = draft ? draftService : service;
     const actions: WorkflowAction[] = [
       { type: "connect", endpoint },
-      { type: "connected", connection: 1, endpoint, route: "direct", service, processes },
+      {
+        type: "connected",
+        connection: 1,
+        endpoint,
+        route: "direct",
+        service: connectedTo,
+        processes,
+      },
       { type: "open-process", processId: process.id },
       {
         type: "process-loaded",
@@ -227,19 +246,59 @@ describe("the Value/Link choice (T2)", () => {
 
   const commands = new Proxy({} as WorkflowCommands, { get: () => vi.fn() });
 
-  function screen(key: string, developer: boolean): HTMLElement {
+  function screen(key: string, developer: boolean, draft = false, updated = false): HTMLElement {
     return render(
-      <ProcessScreen
-        state={openState(key)}
-        commands={commands}
-        fieldErrors={new Map()}
-        jobs={[]}
-        jobNotice={undefined}
-        dismissAdvertisedBy="nothing"
-        developer={developer}
-      />,
+      <UpdatedContext value={updated}>
+        <ProcessScreen
+          state={openState(key, draft)}
+          commands={commands}
+          fieldErrors={new Map()}
+          jobs={[]}
+          jobNotice={undefined}
+          dismissAdvertisedBy="nothing"
+          developer={developer}
+        />
+      </UpdatedContext>,
     );
   }
+
+  for (const updated of [false, true]) {
+    const version = updated ? "Instrument (updated)" : "Instrument";
+    it(`turns Link off on a 2.0 draft service, and says why (${version})`, () => {
+      const view = screen("zoo-project/echo", false, true, updated);
+      const reason = view.querySelector('[data-testid="no-link-reason"]');
+      expect(reason?.textContent).toBe(
+        "This service's version of the standard doesn't let the page ask for a link instead of the data.",
+      );
+      for (const choice of view.querySelectorAll("[data-output-choice]")) {
+        const [value, link] = choice.querySelectorAll<HTMLInputElement>('input[type="radio"]');
+        expect(value?.disabled).toBe(false);
+        expect(value?.checked).toBe(true);
+        expect(link?.disabled).toBe(true);
+        // Read with the control, not only near it.
+        expect(link?.getAttribute("aria-describedby")).toBe(reason?.id);
+      }
+    });
+  }
+
+  it("turns the developer view's link-anyway off on a 2.0 draft service too", () => {
+    const view = screen("pygeoapi/breinstein-inputs", true, true);
+    const boxes = view.querySelectorAll<HTMLInputElement>(
+      '.outputs.developer input[type="checkbox"]',
+    );
+    expect(boxes).toHaveLength(2);
+    for (const box of boxes) expect(box.disabled).toBe(true);
+    expect(view.querySelector('[data-testid="no-link-reason"]')).not.toBeNull();
+  });
+
+  it("leaves Link on, with no reason, on a 1.0 service", () => {
+    const view = screen("zoo-project/echo", false);
+    expect(view.querySelector('[data-testid="no-link-reason"]')).toBeNull();
+    const link = view.querySelectorAll<HTMLInputElement>(
+      '[data-output-choice] input[type="radio"]',
+    )[1];
+    expect(link?.disabled).toBe(false);
+  });
 
   it("offers Value or Link per output where the description allows a reference", () => {
     const view = screen("zoo-project/echo", false);

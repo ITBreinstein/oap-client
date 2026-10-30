@@ -11,6 +11,8 @@
  * says no is cheaper than a job panel that renders `undefined`.
  */
 
+import type { ProtocolVersionPreference } from "@breinstein/oap-client";
+
 export type ExecuteRoute = "direct" | "relay";
 
 /**
@@ -31,6 +33,12 @@ export interface RelayEndpoint {
    * some. Presentation, not access: absent, the page lists them all.
    */
   readonly processes?: readonly string[] | undefined;
+  /**
+   * The page's own, never the relay's: a pin from `config.json`'s preset of
+   * this address, carried here so every client made for the endpoint speaks
+   * the same version. Absent, the core reads the service's declaration.
+   */
+  readonly protocolVersion?: ProtocolVersionPreference | undefined;
 }
 
 /** On every response the relay sends. Missing: the relay did not send it. */

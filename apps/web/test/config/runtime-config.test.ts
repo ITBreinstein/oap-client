@@ -107,6 +107,58 @@ describe("checkRuntimeConfig — valid", () => {
   });
 });
 
+describe("checkRuntimeConfig — a preset's protocolVersion", () => {
+  it("keeps a pin, and leaves it off a preset that has none", () => {
+    const result = checkRuntimeConfig({
+      presets: [
+        { title: "Pinned", url: "https://a.example.org", protocolVersion: "1.0" },
+        { title: "Read", url: "https://b.example.org" },
+      ],
+    });
+    expect(result).toEqual({
+      ok: true,
+      config: {
+        relayUrl: undefined,
+        presets: [
+          { title: "Pinned", url: "https://a.example.org", protocolVersion: "1.0" },
+          { title: "Read", url: "https://b.example.org" },
+        ],
+      },
+    });
+  });
+
+  it.each(["auto", "1.0", "2.0-draft"])("accepts %s", (protocolVersion) => {
+    const checked = checkRuntimeConfig({
+      presets: [{ title: "A", url: "https://a.example.org", protocolVersion }],
+    });
+    expect(checked.ok).toBe(true);
+  });
+
+  // A loopback address is not mixed content to a browser, and CI's services
+  // are on one. Only these three names, though.
+  it.each(["http://localhost:5100", "http://127.0.0.1:5100", "http://[::1]:5100"])(
+    "accepts http: on %s",
+    (url) => {
+      const checked = checkRuntimeConfig({
+        presets: [{ title: "Weaver", url, protocolVersion: "1.0" }],
+      });
+      expect(checked.ok).toBe(true);
+    },
+  );
+
+  it.each([
+    "http://weaver.example.org",
+    "http://192.168.1.10:5100",
+    "http://127.0.0.2:5100",
+    "http://api.localhost:5100",
+    "http://localhost.example.org",
+  ])("still refuses http: on any other host: %s", (url) => {
+    const checked = checkRuntimeConfig({ presets: [{ title: "A", url }] });
+    expect(checked.ok).toBe(false);
+    expect(checked.ok ? "" : checked.problem).toContain("presets[0].url");
+  });
+});
+
 describe("checkRuntimeConfig — refused whole", () => {
   it.each([
     ["not an object", []],
@@ -128,7 +180,10 @@ describe("checkRuntimeConfig — refused whole", () => {
     ["a javascript: relay url", { relay: { url: "javascript:alert(1)" } }],
     ["presets as an object", { presets: {} }],
     ["an http preset", { presets: [{ title: "A", url: "http://a.example.org" }] }],
-    ["a localhost http preset", { presets: [{ title: "A", url: "http://localhost:5080" }] }],
+    [
+      "a preset with an unknown protocolVersion",
+      { presets: [{ title: "A", url: "https://a.example.org", protocolVersion: "2.0" }] },
+    ],
     ["a preset with an empty title", { presets: [{ title: " ", url: "https://a.example.org" }] }],
     ["a preset with no url", { presets: [{ title: "A" }] }],
     ["a preset with a query", { presets: [{ title: "A", url: "https://a.example.org/?k=1" }] }],
