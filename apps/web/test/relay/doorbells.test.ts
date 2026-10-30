@@ -7,7 +7,7 @@
 
 import type { JobState, JobStatus } from "@breinstein/oap-client";
 import { describe, expect, it } from "vitest";
-import { openDoorbells, readEventStream } from "../../src/relay/doorbells.js";
+import { openDoorbells, readEventStream, SILENCE_MS } from "../../src/relay/doorbells.js";
 import { JobReconciler } from "../../src/relay/reconciler.js";
 import { RelayError, type RelayClient } from "../../src/relay/relay-client.js";
 import { manualSchedule, settle, status } from "./harness.js";
@@ -285,7 +285,8 @@ describe("openDoorbells", () => {
 
     expect(relay.opened).toEqual(["session-1", "session-2"]);
     expect(opens.at(-1)).toEqual({ reconnect: true, sessionRenewed: true });
-    expect(timers.pending()).toEqual([]);
+    // No backoff wait: the one timer is the open stream's silence watchdog.
+    expect(timers.pending()).toEqual([SILENCE_MS]);
     doorbells.close();
   });
 
@@ -312,6 +313,67 @@ describe("openDoorbells", () => {
     // Once settled, a later renewal is a new one.
     expect(await doorbells.renew()).toBe("session-3");
     doorbells.close();
+  });
+
+  it("drops a stream that has gone silent and reconnects, so the caller reconciles", async () => {
+    // A sleep or a network change can leave the socket half-open: it looks
+    // open for good while every doorbell is lost.
+    const relay = fakeRelay();
+    const timers = manualSchedule();
+    const opens: { reconnect: boolean }[] = [];
+    const doorbells = openDoorbells({
+      relay: relay.relay,
+      schedule: timers.schedule,
+      onDoorbell: () => undefined,
+      onOpen: (info) => opens.push(info),
+      initialBackoffMs: 1_000,
+      silenceMs: 45_000,
+    });
+    await settle();
+    relay.latest().send("event: ready\ndata: {}\n\n");
+    await settle();
+
+    // A keepalive resets the watchdog; silence after it does not.
+    await timers.advance(40_000);
+    relay.latest().send(": keepalive\n\n");
+    await settle();
+    await timers.advance(40_000);
+    expect(relay.opened).toEqual(["session-1"]);
+    expect(doorbells.live()).toBe(true);
+
+    await timers.advance(5_000);
+    expect(doorbells.live()).toBe(false);
+    await timers.advance(1_000);
+    relay.latest().send("event: ready\ndata: {}\n\n");
+    await settle();
+
+    expect(relay.opened).toEqual(["session-1", "session-1"]);
+    expect(opens.at(-1)).toEqual({ reconnect: true, sessionRenewed: false });
+    doorbells.close();
+  });
+
+  it("arms no watchdog once the stream has ended, and none after close()", async () => {
+    const relay = fakeRelay();
+    const timers = manualSchedule();
+    const doorbells = openDoorbells({
+      relay: relay.relay,
+      schedule: timers.schedule,
+      onDoorbell: () => undefined,
+      onOpen: () => undefined,
+      initialBackoffMs: 1_000,
+    });
+    await settle();
+    relay.latest().send("event: ready\ndata: {}\n\n");
+    await settle();
+    expect(timers.pending()).toEqual([SILENCE_MS]);
+
+    relay.latest().end();
+    await settle();
+    expect(timers.pending()).toEqual([1_000]);
+
+    doorbells.close();
+    await timers.advance(SILENCE_MS);
+    expect(relay.opened).toEqual(["session-1"]);
   });
 });
 

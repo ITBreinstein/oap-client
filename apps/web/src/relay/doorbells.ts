@@ -16,6 +16,10 @@
  *   the stream was down are lost, by design; the caller reconciles on open.
  * - It never gives up. A relay that is down is retried with capped backoff,
  *   and the page keeps polling in the meantime.
+ * - A stream gone silent is treated as dropped. The relay writes at least a
+ *   keepalive every 15 s; a connection left half-open by a sleep or a network
+ *   change would otherwise look open for good, while every doorbell is lost
+ *   and no reconnect ever reconciles.
  * - After `close()`, nothing more is sent: no session is asked for, and no
  *   stream opened. Every step that waits checks again once it resumes, and
  *   the first step waits a turn, so that React's StrictMode — which closes
@@ -50,6 +54,8 @@ export interface DoorbellOptions {
   readonly schedule?: Schedule | undefined;
   readonly initialBackoffMs?: number | undefined;
   readonly maxBackoffMs?: number | undefined;
+  /** How long an open stream may send nothing before it is dropped and reopened. */
+  readonly silenceMs?: number | undefined;
 }
 
 export interface DoorbellStream extends SessionSource {
@@ -62,15 +68,19 @@ export interface DoorbellStream extends SessionSource {
 
 export const INITIAL_BACKOFF_MS = 1_000;
 export const MAX_BACKOFF_MS = 30_000;
+/** Three of the relay's 15 s keepalives missed: the stream is gone, whatever the socket says. */
+export const SILENCE_MS = 45_000;
 
 /**
  * Feed `onEvent` one dispatched event per blank-line-terminated block, as the
  * HTML event-stream format defines it: `event:` names it, `data:` lines join
- * with newlines, comment lines (`:`) are ignored.
+ * with newlines, comment lines (`:`) are ignored. `onActivity` hears of every
+ * chunk, a keepalive comment included.
  */
 export async function readEventStream(
   body: ReadableStream<Uint8Array>,
   onEvent: (event: string, data: string) => void,
+  onActivity?: () => void,
 ): Promise<void> {
   const reader = body.getReader();
   const decoder = new TextDecoder();
@@ -112,6 +122,7 @@ export async function readEventStream(
       lines(true);
       return;
     }
+    onActivity?.();
     buffer += decoder.decode(chunk.value, { stream: true });
     lines(false);
   }
@@ -121,6 +132,7 @@ export function openDoorbells(options: DoorbellOptions): DoorbellStream {
   const schedule = options.schedule ?? systemSchedule;
   const initialBackoff = options.initialBackoffMs ?? INITIAL_BACKOFF_MS;
   const maxBackoff = options.maxBackoffMs ?? MAX_BACKOFF_MS;
+  const silenceMs = options.silenceMs ?? SILENCE_MS;
 
   let session: string | undefined;
   /** The relay's refusal of the last session asked for, until one is granted. */
@@ -167,6 +179,19 @@ export function openDoorbells(options: DoorbellOptions): DoorbellStream {
     return grant.token;
   };
 
+  /**
+   * Restarted on every chunk. When it fires the stream has said nothing for
+   * `silenceMs`, and is aborted, so the loop below reconnects and the caller
+   * reconciles.
+   */
+  let cancelWatchdog: () => void = () => undefined;
+  const armWatchdog = (): void => {
+    cancelWatchdog();
+    cancelWatchdog = schedule(() => {
+      stream?.abort();
+    }, silenceMs);
+  };
+
   const run = async (): Promise<void> => {
     // A close() in the same turn as the open — StrictMode's unmount, straight
     // after its mount — lands before anything is sent.
@@ -198,22 +223,29 @@ export function openDoorbells(options: DoorbellOptions): DoorbellStream {
           throw new Error(`event stream answered ${String(response.status)}`);
         }
         unauthorisedInARow = 0;
-        await readEventStream(response.body, (event, data) => {
-          if (event === "ready") {
-            backoff = initialBackoff;
-            flags.reconnectNow = false;
-            setState("open");
-            options.onOpen({ reconnect: opens > 0, sessionRenewed: renewed });
-            opens += 1;
-            renewed = false;
-          } else if (event === "job") {
-            const doorbell = parseDoorbell(data);
-            if (doorbell !== undefined) options.onDoorbell(doorbell.ref, doorbell.callbacks);
-          }
-        });
+        armWatchdog();
+        await readEventStream(
+          response.body,
+          (event, data) => {
+            if (event === "ready") {
+              backoff = initialBackoff;
+              flags.reconnectNow = false;
+              setState("open");
+              options.onOpen({ reconnect: opens > 0, sessionRenewed: renewed });
+              opens += 1;
+              renewed = false;
+            } else if (event === "job") {
+              const doorbell = parseDoorbell(data);
+              if (doorbell !== undefined) options.onDoorbell(doorbell.ref, doorbell.callbacks);
+            }
+          },
+          armWatchdog,
+        );
       } catch {
-        // Down, unreachable, or aborted by close() or renew(). The loop
-        // condition and the backoff below decide what happens next.
+        // Down, unreachable, gone silent, or aborted by close() or renew().
+        // The loop condition and the backoff below decide what happens next.
+      } finally {
+        cancelWatchdog();
       }
       if (isClosed()) break;
       if (flags.reconnectNow) {
