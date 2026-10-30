@@ -6,6 +6,11 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+      # The server half of automatic deploys (deploy/static/oap-receive.sh).
+      # First, because it needs only bash and the runner's GNU tools: nothing
+      # installed, a few seconds.
+      - run: shellcheck deploy/static/oap-receive.sh deploy/static/test/oap-receive.test.sh
+      - run: deploy/static/test/oap-receive.test.sh
       - uses: pnpm/action-setup@v4
       # Node is pinned to the exact version, in every workflow: a floating `24`
       # moved to 24.22.1 on 2026-10-29 and broke a relay streaming test that
