@@ -212,6 +212,8 @@ for (const style of ["instrument", "instrument-updated"]) {
   test(`${style}: a switch fades, and is instant where motion is reduced`, async ({ page }) => {
     await countTransitions(page);
     await open(page, `style=${style}&theme=light`);
+    // As above: the night picture prefetched, which the fade needs at hand.
+    await expect.poll(() => downloaded(page, NIGHT), { timeout: 15_000 }).toBe(true);
     const dialog = await openAppearance(page);
     await dialog.getByRole("radio", { name: "On" }).check();
     await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
@@ -229,6 +231,10 @@ test("instrument following the system: the system's switch fades too", async ({ 
   await page.emulateMedia({ colorScheme: "light" });
   await open(page, "style=instrument&theme=system");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  // The fade waits at most 500 ms for the night picture (theme-switch.ts), so
+  // first the page's own prefetch of it, once idle: on a loaded machine the
+  // switch came first and was rightly instant (2026-10-26).
+  await expect.poll(() => downloaded(page, NIGHT), { timeout: 15_000 }).toBe(true);
 
   await page.emulateMedia({ colorScheme: "dark" });
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");

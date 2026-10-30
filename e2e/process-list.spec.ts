@@ -4,8 +4,9 @@
  * The local pygeoapi lists enough processes for the search box to show.
  */
 
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures.js";
 import { requireService } from "./services.js";
+import { CONNECTED } from "./waits.js";
 
 const PYGEOAPI = "http://localhost:5080";
 const SERVICE = "https://pygeoapi.example.test";
@@ -32,7 +33,9 @@ test("the count follows the search, and no match is said in words", async ({ pag
   await page.goto("/");
   await page.getByRole("radio", { name: /Reference pygeoapi/ }).check();
   await page.getByRole("button", { name: "Connect", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Hello World", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Hello World", exact: true })).toBeVisible(
+    CONNECTED,
+  );
 
   const count = page.locator(".list-count");
   const listed = Number(/^(\d+) processes/.exec((await count.textContent()) ?? "")?.[1]);

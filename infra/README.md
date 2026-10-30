@@ -27,6 +27,41 @@ tag is for reading, the digest is what Docker pulls. To move the pin, run
 `docker buildx imagetools inspect geopython/pygeoapi:<tag>` and put the
 `Digest:` it prints after the new tag, in both services.
 
+## Running the lanes reliably
+
+What the browser lane needs to pass or fail for a reason, measured in the
+reliability task (2026-10-26):
+
+- **Docker memory.** pygeoapi and ZOO run in under 4 GB. Give Docker at least
+  6 GB when a heavier server joins them (Weaver, on `feat/core-v2`), and keep
+  that server stopped unless its own lane is running.
+- **One lane per machine, or expect it slower.** The blocking lane uses four
+  Playwright workers. With the ZOO lane beside it the load average reached
+  30–50 on eight cores and every request slowed two to four times; the waits
+  below are sized for that, but a third lane, a build or research tools on top
+  of it are not measured.
+- **pygeoapi keeps idle connections 75 s**, not gunicorn's 2 s
+  (`GUNICORN_CMD_ARGS` in `compose/pygeoapi.yml`). With 2 s, a client that
+  reuses an idle connection just as the server closes it gets a reset: the
+  lane's own `fetch` and Playwright's `route.fetch` did, on nearly every
+  request sent 2.0 s after the one before. A stock pygeoapi still keeps 2 s.
+- **The job store is kept small.** Every lane run adds about 80 jobs to
+  pygeoapi's one TinyDB file, and every job request parses the whole file
+  under one lock. Before the blocking and PDOK lanes (never the ZOO or Weaver
+  lane, which may run beside them), `e2e/job-store.ts` dismisses the
+  finished jobs on `:5080` and `:5081` that finished more than 15 minutes ago,
+  once a server holds more than 300, and prints how many and how long
+  (1 000 jobs: 14 s). Recreating the container empties it at once.
+- **A slow service gets 20 s** before its tests are skipped, locally as in CI,
+  and every run ends with a list of what it skipped and why
+  (`e2e/skip-reporter.ts`). Locally a skip is still a skip, never a pass.
+- **Keep the machine awake.** A Mac that goes to idle sleep mid-run stops
+  every worker and the servers with it; the tests that were running time out
+  together when it wakes (16 minutes asleep, six failures, 2026-10-26). Run a
+  long local lane under `caffeinate -i pnpm test:e2e`.
+- **Retries are off.** A test that only passes on a second try is flaky, and
+  is reported as a failure.
+
 ## The two pygeoapi ports
 
 Identical configuration but for one flag. `:5080` sets `cors: true` and
@@ -273,4 +308,5 @@ docker compose -f infra/compose/pygeoapi.yml up -d --force-recreate
 
 Jobs live in a TinyDB file inside the container (`/tmp/pygeoapi-process-manager.db`),
 so they **survive a `restart`** and are **lost on a recreate**. Worth knowing
-before wondering where a demo's job went.
+before wondering where a demo's job went. The browser lane also dismisses old finished jobs
+itself once there are more than 300 (see "Running the lanes reliably").

@@ -8,7 +8,8 @@
  * Skips when pygeoapi is not answering, as the other browser specs do.
  */
 
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./fixtures.js";
 import { requireService } from "./services.js";
 
 const PYGEOAPI = "http://localhost:5080";
