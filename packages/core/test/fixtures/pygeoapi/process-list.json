@@ -751,6 +751,69 @@
         },
         {
             "version":"1.0.0",
+            "id":"breinstein-area-what-if",
+            "title":"Points in an area",
+            "description":"Counts the points of a what-if layer that fall inside an area, and measures the area. Its inputs are described as the Beleidsnormen API describes its own.",
+            "jobControlOptions":[
+                "sync-execute",
+                "async-execute"
+            ],
+            "keywords":[
+                "geojson",
+                "feature collection",
+                "what-if",
+                "testbed"
+            ],
+            "links":[
+                {
+                    "type":"text/html",
+                    "rel":"about",
+                    "title":"information",
+                    "href":"https://example.org/process",
+                    "hreflang":"en-US"
+                },
+                {
+                    "type":"application/json",
+                    "rel":"self",
+                    "href":"http://localhost:5080/processes/breinstein-area-what-if?f=json",
+                    "title":"Process description as JSON",
+                    "hreflang":"en-US"
+                },
+                {
+                    "type":"text/html",
+                    "rel":"alternate",
+                    "href":"http://localhost:5080/processes/breinstein-area-what-if?f=html",
+                    "title":"Process description as HTML",
+                    "hreflang":"en-US"
+                },
+                {
+                    "type":"text/html",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/job-list",
+                    "href":"http://localhost:5080/jobs?f=html",
+                    "title":"Jobs list as HTML",
+                    "hreflang":"en-US"
+                },
+                {
+                    "type":"application/json",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/job-list",
+                    "href":"http://localhost:5080/jobs?f=json",
+                    "title":"Jobs list as JSON",
+                    "hreflang":"en-US"
+                },
+                {
+                    "type":"application/json",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/execute",
+                    "href":"http://localhost:5080/processes/breinstein-area-what-if/execution?f=json",
+                    "title":"Execution for this process as JSON",
+                    "hreflang":"en-US"
+                }
+            ],
+            "outputTransmission":[
+                "value"
+            ]
+        },
+        {
+            "version":"1.0.0",
             "id":"breinstein-buildings",
             "title":"Buildings in an area",
             "description":"Takes one GeoJSON polygon in the Netherlands and returns the buildings that intersect it, as GeoJSON, or as a link to the query when asked for by reference. Buildings: Kadaster, BAG, open data, via PDOK OGC API Features.",

@@ -223,12 +223,71 @@ describe("an input that holds several shapes", () => {
   });
 
   it("deletes the selected shape, and reports what is left", () => {
+    // Changed (3.4): a placed point is no longer selected while points keep
+    // coming. Stopping, then clicking it, selects it.
     const { created, draw, reported } = engine(["Point"], true);
     created.place("Point");
+    user.click(4.6, 52.1);
+    created.stopPlacing();
     user.click(4.6, 52.1);
     created.deleteSelected();
     expect(drawnShapes(draw)).toEqual([]);
     expect(reported.at(-1)).toEqual([]);
+  });
+});
+
+describe("points, one press for several (3.4)", () => {
+  it("stays in point mode after each finished point, and reports each one", () => {
+    const { created, draw, reported, states } = engine(["Point", "Polygon"], true);
+    created.place("Point");
+    user.click(4.6, 52.1);
+    expect(draw.getMode()).toBe("point");
+    user.click(5, 52);
+    user.click(5.2, 52.3);
+    expect(draw.getMode()).toBe("point");
+    expect(reported.at(-1)).toHaveLength(3);
+    expect(states.at(-1)).toEqual({ placing: "Point", hasSelection: false, notShown: 0 });
+  });
+
+  it("goes back to editing when placing is stopped, or another tool is chosen", () => {
+    const { created, draw, states } = engine(["Point", "Polygon"], true);
+    created.place("Point");
+    user.click(4.6, 52.1);
+    created.stopPlacing();
+    expect(draw.getMode()).toBe("select");
+    expect(states.at(-1)).toMatchObject({ placing: undefined });
+    created.place("Point");
+    user.click(5, 52);
+    created.place("Polygon");
+    expect(draw.getMode()).toBe("polygon");
+    expect(states.at(-1)).toMatchObject({ placing: "Polygon" });
+  });
+
+  it("still places one point and goes back to editing for an input of one", () => {
+    const { created, draw, states } = engine(["Point"], false);
+    created.place("Point");
+    user.click(4.6, 52.1);
+    expect(draw.getMode()).toBe("select");
+    expect(states.at(-1)).toMatchObject({ placing: undefined, hasSelection: true });
+  });
+
+  it("still goes back to editing after an area, when the input holds several", () => {
+    const { created, draw } = engine(["Point", "Polygon"], true);
+    created.place("Polygon");
+    drawArea([
+      [5.0, 52.0],
+      [5.2, 52.0],
+      [5.1, 52.2],
+    ]);
+    expect(draw.getMode()).toBe("select");
+  });
+
+  it("does nothing when stopped while not placing", () => {
+    const { created, draw, states } = engine(["Point"], true);
+    const before = states.length;
+    created.stopPlacing();
+    expect(draw.getMode()).toBe("select");
+    expect(states).toHaveLength(before);
   });
 });
 

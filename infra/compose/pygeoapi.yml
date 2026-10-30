@@ -22,6 +22,17 @@ services:
     extra_hosts: ["host.docker.internal:host-gateway"]
     environment:
       PYTHONPATH: /pygeoapi/plugins
+      # Keep idle connections open for 75 s, not gunicorn's 2 s. A stock
+      # pygeoapi keeps 2 s, and a client that reuses an idle connection just
+      # as the server closes it gets a reset with no answer: Node's fetch
+      # (UND_ERR_SOCKET) and Playwright's route.fetch ("socket hang up") did
+      # on nearly every request sent 2.0 s after the one before (2026-10-26).
+      # So the race is real against any stock pygeoapi; in this lane it skipped
+      # tests and failed route proxies. With the server keeping connections
+      # longer than the clients do, the client always closes first.
+      # gunicorn reads GUNICORN_CMD_ARGS itself; the image's entrypoint passes
+      # the environment through.
+      GUNICORN_CMD_ARGS: --keep-alive 75
     volumes:
       - "../pygeoapi/config-cors.yml:/pygeoapi/local.config.yml:ro"
       - "../pygeoapi/plugins:/pygeoapi/plugins:ro"
@@ -45,6 +56,8 @@ services:
     extra_hosts: ["host.docker.internal:host-gateway"]
     environment:
       PYTHONPATH: /pygeoapi/plugins
+      # As :5080, and for the same reason.
+      GUNICORN_CMD_ARGS: --keep-alive 75
     volumes:
       - "../pygeoapi/config-nocors.yml:/pygeoapi/local.config.yml:ro"
       - "../pygeoapi/plugins:/pygeoapi/plugins:ro"

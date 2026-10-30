@@ -345,11 +345,12 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
   const draw = useMemo<DrawTarget>(
     () => ({
       fieldId: drawField,
+      row: drawField === undefined ? undefined : drawFor?.row,
       available: mapAvailable,
-      start: (fieldId) => {
+      start: (fieldId, row) => {
         drawPresses.current += 1;
         if (openForm !== undefined) {
-          setDrawFor({ form: openForm, fieldId, press: drawPresses.current });
+          setDrawFor({ form: openForm, fieldId, row, press: drawPresses.current });
         }
       },
       stop: () => {
@@ -358,7 +359,7 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
       focusToken: drawFor?.press,
       currentView: () => viewReader.current?.(),
     }),
-    [drawField, mapAvailable, openForm, drawFor?.press],
+    [drawField, mapAvailable, openForm, drawFor?.press, drawFor?.row],
   );
 
   // Each stage moves focus to its heading, so a keyboard user lands where the
@@ -703,6 +704,7 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
                             <RequestLog
                               entries={view.snapshot?.observations ?? []}
                               endpoint={redactUrl(state.endpoint.baseUrl)}
+                              open
                             />
                           ) : undefined
                         }
@@ -781,7 +783,7 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
                     }
                     dismissAdvertisedFor={view.dismissAdvertisedFor}
                     messages={view.jobMessages}
-                    onRemove={commands.removeJob}
+                    onRemove={address.removeJob}
                     onDismiss={commands.dismissJob}
                   />
                 </SidePanel>

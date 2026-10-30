@@ -9,6 +9,11 @@
  * delete this file. Either way, delete the second entry of `STYLE_NAMES`
  * (`app/appearance.ts`) and `data-variant` (ADR 0002).
  *
+ * Tokens only the update has: its own shape block in `tokens.css`,
+ * `[data-style="instrument"][data-variant="updated"]`, one radius step per
+ * nesting level (card 8, item 6, control 4, tag 2). Keep its values in the
+ * shape block, or delete it.
+ *
  * Markup only the update shows, hidden by default in `styles.css`: the words
  * in `app/Versioned.tsx` (`.when-updated`), used once, for a job that can't
  * be cancelled. Keep the update's words and delete the component, or the
@@ -54,7 +59,7 @@
  * `MapPane`, `ResultsView`); inputs and outputs have Copy in their boxes
  * (`CopyButton.tsx`: `CopyField` in `FormFields`, `GeometryField`,
  * `ComplexField`; `CopyButton` in `ResultsView`); the request log is in the developer
- * section (`ProcessScreen`, `App.tsx`); My jobs has `structured` rows and
+ * section, unfolded there (`ProcessScreen`, `App.tsx`, `RequestLog` `open`); My jobs has `structured` rows and
  * "Run again" (`JobsPanel.tsx`, `JobFacts`; the inputs, kept in memory for
  * the visit, in `App.tsx`); a background job shows its link and can be left
  * for another process, and My jobs shows a job here (`ProcessScreen`,
@@ -67,8 +72,8 @@
 /* ------------------------------------------------- the rail, easier to read */
 
 /* Labels at 12px, not 10: the rail widens to hold them. */
-[data-variant="updated"] .app-rail {
-  width: 84px;
+[data-variant="updated"] {
+  --rail-width: 84px;
 }
 
 [data-variant="updated"] .rail-item,
@@ -294,6 +299,7 @@
   [data-variant="updated"] .layout:not(.layout-single) .request-log {
     position: static;
     width: auto;
+    max-width: none;
     max-height: none;
     margin: 16px 22px 0;
     background: var(--surface);
@@ -462,6 +468,55 @@
     bottom: 12px;
     margin: 0;
   }
+}
+
+/*
+ * On a phone, every page on the picture is framed alike, Start included: a
+ * 12px edge of picture round the card, 16px inside it, so the content keeps
+ * its width (proportions #12).
+ */
+@media (max-width: 40rem) {
+  [data-variant="updated"] .layout-single .panel {
+    padding: 12px;
+  }
+
+  [data-variant="updated"]
+    :is(.start, .layout-single .process-screen, .layout-single .process-list-screen) {
+    padding: 16px;
+  }
+}
+
+/* ------------------------------------------------- the Appearance menu */
+
+/*
+ * Two groups in one box, without a box round each: a rule between them,
+ * above the second one's name. A legend is drawn on its fieldset's top
+ * border, so a rule there would run through it; floated into the group,
+ * the legend is laid out as an ordinary line, under the rule.
+ */
+[data-variant="updated"] .appearance-popover fieldset {
+  margin: 0;
+  padding: 0;
+  border: none;
+  /* Square, or the rule would curl up at its ends. */
+  border-radius: 0;
+}
+
+[data-variant="updated"] .appearance-popover fieldset + fieldset {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+[data-variant="updated"] .appearance-popover legend {
+  float: left;
+  width: 100%;
+  margin: 0 0 4px;
+  padding: 0;
+}
+
+[data-variant="updated"] .appearance-popover legend + * {
+  clear: left;
 }
 
 /* ------------------------------------------------- the process page */
@@ -890,6 +945,17 @@
   color: var(--warning);
 }
 
+/*
+ * Cancelled — by you, by the server (`dismissed`), or a job the server no
+ * longer has, which the badge calls cancelled: red, outlined only, so it is
+ * not read as failed, which is filled.
+ */
+[data-variant="updated"] .job-badge[data-job-state="cancelled"],
+[data-variant="updated"] .job-badge[data-job-state="dismissed"],
+[data-variant="updated"] .job-badge[data-job-state="gone"] {
+  color: var(--error);
+}
+
 /* Label and value side by side, the labels in one column. */
 [data-variant="updated"] .job-facts {
   display: grid;
@@ -981,7 +1047,7 @@
 
 /*
  * The edge between the form and the map, to drag or move with the arrow keys
- * (#36; PanelHandle.tsx): 400 to 640px. A thin line, a wider target.
+ * (#36; PanelHandle.tsx): 440 to 640px. A thin line, a wider target.
  */
 [data-variant="updated"] .panel-handle-region {
   position: absolute;
@@ -1096,9 +1162,9 @@
  * Remove, "Type it instead" and Clear the form. Copy keeps its own.
  */
 [data-variant="updated"] :is(.form-body, .clear-form) button:not(.copy-button) {
-  min-height: 36px;
-  padding: 0 12px;
-  font-size: 0.8125rem;
+  min-height: var(--button-height-compact);
+  padding-block: 0;
+  padding-inline: 12px;
 }
 
 /*

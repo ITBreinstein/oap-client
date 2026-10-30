@@ -38,7 +38,11 @@ export type MapShape =
 export type Tool = "Point" | "LineString" | "Polygon" | "Rectangle";
 
 export interface GeometryDrawState {
-  /** The tool placing a shape now, if any. Ends by itself when the shape closes. */
+  /**
+   * The tool placing a shape now, if any. Ends by itself when the shape closes
+   * — except points for an input that holds several, which keep coming until
+   * {@link GeometryEngine.stopPlacing} or another tool (3.4).
+   */
   readonly placing: Tool | undefined;
   /** A shape is selected, so it can be deleted. */
   readonly hasSelection: boolean;
@@ -51,8 +55,13 @@ export interface GeometryDrawState {
 }
 
 export interface GeometryEngine {
-  /** Start placing one shape. Editing resumes once it is finished. */
+  /**
+   * Start placing one shape. Editing resumes once it is finished — but for an
+   * input that holds several, the point tool stays: each click adds a point.
+   */
   place(tool: Tool): void;
+  /** Stop placing, and go back to editing what is drawn. */
+  stopPlacing(): void;
   /**
    * Show these shapes instead of whatever is drawn. Shapes the map cannot show
    * are left off the map but kept in what the engine reports (`notShown`).
@@ -266,6 +275,10 @@ export const createTerraDrawGeometryEngine: CreateGeometryEngine = (map, { tools
             // A new shape replaces the value, the part the map could not show too.
             notShown = [];
           }
+          // Ten benches should not take ten presses of Add point (3.4): for an
+          // input that holds several, the point tool stays until it is stopped.
+          // Areas and lines still go back to editing.
+          if (several && placing === "Point") return;
           placing = undefined;
           draw.setMode(SELECT);
           // Adjusting what was just drawn is the common case; hunting for it
@@ -329,6 +342,14 @@ export const createTerraDrawGeometryEngine: CreateGeometryEngine = (map, { tools
       placing = tool;
       own.apply(() => {
         draw.setMode(MODE[tool]);
+      });
+      announce();
+    },
+    stopPlacing() {
+      if (placing === undefined) return;
+      placing = undefined;
+      own.apply(() => {
+        draw.setMode(SELECT);
       });
       announce();
     },

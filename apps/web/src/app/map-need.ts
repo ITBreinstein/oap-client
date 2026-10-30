@@ -3,8 +3,8 @@
  *
  * - Before a process is open (start screen, process list): never.
  * - With a process open: when one of its inputs can be drawn on the map — a
- *   bounding box, a geometry, or a complex input with a JSON-object format,
- *   which the map draws as GeoJSON. These are exactly the fields `MapPane`
+ *   bounding box, a geometry (repeatable or not), or a complex input with a
+ *   JSON-object format, which the map draws as GeoJSON. These are exactly the fields `MapPane`
  *   binds to, so a "Draw on the map" button never appears without a map.
  * - With a result in: also when the result can be drawn — GeoJSON within the
  *   page's coordinate limit, or an image with a box that places it.
@@ -30,13 +30,15 @@ export function drawsOnMap(field: FieldPlan): boolean {
       return true;
     case "complex":
       return control.formats.some((format) => format.object);
+    // One row at a time (`DrawTarget.row`).
+    case "list":
+      return control.item.kind === "geometry";
     // Listed rather than left to a `default`, so a new kind of control has to
     // be decided on here before the page compiles.
     case "text":
     case "number":
     case "select":
     case "checkbox":
-    case "list":
     case "json":
       return false;
   }

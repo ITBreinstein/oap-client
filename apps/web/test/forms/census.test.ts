@@ -68,24 +68,27 @@ describe("census over the committed fixtures", () => {
     expect(census(Object.keys(FIXTURE_DESCRIPTIONS).sort())).toMatchInlineSnapshot(`
       {
         "controls": {
-          "bbox": 6,
+          "bbox": 7,
           "checkbox": 6,
           "complex": 15,
-          "geometry": 4,
-          "json": 4,
-          "list:json": 2,
-          "list:number": 1,
+          "geometry": 16,
+          "json": 7,
+          "list:geometry": 16,
+          "list:json": 5,
+          "list:number": 2,
+          "list:select": 3,
           "list:text": 4,
-          "number": 18,
-          "select": 7,
-          "text": 28,
+          "number": 23,
+          "select": 14,
+          "text": 29,
         },
-        "descriptions": 39,
+        "descriptions": 52,
         "diagnostics": {
           "contradictory-schema": 1,
-          "unsupported-keyword": 6,
+          "unsupported-keyword": 8,
+          "unsupported-type": 4,
         },
-        "inputs": 95,
+        "inputs": 147,
       }
     `);
   });

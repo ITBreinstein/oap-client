@@ -4,7 +4,10 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { fixtureProcess, planFor } from "./forms/helpers.js";
+import { resolveFormPlan } from "../src/forms/resolve.js";
 import {
+  geometryObservationsFor,
   kindCounts,
   observationExport,
   observedEndpoints,
@@ -38,6 +41,7 @@ const form = (endpoint: string, processId: string): SessionObservation => ({
     code: "unsupported-keyword",
     keyword: "oneOf",
     crs: undefined,
+    recognisedBy: undefined,
   },
 });
 const session = [capabilities, form(zoo, "echo"), form(cors, "hello-world"), form(zoo, "echo")];
@@ -88,5 +92,31 @@ describe("observationExport", () => {
       observationExport(session, "0.4.0", { now: at, endpoint: zoo, dropped: 3 }),
     ) as Record<string, unknown>;
     expect(exported["droppedObservations"]).toBe(3);
+  });
+});
+
+describe("geometryObservationsFor", () => {
+  it("names each geometry input and its pattern, a repeatable one included, and nothing else", () => {
+    const plan = resolveFormPlan(fixtureProcess("pygeoapi/breinstein-rotate"));
+    const observations = geometryObservationsFor(`${cors}/?token=secret`, "rotate", plan.fields);
+    expect(observations).toEqual([
+      {
+        kind: "form",
+        endpoint: `${cors}/`,
+        processId: "rotate",
+        inputId: plan.fields[0]?.id,
+        code: "geometry-recognised",
+        keyword: undefined,
+        crs: undefined,
+        recognisedBy: "format",
+      },
+    ]);
+    const repeatable = planFor({
+      places: { schema: { $ref: "https://geojson.org/schema/Point.json" }, maxOccurs: 3 },
+      label: { schema: { type: "string" } },
+    });
+    expect(geometryObservationsFor(cors, "demo", repeatable.fields)).toMatchObject([
+      { inputId: "places", code: "geometry-recognised", recognisedBy: "ref" },
+    ]);
   });
 });

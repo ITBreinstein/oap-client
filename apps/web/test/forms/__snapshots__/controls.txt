@@ -1,0 +1,199 @@
+beleidsnormen/afstand_voorzieningen — needs area
+  beleidsnormen/afstand_voorzieningen/output_crs → select
+  beleidsnormen/afstand_voorzieningen/voorzieningstype → select
+  beleidsnormen/afstand_voorzieningen/parameters → json [no control for type `object`] · unsupported-type
+  beleidsnormen/afstand_voorzieningen/nieuwe_huisarts → list<geometry (feature-collection, Point)> · map
+  beleidsnormen/afstand_voorzieningen/nieuwe_ziekenhuis → list<geometry (feature-collection, Point)> · map
+  beleidsnormen/afstand_voorzieningen/nieuwe_tandarts → list<geometry (feature-collection, Point)> · map
+  beleidsnormen/afstand_voorzieningen/nieuwe_middelbare_school → list<geometry (feature-collection, Point)> · map
+  beleidsnormen/afstand_voorzieningen/nieuwe_basisschool → list<geometry (feature-collection, Point)> · map
+  beleidsnormen/afstand_voorzieningen/nieuwe_sportvoorziening → list<geometry (feature-collection, Point)> · map
+  beleidsnormen/afstand_voorzieningen/nieuwe_buurthuis → list<geometry (feature-collection, Point)> · map
+  beleidsnormen/afstand_voorzieningen/geometry → geometry (geometry, Polygon|MultiPolygon) · map
+beleidsnormen/beleidsnorm — needs area
+  beleidsnormen/beleidsnorm/beleidsnorm → list<json [`anyOf` is outside the supported JSON Schema subset]> · unsupported-keyword
+  beleidsnormen/beleidsnorm/new_geometry_objects → list<json [`anyOf` is outside the supported JSON Schema subset]> · unsupported-keyword
+  beleidsnormen/beleidsnorm/geometry → geometry (geometry, Polygon|MultiPolygon) · map
+beleidsnormen/echo — needs area
+  beleidsnormen/echo/stringInput → text
+  beleidsnormen/echo/arrayInput → list<number>
+  beleidsnormen/echo/boundingBoxInput → bbox · map
+  beleidsnormen/echo/mixedInput → json [`oneOf` is outside the supported JSON Schema subset] · unsupported-keyword
+  beleidsnormen/echo/pause → number
+beleidsnormen/geluidsbelasting — needs area
+  beleidsnormen/geluidsbelasting/geometry → geometry (geometry, Polygon|MultiPolygon) · map
+beleidsnormen/laadmogelijkheden — needs area
+  beleidsnormen/laadmogelijkheden/nieuwe_laadpalen → list<geometry (feature-collection, Point)> · map
+  beleidsnormen/laadmogelijkheden/output_crs → list<select>
+  beleidsnormen/laadmogelijkheden/geometry → list<geometry (geometry, Polygon|MultiPolygon)> · map
+beleidsnormen/oppervlakte_voorzieningen — needs area
+  beleidsnormen/oppervlakte_voorzieningen/output_crs → select
+  beleidsnormen/oppervlakte_voorzieningen/voorzieningstype → list<select>
+  beleidsnormen/oppervlakte_voorzieningen/parameters → json [no control for type `object`] · unsupported-type
+  beleidsnormen/oppervlakte_voorzieningen/geometry → geometry (geometry, Polygon|MultiPolygon) · map
+beleidsnormen/regel_30 — needs area
+  beleidsnormen/regel_30/geometry → geometry (geometry, Polygon|MultiPolygon) · map
+beleidsnormen/regel_300 — needs area
+  beleidsnormen/regel_300/output_crs → select
+  beleidsnormen/regel_300/groenpercentage → number
+  beleidsnormen/regel_300/schaduwpercentage → number
+  beleidsnormen/regel_300/minimale_grootte → number
+  beleidsnormen/regel_300/maximale_groenafstand → number
+  beleidsnormen/regel_300/nieuwe_bankjes → list<geometry (feature-collection, Point)> · map
+  beleidsnormen/regel_300/nieuwe_grasvelden → list<geometry (feature-collection, Polygon|MultiPolygon)> · map
+  beleidsnormen/regel_300/nieuwe_struiken → list<geometry (feature-collection, Polygon|MultiPolygon)> · map
+  beleidsnormen/regel_300/nieuwe_bomen → list<geometry (feature-collection, Point|Polygon|MultiPolygon)> · map
+  beleidsnormen/regel_300/geometry → geometry (geometry, Polygon|MultiPolygon) · map
+beleidsnormen/rustplekken — needs area
+  beleidsnormen/rustplekken/output_crs → select
+  beleidsnormen/rustplekken/parameters → json [no control for type `object`] · unsupported-type
+  beleidsnormen/rustplekken/nieuwe_bankjes → list<geometry (feature-collection, Point)> · map
+  beleidsnormen/rustplekken/geometry → geometry (geometry, Polygon|MultiPolygon) · map
+beleidsnormen/stedelijkheid — needs area
+  beleidsnormen/stedelijkheid/output_crs → select
+  beleidsnormen/stedelijkheid/geometry → geometry (geometry, Polygon|MultiPolygon) · map
+beleidsnormen/woningvoorraad — needs area
+  beleidsnormen/woningvoorraad/output_crs → select
+  beleidsnormen/woningvoorraad/geometry → geometry (geometry, Polygon|MultiPolygon) · map
+  beleidsnormen/woningvoorraad/parameters → list<json [no control for type `object`]> · unsupported-type
+  beleidsnormen/woningvoorraad/woningtype → list<select>
+beleidsnormen/zonal_stats — needs area
+  beleidsnormen/zonal_stats/statistiek → list<json [`oneOf` is outside the supported JSON Schema subset]> · unsupported-keyword
+  beleidsnormen/zonal_stats/geometry → geometry (geometry, Polygon|MultiPolygon) · map
+pygeoapi/breinstein-aerial — needs area
+  pygeoapi/breinstein-aerial/area → geometry (geometry, Polygon) · map
+pygeoapi/breinstein-area-what-if — needs area
+  pygeoapi/breinstein-area-what-if/geometry → geometry (geometry, Polygon|MultiPolygon) · map
+  pygeoapi/breinstein-area-what-if/nieuwe_punten → list<geometry (feature-collection, Point)> · map
+pygeoapi/breinstein-async-only — needs values
+  pygeoapi/breinstein-async-only/seconds → number
+  pygeoapi/breinstein-async-only/message → text
+pygeoapi/breinstein-bbox — needs area
+  pygeoapi/breinstein-bbox/bbox → bbox · map
+pygeoapi/breinstein-buildings — needs area
+  pygeoapi/breinstein-buildings/area → geometry (geometry, Polygon) · map
+pygeoapi/breinstein-dates — needs values
+  pygeoapi/breinstein-dates/day → text
+  pygeoapi/breinstein-dates/moment → text
+pygeoapi/breinstein-fail-late — needs values
+  pygeoapi/breinstein-fail-late/seconds → number
+  pygeoapi/breinstein-fail-late/message → text
+pygeoapi/breinstein-feature-area — needs data
+  pygeoapi/breinstein-feature-area/features → complex (JSON object, application/geo+json) · map
+pygeoapi/breinstein-formats — needs area
+  pygeoapi/breinstein-formats/area → bbox · map
+pygeoapi/breinstein-gml — needs area
+  pygeoapi/breinstein-gml/area → bbox · map
+  pygeoapi/breinstein-gml/crs → select
+pygeoapi/breinstein-inputs — needs area
+  pygeoapi/breinstein-inputs/label → text
+  pygeoapi/breinstein-inputs/notes → text
+  pygeoapi/breinstein-inputs/count → number
+  pygeoapi/breinstein-inputs/ratio → number
+  pygeoapi/breinstein-inputs/colour → select
+  pygeoapi/breinstein-inputs/enabled → checkbox
+  pygeoapi/breinstein-inputs/tags → list<text>
+  pygeoapi/breinstein-inputs/comment → text
+  pygeoapi/breinstein-inputs/area → geometry (geometry, Point|MultiPoint|LineString|MultiLineString|Polygon|MultiPolygon|GeometryCollection) · map
+pygeoapi/breinstein-kml — needs area
+  pygeoapi/breinstein-kml/area → bbox · map
+pygeoapi/breinstein-link — needs values
+pygeoapi/breinstein-png — needs values
+  pygeoapi/breinstein-png/size → number
+pygeoapi/breinstein-rd-link — needs values
+  pygeoapi/breinstein-rd-link/crs → select
+pygeoapi/breinstein-rotate — needs area
+  pygeoapi/breinstein-rotate/polygon → geometry (geometry, Polygon) · map
+pygeoapi/breinstein-sync-only — needs values
+  pygeoapi/breinstein-sync-only/seconds → number
+  pygeoapi/breinstein-sync-only/message → text
+pygeoapi/hello-world — needs values
+  pygeoapi/hello-world/name → text
+  pygeoapi/hello-world/message → text
+weaver/EchoProcess — needs area
+  weaver/EchoProcess/stringInput → select
+  weaver/EchoProcess/measureInput → json [`oneOf` is outside the supported JSON Schema subset] · unsupported-keyword
+  weaver/EchoProcess/dateInput → text
+  weaver/EchoProcess/doubleInput → number
+  weaver/EchoProcess/arrayInput → list<list<number>>
+  weaver/EchoProcess/complexObjectInput → json [`oneOf` is outside the supported JSON Schema subset] · unsupported-keyword
+  weaver/EchoProcess/geometryInput → list<list<geometry (geometry, Point|MultiPoint|LineString|MultiLineString|Polygon|MultiPolygon|GeometryCollection)>>
+  weaver/EchoProcess/boundingBoxInput → json [`oneOf` is outside the supported JSON Schema subset] · unsupported-keyword
+  weaver/EchoProcess/imagesInput → list<json [`oneOf` is outside the supported JSON Schema subset]> · unsupported-keyword
+  weaver/EchoProcess/featureCollectionInput → geometry (feature-collection, Point|MultiPoint|LineString|MultiLineString|Polygon|MultiPolygon|GeometryCollection) · map
+zoo-project/Buffer — needs data
+  zoo-project/Buffer/InputPolygon → complex (text/xml, JSON object) · map
+  zoo-project/Buffer/BufferDistance → number
+zoo-project/Centroid — needs data
+  zoo-project/Centroid/InputPolygon → complex (text/xml, text/xml (base64))
+zoo-project/EchoProcess — needs area
+  zoo-project/EchoProcess/literalInput → text
+  zoo-project/EchoProcess/complexInput → complex (text/xml, JSON object) · map
+  zoo-project/EchoProcess/c → bbox · map
+zoo-project/GdalExtractProfile — needs data
+  zoo-project/GdalExtractProfile/RasterFile → text
+  zoo-project/GdalExtractProfile/Geometry → complex (JSON object) · map
+zoo-project/Gdal_Translate — needs values
+  zoo-project/Gdal_Translate/Format → text
+  zoo-project/Gdal_Translate/GCP → list<text>
+  zoo-project/Gdal_Translate/InputDSN → text
+  zoo-project/Gdal_Translate/OutputDSN → text
+zoo-project/Gdal_Warp — needs values
+  zoo-project/Gdal_Warp/Format → text
+  zoo-project/Gdal_Warp/InputDSN → text
+  zoo-project/Gdal_Warp/OutputDSN → text
+  zoo-project/Gdal_Warp/s_srs → text
+  zoo-project/Gdal_Warp/t_srs → text
+  zoo-project/Gdal_Warp/tps → checkbox
+  zoo-project/Gdal_Warp/geoloc → checkbox
+  zoo-project/Gdal_Warp/rpc → checkbox
+  zoo-project/Gdal_Warp/r → checkbox
+  zoo-project/Gdal_Warp/order → text
+  zoo-project/Gdal_Warp/te → text
+zoo-project/HelloPy — needs values
+  zoo-project/HelloPy/a → text
+zoo-project/IsValid — needs data
+  zoo-project/IsValid/InputPolygon → complex (text/xml, text/xml (base64))
+zoo-project/OTB.ComputeOGRLayersFeaturesStatistics — needs data
+  zoo-project/OTB.ComputeOGRLayersFeaturesStatistics/inshp → complex (text/xml, application/vnd.google-earth.kml+xml, JSON object, application/zip (base64)) · map
+zoo-project/OTB.PixelValue — needs data
+  zoo-project/OTB.PixelValue/in → complex (image/tiff (base64), image/jpeg (base64), image/png (base64))
+  zoo-project/OTB.PixelValue/coordx → number
+  zoo-project/OTB.PixelValue/coordy → number
+  zoo-project/OTB.PixelValue/mode → select
+  zoo-project/OTB.PixelValue/mode.epsg.code → number
+zoo-project/Ogr2Ogr — needs values
+  zoo-project/Ogr2Ogr/F → text
+  zoo-project/Ogr2Ogr/InputDSN → text
+  zoo-project/Ogr2Ogr/OutputDSN → text
+  zoo-project/Ogr2Ogr/LCO → list<text>
+  zoo-project/Ogr2Ogr/DSCO → list<text>
+zoo-project/SAGA.db_odbc.9 — needs values
+  zoo-project/SAGA.db_odbc.9/CONNECTED → checkbox · contradictory-schema
+zoo-project/SAGA.garden_fractals.1 — needs values
+  zoo-project/SAGA.garden_fractals.1/TYPE → select
+  zoo-project/SAGA.garden_fractals.1/ANGLE → number
+  zoo-project/SAGA.garden_fractals.1/MINSIZE → number
+  zoo-project/SAGA.garden_fractals.1/METHOD → select
+  zoo-project/SAGA.garden_fractals.1/VARRANGE_MIN → number
+  zoo-project/SAGA.garden_fractals.1/VARRANGE_MAX → number
+zoo-project/SAGA.pointcloud_tools.5 — needs data
+  zoo-project/SAGA.pointcloud_tools.5/POINTS → complex (application/x-ogc-lasf (base64))
+zoo-project/SAGA.statistics_grid.12 — needs data
+  zoo-project/SAGA.statistics_grid.12/GRID → complex (image/tiff (base64), application/x-ogc-envi (base64), application/x-ogc-aaigrid (base64), image/png (base64))
+zoo-project/SAGA.statistics_points.3 — needs data
+  zoo-project/SAGA.statistics_points.3/POINTS → complex (text/xml, application/vnd.google-earth.kml+xml (base64), JSON object) · map
+zoo-project/SAGA.table_tools.22 — needs data
+  zoo-project/SAGA.table_tools.22/TABLE → complex (text/csv, text/csv (base64))
+zoo-project/Simplify — needs data
+  zoo-project/Simplify/InputPolygon → complex (text/xml, JSON object) · map
+  zoo-project/Simplify/Tolerance → number
+zoo-project/display — needs data
+  zoo-project/display/tmpl → complex (JSON object) · map
+zoo-project/echo — needs area
+  zoo-project/echo/a → text
+  zoo-project/echo/b → complex (text/xml, JSON object) · map
+  zoo-project/echo/c → bbox · map
+  zoo-project/echo/pause → number
+zoo-project/longProcess — needs values
+  zoo-project/longProcess/sid → number

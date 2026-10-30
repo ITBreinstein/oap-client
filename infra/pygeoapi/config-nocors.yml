@@ -124,6 +124,13 @@ resources:
     type: process
     processor:
       name: breinstein_feature_area.FeatureAreaProcessor
+  # An area and a repeatable layer of points, described as the Beleidsnormen
+  # API describes its inputs; how many points are inside, and the area. Source
+  # and rationale: infra/pygeoapi/plugins/breinstein_area_what_if.py.
+  breinstein-area-what-if:
+    type: process
+    processor:
+      name: breinstein_area_what_if.AreaWhatIfProcessor
   # A polygon in, the buildings in it out, from PDOK's BAG; inline or by
   # reference. Needs the network. Source and rationale:
   # infra/pygeoapi/plugins/breinstein_buildings.py.
