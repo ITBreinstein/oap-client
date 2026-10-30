@@ -51,7 +51,7 @@ import { cors } from "hono/cors";
 import { streamSSE } from "hono/streaming";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { clientKey, type ClientKey } from "./client-address.js";
-import { parseConfig, type EndpointConfig, type RelayConfig } from "./config.js";
+import { parseConfig, PROCESS_ID, type EndpointConfig, type RelayConfig } from "./config.js";
 import { systemSchedule, UpstreamError, type Schedule, type UpstreamFailure } from "./exchange.js";
 import {
   forward as forwardUpstream,
@@ -77,16 +77,6 @@ import { executionUrl, postExecute, type ExecuteAnswer } from "./upstream.js";
 function isCallbackKind(value: string): value is CallbackKind {
   return CALLBACK_KINDS.some((kind) => kind === value);
 }
-
-/**
- * Server ids are chosen by the server, and the specification does not restrict
- * them. This admits ZOO's `OTB.BandMath` and namespaced ids such as
- * `ns:process:v1`, and nothing that could change the shape of the URL it is
- * placed into: no `/`, `\`, `?`, `#`, `%` or `@`, and no leading `.` or `:`.
- * A colon is safe because `upstream.ts` percent-encodes the id into its own
- * path segment; this pattern is the second guard, not the only one.
- */
-const PROCESS_ID = /^[A-Za-z0-9_][A-Za-z0-9._~:-]{0,127}$/;
 
 /**
  * What happened, for tests and operators. Carries no token, no URL and no
@@ -603,6 +593,8 @@ export function createApp(options: AppOptions = {}): Hono {
         executeRoute: endpoint.executeRoute,
         readRoute: endpoint.readRoute,
         callbacks: endpoint.callbacks,
+        // Left out of the JSON when the endpoint names none.
+        processes: endpoint.processes,
       })),
     }),
   );

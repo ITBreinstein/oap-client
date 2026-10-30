@@ -128,12 +128,20 @@ All three are made in the config, before any request exists.
   refuses makes the server wait for its connection attempt to time out,
   about two minutes, before it rewrites the job (review W14).
 
+One more per-endpoint setting is not a decision about routes at all:
+`processes`, an optional list of process ids, narrows what the web app _lists_
+for that endpoint, for a deployment that carries far more processes than a
+demo needs. A non-empty list of distinct ids, each one the execute route would
+accept. It is not access control: the relay forwards nothing on the strength
+of it, and the page still reads the whole list, records its size, and says how
+many it left out.
+
 ## HTTP API
 
 | Route                                     | Caller     | Answers                                                                                                                          |
 | ----------------------------------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------- |
 | `GET /healthz`                            | operator   | `{ "ok": true }`, and `"build"` when the process was started with `RELAY_BUILD_ID`                                               |
-| `GET /endpoints`                          | browser    | each endpoint's `key`, `baseUrl`, `executeRoute`, `readRoute`, `callbacks`                                                       |
+| `GET /endpoints`                          | browser    | each endpoint's `key`, `baseUrl`, `executeRoute`, `readRoute`, `callbacks`, and `processes` when set                             |
 | `POST /sessions`                          | browser    | `201 { token, expiresAt }` — the session token                                                                                   |
 | `GET /sessions/events`                    | browser    | `text/event-stream`: `ready`, then `job` events `{ "ref", "callbacks" }`: the callbacks called since the last event for that job |
 | `POST /execute/{endpointKey}/{processId}` | browser    | `{ upstream: { status, location, contentType, preferenceApplied, body }, registration: { ref } \| null }`                        |
