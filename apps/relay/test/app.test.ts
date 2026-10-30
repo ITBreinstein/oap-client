@@ -263,6 +263,22 @@ describe("GET /endpoints", () => {
       ],
     });
   });
+
+  it("passes on the process ids an endpoint names, and nothing for one that names none", async () => {
+    const app = createApp({
+      config: parseConfig({
+        endpoints: [
+          { key: "some", baseUrl: "https://ogc.test", processes: ["hellojs", "Buffer"] },
+          { key: "all", baseUrl: "https://ogc.test" },
+        ],
+      }),
+    });
+    const body = (await (await app.request("/endpoints")).json()) as {
+      endpoints: Record<string, unknown>[];
+    };
+    expect(body.endpoints[0]).toMatchObject({ key: "some", processes: ["hellojs", "Buffer"] });
+    expect(body.endpoints[1]).not.toHaveProperty("processes");
+  });
 });
 
 describe("CORS", () => {

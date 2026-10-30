@@ -40,6 +40,15 @@ describe("parseEndpoints", () => {
     expect(parseEndpoints({ endpoints: [older] })).toEqual([{ ...older, readRoute: "direct" }]);
   });
 
+  it("reads the process ids an endpoint names, and none for one that names none", () => {
+    const [named] = parseEndpoints({
+      endpoints: [{ ...endpoint, processes: ["hellojs", "Buffer"] }],
+    });
+    expect(named?.processes).toEqual(["hellojs", "Buffer"]);
+    const [all] = parseEndpoints({ endpoints: [endpoint] });
+    expect(all).not.toHaveProperty("processes");
+  });
+
   it.each([
     ["not an object", "endpoints"],
     ["no list", {}],
@@ -50,6 +59,13 @@ describe("parseEndpoints", () => {
     ["an execute route it does not know", { endpoints: [{ ...endpoint, executeRoute: "both" }] }],
     ["a read route it does not know", { endpoints: [{ ...endpoint, readRoute: "both" }] }],
     ["callbacks that are not a boolean", { endpoints: [{ ...endpoint, callbacks: "yes" }] }],
+    ["a process list that is not a list", { endpoints: [{ ...endpoint, processes: "hellojs" }] }],
+    ["a process id that is not a string", { endpoints: [{ ...endpoint, processes: ["a", 7] }] }],
+    [
+      "an empty process list, which would hide them all",
+      { endpoints: [{ ...endpoint, processes: [] }] },
+    ],
+    ["a process id listed twice", { endpoints: [{ ...endpoint, processes: ["a", "a"] }] }],
   ])("refuses %s", (_case, value) => {
     expect(() => parseEndpoints(value)).toThrow(RelayContractError);
   });

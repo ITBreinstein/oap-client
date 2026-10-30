@@ -40,7 +40,7 @@ import {
   type Resolver,
 } from "./address-guard.js";
 import type { EndpointConfig } from "./config.js";
-import { systemSchedule, UpstreamError, type Schedule } from "./exchange.js";
+import { systemSchedule, UpstreamError, type Schedule, type UpstreamFailure } from "./exchange.js";
 
 /** Request headers the browser may send upstream. Everything else is dropped. */
 export const FORWARDED_REQUEST_HEADERS = [
@@ -243,8 +243,11 @@ export function forward(
   }, options.timeoutMs);
 
   const hop = (url: URL, redirectsFollowed: number): Promise<ForwardedResponse> => {
+    // Every failure says how far the exchange got, for the audit line.
+    const upstreamError = (reason: UpstreamFailure, cause?: unknown): UpstreamError =>
+      new UpstreamError(reason, { redirectsFollowed, ...(cause === undefined ? {} : { cause }) });
     if (!endpoint.allowPrivateNetwork && isBlockedHost(url.hostname)) {
-      return Promise.reject(new UpstreamError("blocked-address"));
+      return Promise.reject(upstreamError("blocked-address"));
     }
     const transport = url.protocol === "https:" ? https : http;
 
@@ -265,13 +268,13 @@ export function forward(
       });
 
       onDeadline = () => {
-        fail(new UpstreamError("timeout"));
+        fail(upstreamError("timeout"));
         outgoing.destroy();
       };
 
       outgoing.on("error", (cause: NodeJS.ErrnoException) => {
         const blocked = cause.code === "ENOTFOUND" && cause.message.startsWith("refused:");
-        fail(new UpstreamError(blocked ? "blocked-address" : "connection-failed", { cause }));
+        fail(upstreamError(blocked ? "blocked-address" : "connection-failed", cause));
       });
 
       outgoing.on("response", (response) => {
@@ -291,7 +294,7 @@ export function forward(
             response.destroy();
             settled = true;
             if (redirectsFollowed >= MAX_REDIRECTS) {
-              rejectPromise(new UpstreamError("redirect-limit"));
+              rejectPromise(upstreamError("redirect-limit"));
               return;
             }
             hop(target, redirectsFollowed + 1).then(resolvePromise, rejectPromise);
@@ -303,7 +306,7 @@ export function forward(
         const declared = Number(response.headers["content-length"]);
         if (Number.isFinite(declared) && declared > options.maxResponseBytes) {
           response.destroy();
-          fail(new UpstreamError("response-too-large"));
+          fail(upstreamError("response-too-large"));
           return;
         }
 

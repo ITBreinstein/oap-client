@@ -29,6 +29,12 @@
  * the relay's *availability* part of the job's correctness. Polling works
  * without it.
  *
+ * `processes` narrows what the web app *lists* for an endpoint, for a
+ * deployment that carries far more than the demo needs. It is a presentation
+ * choice made in configuration, so no code has to name a server. It is not
+ * access control: the relay forwards nothing on the strength of it, and the
+ * page still reads the whole list and records its size.
+ *
  * ## Private addresses take two keys
  *
  * An endpoint on `http:`, or on a loopback, private or otherwise reserved
@@ -77,6 +83,8 @@ export interface EndpointConfig {
   readonly baseUrl: string;
   readonly executeRoute: ExecuteRoute;
   readonly readRoute: ReadRoute;
+  /** The process ids the web app lists for this endpoint. Absent: all of them. */
+  readonly processes?: readonly string[] | undefined;
   /** Whether the relay registers callbacks for jobs it starts here. */
   readonly callbacks: boolean;
   /**
@@ -280,6 +288,7 @@ const ENDPOINT_MEMBERS = [
   "readRoute",
   "callbacks",
   "allowPrivateNetwork",
+  "processes",
 ] as const;
 
 const LIMIT_MEMBERS: readonly (keyof RelayLimits)[] = [
@@ -319,6 +328,36 @@ const PER_ENDPOINT_MEMBERS: readonly (keyof PerEndpointLimits)[] = [
   "requestsPerMinute",
   "inFlight",
 ];
+
+/**
+ * Server ids are chosen by the server, and the specification does not restrict
+ * them. This admits ZOO's `OTB.BandMath` and namespaced ids such as
+ * `ns:process:v1`, and nothing that could change the shape of the URL it is
+ * placed into: no `/`, `\`, `?`, `#`, `%` or `@`, and no leading `.` or `:`.
+ * A colon is safe because `upstream.ts` percent-encodes the id into its own
+ * path segment; this pattern is the second guard, not the only one. The
+ * execute route checks against it too, so a configured process list and the
+ * route accept the same ids.
+ */
+export const PROCESS_ID = /^[A-Za-z0-9_][A-Za-z0-9._~:-]{0,127}$/;
+
+/** `processes`: absent, or a non-empty list of distinct process ids. */
+function readProcessIds(record: Record<string, unknown>, path: string): string[] | undefined {
+  const value = record["processes"];
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value) || value.length === 0) {
+    throw new ConfigError(`${path}.processes`, "must be a non-empty array of process ids");
+  }
+  const ids: string[] = [];
+  for (const [index, entry] of value.entries()) {
+    if (typeof entry !== "string" || !PROCESS_ID.test(entry)) {
+      throw new ConfigError(`${path}.processes[${String(index)}]`, "is not a process id");
+    }
+    if (ids.includes(entry)) throw new ConfigError(`${path}.processes`, `repeats ${entry}`);
+    ids.push(entry);
+  }
+  return ids;
+}
 
 function parseEndpoint(value: unknown, path: string, options: ParseOptions): EndpointConfig {
   if (!isRecord(value)) throw new ConfigError(path, "must be an object");
@@ -363,6 +402,7 @@ function parseEndpoint(value: unknown, path: string, options: ParseOptions): End
     baseUrl,
     executeRoute: route,
     readRoute,
+    processes: readProcessIds(value, path),
     callbacks: readBoolean(value, "callbacks", path, false),
     allowPrivateNetwork,
   };

@@ -96,6 +96,15 @@ docker compose -f infra/compose/pygeoapi.yml up -d --wait   # :5080 with CORS, :
    directly**: the relay only accepts the keys it was configured with, and is
    not a general proxy.
 
+A configured endpoint may also name the `processes` to list. The process list
+then shows only those, in the server's order, under a line such as "46 of the
+703 processes this server lists, as configured for this service", followed by
+any configured ids the server lacks. If none of them is on the server, the page
+says so and lists everything, so a stale list never leaves nothing to open. It
+narrows what is shown and nothing else: the census in the Developer section
+still describes every process the server lists, and an example still opens a
+process the list leaves out.
+
 Which of the reference servers a page can read at all, measured in Chromium on
 2026-09-23 (Task 7, Z1):
 
