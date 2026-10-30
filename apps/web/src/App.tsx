@@ -33,6 +33,7 @@ import { mapNeeded } from "./app/map-need.js";
 import { MapPane } from "./app/MapPane.js";
 import { createWorldMap } from "./map/MapView.js";
 import { needsOfPlan, type Needs } from "./app/needs.js";
+import { listedProcesses } from "./app/listed-processes.js";
 import { ProcessListScreen } from "./app/ProcessListScreen.js";
 import { ProcessScreen, RequestLog } from "./app/ProcessScreen.js";
 import { AboutFooter, AboutPanel } from "./app/AboutPanel.js";
@@ -443,12 +444,15 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
         />
       );
       break;
-    case "connected":
+    case "connected": {
+      // Narrowed here, as it is drawn: the workflow keeps the whole list.
+      const listed = listedProcesses(state.endpoint, state.processes);
       screen = (
         <ProcessListScreen
           endpoint={state.endpoint}
           service={state.service}
-          processes={state.processes}
+          processes={listed.processes}
+          listFilter={listed.listFilter}
           opening={state.opening}
           route={state.route}
           needs={listNeeds}
@@ -460,6 +464,7 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
         />
       );
       break;
+    }
     case "process":
     case "running":
     case "result":

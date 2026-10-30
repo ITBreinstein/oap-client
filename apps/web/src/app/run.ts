@@ -88,6 +88,7 @@ export function relayEndpointFor(endpoint: EndpointRef): RelayEndpoint {
         executeRoute: endpoint.executeRoute,
         readRoute: endpoint.readRoute,
         callbacks: endpoint.callbacks,
+        ...(endpoint.processes === undefined ? {} : { processes: endpoint.processes }),
       }
     : {
         key: "typed",

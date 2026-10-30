@@ -49,6 +49,8 @@ export type EndpointRef =
       /** Whether the relay may carry this endpoint's reads, once the user confirmed. */
       readonly readRoute: "direct" | "relay";
       readonly callbacks: boolean;
+      /** The process ids to list, when the configuration names some. Absent: all. */
+      readonly processes?: readonly string[] | undefined;
     }
   | { readonly source: "typed"; readonly baseUrl: string };
 
