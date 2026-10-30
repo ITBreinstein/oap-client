@@ -49,18 +49,26 @@ function describeTarget(control: GeometryControl): string {
 }
 
 export function GeometryField(props: ControlProps<GeometryControl>) {
-  const { control, value, onChange, inputId, label } = props;
+  const { control, value, onChange, inputId, row, label } = props;
   // STYLE TRIAL: the updated Instrument lays GeoJSON out with tabs.
   const updated = useUpdated();
   const draw = useContext(DrawContext);
   const base = useId();
   const [message, setMessage] = useState<string | undefined>();
   const text = isGeoJsonText(value) ? value.geojson : "";
-  const drawing = inputId !== undefined && draw.fieldId === inputId;
+  const drawing = inputId !== undefined && draw.fieldId === inputId && draw.row === row;
+  // Points keep coming for an input that holds several (3.4): the field says so.
+  const severalPoints = holdsSeveral(control) && drawableTypes(control).includes("Point");
+  // In a repeatable field, each row's controls say which row they are for, in
+  // their name: the visible words first, so the name still holds what is seen.
+  const named = (words: string) =>
+    row === undefined ? undefined : `${words}, value ${String(row + 1)}`;
   const canDraw = inputId !== undefined && draw.available && drawableTypes(control).length > 0;
   // An area input can take the map's view as its area (#18).
   const canView =
     inputId !== undefined && draw.available && drawableTypes(control).includes("Polygon");
+  // A oneOf of GeoJSON among other formats (#G2b): the field says they exist.
+  const others = control.otherFormats ?? [];
   const tooMany = useTooManyToEdit(text);
   const size = useMemo(() => sizeOfGeoJsonText(text), [text]);
   // A value too large to edit — loaded or pasted while drawing — ends drawing.
@@ -76,11 +84,24 @@ export function GeometryField(props: ControlProps<GeometryControl>) {
   return (
     <div className="geometry">
       <p className="help">{describeTarget(control)}</p>
+      {others.length > 0 && (
+        <p className="help" data-testid="other-formats">
+          The service also accepts this input as{" "}
+          {others.map((format, index) => (
+            <span key={format}>
+              {index === 0 ? "" : index === others.length - 1 ? " or " : ", "}
+              <code>{format}</code>
+            </span>
+          ))}
+          . The page sends GeoJSON, the one format the map can make.
+        </p>
+      )}
       <p>
         <label htmlFor={`${base}-geojson`}>GeoJSON</label>
         <CopyField text={text} name={`Copy ${label}`} multiline>
           <textarea
             id={`${base}-geojson`}
+            aria-label={named("GeoJSON")}
             className="code"
             aria-invalid={props.invalid === true ? true : undefined}
             aria-describedby={props.boxTrouble === undefined ? undefined : `${props.id}-error`}
@@ -112,6 +133,7 @@ export function GeometryField(props: ControlProps<GeometryControl>) {
         <label htmlFor={`${base}-file`}>Or load a GeoJSON file</label>
         <input
           id={`${base}-file`}
+          aria-label={named("Or load a GeoJSON file")}
           type="file"
           accept=".geojson,.json,application/geo+json,application/json"
           onChange={(event) => {
@@ -167,11 +189,13 @@ export function GeometryField(props: ControlProps<GeometryControl>) {
             type="button"
             className={drawing ? "" : "secondary"}
             aria-pressed={drawing}
+            aria-label={named(drawing ? "Stop drawing" : "Draw on the map")}
+            data-row={row}
             disabled={tooMany !== undefined}
             aria-describedby={tooMany === undefined ? undefined : `${base}-too-many`}
             onClick={() => {
               if (drawing) draw.stop();
-              else draw.start(inputId);
+              else draw.start(inputId, row);
             }}
           >
             {drawing ? "Stop drawing" : "Draw on the map"}
@@ -181,6 +205,7 @@ export function GeometryField(props: ControlProps<GeometryControl>) {
           <button
             type="button"
             className="secondary"
+            aria-label={named("Use the current map view")}
             onClick={() => {
               const view = draw.currentView?.();
               if (view === undefined) return;
@@ -197,6 +222,7 @@ export function GeometryField(props: ControlProps<GeometryControl>) {
         <button
           type="button"
           className="secondary"
+          aria-label={named("Clear")}
           onClick={() => {
             setMessage(undefined);
             set("");
@@ -209,6 +235,8 @@ export function GeometryField(props: ControlProps<GeometryControl>) {
       {canDraw && (
         <p className="help draw-hint">
           Drawing needs a mouse or touch. You can also paste GeoJSON or use the current map view.
+          {severalPoints &&
+            " With Add point, each click on the map adds a point, until you press Esc, choose another tool or Stop drawing."}
         </p>
       )}
     </div>

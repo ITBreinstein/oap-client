@@ -15,7 +15,7 @@
 
 import { redactUrl, type Observation } from "@breinstein/oap-client";
 import type { EncodeNote } from "./forms/encode.js";
-import type { Diagnostic, DiagnosticCode } from "./forms/plan.js";
+import type { Diagnostic, DiagnosticCode, FieldPlan, GeometryRecognisedBy } from "./forms/plan.js";
 import type { RelayOutcome } from "./relay/relay-fetch.js";
 import {
   isTruncated,
@@ -49,11 +49,18 @@ export interface FormObservation {
      * (package 6): `keyword` says why — `$ref`, `pattern`, `size`,
      * `unevaluatedProperties` or `unevaluatedItems`.
      */
-    | "schema-not-checked";
+    | "schema-not-checked"
+    /**
+     * Not a degradation: a geometry input, and the pattern in its schema that
+     * said GeoJSON (`recognisedBy`). One per geometry input, repeatable or not.
+     */
+    | "geometry-recognised";
   /** The schema keyword that caused a fallback: `oneOf`, `type`, `enum`, … */
   readonly keyword: string | undefined;
   /** For the bbox codes, the CRS URI involved. A URI, never a coordinate. */
   readonly crs: string | undefined;
+  /** For `geometry-recognised`, which pattern: a keyword name, never a schema body. */
+  readonly recognisedBy: GeometryRecognisedBy | undefined;
 }
 
 /**
@@ -272,7 +279,32 @@ export function formObservationsFor(
     code: diagnostic.code,
     keyword: diagnostic.keyword,
     crs: undefined,
+    recognisedBy: undefined,
   }));
+}
+
+/** How each geometry input was recognised, a repeatable one included. */
+export function geometryObservationsFor(
+  endpoint: string,
+  processId: string,
+  fields: readonly FieldPlan[],
+): FormObservation[] {
+  return fields.flatMap((field) => {
+    const control = field.control.kind === "list" ? field.control.item : field.control;
+    if (control.kind !== "geometry") return [];
+    return [
+      {
+        kind: "form",
+        endpoint: redactUrl(endpoint),
+        processId,
+        inputId: field.id,
+        code: "geometry-recognised",
+        keyword: undefined,
+        crs: undefined,
+        recognisedBy: control.recognisedBy,
+      },
+    ];
+  });
 }
 
 /**

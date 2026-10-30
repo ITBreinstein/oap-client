@@ -248,6 +248,36 @@ process:` whatever the failure was.
 `breinstein-buildings` reach the network; the contract lane never runs them,
 and their browser tests skip when PDOK is not answering.
 
+### `breinstein-area-what-if`
+
+```yaml
+breinstein-area-what-if:
+  type: process
+  processor:
+    name: breinstein_area_what_if.AreaWhatIfProcessor
+```
+
+Its inputs are described exactly as the Beleidsnormen API describes its own
+(2026-10-29), so the web client's handling of them is tested in the blocking
+lane: that server sends no CORS headers and is another party's dev server.
+
+| Input           | Copied from                  | Shape                                                                                          |
+| --------------- | ---------------------------- | ---------------------------------------------------------------------------------------------- |
+| `geometry`      | `regel_30.geometry`          | a `oneOf` of a structural `Polygon` and `MultiPolygon`, each with `format: "geojson-geometry"` |
+| `nieuwe_punten` | `rustplekken.nieuwe_bankjes` | a structural FeatureCollection of Points, no format, no `$ref`, `maxOccurs: "unbounded"`       |
+
+It returns one JSON object: `inside`, how many of the points fall inside the
+area or on its edge; `points`, how many were sent; `area_m2`, the geodesic area;
+and `points_as`, how `nieuwe_punten` arrived — `"array"`, `"single"` or
+`"absent"`. A spec-correct server takes a repeatable input as an array, even of
+one value (`/req/core/process-execute-input-array`), and may take a lone value;
+this one takes both, bare or qualified, and says which it got, so a browser
+test can tell what was sent from what arrived. The Beleidsnormen API ignores
+the array (2026-10-29).
+
+Coordinates must be longitude and latitude: RD New metres are refused, not
+read as degrees.
+
 ### `breinstein-link`
 
 One output, always given by reference, to a static file on the _other_

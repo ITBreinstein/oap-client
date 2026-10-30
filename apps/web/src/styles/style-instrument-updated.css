@@ -890,6 +890,17 @@
   color: var(--warning);
 }
 
+/*
+ * Cancelled — by you, by the server (`dismissed`), or a job the server no
+ * longer has, which the badge calls cancelled: red, outlined only, so it is
+ * not read as failed, which is filled.
+ */
+[data-variant="updated"] .job-badge[data-job-state="cancelled"],
+[data-variant="updated"] .job-badge[data-job-state="dismissed"],
+[data-variant="updated"] .job-badge[data-job-state="gone"] {
+  color: var(--error);
+}
+
 /* Label and value side by side, the labels in one column. */
 [data-variant="updated"] .job-facts {
   display: grid;

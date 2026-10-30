@@ -1,8 +1,9 @@
 /**
- * How a field holds GeoJSON the map can draw: a geometry field, or a complex
- * field's JSON-object format given inline. `MapPane` draws and edits through
- * it; the record of what was sent asks it whether the map shows a value.
- * No map import here, so neither needs the map to ask.
+ * How a field holds GeoJSON the map can draw: a geometry field, one row of a
+ * repeatable geometry field, or a complex field's JSON-object format given
+ * inline. `MapPane` draws and edits through it; the record of what was sent
+ * asks it whether the map shows a value. No map import here, so neither needs
+ * the map to ask.
  */
 
 import type { ComplexValue, GeoJsonText } from "../forms/encode.js";
@@ -29,16 +30,40 @@ export interface ShapeBinding {
   readonly write: (text: string) => unknown;
 }
 
-export function shapeBinding(field: FieldPlan, current: unknown): ShapeBinding | undefined {
+function geoJsonValue(text: string): GeoJsonText | undefined {
+  return text === "" ? undefined : { geojson: text };
+}
+
+/** A repeatable input's rows, as the list holds them: a lone value is a list of one. */
+function rowsOf(value: unknown): readonly unknown[] {
+  if (Array.isArray(value)) return value;
+  return value === undefined ? [] : [value];
+}
+
+/**
+ * The map draws for one field — for a repeatable geometry field, for one of its
+ * rows, `row`: the others stay as they are.
+ */
+export function shapeBinding(
+  field: FieldPlan,
+  current: unknown,
+  row?: number,
+): ShapeBinding | undefined {
   const { control } = field;
   if (control.kind === "geometry") {
     return {
       target: control,
       text: readText(current, "geojson") ?? "",
-      write: (text) => {
-        const value: GeoJsonText = { geojson: text };
-        return text === "" ? undefined : value;
-      },
+      write: geoJsonValue,
+    };
+  }
+  if (control.kind === "list" && control.item.kind === "geometry") {
+    const rows = rowsOf(current);
+    if (row === undefined || row < 0 || row >= rows.length) return undefined;
+    return {
+      target: control.item,
+      text: readText(rows[row], "geojson") ?? "",
+      write: (text) => rows.map((item, at) => (at === row ? geoJsonValue(text) : item)),
     };
   }
   if (control.kind === "complex") {
@@ -58,13 +83,35 @@ export function shapeBinding(field: FieldPlan, current: unknown): ShapeBinding |
   return undefined;
 }
 
+/** GeoJSON the map can show for a field, and which row of a repeatable one it is. */
+export interface FieldText {
+  readonly text: string;
+  readonly row?: number | undefined;
+}
+
+/**
+ * Every GeoJSON text a field holds that the map can show: its one value, or
+ * each row of a repeatable geometry field but `except`, the row being drawn.
+ */
+export function fieldTexts(field: FieldPlan, current: unknown, except?: number): FieldText[] {
+  const { control } = field;
+  if (control.kind === "list" && control.item.kind === "geometry") {
+    return rowsOf(current).flatMap((item, row) =>
+      row === except ? [] : [{ text: readText(item, "geojson") ?? "", row }],
+    );
+  }
+  const binding = shapeBinding(field, current);
+  return binding === undefined ? [] : [{ text: binding.text }];
+}
+
 /**
  * Whether the map draws this value as the input's dashed outline: it holds
- * shapes, and no more positions than the page draws (`map-limits.ts`).
+ * shapes, and no more positions than the page draws (`map-limits.ts`). For a
+ * repeatable geometry input, whether it draws any row.
  */
 export function shownOnMap(field: FieldPlan, value: unknown, maxCoordinates: number): boolean {
-  const binding = shapeBinding(field, value);
-  if (binding === undefined) return false;
-  const shapes = shapesOfText(binding.text);
-  return shapes.length > 0 && positionCount(shapes) <= maxCoordinates;
+  return fieldTexts(field, value).some(({ text }) => {
+    const shapes = shapesOfText(text);
+    return shapes.length > 0 && positionCount(shapes) <= maxCoordinates;
+  });
 }
