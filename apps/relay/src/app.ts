@@ -513,7 +513,7 @@ export function createApp(options: AppOptions = {}): Hono {
       ...auditBase(kind, endpoint, request),
       upstreamStatus: undefined,
       failure: reason,
-      redirectsFollowed: 0,
+      redirectsFollowed: error instanceof UpstreamError ? error.redirectsFollowed : 0,
       bytes: 0,
       ms: clock.now() - started,
       capHit:

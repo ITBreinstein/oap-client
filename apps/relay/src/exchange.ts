@@ -29,11 +29,17 @@ export type UpstreamFailure =
 
 export class UpstreamError extends Error {
   readonly reason: UpstreamFailure;
+  /** Read route: the redirects followed before the exchange failed, for the audit line. */
+  readonly redirectsFollowed: number;
 
-  constructor(reason: UpstreamFailure, options?: ErrorOptions) {
+  constructor(
+    reason: UpstreamFailure,
+    options?: ErrorOptions & { readonly redirectsFollowed?: number | undefined },
+  ) {
     super(`upstream exchange failed: ${reason}`, options);
     this.name = "UpstreamError";
     this.reason = reason;
+    this.redirectsFollowed = options?.redirectsFollowed ?? 0;
   }
 }
 

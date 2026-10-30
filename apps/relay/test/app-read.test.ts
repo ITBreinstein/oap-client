@@ -459,6 +459,15 @@ describe("audit", () => {
     });
   });
 
+  it("records the redirects followed before an exchange failed, not zero", async () => {
+    const h = harness(() =>
+      Promise.reject(new UpstreamError("redirect-limit", { redirectsFollowed: 3 })),
+    );
+    const response = await read(h, "/read/zoo/processes");
+    expect(response.status).toBe(502);
+    expect(h.audits[0]).toMatchObject({ failure: "redirect-limit", redirectsFollowed: 3 });
+  });
+
   it("writes nothing for a refusal, since nothing was forwarded", async () => {
     const h = harness();
     await read(h, "/read/async-only/processes");

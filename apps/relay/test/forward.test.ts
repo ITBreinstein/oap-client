@@ -422,16 +422,32 @@ describe("forward", () => {
     expect(asked).toEqual([HOST]);
   });
 
-  it(`stops after ${String(MAX_REDIRECTS)} redirects`, async () => {
+  it(`stops after ${String(MAX_REDIRECTS)} redirects, and says how many it followed`, async () => {
     handlers.set("/api/loop", (_request, response) => {
       response.writeHead(307, { Location: "/api/loop" }).end();
     });
     const asked: string[] = [];
-    const reason = await failure(
-      forward(endpoint(), get("/loop"), { ...limits, lookup: loopbackLookup(asked) }),
-    );
-    expect(reason).toBe("redirect-limit");
+    const error: unknown = await forward(endpoint(), get("/loop"), {
+      ...limits,
+      lookup: loopbackLookup(asked),
+    }).catch((cause: unknown) => cause);
+    expect(error).toBeInstanceOf(UpstreamError);
+    expect(error).toMatchObject({ reason: "redirect-limit", redirectsFollowed: MAX_REDIRECTS });
     expect(asked).toHaveLength(MAX_REDIRECTS + 1);
+  });
+
+  it("says how many redirects it followed when a later hop fails", async () => {
+    handlers.set("/api/hop-then-big", (_request, response) => {
+      response.writeHead(302, { Location: "/api/big" }).end();
+    });
+    handlers.set("/api/big", (_request, response) => {
+      response.writeHead(200, { "Content-Length": String(limits.maxResponseBytes + 1) }).end();
+    });
+    const error: unknown = await forward(endpoint(), get("/hop-then-big"), {
+      ...limits,
+      lookup: loopbackLookup([]),
+    }).catch((cause: unknown) => cause);
+    expect(error).toMatchObject({ reason: "response-too-large", redirectsFollowed: 1 });
   });
 
   it("drops a redirect it follows rather than reading its body, which no cap covers", async () => {
