@@ -21,6 +21,7 @@ const captures = import.meta.glob<string>("../fixtures/forms/*/*.json", {
 });
 
 type Name =
+  | "beleidsnormen-one-row-list"
   | "hand-written-undocumented-array"
   | "zoo-inline-csv"
   | "zoo-inline-geojson-polygons"
@@ -115,6 +116,29 @@ describe("requests sent to the pinned ZOO-Project", () => {
     });
     expect(sent).toEqual(expected);
     expect(polygons).toEqual({ value: polygons.value });
+  });
+});
+
+describe("a request sent to the Beleidsnormen API", () => {
+  it("sends a repeatable geometry with one row as an array of one", () => {
+    // /req/core/process-execute-input-array: a server SHALL accept an array
+    // for an input with maxOccurs > 1, "even if the input consists of a
+    // single value". This server answered 200 and read no bench from it; the
+    // same FeatureCollection sent on its own was read. The array stays: it is
+    // the one form every server must take, and switching to the bare form
+    // would stop the array path from ever being exercised.
+    const name = "beleidsnormen-one-row-list";
+    const inputs = capturedInputs(name);
+    const area = inputs["geometry"] as { value: unknown };
+    const [benches] = inputs["nieuwe_bankjes"] as [{ value: unknown }];
+    const { sent, expected } = compare(name, {
+      geometry: { geojson: JSON.stringify(area.value) },
+      nieuwe_bankjes: [{ geojson: JSON.stringify(benches.value) }],
+    });
+    expect(sent).toEqual(expected);
+    expect(expected["nieuwe_bankjes"]).toEqual([
+      { value: benches.value, mediaType: "application/geo+json" },
+    ]);
   });
 });
 

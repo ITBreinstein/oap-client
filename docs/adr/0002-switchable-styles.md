@@ -165,7 +165,10 @@ When one of the two versions is chosen:
 1. If the update is kept, move the rules of
    `src/styles/style-instrument-updated.css` into `style-instrument.css`
    without the `[data-variant="updated"]` prefix; if it is not, leave them
-   out. Either way, delete the file and its import in `src/main.tsx`.
+   out. Either way, delete the file and its import in `src/main.tsx`. The
+   same for the update's shape block in `src/styles/tokens.css`
+   (`[data-style="instrument"][data-variant="updated"]`): move its values
+   into the shape block, or delete it.
 2. `src/app/appearance.ts`: drop `"instrument-updated"` from `STYLE_NAMES`
    and stop writing `data-variant`; `src/app/AppearanceControl.tsx`: drop
    the "Style" fieldset and `STYLE_LABELS`, keeping "Night mode".

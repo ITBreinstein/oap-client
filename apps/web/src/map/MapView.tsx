@@ -55,6 +55,10 @@ const TOOL_HINTS: Readonly<Record<Tool, string>> = {
   Rectangle: "Drag, or click two corners, to draw a box.",
 };
 
+/** For an input that holds several: the point tool stays on (3.4). */
+const POINTS_HINT =
+  "Each click adds a point. Press Esc, choose another tool, or Stop drawing to stop adding points.";
+
 /**
  * Said beside the tools when the value holds shapes the map cannot draw: an
  * area with a hole, a position with a height. They are still sent.
@@ -348,6 +352,22 @@ export function MapView({
     selected,
   );
   const drawingShapes = geometry.active && map !== undefined;
+  // Points keep coming for an input that holds several (3.4); Esc stops them.
+  const addingPoints = drawingShapes && geometry.several && shapes.placing === "Point";
+  const latestShapes = useRef(shapes);
+  useEffect(() => {
+    latestShapes.current = shapes;
+  });
+  useEffect(() => {
+    if (!addingPoints) return undefined;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") latestShapes.current.stopPlacing();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [addingPoints]);
   // Drawing starts with the focus on the first tool, over the map (#18),
   // once for each press of Draw: not when drawing comes back by itself.
   const firstTool = useRef<HTMLButtonElement>(null);
@@ -389,7 +409,9 @@ export function MapView({
       <p className="map-hint" role="status">
         {shapes.placing === undefined
           ? "Choose a tool to add a shape. Click a shape to select it; drag it or its corners to adjust."
-          : TOOL_HINTS[shapes.placing]}
+          : addingPoints
+            ? POINTS_HINT
+            : TOOL_HINTS[shapes.placing]}
         {shapes.notShown > 0 && ` ${notShownHint(shapes.notShown)}`}
       </p>
     </div>

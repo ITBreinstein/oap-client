@@ -121,7 +121,12 @@ describe("summarise, by control kind", () => {
 
   it("geometry: its type and size in words, the map's outline when it is drawn, the GeoJSON to fold out", () => {
     const geojson = JSON.stringify(SQUARE);
-    const control: Control = { kind: "geometry", wrapper: "geometry", geometryTypes: ["Polygon"] };
+    const control: Control = {
+      kind: "geometry",
+      wrapper: "geometry",
+      geometryTypes: ["Polygon"],
+      recognisedBy: "format",
+    };
     const summary = summarise(field(control), { geojson }, { onMap: true });
     expect(text(summary)).toBe("Polygon, 5 points. Shown on the map as the dashed outline.");
     expect(summary.full).toBe(geojson);
@@ -129,7 +134,12 @@ describe("summarise, by control kind", () => {
   });
 
   it("geometry: a point or a line is named as the map draws it, not as an outline (#22)", () => {
-    const control: Control = { kind: "geometry", wrapper: "geometry", geometryTypes: [] };
+    const control: Control = {
+      kind: "geometry",
+      wrapper: "geometry",
+      geometryTypes: [],
+      recognisedBy: "format",
+    };
     const point = JSON.stringify({ type: "Point", coordinates: [5.1, 52.1] });
     expect(text(summarise(field(control), { geojson: point }, { onMap: true }))).toMatch(
       /Shown on the map as the amber point\.$/,

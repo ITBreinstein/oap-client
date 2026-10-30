@@ -12,7 +12,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
-        with: { node-version: 24, cache: pnpm }
+        with: { node-version: 24.21.0, cache: pnpm }
       - run: pnpm install --frozen-lockfile
       - run: pnpm test:interop
         continue-on-error: true
@@ -29,7 +29,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
-        with: { node-version: 24, cache: pnpm }
+        with: { node-version: 24.21.0, cache: pnpm }
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - name: start ZOO
@@ -71,7 +71,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
-        with: { node-version: 24, cache: pnpm }
+        with: { node-version: 24.21.0, cache: pnpm }
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: docker compose -f infra/compose/pygeoapi.yml up -d --wait

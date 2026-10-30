@@ -2,7 +2,8 @@
  * The reference services a spec needs, and what happens when one is down.
  *
  * Locally, a spec whose service is not running is skipped and says why, so
- * the rest of the lane still runs on a laptop with only some of them up. In
+ * the rest of the lane still runs on a laptop with only some of them up; the
+ * run ends with a list of every skip (`e2e/skip-reporter.ts`). In
  * CI a missing reference service is a broken run and fails it: a blocking
  * lane that quietly skipped its tests used to show green with nothing tested
  * (review T3).
@@ -26,31 +27,42 @@ export async function answering(url: string): Promise<boolean> {
 }
 
 /**
- * How long CI keeps asking a service that did not answer the first time. A
- * server can be up but busy: pygeoapi has four request workers, and the other
- * Playwright worker can hold all of them for longer than one five-second try.
- * That failed two CI runs on 2026-10-02 with the stack up. A stack that is
- * down still fails, this much later.
+ * How long the lane keeps asking a service that did not answer the first
+ * time. A server can be up but busy: pygeoapi has four request workers, and
+ * the other Playwright workers can hold all of them for longer than one
+ * five-second try. That failed two CI runs on 2026-10-02 with the stack up,
+ * and skipped a test locally in step zero of the reliability task
+ * (2026-10-26). A stack that is down still fails or skips, this much later.
  */
 const BUSY_GRACE_MS = 20_000;
 
-/** A reference service this lane runs against: pygeoapi, ZOO, the relay. */
+/**
+ * A reference service this lane runs against: pygeoapi, ZOO, the relay.
+ *
+ * Asked again for {@link BUSY_GRACE_MS} when it does not answer at once, in
+ * CI and locally alike. Still not answering: in CI the test fails; locally it
+ * is skipped, with why, and `e2e/skip-reporter.ts` lists every skip at the
+ * end of the run, so a count of passed tests never hides one.
+ */
 export async function requireService(url: string, name: string): Promise<void> {
   if (await answering(url)) return;
+  // The grace comes on top of the test's own time, not out of it.
+  const info = test.info();
+  info.setTimeout(info.timeout + BUSY_GRACE_MS);
+  const until = Date.now() + BUSY_GRACE_MS;
+  while (Date.now() < until) {
+    await new Promise((resolve) => setTimeout(resolve, 1_000));
+    if (await answering(url)) return;
+  }
   if (process.env["CI"]) {
-    // The grace comes on top of the test's own time, not out of it.
-    const info = test.info();
-    info.setTimeout(info.timeout + BUSY_GRACE_MS);
-    const until = Date.now() + BUSY_GRACE_MS;
-    while (Date.now() < until) {
-      await new Promise((resolve) => setTimeout(resolve, 1_000));
-      if (await answering(url)) return;
-    }
     throw new Error(
       `${name} is not answering at ${url}. In CI that fails the run rather than skipping the test: start it before the lane.`,
     );
   }
-  test.skip(true, `${name} is not answering at ${url}`);
+  test.skip(
+    true,
+    `${name} is not answering at ${url}, asked again for ${String(BUSY_GRACE_MS / 1000)} s`,
+  );
 }
 
 /**

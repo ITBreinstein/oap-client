@@ -62,13 +62,13 @@
 
 /*
  * The card: the whole start screen, examples and the folded notes too. As
- * wide as its content, the 760px column (style-instrument.css), with its
+ * wide as its content, the `--start-column` (style-instrument.css), with its
  * padding and edge.
  */
 [data-style="instrument"] .start {
   flex: none;
   width: 100%;
-  max-width: calc(760px + 2 * 48px + 2px);
+  max-width: calc(var(--start-column) + 2 * 48px + 2px);
   margin-bottom: 16px;
   padding: 40px 48px;
   background: var(--surface);
@@ -80,7 +80,7 @@
 /* The developer section, when it's open, gets a surface of its own. */
 [data-style="instrument"] .panel[data-stage="choose-endpoint"] > .developer {
   width: 100%;
-  max-width: calc(760px + 2 * 48px + 2px);
+  max-width: calc(var(--start-column) + 2 * 48px + 2px);
   margin: 0 0 16px;
   padding: 12px 16px;
   background: var(--surface);

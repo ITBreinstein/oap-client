@@ -9,8 +9,13 @@
 
 :root {
   --panel-width: 30rem;
-  /* The Examples panel's width, and how far it moves the start screen over. */
-  --examples-width: 380px;
+  /* A side panel's width, and how far Examples moves the start screen over. */
+  --side-panel-width: 380px;
+  /*
+   * How far what lies over the map keeps from its edge: MapLibre's own zoom
+   * buttons and scale bar sit 10px in.
+   */
+  --map-inset: 10px;
   font-family: var(--font-ui);
   font-size: 16px;
   line-height: 1.5;
@@ -186,8 +191,8 @@ legend,
 .map-tools {
   position: absolute;
   z-index: 1;
-  top: 0.75rem;
-  left: 0.75rem;
+  top: var(--map-inset);
+  left: var(--map-inset);
   right: 3.5rem;
   display: flex;
   flex-wrap: wrap;
@@ -204,8 +209,8 @@ legend,
 .map-overlay {
   position: absolute;
   z-index: 1;
-  top: 0.75rem;
-  left: 0.75rem;
+  top: var(--map-inset);
+  left: var(--map-inset);
   max-width: min(24rem, calc(100% - 5rem));
   max-height: calc(100% - 6.5rem);
   overflow: auto;
@@ -221,11 +226,13 @@ legend,
 /*
  * A clicked shape's properties: a head with Close that stays, and what
  * scrolls under it. Clear of what sits at the map's foot (the legend, the
- * scale, "Show the result").
+ * scale, "Show the result"). Within its half of the map, so it stays on the
+ * side away from the click (#20) however narrow the map.
  */
 .map-pane .feature-properties {
   display: flex;
   flex-direction: column;
+  max-width: min(24rem, calc(50% - 2 * var(--map-inset)));
   max-height: calc(100% - 4rem - 6rem);
   padding: 0;
   overflow: hidden;
@@ -376,8 +383,8 @@ pre.code {
 .place-search {
   position: absolute;
   z-index: 3;
-  top: 0.75rem;
-  left: 0.75rem;
+  top: var(--map-inset);
+  left: var(--map-inset);
   width: min(22rem, calc(100% - 4.5rem));
 }
 
@@ -419,9 +426,10 @@ pre.code {
   border-radius: var(--r-item);
 }
 
+/* Under "Find a place" (2.5rem high), 0.75rem clear of it. */
 .map-pane .map-overlay,
 .map-view > .map-tools {
-  top: 4rem;
+  top: calc(var(--map-inset) + 3.25rem);
 }
 
 /*
@@ -712,12 +720,18 @@ textarea.code {
   flex: 1;
 }
 
+/*
+ * A button's size is its role's (tokens.css): this, every button's; Connect
+ * and Run are `.primary`; a field's own toolbar is compact. One that is a
+ * row, a link or an icon sets its own.
+ */
 button,
 a.button {
   display: inline-block;
-  min-height: 2.5rem;
+  min-height: var(--button-height);
   padding: 0.45rem 0.9rem;
   font: inherit;
+  font-size: var(--button-text);
   font-weight: 600;
   color: var(--accent-text);
   background: var(--accent);
@@ -744,9 +758,26 @@ button.secondary:hover:not(:disabled) {
   border-color: var(--accent-ink);
 }
 
+/* The screen's one main action: Connect, Run. */
+button.primary {
+  min-height: var(--button-height-primary);
+  padding-block: 0;
+  padding-inline: 22px;
+  font-size: var(--button-text-primary);
+  font-weight: 800;
+}
+
+/* Compact: the buttons of a field's own toolbar (a box's, an area's). */
+:is(.geometry, .bbox) .actions button {
+  min-height: var(--button-height-compact);
+  padding-block: 0;
+  padding-inline: 12px;
+}
+
 button.link {
   min-height: 0;
   padding: 0;
+  font-size: inherit;
   color: var(--accent-ink);
   background: none;
   border: none;
@@ -1112,8 +1143,22 @@ label.choice-card:hover {
 
 label.choice-card:has(input:checked) {
   position: relative;
-  box-shadow: inset 3px 0 0 var(--accent-ink);
   background: var(--surface-hover);
+}
+
+/*
+ * The chosen one's bar: an element of its own, clear of the rounded corners
+ * at the list's ends. An inset shadow would follow the corner's curve.
+ */
+label.choice-card:has(input:checked)::before {
+  content: "";
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 0;
+  width: 2px;
+  background: var(--accent-ink);
+  border-radius: 0 2px 2px 0;
 }
 
 .choice-body {
@@ -1193,18 +1238,16 @@ label.choice-card:not(:last-of-type) .choice-note {
   gap: 10px;
 }
 
+/* The address beside Connect, as tall as the button. */
 .input-with-button input {
   flex: 1;
-  min-height: 52px;
+  min-height: var(--button-height-primary);
   padding: 0 16px;
   font-size: 1.0625rem;
 }
 
 .input-with-button button {
   flex: none;
-  min-height: 52px;
-  padding: 0 26px;
-  font-size: 1.0625rem;
 }
 
 .connect-target {
@@ -1536,7 +1579,7 @@ ol.steps li .help {
  */
 @media (min-width: 64rem) {
   .app-body:has(> .examples-panel[data-open="true"]) {
-    --dock: var(--examples-width);
+    --dock: var(--side-panel-width);
   }
 }
 
@@ -1793,7 +1836,7 @@ ol.steps li .help {
   bottom: 0;
   display: flex;
   flex-direction: column;
-  width: min(27rem, 100%);
+  width: min(var(--side-panel-width), 100%);
   color: var(--text);
   background: var(--surface);
   border-left: 1px solid var(--line-strong);
@@ -1866,10 +1909,6 @@ button.secondary.panel-close {
   border-top: 1px solid var(--line);
 }
 
-.examples-panel {
-  width: min(var(--examples-width), 100%);
-}
-
 .panel-close .icon {
   width: 18px;
   height: 18px;
@@ -1904,9 +1943,7 @@ button.secondary.panel-close {
 }
 
 .browse-all {
-  min-height: 44px;
   padding: 0 16px;
-  font-size: 0.9375rem;
   color: var(--text);
   border-color: var(--line-strong);
 }
@@ -1942,6 +1979,8 @@ button.secondary.panel-close {
   align-items: flex-start;
   gap: 0.3rem;
   width: 100%;
+  /* A row of the list, not a button to look at: the text's own size. */
+  font-size: inherit;
   font-weight: normal;
   text-align: left;
   color: var(--text);

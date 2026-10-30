@@ -5,9 +5,11 @@
  * Behaviour that both versions of Instrument share is tested in both.
  */
 
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./fixtures.js";
 import { RELAY } from "./servers.js";
 import { requireService } from "./services.js";
+import { CONNECTED } from "./waits.js";
 
 const PYGEOAPI = "http://localhost:5080";
 const STYLES = ["instrument", "instrument-updated"] as const;
@@ -33,7 +35,7 @@ async function connectTyped(page: Page) {
   if (await typed.isVisible()) await typed.check();
   await page.getByRole("textbox", { name: "Service address" }).fill(PYGEOAPI);
   await page.getByRole("button", { name: "Connect", exact: true }).click();
-  await expect(page.getByRole("heading", { level: 2, name: "Processes" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Processes" })).toBeVisible(CONNECTED);
 }
 
 async function openProcess(page: Page, title: string) {
@@ -314,7 +316,7 @@ test("#35 opening a process from a panel closes it, and so does Back", async ({ 
   await open(page, "instrument-updated");
   await page.getByRole("radio", { name: /Reference pygeoapi/ }).check();
   await page.getByRole("button", { name: "Connect", exact: true }).click();
-  await expect(page.getByRole("heading", { level: 2, name: "Processes" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Processes" })).toBeVisible(CONNECTED);
 
   // Opening a process from the Examples panel: the panel closes.
   const examples = page.getByRole("dialog", { name: "Examples" });
@@ -712,7 +714,7 @@ for (const style of STYLES) {
   });
 }
 
-test("#36 the form's width can be changed with the keys and by dragging, between 400 and 640px", async ({
+test("#36 the form's width can be changed with the keys and by dragging, between 440 and 640px", async ({
   page,
 }) => {
   await open(page, "instrument-updated");
@@ -721,13 +723,13 @@ test("#36 the form's width can be changed with the keys and by dragging, between
   const handle = page.getByRole("separator", { name: "Width of the form" });
   const panel = page.locator("main.panel");
   const width = async () => Math.round((await panel.boundingBox())?.width ?? 0);
-  expect(await width()).toBe(400);
+  expect(await width()).toBe(440);
 
   await handle.focus();
   await page.keyboard.press("ArrowRight");
   await page.keyboard.press("ArrowRight");
-  await expect(handle).toHaveAttribute("aria-valuenow", "432");
-  await expect.poll(width).toBe(432);
+  await expect(handle).toHaveAttribute("aria-valuenow", "472");
+  await expect.poll(width).toBe(472);
   await page.keyboard.press("End");
   await expect.poll(width).toBe(640);
 
@@ -1242,6 +1244,9 @@ for (const style of STYLES) {
   test(`#33 jobs from an earlier visit ${updated ? "are said once, and Run again opens an empty form that says why" : "keep their note on each row"} (${style})`, async ({
     page,
   }) => {
+    // Two background runs, a reload and a third opening: each run waits for a
+    // job, and job requests are what a busy pygeoapi answers slowest.
+    test.setTimeout(90_000);
     await requireService(`${RELAY}/healthz`, "the relay");
     await open(page, style);
     await page.getByRole("radio", { name: /^pygeoapi[- ]cors /i }).check();

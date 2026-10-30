@@ -52,7 +52,8 @@ describe("listProcesses on a single page", () => {
 
     // Task 5 registered `slow` on the pinned server so that asynchronous
     // polling could be tested at all, Task 7 the coverage-gap processes the
-    // form generator needs, and Task 8 a link a page cannot read — see
+    // form generator needs, Task 8 a link a page cannot read, and a process
+    // described as the Beleidsnormen API describes its inputs — see
     // infra/README.md.
     expect(list.processes.map((process) => process.id)).toEqual([
       "hello-world",
@@ -67,6 +68,7 @@ describe("listProcesses on a single page", () => {
       "breinstein-fail-late",
       "breinstein-dates",
       "breinstein-feature-area",
+      "breinstein-area-what-if",
       "breinstein-buildings",
       "breinstein-link",
     ]);

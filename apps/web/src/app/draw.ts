@@ -16,9 +16,16 @@ export type MapExtent = readonly [number, number, number, number];
 export interface DrawTarget {
   /** The field being drawn for, or undefined when the map is only a map. */
   readonly fieldId: string | undefined;
+  /**
+   * For a repeatable geometry input, the row being drawn for, by its index in
+   * the list. The list's rows have no other identity, so removing any row ends
+   * drawing (`ListInput`): an index that moved would send the next shape into
+   * the wrong row.
+   */
+  readonly row?: number | undefined;
   /** Whether the map can draw at all: a basemap exists and loaded. */
   readonly available: boolean;
-  start(fieldId: string): void;
+  start(fieldId: string, row?: number): void;
   stop(): void;
   /**
    * Changes each time Draw is pressed (#18): the tools take the focus once for
@@ -44,6 +51,8 @@ export const DrawContext = createContext<DrawTarget>({
 export interface DrawRequest {
   readonly form: object;
   readonly fieldId: string;
+  /** The row of a repeatable geometry input, if it is one. */
+  readonly row?: number | undefined;
   /** Which press of Draw this is (#18). */
   readonly press?: number | undefined;
 }
