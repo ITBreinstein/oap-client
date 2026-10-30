@@ -229,22 +229,36 @@ export function openDoorbells(options: DoorbellOptions): DoorbellStream {
 
   void run();
 
+  /**
+   * The renewal in progress, shared. Several requests can learn at once that
+   * the relay forgot the session — a restart fails them all — and one new
+   * session serves them all. A session each would leave jobs registered on
+   * sessions this page no longer listens to, their doorbells unheard, and
+   * spend the per-client session allowance on sessions nobody uses.
+   */
+  let renewing: Promise<string | undefined> | undefined;
+
   return {
     current: () => session,
     live: () => state === "open",
     refusal: () => refused,
-    async renew() {
-      try {
-        const token = await newSession();
-        // Reconnect on the new session, so doorbells for the next job reach
-        // this page and the reconnect triggers a reconciliation.
-        flags.reconnectNow = true;
-        stream?.abort();
-        cancelWait?.();
-        return token;
-      } catch {
-        return undefined;
-      }
+    renew() {
+      renewing ??= (async () => {
+        try {
+          const token = await newSession();
+          // Reconnect on the new session, so doorbells for the next job reach
+          // this page and the reconnect triggers a reconciliation.
+          flags.reconnectNow = true;
+          stream?.abort();
+          cancelWait?.();
+          return token;
+        } catch {
+          return undefined;
+        } finally {
+          renewing = undefined;
+        }
+      })();
+      return renewing;
     },
     close() {
       closed = true;

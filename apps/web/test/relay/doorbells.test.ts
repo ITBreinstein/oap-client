@@ -288,6 +288,31 @@ describe("openDoorbells", () => {
     expect(timers.pending()).toEqual([]);
     doorbells.close();
   });
+
+  it("shares one renewal between callers that ask at the same time", async () => {
+    const relay = fakeRelay();
+    const timers = manualSchedule();
+    const doorbells = openDoorbells({
+      relay: relay.relay,
+      schedule: timers.schedule,
+      onDoorbell: () => undefined,
+      onOpen: () => undefined,
+    });
+    await settle();
+    relay.latest().send("event: ready\ndata: {}\n\n");
+    await settle();
+
+    // A relay restart fails every request in flight with unknown-session.
+    const tokens = await Promise.all([doorbells.renew(), doorbells.renew(), doorbells.renew()]);
+    await settle();
+
+    expect(tokens).toEqual(["session-2", "session-2", "session-2"]);
+    expect(relay.opened).toEqual(["session-1", "session-2"]);
+
+    // Once settled, a later renewal is a new one.
+    expect(await doorbells.renew()).toBe("session-3");
+    doorbells.close();
+  });
 });
 
 describe("a relay restart in the middle of a job", () => {
