@@ -256,7 +256,14 @@ describe("the job list", () => {
     const statusUrl = await startSlowJob(2);
     await client.waitForJob(statusUrl, { intervalMs: 500, timeoutMs: 60_000 });
 
-    const list = await client.listJobs();
+    // To the end of the list, whatever the server already holds: pygeoapi puts
+    // the newest job first on the last page (finding 0039's addendum), and the
+    // default walk's 20 pages stop at 1 000 jobs at fifty a page, which a
+    // laptop's server passed in a day (reliability task, 2026-10-26).
+    const list = await client.listJobs({ maxPages: 200 });
+    expect(list.truncated, `walked ${String(list.pageCount)} pages without reaching the end`).toBe(
+      false,
+    );
 
     expect(list.jobs.length).toBeGreaterThan(0);
     expect(list.jobs.some((entry) => entry.jobId === statusUrl.split("/").pop())).toBe(true);

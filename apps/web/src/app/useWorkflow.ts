@@ -35,6 +35,8 @@ import {
   type RunFacts,
 } from "../observations.js";
 import { isMixedContent, pageProtocol } from "../mixed-content.js";
+import type { Preset } from "../config/runtime-config.js";
+import { withPin } from "./protocol-version.js";
 import { createJobStore } from "../jobs/job-store.js";
 import type { RelayEndpoint } from "../relay/contract.js";
 import {
@@ -55,8 +57,10 @@ import {
   type RelayAttempt,
 } from "./route-decision.js";
 import { loadReference as followReference } from "../results/reference.js";
+import { formatsToAsk } from "../results/format-choice.js";
 import { toRenderable, type RenderableResult } from "../results/renderable.js";
 import {
+  base64Outputs,
   declaredMediaTypes,
   rateLimitMessage,
   relayEndpointFor,
@@ -96,6 +100,8 @@ export interface WorkflowCommands {
   readonly setMode: (mode: ExecutionMode) => void;
   /** Task 8, T2: ask for one output as a value (as the server prefers) or a link. */
   readonly setTransmission: (outputId: string, transmission: "value" | "reference") => void;
+  /** #F3: ask for this media type for one output, or `null` to let the service choose. */
+  readonly setFormat: (outputId: string, mediaType: string | null) => void;
   readonly run: () => void;
   /**
    * "Stop waiting" on a foreground run (#24): abort the request and go back
@@ -316,7 +322,14 @@ function cancelledOf(jobs: readonly JobRow[] | undefined): ReadonlyMap<string, s
   return cancelled;
 }
 
-export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: number): WorkflowView {
+/** No presets: nothing pinned, every version read from the service. */
+const NO_PRESETS: readonly Preset[] = [];
+
+export function useWorkflow(
+  relayUrl: string | undefined,
+  acceptedNoticeMs?: number,
+  presets: readonly Preset[] = NO_PRESETS,
+): WorkflowView {
   const [state, dispatch] = useReducer(workflowReducer, INITIAL_WORKFLOW);
   const [snapshot, setSnapshot] = useState<JobSessionSnapshot | undefined>();
   const [configured, setConfigured] = useState<RelayEndpoint[]>([]);
@@ -326,6 +339,12 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>(NO_ERRORS);
   const [jobNotice, setJobNotice] = useState<string | undefined>();
   const [jobMessages, setJobMessages] = useState<ReadonlyMap<string, string>>(() => new Map());
+
+  /** The presets a connection takes its version pin from, as of the last render. */
+  const pinsFrom = useRef(presets);
+  useEffect(() => {
+    pinsFrom.current = presets;
+  }, [presets]);
 
   // Made inside the effect, for the reason AsyncJobPanel gives: StrictMode
   // runs effects twice, and a memoised session would be disposed and reused.
@@ -515,7 +534,9 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
   // CORS-shaped failure on an endpoint that allows it, and tried only from
   // confirmRelay. The attempt's one record is written when it settles.
   const start = useCallback(
-    (endpoint: EndpointRef, openAfter: string | undefined) => {
+    (reached: EndpointRef, openAfter: string | undefined) => {
+      // The version a preset of this address pins, however it was reached.
+      const endpoint = withPin(reached, pinsFrom.current);
       const active = session.current;
       if (active === undefined) return;
       // The relay offer is open: only its answer moves on (review W22). The
@@ -683,7 +704,9 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
       unfindable.has(backgroundKey(relayEndpointFor(connection.endpoint)))
         ? "sync"
         : state.mode;
-    const request = runRequest(process, plan, state.values, linkOutputs);
+    // #F3: a format for each output that offers several, unless the user chose.
+    const formats = formatsToAsk(process.outputs, state.formatChoices);
+    const request = runRequest(process, plan, state.values, linkOutputs, formats);
     // Package 6: the schema warnings were on screen and do not stop the run;
     // an input whose value could not be checked is recorded, once.
     record(
@@ -705,6 +728,7 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
       processId: process.id,
       declaredTransmission: process.outputTransmission,
       linkOutputs,
+      formatsAsked: formats,
     };
     record(
       request.notes.map((note) => ({
@@ -760,6 +784,8 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
           outputIds,
           processId: process.id,
           declaredMediaTypes: declaredMediaTypes(process),
+          askedFormats: formats,
+          base64Outputs: base64Outputs(process, formats),
         });
         recordResults(results);
         dispatch({ type: "results", runId, results });
@@ -890,6 +916,8 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
     const outputIds = state.process.outputs.map((output) => output.id);
     const processId = state.process.id;
     const declared = declaredMediaTypes(state.process);
+    // What this run asked for (#F3); nothing for a job followed from elsewhere.
+    const asked = lastRun.current?.runId === runId ? lastRun.current.formatsAsked : undefined;
     void (async () => {
       try {
         const { envelope } = await connection.client.getResults(jobRef, { status: decided });
@@ -897,6 +925,8 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
           outputIds,
           processId,
           declaredMediaTypes: declared,
+          askedFormats: asked,
+          base64Outputs: base64Outputs(state.process, asked),
         });
         recordResults(results);
         dispatch({ type: "results", runId, results });
@@ -1152,6 +1182,9 @@ export function useWorkflow(relayUrl: string | undefined, acceptedNoticeMs?: num
     },
     setTransmission: (outputId, transmission) => {
       dispatch({ type: "set-transmission", outputId, transmission });
+    },
+    setFormat: (outputId, mediaType) => {
+      dispatch({ type: "set-format", outputId, mediaType });
     },
     run,
     stopWaiting,

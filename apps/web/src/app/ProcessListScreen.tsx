@@ -22,6 +22,7 @@ import type {
 } from "@breinstein/oap-client";
 import { useId, useRef, useState } from "react";
 import { ErrorMessage } from "./ErrorMessage.js";
+import { narrowedCount, unappliedNote, type ListFilter } from "./listed-processes.js";
 import { NoMatch } from "./NoMatch.js";
 import type { Needs } from "./needs.js";
 import { NeedsTag } from "./NeedsTag.js";
@@ -32,7 +33,10 @@ import type { EndpointRef, WorkflowError } from "./workflow.js";
 export interface ProcessListScreenProps {
   readonly endpoint: EndpointRef;
   readonly service: ServiceDescription;
+  /** What to list: the server's list, narrowed when the configuration says so. */
   readonly processes: ProcessList;
+  /** Set when this service's configuration names the processes to list. */
+  readonly listFilter?: ListFilter | undefined;
   readonly opening: string | undefined;
   /** How this connection reads the server: direct, or through the relay. */
   readonly route?: "direct" | "relay" | undefined;
@@ -88,7 +92,8 @@ export function standardLabel(capabilities: ServiceCapabilities): string {
 }
 
 export function ProcessListScreen(props: ProcessListScreenProps) {
-  const { endpoint, service, processes, opening, error, onOpen, onDisconnect } = props;
+  const { endpoint, service, processes, listFilter, opening, error, onOpen, onDisconnect } = props;
+  const narrowed = listFilter?.applied === true;
   const ran = props.ran ?? [];
   const base = useId();
   const [filter, setFilter] = useState("");
@@ -154,7 +159,9 @@ export function ProcessListScreen(props: ProcessListScreenProps) {
           </div>
           <div className="fact-processes">
             <dt className="label">Processes</dt>
-            <dd className="mono">{String(total ?? processes.processes.length)}</dd>
+            <dd className="mono">
+              {String(total ?? listFilter?.read ?? processes.processes.length)}
+            </dd>
           </div>
           <div className="fact-standard">
             <dt className="label">Standard</dt>
@@ -181,17 +188,33 @@ export function ProcessListScreen(props: ProcessListScreenProps) {
             />
           </p>
         )}
-        <p className="muted list-count" role="status">
-          {count}
-          {needle === "" &&
-            total !== undefined &&
-            total > processes.processes.length &&
-            ` of ${String(total)} the server reports`}
-          {processes.truncated &&
-            " — the list was cut short after too many pages; some are not shown"}
-          .
+        <p
+          className="muted list-count"
+          role="status"
+          data-testid={narrowed ? "list-filter" : undefined}
+        >
+          {narrowed && needle === "" ? (
+            // One count for a narrowed list, never a second that disagrees.
+            narrowedCount(listFilter, processes)
+          ) : (
+            <>
+              {count}
+              {needle === "" &&
+                total !== undefined &&
+                total > processes.processes.length &&
+                ` of ${String(total)} the server reports`}
+              {processes.truncated &&
+                " — the list was cut short after too many pages; some are not shown"}
+              .
+            </>
+          )}
         </p>
       </div>
+      {listFilter !== undefined && !narrowed && (
+        <p className="muted" data-testid="list-unfiltered">
+          {unappliedNote(listFilter, processes)}
+        </p>
+      )}
       <ErrorMessage error={error} tone={error?.notice === true ? "notice" : "error"} />
       {opening !== undefined && (
         <p role="status" className="status">

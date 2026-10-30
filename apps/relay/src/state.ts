@@ -100,11 +100,26 @@ export class RelayState {
     };
   }
 
-  /** A new session, or `undefined` when the relay is at its session cap. */
+  /**
+   * A new session, or `undefined` when the relay is at its session cap and
+   * every session has an open stream.
+   *
+   * At the cap, the least recently used session without an open stream makes
+   * room. `POST /sessions` needs nothing, so refusing instead would let anyone
+   * lock every page out for an idle hour by creating sessions, from as few
+   * addresses as the per-client limit takes; a page that is using its session
+   * holds a stream open, and so is never the one evicted. The evicted
+   * session's jobs lose their doorbells, not their state: the browser polls
+   * regardless, and a callback for them is answered as for any forgotten one.
+   */
   createSession(): { token: string; expiresAt: number } | undefined {
     if (this.#sessions.size >= this.#options.maxSessions) {
       this.sweep();
-      if (this.#sessions.size >= this.#options.maxSessions) return undefined;
+      if (this.#sessions.size >= this.#options.maxSessions) {
+        const idle = this.#leastRecentlyUsedIdle();
+        if (idle === undefined) return undefined;
+        this.#dropSession(idle);
+      }
     }
     const now = this.#clock.now();
     const token = mintSecretToken();
@@ -240,6 +255,15 @@ export class RelayState {
       registrations: this.#byRef.size,
       listeners: this.#openStreams,
     };
+  }
+
+  #leastRecentlyUsedIdle(): Session | undefined {
+    let oldest: Session | undefined;
+    for (const session of this.#sessions.values()) {
+      if (session.listeners.size > 0) continue;
+      if (oldest === undefined || session.lastSeen < oldest.lastSeen) oldest = session;
+    }
+    return oldest;
   }
 
   #isExpired(session: Session, now: number): boolean {

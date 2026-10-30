@@ -1,0 +1,132 @@
+{
+    "version":"1.0.0",
+    "id":"breinstein-formats",
+    "title":"An area, in a format of your choice",
+    "description":"Returns the area given as one polygon feature, as GeoJSON, GML 3.2 or KML, whichever is asked for. Exists so that a client's choice of an output format can be tested.",
+    "jobControlOptions":[
+        "sync-execute",
+        "async-execute"
+    ],
+    "keywords":[
+        "formats",
+        "geojson",
+        "gml",
+        "kml",
+        "testbed"
+    ],
+    "links":[
+        {
+            "type":"application/json",
+            "rel":"self",
+            "href":"http://localhost:5080/processes/breinstein-formats?f=json",
+            "title":"Process description as JSON",
+            "hreflang":"en-US"
+        },
+        {
+            "type":"text/html",
+            "rel":"alternate",
+            "href":"http://localhost:5080/processes/breinstein-formats?f=html",
+            "title":"Process description as HTML",
+            "hreflang":"en-US"
+        },
+        {
+            "type":"text/html",
+            "rel":"http://www.opengis.net/def/rel/ogc/1.0/job-list",
+            "href":"http://localhost:5080/jobs?f=html",
+            "title":"Jobs list as HTML",
+            "hreflang":"en-US"
+        },
+        {
+            "type":"application/json",
+            "rel":"http://www.opengis.net/def/rel/ogc/1.0/job-list",
+            "href":"http://localhost:5080/jobs?f=json",
+            "title":"Jobs list as JSON",
+            "hreflang":"en-US"
+        },
+        {
+            "type":"application/json",
+            "rel":"http://www.opengis.net/def/rel/ogc/1.0/execute",
+            "href":"http://localhost:5080/processes/breinstein-formats/execution?f=json",
+            "title":"Execution for this process as JSON",
+            "hreflang":"en-US"
+        }
+    ],
+    "inputs":{
+        "area":{
+            "title":"Area",
+            "description":"A bounding box in longitude and latitude. A small box in Utrecht when left out.",
+            "schema":{
+                "type":"object",
+                "format":"ogc-bbox",
+                "required":[
+                    "bbox"
+                ],
+                "properties":{
+                    "bbox":{
+                        "type":"array",
+                        "minItems":4,
+                        "maxItems":4,
+                        "items":{
+                            "type":"number"
+                        }
+                    },
+                    "crs":{
+                        "type":"string",
+                        "format":"uri",
+                        "enum":[
+                            "http://www.opengis.net/def/crs/OGC/1.3/CRS84"
+                        ],
+                        "default":"http://www.opengis.net/def/crs/OGC/1.3/CRS84"
+                    }
+                }
+            },
+            "minOccurs":0,
+            "maxOccurs":1
+        }
+    },
+    "outputs":{
+        "features":{
+            "title":"Features",
+            "description":"The area as one polygon feature.",
+            "schema":{
+                "oneOf":[
+                    {
+                        "type":"object",
+                        "contentMediaType":"application/geo+json"
+                    },
+                    {
+                        "type":"string",
+                        "contentMediaType":"application/gml+xml; version=3.2",
+                        "contentSchema":"http://schemas.opengis.net/gml/3.2.1/gml.xsd"
+                    },
+                    {
+                        "type":"string",
+                        "contentMediaType":"application/vnd.google-earth.kml+xml"
+                    }
+                ]
+            }
+        },
+        "count":{
+            "title":"Count",
+            "description":"The number of features: always 1.",
+            "schema":{
+                "type":"integer"
+            }
+        }
+    },
+    "example":{
+        "inputs":{
+            "area":{
+                "bbox":[
+                    5.118,
+                    52.089,
+                    5.124,
+                    52.093
+                ]
+            }
+        }
+    },
+    "outputTransmission":[
+        "value"
+    ]
+}

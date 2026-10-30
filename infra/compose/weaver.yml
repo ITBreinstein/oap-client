@@ -1,0 +1,68 @@
+# Weaver: the v2 lane's server, on :5100 (`pnpm test:e2e:weaver`).
+#
+# The only OGC API - Processes server found, 2026-10-23, that declares the 2.0
+# draft's Core class; ZOO-Project and pygeoapi (0.24.0 and master) declare 1.0
+# only. It is not pinned to a release but to the image the lane was built
+# against: 6.16.0 plus master to about 868d357f, which is what declares 2.0.
+#
+# Three services, as Weaver's own docker/docker-compose.yml.example has them,
+# less the Docker socket proxy: without one the worker cannot run deployed
+# CWL packages, and the lane needs only the builtin EchoProcess. MongoDB is
+# both the store and the job queue's broker.
+#
+# The Weaver images are amd64 only, so on Apple Silicon they run under
+# emulation and take about 30 s to answer. That, and the fact that this is a
+# moving draft, is why the lane is named and never blocks.
+#
+# Job outputs are files the worker writes and the API reads back to answer a
+# results request, so the two share one named volume, as upstream shares a
+# host directory; on its own tmpfs each, every result is a 500. MongoDB keeps
+# its data in tmpfs. `down -v` leaves nothing behind.
+#
+# Pinned by digest; the tag is there to be read.
+services:
+  weaver:
+    image: pavics/weaver:latest-manager@sha256:5413e6466eada9d9a5b1e39e44ed9605a1da7fccfe8296b087c886a9c5570e88
+    platform: linux/amd64
+    ports: ["5100:4001"]
+    environment:
+      HOSTNAME: localhost
+      FORWARDED_ALLOW_IPS: "*"
+    depends_on: [worker, mongodb]
+    networks:
+      default:
+        aliases: [weaver.internal]
+    volumes:
+      - "../weaver/weaver.ini:/opt/local/src/weaver/config/weaver.ini:ro"
+      - "../weaver/wps_processes.yml:/opt/local/src/weaver/config/wps_processes.yml:ro"
+      - "outputs:/tmp/weaver/wps-outputs"
+    tmpfs: &scratch
+      - /tmp/weaver/wps-workdir
+      - /tmp/vault
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:4001/processes?f=json', timeout=5)"
+      interval: 5s
+      timeout: 6s
+      retries: 36
+      start_period: 10s
+  worker:
+    image: pavics/weaver:latest-worker@sha256:a06d5f85cb00da4565ecb45c29d0c04d928076495da132e02f0386999d1de36d
+    platform: linux/amd64
+    depends_on: [mongodb]
+    volumes:
+      - "../weaver/weaver.ini:/opt/local/src/weaver/config/weaver.ini:ro"
+      - "../weaver/wps_processes.yml:/opt/local/src/weaver/config/wps_processes.yml:ro"
+      - "outputs:/tmp/weaver/wps-outputs"
+    tmpfs: *scratch
+  mongodb:
+    image: mongo:7.0@sha256:c53852c00c23ca9f23fc39690350ffa9a80e3642fe8f96879726d8da0abe80a7
+    tmpfs:
+      - /data/db
+      - /data/configdb
+
+volumes:
+  outputs: {}

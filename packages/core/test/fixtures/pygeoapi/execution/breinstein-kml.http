@@ -1,0 +1,51 @@
+HTTP/1.1 200 OK
+Server: gunicorn
+Date: Mon, 26 Oct 2026 09:35:24 GMT
+Connection: keep-alive
+Content-Type: application/vnd.google-earth.kml+xml
+X-Powered-By: pygeoapi 0.21.0
+Content-Language: en-US
+Location: http://localhost:5080/jobs/9258eaa4-d120-11f1-a443-4e8815af2561
+Access-Control-Allow-Origin: *
+Content-Length: 1796
+
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+<Document>
+  <name>An area</name>
+  <Schema name="measure" id="measure">
+    <SimpleField name="length" type="float"/>
+    <SimpleField name="unit" type="string"/>
+  </Schema>
+  <Folder><name>Placemarks</name>
+  <Placemark id="area">
+    <name>The area</name>
+    <description><![CDATA[<h3>An area</h3><p>Given as a <b>bounding box</b>.</p><img src="https://example.org/tracker.png" onerror="alert(1)"><script>alert("not run")</script><a href="https://example.org/">More</a>]]></description>
+    <Polygon><outerBoundaryIs><LinearRing><coordinates>5.118000,52.089000,2.5 5.124000,52.089000,2.5 5.124000,52.093000,2.5 5.118000,52.093000,2.5 5.118000,52.089000,2.5</coordinates></LinearRing></outerBoundaryIs></Polygon>
+  </Placemark>
+  <Placemark id="centre">
+    <name>Its centre</name>
+    <ExtendedData>
+      <Data name="kind"><value>centre</value></Data>
+      <Data name="note"><displayName>Note</displayName><value>&lt;b&gt;not bold&lt;/b&gt;</value></Data>
+    </ExtendedData>
+    <Point><coordinates>5.121000,52.091000,2.5</coordinates></Point>
+  </Placemark>
+  <Placemark id="diagonal">
+    <name>A diagonal</name>
+    <ExtendedData><SchemaData schemaUrl="#measure">
+      <SimpleData name="length">0.0072</SimpleData>
+      <SimpleData name="unit">degree</SimpleData>
+    </SchemaData></ExtendedData>
+    <LineString><coordinates>5.118000,52.089000,2.5 5.124000,52.093000,2.5</coordinates></LineString>
+  </Placemark>
+  <Placemark id="corners">
+    <name>Two corners</name>
+    <MultiGeometry>
+      <Point><coordinates>5.118000,52.093000,2.5</coordinates></Point>
+      <Point><coordinates>5.124000,52.089000,2.5</coordinates></Point>
+    </MultiGeometry>
+  </Placemark>
+  </Folder>
+</Document>
+</kml>

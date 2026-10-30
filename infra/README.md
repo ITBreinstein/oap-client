@@ -3,15 +3,37 @@
 Two implementations, because one cannot tell a server's deviation apart from an
 ambiguous specification.
 
-| Where                  | What                                                    | Lane                              |
-| ---------------------- | ------------------------------------------------------- | --------------------------------- |
-| `compose/pygeoapi.yml` | pygeoapi 0.21.0 on `:5080` (CORS) and `:5081` (no CORS) | `pnpm test:contract`, blocks CI   |
-| `zoo/`                 | ZOO-Project fork on `:5090`                             | `pnpm test:interop`, never blocks |
+| Where                  | What                                                    | Lane                                 |
+| ---------------------- | ------------------------------------------------------- | ------------------------------------ |
+| `compose/pygeoapi.yml` | pygeoapi 0.21.0 on `:5080` (CORS) and `:5081` (no CORS) | `pnpm test:contract`, blocks CI      |
+| `zoo/`                 | ZOO-Project fork on `:5090`                             | `pnpm test:interop`, never blocks    |
+| `compose/weaver.yml`   | Weaver on `:5100`, the OGC API - Processes 2.0 draft    | `pnpm test:e2e:weaver`, never blocks |
 
 ```bash
 docker compose -f infra/compose/pygeoapi.yml up -d --wait
 ./infra/zoo/zoo.sh up
+docker compose -f infra/compose/weaver.yml -p oap-weaver up -d --wait
 ```
+
+Weaver is the one server found, 2026-10-23, that declares the 2.0 draft's Core
+class; ZOO-Project and pygeoapi declare 1.0 only. Its config is
+[weaver/weaver.ini](weaver/weaver.ini), and the compose file says why it is
+shaped as it is. Two things about this image limit what can be run on it: of
+its builtin processes only `EchoProcess` runs (the others look for a Python
+interpreter the image does not have), and it refuses, with a 422, the arrays of
+arrays a form generated from `EchoProcess`'s description sends. See
+`e2e/weaver.spec.ts`.
+
+Stop Weaver before running the blocking lane on a laptop
+(`docker compose -f infra/compose/weaver.yml -p oap-weaver stop`). Its API and
+worker hold about 2 GB and run under emulation on Apple Silicon. Beside them,
+pygeoapi answered slowly enough on 2026-10-23 that five of the lane's 5-second
+waits ran out, and all 200 passed once Weaver was stopped. CI runs the two
+lanes in separate jobs. Keep Weaver stopped unless its lane is running.
+
+Give Docker at least 6 GB of memory when running Weaver. With less, Docker
+Desktop stopped every container at once on 2026-10-23 (all exited 137) while
+Weaver ran beside pygeoapi and ZOO.
 
 ZOO keeps its job results in a Docker volume, `zoo-data` (`compose/zoo.yml`),
 not in the pinned checkout, so they do not survive `./infra/zoo/zoo.sh down`,
@@ -26,6 +48,41 @@ pygeoapi is pinned by digest in `compose/pygeoapi.yml`, as `tag@sha256:…`: the
 tag is for reading, the digest is what Docker pulls. To move the pin, run
 `docker buildx imagetools inspect geopython/pygeoapi:<tag>` and put the
 `Digest:` it prints after the new tag, in both services.
+
+## Running the lanes reliably
+
+What the browser lane needs to pass or fail for a reason, measured in the
+reliability task (2026-10-26):
+
+- **Docker memory.** pygeoapi and ZOO run in under 4 GB. Give Docker at least
+  6 GB when a heavier server joins them (Weaver, on `feat/core-v2`), and keep
+  that server stopped unless its own lane is running.
+- **One lane per machine, or expect it slower.** The blocking lane uses four
+  Playwright workers. With the ZOO lane beside it the load average reached
+  30–50 on eight cores and every request slowed two to four times; the waits
+  below are sized for that, but a third lane, a build or research tools on top
+  of it are not measured.
+- **pygeoapi keeps idle connections 75 s**, not gunicorn's 2 s
+  (`GUNICORN_CMD_ARGS` in `compose/pygeoapi.yml`). With 2 s, a client that
+  reuses an idle connection just as the server closes it gets a reset: the
+  lane's own `fetch` and Playwright's `route.fetch` did, on nearly every
+  request sent 2.0 s after the one before. A stock pygeoapi still keeps 2 s.
+- **The job store is kept small.** Every lane run adds about 80 jobs to
+  pygeoapi's one TinyDB file, and every job request parses the whole file
+  under one lock. Before the blocking and PDOK lanes (never the ZOO or Weaver
+  lane, which may run beside them), `e2e/job-store.ts` dismisses the
+  finished jobs on `:5080` and `:5081` that finished more than 15 minutes ago,
+  once a server holds more than 300, and prints how many and how long
+  (1 000 jobs: 14 s). Recreating the container empties it at once.
+- **A slow service gets 20 s** before its tests are skipped, locally as in CI,
+  and every run ends with a list of what it skipped and why
+  (`e2e/skip-reporter.ts`). Locally a skip is still a skip, never a pass.
+- **Keep the machine awake.** A Mac that goes to idle sleep mid-run stops
+  every worker and the servers with it; the tests that were running time out
+  together when it wakes (16 minutes asleep, six failures, 2026-10-26). Run a
+  long local lane under `caffeinate -i pnpm test:e2e`.
+- **Retries are off.** A test that only passes on a second try is flaky, and
+  is reported as a failure.
 
 ## The two pygeoapi ports
 
@@ -262,6 +319,75 @@ each config; the process takes no inputs and fetches nothing. It declares
 `outputTransmission: ["reference"]`, and pygeoapi describes it as `["value"]`
 (finding 0059).
 
+### `breinstein-formats`
+
+One output, `features`, offered in three formats, answered in the one asked
+for (2026-10-23, #F3): an area, given as a bounding box (a small box in
+Utrecht when left out), as one polygon feature in GeoJSON, GML 3.2 or KML.
+Asked for none, it answers GeoJSON. A second output, `count`, is always 1, so
+that the answer for both outputs — a JSON object keyed by output id, with a
+GML or KML `features` as a qualified value carrying its media type — is tested
+as well as the answer for one.
+
+| Asked for `features` alone as          | Answer                                       |
+| -------------------------------------- | -------------------------------------------- |
+| nothing, or `application/geo+json`     | `application/geo+json`, a FeatureCollection  |
+| `application/gml+xml; version=3.2`     | that media type, a WFS 2.0 FeatureCollection |
+| `application/vnd.google-earth.kml+xml` | that media type, a KML document              |
+
+pygeoapi 0.21.0 lets a process see the `outputs` it was asked for
+(`supports_outputs`), which is what makes this possible. It does not let a
+process set a response header, so no pygeoapi process can send
+`Content-Crs`: there is no `breinstein-rd-geojson`. `breinstein-rd-link`
+below is what takes its place.
+
+### `breinstein-gml`
+
+GML 2 shaped as ZOO-Project's OGR services return it (2026-10-26, #F4): an
+`ogr:FeatureCollection` of `gml:featureMember`s, `gml:coordinates` with commas,
+labelled `text/xml`. One polygon, the area given (a small box in Utrecht when
+left out), and its centre as a point, each with two simple properties. The
+`crs` input picks the `srsName`, as ZOO's answers have them:
+
+| `crs`                 | `srsName`    | Coordinates                                    |
+| --------------------- | ------------ | ---------------------------------------------- |
+| `EPSG:4326` (default) | `EPSG:4326`  | longitude first, as GML 2 writes the bare code |
+| `EPSG:28992`          | `EPSG:28992` | RD New, by pyproj, to the millimetre           |
+| `none`                | none         | longitude first, with nothing to say so        |
+
+The first two are the same area, so a client can be checked to put them in the
+same place; the third is ZOO's `Centroid`, which names no system at all.
+
+### `breinstein-kml`
+
+KML as tools write it (2026-10-26, #F5): four Placemarks in a Folder — a
+polygon whose `description` is HTML with a script and an image in it, a point
+with `ExtendedData` `Data` pairs, a line with `SchemaData`, and a
+`MultiGeometry` of two points. Every coordinate carries an altitude. Labelled
+`application/vnd.google-earth.kml+xml`.
+
+### `breinstein-rd-link` and the `breinstein-rd` collection
+
+A pygeoapi process cannot send `Content-Crs`; pygeoapi's OGC API - Features
+can (2026-10-26, #F1). `breinstein-rd` is a features collection of three fixed
+features in Utrecht — a polygon, a line and a point — stored in RD New
+([pygeoapi/data/breinstein-rd.geojson](pygeoapi/data/breinstein-rd.geojson),
+mounted by `compose/pygeoapi.yml`) and offered in RD New and CRS84. Asked for
+with `crs=http://www.opengis.net/def/crs/EPSG/0/28992`, pygeoapi answers as
+stored, with `Content-Crs: <http://www.opengis.net/def/crs/EPSG/0/28992>`;
+asked for nothing, it reprojects to CRS84 with pyproj, by the same
+seven-parameter shift the web client uses (0.17 mm apart).
+
+`breinstein-rd-link` returns one output, always by reference: a link to that
+query, in RD New by default or in CRS84 (its `crs` input). The link's target is
+set per instance in the YAML, as for `breinstein-link`. Everything stays on
+the local server: the blocking lane does not need the network.
+
+A side effect worth knowing: with a features collection configured, pygeoapi
+declares ten OGC API - Features conformance classes beside the Processes ones.
+`packages/core/test/fixtures/pygeoapi/conformance.json` was re-captured with
+them.
+
 ## Re-creating the stack after a config change
 
 `up -d` alone will not pick up a change to a mounted config or a new plugin
@@ -273,4 +399,5 @@ docker compose -f infra/compose/pygeoapi.yml up -d --force-recreate
 
 Jobs live in a TinyDB file inside the container (`/tmp/pygeoapi-process-manager.db`),
 so they **survive a `restart`** and are **lost on a recreate**. Worth knowing
-before wondering where a demo's job went.
+before wondering where a demo's job went. The browser lane also dismisses old finished jobs
+itself once there are more than 300 (see "Running the lanes reliably").

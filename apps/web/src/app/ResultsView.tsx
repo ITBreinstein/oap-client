@@ -21,15 +21,19 @@ import { saveBlob } from "./save.js";
 import { useDataUrl } from "./useDataUrl.js";
 import { useSpared } from "./developer.js";
 import { useUpdated } from "./variant.js";
+import { placementWords } from "./placement-words.js";
+import { arrivedAs, formatSentLine } from "../results/format-choice.js";
 import {
   isShownImage,
   mapImage,
+  placementOf,
   plotStatus,
   shownImage,
   type MapImage,
 } from "../results/plottable.js";
 import { isOpenable, isTruncated, originOf, type LoadedReference } from "../results/reference.js";
 import { parseCsv } from "../results/csv.js";
+import type { GeoRead } from "../results/sniff.js";
 import { plainValue } from "../results/plain-value.js";
 import {
   defaultFilename,
@@ -167,6 +171,9 @@ function ResultItem({
   const plain = updated && result.kind === "json" ? plainValue(result.value) : undefined;
   const status = plotStatus(result, maxCoordinates);
   const plot = status.kind;
+  const placementLine = placementWords(status, placementOf(result));
+  const geo = result.kind === "text" || result.kind === "download" ? result.geo : undefined;
+  const sentLine = formatSentLine(result.asked, result.received, arrivedAs(result));
   const imageOnMap = placed?.outputId === result.outputId;
   const boxOfImage = placed?.bboxOutputId === result.outputId;
   return (
@@ -176,15 +183,20 @@ function ResultItem({
       data-kind={result.kind}
       data-plotted={plot === "plotted" || imageOnMap ? "true" : undefined}
     >
-      {plot === "plotted" && <p className="muted">GeoJSON: shown on the map in blue.</p>}
+      {plot === "plotted" && <p className="muted">{geoNoun(geo)}: shown on the map in blue.</p>}
+      <GeoLines geo={geo} plotted={plot === "plotted"} />
       {imageOnMap && (
         <p className="muted">Shown on the map, over the area in “{placed.bboxOutputId}”.</p>
       )}
       {boxOfImage && <p className="muted">The area the image “{placed.outputId}” covers.</p>}
-      {plot === "projected" && (
-        <p className="muted">
-          GeoJSON, but its coordinates are not longitude and latitude, so it is not shown on the
-          map.
+      {placementLine !== undefined && (
+        <p className="muted" data-testid="placement">
+          {placementLine}
+        </p>
+      )}
+      {sentLine !== undefined && (
+        <p className="muted" data-testid="format-sent">
+          {sentLine}
         </p>
       )}
       {status.kind === "too-many" && (
@@ -226,7 +238,8 @@ function ResultItem({
         </details>
       )}
       {result.kind === "text" && (
-        <details open>
+        // GML or KML on the map is folded, as JSON is: the shapes are the answer there.
+        <details open={plot !== "plotted"}>
           <summary>
             <strong>{result.outputId}</strong> <span className="muted">{result.mediaType}</span>
           </summary>
@@ -242,11 +255,11 @@ function ResultItem({
             )
           ) : updated ? (
             <div className="code-box">
-              <pre className="code">{result.value}</pre>
+              <TextValue result={result} />
               <CopyButton name={copyName} text={() => result.value} />
             </div>
           ) : (
-            <pre className="code">{result.value}</pre>
+            <TextValue result={result} />
           )}
         </details>
       )}
@@ -269,6 +282,48 @@ function ResultItem({
       </p>
     </article>
   );
+}
+
+/**
+ * A text result as it came. Its lines can be wider than the panel (GML and KML
+ * often are one long line of coordinates), so the box scrolls, and a box that
+ * scrolls is a region the keyboard can reach, as the CSV table is.
+ */
+function TextValue({ result }: { readonly result: Extract<ValueResult, { kind: "text" }> }) {
+  return (
+    <pre className="code" tabIndex={0} role="region" aria-label={`Text “${result.outputId}”`}>
+      {result.value}
+    </pre>
+  );
+}
+
+/** What a plotted result is, in a word: GML or KML when read from one, else GeoJSON. */
+function geoNoun(geo: GeoRead | undefined): string {
+  return geo === undefined ? "GeoJSON" : geo.parsedAs.toUpperCase();
+}
+
+/**
+ * GML or KML that could not be read for the map, and why (#F4, #F5); or,
+ * read and drawn, that its heights are left out. Nothing for anything else.
+ */
+function GeoLines({
+  geo,
+  plotted,
+}: {
+  readonly geo: GeoRead | undefined;
+  readonly plotted: boolean;
+}) {
+  if (geo === undefined) return null;
+  if (!geo.ok) {
+    return (
+      <p className="muted" data-testid="not-read">
+        {geoNoun(geo)}, but not shown on the map: {geo.reason}
+      </p>
+    );
+  }
+  return plotted && geo.heightsDropped ? (
+    <p className="muted">Its heights are left out: the map is flat.</p>
+  ) : null;
 }
 
 function hostOf(href: string): string | undefined {
@@ -309,6 +364,14 @@ function LoadedOk({ loaded, host }: { readonly loaded: LoadedReference; readonly
       return (
         <p>
           Loaded: an image ({type}
+          {size}).
+        </p>
+      );
+    case "gml":
+    case "kml":
+      return (
+        <p>
+          Loaded: {loaded.representation.toUpperCase()} ({type}
           {size}).
         </p>
       );
@@ -467,6 +530,8 @@ function ReferenceItem({
   const { maxCoordinates } = useContext(MapLimitsContext);
   const status = plotStatus(result, maxCoordinates);
   const plot = status.kind;
+  const placementLine = placementWords(status, placementOf(result));
+  const sentLine = formatSentLine(result.asked, result.received);
   const image = shownImage(result);
   const imageOnMap = placed?.outputId === result.outputId;
   const page = loaded === undefined ? undefined : pageLine(loaded);
@@ -504,17 +569,26 @@ function ReferenceItem({
           <LoadedLine loaded={loaded} href={result.href} outputId={result.outputId} />
         )}
       </div>
-      {plot === "plotted" && <p className="muted">GeoJSON: shown on the map in blue.</p>}
-      {plot === "plotted" && loaded?.axes === "swapped" && (
-        <p className="muted">
-          Its Content-Crs is EPSG:4326, latitude first: its axes were swapped to put it on the map.
+      {plot === "plotted" && (
+        <p className="muted">{geoNoun(loaded?.geo)}: shown on the map in blue.</p>
+      )}
+      <GeoLines geo={loaded?.geo} plotted={plot === "plotted"} />
+      {placementLine !== undefined && (
+        <p className="muted" data-testid="placement">
+          {placementLine}
         </p>
       )}
-      {plot === "projected" && (
-        <p className="muted">
-          GeoJSON, but not in longitude and latitude
-          {loaded?.contentCrs === undefined ? "" : ` (Content-Crs ${loaded.contentCrs})`}, so it is
-          not shown on the map. Nothing here reprojects.
+      {plot === "crs-unstated" && loaded?.route === "direct" && loaded.contentCrs === undefined && (
+        // A page reads only the headers a server exposes to it; an unexposed
+        // Content-Crs looks exactly like none (pygeoapi 0.21.0 exposes none).
+        <p className="muted" data-testid="content-crs-unseen">
+          Read directly from the server: a Content-Crs reaches this page only if the server exposes
+          it to web pages (Access-Control-Expose-Headers), so one may have been sent and not seen.
+        </p>
+      )}
+      {sentLine !== undefined && (
+        <p className="muted" data-testid="format-sent">
+          {sentLine}
         </p>
       )}
       {status.kind === "too-many" && (

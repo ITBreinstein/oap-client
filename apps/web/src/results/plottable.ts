@@ -9,10 +9,10 @@
  * services send it as `application/json`, and either way it is the same
  * document. Nothing here knows a process.
  *
- * GeoJSON in a projected system — RD New's metres, most likely — is not
- * plotted: it would land nowhere near the map, and nothing here reprojects.
- * It stays in the result as JSON, and the result says why it is not on the
- * map.
+ * GeoJSON in a projected system the result does not name — RD New's metres,
+ * most likely — is not plotted: it would land nowhere near the map, and its
+ * system is not guessed from its numbers. It stays in the result as JSON, and
+ * the result says why it is not on the map.
  *
  * An image goes on the map when the same results carry exactly one image and
  * exactly one bounding box in CRS84: the box is taken as the image's extent.
@@ -28,13 +28,20 @@
  *
  * An output given by reference joins in once it is loaded (Task 8, T8): its
  * GeoJSON is plotted and its image placed by the same rules, on the same
- * path. Its `Content-Crs` comes first: EPSG:4326 is swapped back to longitude
- * first, and any other CRS is not plotted and says so as `projected`.
+ * path.
+ *
+ * A `Content-Crs` comes first, on a reference's answer or on a response whose
+ * body is one output's value (#F1, `crs.ts`): CRS84 as it is, EPSG:4326
+ * swapped back to longitude first, EPSG:28992 reprojected, and any other CRS
+ * not plotted, said as `projected`. With no CRS named, numbers that are not
+ * longitude and latitude are not plotted either, and the result says the
+ * service did not say which system they are in (`crs-unstated`).
  */
 
 import { CRS84 } from "../forms/crs.js";
 import { shapesWithOriginIn, type Shape, type ShapeOrigin } from "../forms/geojson.js";
 import { isJsonArray, isJsonObject } from "../forms/json.js";
+import type { Placement } from "./crs.js";
 import type { RenderableResult } from "./renderable.js";
 
 export type PlotStatus =
@@ -44,8 +51,13 @@ export type PlotStatus =
       /** Where each shape came from, by index into `shapes`. */
       readonly origins: readonly ShapeOrigin[];
     }
-  /** GeoJSON, but its coordinates are outside longitude and latitude. */
+  /** GeoJSON in a coordinate system the result names and this page does not place. */
   | { readonly kind: "projected" }
+  /**
+   * GeoJSON whose numbers are not longitude and latitude, from a service that
+   * did not say which system they are in (#F1). Never guessed from their size.
+   */
+  | { readonly kind: "crs-unstated" }
   /** Plottable, but with more positions than the page draws. */
   | { readonly kind: "too-many"; readonly positions: number; readonly limit: number }
   /** Not GeoJSON, or GeoJSON with no geometry in it. */
@@ -72,29 +84,40 @@ function inDegrees(shape: Shape): boolean {
   return positions.every(([x = 0, y = 0]) => Math.abs(x) <= 180 && Math.abs(y) <= 90);
 }
 
-/** The JSON a result holds: shown, read and too large to show, or loaded from its reference. */
+/** GML or KML the result was read as, when it was read (#F4, #F5). */
+function geoOf(result: RenderableResult) {
+  if (result.kind === "text" || result.kind === "download") {
+    return result.geo?.ok === true ? result.geo : undefined;
+  }
+  if (result.kind === "reference" && result.loaded?.outcome === "ok") {
+    return result.loaded.geo?.ok === true ? result.loaded.geo : undefined;
+  }
+  return undefined;
+}
+
+/**
+ * The GeoJSON a result holds: shown, read and too large to show, loaded from
+ * its reference, or read from GML or KML (#F4, #F5).
+ */
 function jsonOf(result: RenderableResult): unknown {
+  const geo = geoOf(result);
+  if (geo !== undefined) return geo.geojson;
   if (result.kind === "json") return result.value;
   if (result.kind === "download") return result.json;
   if (result.kind === "reference" && result.loaded?.outcome === "ok") return result.loaded.geojson;
   return undefined;
 }
 
-function swapped(position: readonly number[]): number[] {
-  const [first = 0, second = 0, ...rest] = position;
-  return [second, first, ...rest];
-}
-
-/** Latitude-first to longitude-first, as `forms/crs.ts` does the other way (Task 8, T5). */
-export function swapAxes(shape: Shape): Shape {
-  switch (shape.type) {
-    case "Point":
-      return { type: "Point", coordinates: swapped(shape.coordinates) };
-    case "LineString":
-      return { type: "LineString", coordinates: shape.coordinates.map(swapped) };
-    case "Polygon":
-      return { type: "Polygon", coordinates: shape.coordinates.map((ring) => ring.map(swapped)) };
-  }
+/**
+ * Where the result's GeoJSON goes, from the CRS it named (#F1) or its GML
+ * `srsName` or KML; undefined when it named none.
+ */
+export function placementOf(result: RenderableResult): Placement | undefined {
+  const geo = geoOf(result);
+  if (geo !== undefined) return geo.placement;
+  if (result.kind === "json" || result.kind === "download") return result.placement;
+  if (result.kind === "reference") return result.loaded?.placement;
+  return undefined;
 }
 
 /** `limit`: the most positions the map may be given for one result. */
@@ -102,15 +125,29 @@ export function plotStatus(
   result: RenderableResult,
   limit: number = Number.POSITIVE_INFINITY,
 ): PlotStatus {
-  const value = jsonOf(result);
-  if (value === undefined) return { kind: "not-geojson" };
+  const sent = jsonOf(result);
+  if (sent === undefined) return { kind: "not-geojson" };
+  // The shapes are read from the value in CRS84 when the result named a CRS
+  // this page places: swapped or reprojected already, in `crs.ts`. The value
+  // shown stays the server's.
+  const placement = placementOf(result);
+  if (placement?.kind === "other") {
+    return shapesWithOriginIn(sent)?.length ? { kind: "projected" } : { kind: "not-geojson" };
+  }
+  // GML with no srsName: never placed, whatever its numbers (#F4).
+  if (placement?.kind === "unstated") {
+    return shapesWithOriginIn(sent)?.length ? { kind: "crs-unstated" } : { kind: "not-geojson" };
+  }
+  const value = placement === undefined || placement.kind === "as-sent" ? sent : placement.value;
   const found = shapesWithOriginIn(value);
   if (found === undefined || found.length === 0) return { kind: "not-geojson" };
-  const shapes = found.map((entry) => entry.shape);
-  const axes = result.kind === "reference" ? result.loaded?.axes : undefined;
-  if (axes === "not-plotted") return { kind: "projected" };
-  const placed = axes === "swapped" ? shapes.map(swapAxes) : shapes;
-  if (!placed.every(inDegrees)) return { kind: "projected" };
+  const placed = found.map((entry) => entry.shape);
+  if (!placed.every(inDegrees)) {
+    // A named system that still is not in degrees is not where it says it is.
+    return placement === undefined || placement.kind === "as-sent"
+      ? { kind: "crs-unstated" }
+      : { kind: "projected" };
+  }
   const positions = positionCount(placed);
   if (positions > limit) return { kind: "too-many", positions, limit };
   return { kind: "plotted", shapes: placed, origins: found.map((entry) => entry.origin) };

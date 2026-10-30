@@ -80,6 +80,11 @@ pygeoapi/breinstein-fail-late — needs values
   pygeoapi/breinstein-fail-late/message → text
 pygeoapi/breinstein-feature-area — needs data
   pygeoapi/breinstein-feature-area/features → complex (JSON object, application/geo+json) · map
+pygeoapi/breinstein-formats — needs area
+  pygeoapi/breinstein-formats/area → bbox · map
+pygeoapi/breinstein-gml — needs area
+  pygeoapi/breinstein-gml/area → bbox · map
+  pygeoapi/breinstein-gml/crs → select
 pygeoapi/breinstein-inputs — needs area
   pygeoapi/breinstein-inputs/label → text
   pygeoapi/breinstein-inputs/notes → text
@@ -90,9 +95,13 @@ pygeoapi/breinstein-inputs — needs area
   pygeoapi/breinstein-inputs/tags → list<text>
   pygeoapi/breinstein-inputs/comment → text
   pygeoapi/breinstein-inputs/area → geometry (geometry, Point|MultiPoint|LineString|MultiLineString|Polygon|MultiPolygon|GeometryCollection) · map
+pygeoapi/breinstein-kml — needs area
+  pygeoapi/breinstein-kml/area → bbox · map
 pygeoapi/breinstein-link — needs values
 pygeoapi/breinstein-png — needs values
   pygeoapi/breinstein-png/size → number
+pygeoapi/breinstein-rd-link — needs values
+  pygeoapi/breinstein-rd-link/crs → select
 pygeoapi/breinstein-rotate — needs area
   pygeoapi/breinstein-rotate/polygon → geometry (geometry, Polygon) · map
 pygeoapi/breinstein-sync-only — needs values
@@ -101,6 +110,17 @@ pygeoapi/breinstein-sync-only — needs values
 pygeoapi/hello-world — needs values
   pygeoapi/hello-world/name → text
   pygeoapi/hello-world/message → text
+weaver/EchoProcess — needs area
+  weaver/EchoProcess/stringInput → select
+  weaver/EchoProcess/measureInput → json [`oneOf` is outside the supported JSON Schema subset] · unsupported-keyword
+  weaver/EchoProcess/dateInput → text
+  weaver/EchoProcess/doubleInput → number
+  weaver/EchoProcess/arrayInput → list<list<number>>
+  weaver/EchoProcess/complexObjectInput → json [`oneOf` is outside the supported JSON Schema subset] · unsupported-keyword
+  weaver/EchoProcess/geometryInput → list<list<geometry (geometry, Point|MultiPoint|LineString|MultiLineString|Polygon|MultiPolygon|GeometryCollection)>>
+  weaver/EchoProcess/boundingBoxInput → json [`oneOf` is outside the supported JSON Schema subset] · unsupported-keyword
+  weaver/EchoProcess/imagesInput → list<json [`oneOf` is outside the supported JSON Schema subset]> · unsupported-keyword
+  weaver/EchoProcess/featureCollectionInput → geometry (feature-collection, Point|MultiPoint|LineString|MultiLineString|Polygon|MultiPolygon|GeometryCollection) · map
 zoo-project/Buffer — needs data
   zoo-project/Buffer/InputPolygon → complex (text/xml, JSON object) · map
   zoo-project/Buffer/BufferDistance → number

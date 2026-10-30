@@ -26,6 +26,7 @@ pnpm --filter @breinstein/web dev     # interface on :5173
 pnpm test:e2e                         # Playwright, blocking lane: pygeoapi; its own relay :8797 and build :4183
 pnpm test:e2e:zoo                     # Playwright against ZOO-Project; reports, never blocks
 pnpm test:e2e:pdok                    # the specs that reach PDOK; opt-in, never blocks
+pnpm test:e2e:weaver                  # the OGC API - Processes 2.0 draft, against Weaver; never blocks
 pnpm capture:observations             # not a test: one observation export per local endpoint, for the matrix
 pnpm test:contract                    # pinned pygeoapi; needs the compose stack up
 pnpm test:interop                     # ZOO-Project and third-party servers; never blocking
@@ -34,6 +35,7 @@ pnpm graph                            # write docs/architecture.svg, not committ
 
 docker compose -f infra/compose/pygeoapi.yml up -d   # reference servers on :5080 (CORS) and :5081 (no CORS)
 ./infra/zoo/zoo.sh up                               # ZOO-Project reference deployment on :5090
+docker compose -f infra/compose/weaver.yml -p oap-weaver up -d --wait   # Weaver, the 2.0 draft, on :5100
 ```
 
 Two implementations, because one cannot tell a server's deviation apart from an
@@ -42,16 +44,19 @@ CI; ZOO-Project is a second implementation with nothing in common but the
 standard, and it reports without blocking — see [infra/README.md](infra/README.md)
 and [infra/zoo/README.md](infra/zoo/README.md).
 
-The pinned pygeoapi also carries thirteen processes of our own, mounted from
+The pinned pygeoapi also carries seventeen processes of our own, mounted from
 [infra/pygeoapi/plugins](infra/pygeoapi/plugins) without rebuilding the image:
 `slow`, because the stock image's only process finishes before the first poll
-returns, and twelve `breinstein-*` processes, each there for one thing the
+returns, and sixteen `breinstein-*` processes, each there for one thing the
 client must handle and no stock process exercises — a bounding box, every
 control kind, a non-JSON output, a geometry in and out, an image of a place, one
 execution mode, a job that fails partway, dates, an input by reference, a CSV
-output, a large result, and an output by reference to a server that sends no
-CORS headers. Three reach PDOK, so they need the network. See
-[infra/README.md](infra/README.md).
+output, a large result, an output by reference to a server that sends no CORS
+headers, an output offered in several formats, GML as ZOO-Project writes it,
+KML with HTML in it, and a link to features in RD New. That last one links to
+`breinstein-rd`, a small features collection on the same server, so the
+pygeoapi also serves OGC API - Features. Three processes reach PDOK, so they
+need the network. See [infra/README.md](infra/README.md).
 
 ## Boundaries
 

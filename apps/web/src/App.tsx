@@ -19,6 +19,7 @@ import { DeveloperContext } from "./app/developer.js";
 import { sameService, useAddress, wouldLoseWork } from "./app/address.js";
 import { AppFrame, RailItem, type FramePlace } from "./app/AppFrame.js";
 import { DeveloperPanel } from "./app/DeveloperPanel.js";
+import { versionNote } from "./app/protocol-version.js";
 import {
   activeDrawField,
   DrawContext,
@@ -33,6 +34,7 @@ import { mapNeeded } from "./app/map-need.js";
 import { MapPane } from "./app/MapPane.js";
 import { createWorldMap } from "./map/MapView.js";
 import { needsOfPlan, type Needs } from "./app/needs.js";
+import { listedProcesses } from "./app/listed-processes.js";
 import { ProcessListScreen } from "./app/ProcessListScreen.js";
 import { ProcessScreen, RequestLog } from "./app/ProcessScreen.js";
 import { AboutFooter, AboutPanel } from "./app/AboutPanel.js";
@@ -119,7 +121,7 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
       import.meta.env.DEV ? [...DEV_EXAMPLES, ...(config.examples ?? [])] : (config.examples ?? []),
     [config.examples],
   );
-  const view = useWorkflow(relayUrl, config.acceptedNoticeMs);
+  const view = useWorkflow(relayUrl, config.acceptedNoticeMs, presets);
   const mapLimits = useMemo<MapLimits>(
     () => ({
       maxCoordinates: config.maxMapCoordinates ?? DEFAULT_MAX_MAP_COORDINATES,
@@ -443,12 +445,15 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
         />
       );
       break;
-    case "connected":
+    case "connected": {
+      // Narrowed here, as it is drawn: the workflow keeps the whole list.
+      const listed = listedProcesses(state.endpoint, state.processes);
       screen = (
         <ProcessListScreen
           endpoint={state.endpoint}
           service={state.service}
-          processes={state.processes}
+          processes={listed.processes}
+          listFilter={listed.listFilter}
           opening={state.opening}
           route={state.route}
           needs={listNeeds}
@@ -460,6 +465,7 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
         />
       );
       break;
+    }
     case "process":
     case "running":
     case "result":
@@ -688,6 +694,11 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
                         open={developer}
                         census={view.census}
                         notes={developerNotes}
+                        version={
+                          state.stage === "choose-endpoint"
+                            ? undefined
+                            : versionNote(state.service.capabilities)
+                        }
                         onDescribeAll={
                           state.stage === "choose-endpoint" ? undefined : commands.describeAll
                         }
@@ -698,6 +709,7 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
                             <RequestLog
                               entries={view.snapshot?.observations ?? []}
                               endpoint={redactUrl(state.endpoint.baseUrl)}
+                              open
                             />
                           ) : undefined
                         }
@@ -776,7 +788,7 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
                     }
                     dismissAdvertisedFor={view.dismissAdvertisedFor}
                     messages={view.jobMessages}
-                    onRemove={commands.removeJob}
+                    onRemove={address.removeJob}
                     onDismiss={commands.dismissJob}
                   />
                 </SidePanel>

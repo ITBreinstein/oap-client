@@ -36,3 +36,22 @@ export function preferenceOutcome(
   if (answer.kind === "immediate") return answer.locationPresent ? "ambiguous" : "honoured";
   return "ambiguous";
 }
+
+/**
+ * The tokens of a `Preference-Applied` header, as written: `respond-async`,
+ * `return=minimal`, pygeoapi's `wait`. Undefined when no header was readable.
+ *
+ * Recorded rather than interpreted. What a server *says* it applied is one
+ * fact, and {@link preferenceOutcome} — what the response shows it did — is
+ * another; pygeoapi reports `wait` on every synchronous answer, a preference
+ * this client never sends, and only both together show that.
+ */
+export function preferenceAppliedTokens(header: string | null): readonly string[] | undefined {
+  if (header === null) return undefined;
+  return Object.freeze(
+    header
+      .split(",")
+      .map((token) => token.trim())
+      .filter((token) => token !== ""),
+  );
+}

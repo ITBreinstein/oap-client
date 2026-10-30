@@ -1,0 +1,11 @@
+HTTP/1.1 201 Created
+Server: gunicorn
+Date: Fri, 23 Oct 2026 10:43:18 GMT
+Connection: close
+Location: http://localhost:5100/processes/EchoProcess/jobs/e48ac36d-90e1-4cf9-ab4e-b56cadc081d9
+Preference-Applied: respond-async
+Content-Type: application/json
+Content-Length: 414
+X-Content-Type-Options: nosniff
+
+{"description":"Job successfully submitted to processing queue. Execution should begin when resources are available.","id":"e48ac36d-90e1-4cf9-ab4e-b56cadc081d9","jobID":"e48ac36d-90e1-4cf9-ab4e-b56cadc081d9","processID":"EchoProcess","processingEntityType":"ogc-api-processes","type":"process","status":"accepted","location":"http://localhost:5100/processes/EchoProcess/jobs/e48ac36d-90e1-4cf9-ab4e-b56cadc081d9"}

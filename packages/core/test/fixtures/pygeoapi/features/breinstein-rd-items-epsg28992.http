@@ -1,0 +1,120 @@
+HTTP/1.1 200 OK
+Server: gunicorn
+Date: Mon, 26 Oct 2026 09:34:00 GMT
+Connection: keep-alive
+Content-Type: application/json
+X-Powered-By: pygeoapi 0.21.0
+Content-Language: en-US
+Content-Crs: <http://www.opengis.net/def/crs/EPSG/0/28992>
+Access-Control-Allow-Origin: *
+Content-Length: 3250
+
+{
+    "type":"FeatureCollection",
+    "features":[
+        {
+            "type":"Feature",
+            "id":"area",
+            "properties":{
+                "name":"An area",
+                "kind":"polygon"
+            },
+            "geometry":{
+                "type":"Polygon",
+                "coordinates":[
+                    [
+                        [
+                            136812.5,
+                            455812.5
+                        ],
+                        [
+                            137012.5,
+                            455812.5
+                        ],
+                        [
+                            137012.5,
+                            456012.5
+                        ],
+                        [
+                            136812.5,
+                            456012.5
+                        ],
+                        [
+                            136812.5,
+                            455812.5
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type":"Feature",
+            "id":"route",
+            "properties":{
+                "name":"A route",
+                "kind":"line"
+            },
+            "geometry":{
+                "type":"LineString",
+                "coordinates":[
+                    [
+                        136700.0,
+                        455700.0
+                    ],
+                    [
+                        136900.0,
+                        455950.0
+                    ],
+                    [
+                        137100.0,
+                        456100.0
+                    ]
+                ]
+            }
+        },
+        {
+            "type":"Feature",
+            "id":"place",
+            "properties":{
+                "name":"A place",
+                "kind":"point"
+            },
+            "geometry":{
+                "type":"Point",
+                "coordinates":[
+                    136900.0,
+                    455900.0
+                ]
+            }
+        }
+    ],
+    "numberMatched":3,
+    "numberReturned":3,
+    "links":[
+        {
+            "type":"application/geo+json",
+            "rel":"self",
+            "title":"This document as GeoJSON",
+            "href":"http://localhost:5080/collections/breinstein-rd/items?f=json&crs=http%3A%2F%2Fwww.opengis.net%2Fdef%2Fcrs%2FEPSG%2F0%2F28992"
+        },
+        {
+            "rel":"alternate",
+            "type":"application/ld+json",
+            "title":"This document as RDF (JSON-LD)",
+            "href":"http://localhost:5080/collections/breinstein-rd/items?f=jsonld&crs=http%3A%2F%2Fwww.opengis.net%2Fdef%2Fcrs%2FEPSG%2F0%2F28992"
+        },
+        {
+            "type":"text/html",
+            "rel":"alternate",
+            "title":"This document as HTML",
+            "href":"http://localhost:5080/collections/breinstein-rd/items?f=html&crs=http%3A%2F%2Fwww.opengis.net%2Fdef%2Fcrs%2FEPSG%2F0%2F28992"
+        },
+        {
+            "type":"application/json",
+            "title":"Three areas in Utrecht, stored in RD New",
+            "rel":"collection",
+            "href":"http://localhost:5080/collections/breinstein-rd"
+        }
+    ],
+    "timeStamp":"2026-10-26T09:34:00.829740Z"
+}

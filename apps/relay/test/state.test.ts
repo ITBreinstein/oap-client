@@ -98,15 +98,75 @@ describe("sessions", () => {
     expect(state.touchSession(session.token)).toBe(true);
   });
 
-  it("refuses a new session at the cap, after trying a sweep", () => {
+  it("makes room at the cap by evicting the least recently used session without a stream", () => {
+    // POST /sessions needs nothing: refusing at the cap would let a script
+    // lock every page out for an idle hour.
     const clock = manualClock();
     const state = stateWith(clock, { maxSessions: 2 });
-    expect(state.createSession()).toBeDefined();
-    expect(state.createSession()).toBeDefined();
-    expect(state.createSession()).toBeUndefined();
+    const first = state.createSession();
+    clock.advance(MINUTE);
+    const second = state.createSession();
+    if (first === undefined || second === undefined) throw new Error("expected sessions");
+    clock.advance(MINUTE);
+    expect(state.touchSession(first.token)).toBe(true);
 
-    clock.advance(10 * MINUTE);
     expect(state.createSession()).toBeDefined();
+    expect(state.touchSession(second.token)).toBe(false);
+    expect(state.touchSession(first.token)).toBe(true);
+    expect(state.counts().sessions).toBe(2);
+  });
+
+  it("sweeps first at the cap, so an expired session goes before a live one", () => {
+    const clock = manualClock();
+    const state = stateWith(clock, {
+      maxSessions: 2,
+      sessionIdleTtlMs: 60 * MINUTE,
+      sessionMaxAgeMs: 30 * MINUTE,
+    });
+    const aged = state.createSession();
+    clock.advance(MINUTE);
+    const live = state.createSession();
+    if (aged === undefined || live === undefined) throw new Error("expected sessions");
+    // Used more recently than `live`, but past its maximum age a moment later.
+    clock.advance(29 * MINUTE - 1);
+    expect(state.touchSession(aged.token)).toBe(true);
+    clock.advance(1);
+
+    expect(state.createSession()).toBeDefined();
+    expect(state.touchSession(live.token)).toBe(true);
+    expect(state.counts().sessions).toBe(2);
+  });
+
+  it("never evicts a session with an open stream, and refuses when every one has one", () => {
+    const clock = manualClock();
+    const state = stateWith(clock, { maxSessions: 2 });
+    const closed: string[] = [];
+    for (let index = 0; index < 2; index += 1) {
+      const session = state.createSession();
+      if (session === undefined) throw new Error("expected a session");
+      state.listen(
+        session.token,
+        () => undefined,
+        () => closed.push(session.token),
+      );
+      clock.advance(MINUTE);
+    }
+    expect(state.createSession()).toBeUndefined();
+    expect(state.counts()).toMatchObject({ sessions: 2, listeners: 2 });
+    expect(closed).toEqual([]);
+  });
+
+  it("drops an evicted session's registrations with it", () => {
+    const clock = manualClock();
+    const state = stateWith(clock, { maxSessions: 1 });
+    const session = state.createSession();
+    if (session === undefined) throw new Error("expected a session");
+    const registration = state.register(session.token, "pygeoapi");
+    if (typeof registration === "string") throw new Error(registration);
+
+    expect(state.createSession()).toBeDefined();
+    expect(state.ring(registration.callbackToken, "success")).toBe("unknown");
+    expect(state.counts().registrations).toBe(0);
   });
 });
 

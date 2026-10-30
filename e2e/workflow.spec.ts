@@ -12,7 +12,8 @@
  * answering, as the other browser specs do.
  */
 
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./fixtures.js";
 import { RELAY } from "./servers.js";
 import { PDOK_LANE, requireService } from "./services.js";
 import { readFile } from "node:fs/promises";

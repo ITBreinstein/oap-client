@@ -1,0 +1,18 @@
+HTTP/1.1 200 OK
+Server: gunicorn
+Date: Mon, 26 Oct 2026 09:35:25 GMT
+Connection: keep-alive
+Content-Type: application/json
+X-Powered-By: pygeoapi 0.21.0
+Content-Language: en-US
+Location: http://localhost:5080/jobs/92611d82-d120-11f1-9b7e-4e8815af2561
+Access-Control-Allow-Origin: *
+Content-Length: 459
+
+{
+    "features":{
+        "value":"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<kml xmlns=\"http://www.opengis.net/kml/2.2\"><Document><Placemark><name>The area given</name><Polygon><outerBoundaryIs><LinearRing><coordinates>5.118,52.089 5.124,52.089 5.124,52.093 5.118,52.093 5.118,52.089</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark></Document></kml>\n",
+        "mediaType":"application/vnd.google-earth.kml+xml"
+    },
+    "count":1
+}

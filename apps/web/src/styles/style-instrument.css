@@ -33,6 +33,11 @@
   flex-direction: row;
 }
 
+/* The rail's width: what lies over the map is placed from it. */
+[data-style="instrument"] {
+  --rail-width: 72px;
+}
+
 [data-style="instrument"] .app-rail {
   position: relative;
   z-index: 15;
@@ -40,7 +45,7 @@
   flex: none;
   flex-direction: column;
   align-items: center;
-  width: 72px;
+  width: var(--rail-width);
   padding: 14px 0 8px;
   background: var(--rail);
   border-right: 1px solid var(--line);
@@ -111,7 +116,19 @@
 [data-style="instrument"] .rail-item[aria-expanded="true"] {
   color: var(--text-strong);
   background: var(--rail-hover);
-  box-shadow: inset 2px 0 0 var(--accent-ink);
+}
+
+/* Its bar: an element of its own, clear of the corners an inset shadow would curl round. */
+[data-style="instrument"] .rail-item[aria-current="page"]::before,
+[data-style="instrument"] .rail-item[aria-expanded="true"]::before {
+  content: "";
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 0;
+  width: 2px;
+  background: var(--accent-ink);
+  border-radius: 0 2px 2px 0;
 }
 
 [data-style="instrument"] .rail-item:disabled {
@@ -210,9 +227,15 @@
     border-radius: 0;
   }
 
-  [data-style="instrument"] .rail-item[aria-current="page"],
-  [data-style="instrument"] .rail-item[aria-expanded="true"] {
-    box-shadow: inset 0 2px 0 var(--accent-ink);
+  /* In the bar at the foot, square-cornered: the bar runs along the top edge. */
+  [data-style="instrument"] .rail-item[aria-current="page"]::before,
+  [data-style="instrument"] .rail-item[aria-expanded="true"]::before {
+    top: 0;
+    right: 0;
+    bottom: auto;
+    width: auto;
+    height: 2px;
+    border-radius: 0;
   }
 
   [data-style="instrument"] .rail-end {
@@ -232,6 +255,11 @@
 [data-style="instrument"] h2 {
   font-size: 1.6rem;
   line-height: 1.2;
+}
+
+/* Radios and checkboxes, ticked, in the main colour rather than the browser's blue. */
+[data-style="instrument"] {
+  accent-color: var(--accent);
 }
 
 /* One accent-filled control per screen: everything else is outlined. */
@@ -294,8 +322,16 @@
   gap: 36px;
 }
 
+/*
+ * The start screen's column: the address row, the known services, the
+ * examples and the notes all end at one edge.
+ */
+[data-style="instrument"] {
+  --start-column: 760px;
+}
+
 [data-style="instrument"] .address-field {
-  max-width: 720px;
+  max-width: var(--start-column);
 }
 
 [data-style="instrument"] .address-field > label,
@@ -308,21 +344,13 @@
 }
 
 [data-style="instrument"] .input-with-button input {
-  min-height: 48px;
   padding: 0 14px;
   font-size: 0.9375rem;
 }
 
-[data-style="instrument"] .input-with-button button {
-  min-height: 48px;
-  padding: 0 22px;
-  font-size: 0.9375rem;
-  font-weight: 800;
-}
-
 /* The known services: a table, the radio as its status dot. */
 [data-style="instrument"] .service-choices {
-  max-width: 760px;
+  max-width: var(--start-column);
 }
 
 [data-style="instrument"] .service-choices .connect-line strong {
@@ -348,11 +376,6 @@
 
 [data-style="instrument"] label.choice-card:hover {
   background: var(--surface-hover);
-}
-
-[data-style="instrument"] label.choice-card:has(input:checked) {
-  background: var(--surface-hover);
-  box-shadow: inset 2px 0 0 var(--accent-ink);
 }
 
 [data-style="instrument"] label.choice-card input[type="radio"] {
@@ -394,11 +417,6 @@
   color: var(--warning);
 }
 
-[data-style="instrument"] .featured-head .browse-all {
-  min-height: 40px;
-  font-size: 0.8125rem;
-}
-
 [data-style="instrument"] .how-it-works,
 [data-style="instrument"] .about-access {
   background: var(--surface);
@@ -409,7 +427,7 @@
 [data-style="instrument"] .how-it-works,
 [data-style="instrument"] .about-access,
 [data-style="instrument"] .start-card form > .notice {
-  max-width: 760px;
+  max-width: var(--start-column);
 }
 
 [data-style="instrument"] ol.steps li::before {
@@ -419,7 +437,7 @@
 
 /* Featured examples: compact rows in one table, as the panel lists them. */
 [data-style="instrument"] .featured-examples {
-  max-width: 760px;
+  max-width: var(--start-column);
 }
 
 [data-style="instrument"] .example-grid {
@@ -439,7 +457,7 @@
 
 /* Over the content, never beside it: the start screen stays where it is. */
 [data-style="instrument"] {
-  --examples-width: 420px;
+  --side-panel-width: 420px;
 }
 
 [data-style="instrument"] .app-body:has(> .examples-panel[data-open="true"]) {
@@ -458,14 +476,20 @@
   transform: translateX(-100%);
 }
 
-[data-style="instrument"] .examples-panel .side-panel-head {
-  padding: 20px 20px 0;
+/* Every panel's title row: Examples, My jobs and About alike. */
+[data-style="instrument"] .side-panel-head {
+  padding: 20px 20px 12px;
 }
 
-[data-style="instrument"] .examples-panel .side-panel-head h2 {
+[data-style="instrument"] .side-panel-head h2 {
   font-size: 1.25rem;
   font-weight: 800;
   letter-spacing: -0.015em;
+}
+
+/* Examples' filters follow at once. */
+[data-style="instrument"] .examples-panel .side-panel-head {
+  padding-bottom: 0;
 }
 
 [data-style="instrument"] .examples-tools {
@@ -805,9 +829,6 @@
 
 /* After a result, both ways on are outlined: Run was the screen's one primary. */
 [data-style="instrument"] .next-steps button {
-  min-height: 38px;
-  padding: 0 12px;
-  font-size: 0.8125rem;
   color: var(--text);
   background: var(--surface);
   border-color: var(--line-strong);
@@ -826,12 +847,13 @@
   border-top: 1px solid var(--line);
 }
 
-[data-style="instrument"] .request-log h3 {
-  margin: 0 0 8px;
+[data-style="instrument"] .request-log summary {
+  cursor: pointer;
 }
 
 [data-style="instrument"] .request-log ol {
   display: flex;
+  margin-top: 8px;
   flex-direction: column;
   gap: 4px;
   font-size: 0.75rem;
@@ -854,7 +876,8 @@
 
 @media (min-width: 52rem) {
   [data-style="instrument"] .layout:not(.layout-single) {
-    --panel-width: 400px;
+    /* A box's four coordinates two to a row, each label on one line. */
+    --panel-width: 440px;
   }
 
   [data-style="instrument"] .layout:not(.layout-single) .panel {
@@ -972,9 +995,6 @@
 
   /* A box's and an area's: one look, drawing or not (#17). */
   [data-style="instrument"] :is(.geometry, .bbox) .actions button {
-    min-height: 36px;
-    padding: 0 12px;
-    font-size: 0.8125rem;
     color: var(--text-secondary);
     background: var(--surface);
     border-color: var(--line-strong);
@@ -1007,7 +1027,6 @@
   [data-style="instrument"] .layout:not(.layout-single) .run-bar input[type="checkbox"] {
     width: 16px;
     height: 16px;
-    accent-color: var(--accent);
   }
 
   [data-style="instrument"] .layout:not(.layout-single) .run-hint {
@@ -1018,10 +1037,6 @@
   [data-style="instrument"] .layout:not(.layout-single) .run-bar button[type="submit"] {
     grid-column: 2;
     grid-row: 1 / span 2;
-    min-height: 46px;
-    padding: 0 22px;
-    font-size: 0.9375rem;
-    font-weight: 800;
   }
 
   [data-style="instrument"] .layout:not(.layout-single) .developer {
@@ -1029,13 +1044,18 @@
     padding: 0.5rem 22px;
   }
 
-  /* The request log lies over the map's foot, out of the sheet. */
+  /*
+   * The request log lies over the map's foot, out of the sheet, folded: clear
+   * of the scale bar under it, level with the legend at the other corner.
+   * As wide as what it shows, so folded it stays clear of the legend.
+   */
   [data-style="instrument"] .layout:not(.layout-single) .request-log {
     position: fixed;
     z-index: 3;
-    left: calc(72px + var(--panel-width) + 20px);
-    bottom: 20px;
-    width: min(560px, calc(100vw - 72px - var(--panel-width) - 40px));
+    left: calc(var(--rail-width) + var(--panel-width) + 20px);
+    bottom: 40px;
+    width: fit-content;
+    max-width: min(560px, calc(100vw - var(--rail-width) - var(--panel-width) - 40px));
     max-height: 40vh;
     margin: 0;
     padding: 12px 14px;
@@ -1055,10 +1075,10 @@
   }
 
   [data-style="instrument"] .map-pane > .map-hint:not(.map-legend) {
-    /* Below "Find a place" (#16). */
-    top: 4.25rem;
+    /* Below "Find a place" (#16, 2.5rem high), 1rem clear of it, at its edge. */
+    top: calc(var(--map-inset) + 3.5rem);
     bottom: auto;
-    left: 20px;
+    left: var(--map-inset);
   }
 }
 
@@ -1150,20 +1170,9 @@
 
 /* ------------------------------------------------------------ About */
 
-/* Out of the rail like Examples, at its width. */
-[data-style="instrument"] .about-panel {
-  width: min(var(--examples-width), 100%);
-}
-
+/* Out of the rail like Examples; its sections draw their own rules. */
 [data-style="instrument"] .about-panel .side-panel-head {
-  padding: 20px 20px 12px;
   border-bottom: none;
-}
-
-[data-style="instrument"] .about-panel .side-panel-head h2 {
-  font-size: 1.25rem;
-  font-weight: 800;
-  letter-spacing: -0.015em;
 }
 
 /* The sections carry their own padding and rules. */

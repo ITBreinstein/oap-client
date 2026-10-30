@@ -83,3 +83,39 @@ export function toJobState(value: string): JobState | undefined {
 export function isTerminalState(value: string): boolean {
   return TERMINAL_STATES.has(value.toLowerCase());
 }
+
+/**
+ * The top-level members of a job document the core models. Anything else is
+ * recorded by name — vendor extension or draft, and either way not something
+ * to drop silently. One list, for both readers of a job document: the status
+ * parser in `jobs/` and the execution classifier in `execution/`.
+ *
+ * 1.0's `statusInfo` members, plus the 2.0 draft's (OGC 18-062r3 at 756b659,
+ * `statusInfo.yaml` and `descriptionType.yaml`): `processingEntityType`, which
+ * the draft requires in place of 1.0's `type`, and the optional
+ * `profileEntityType`, `request`, `title`, `description`, `keywords` and
+ * `metadata`. Weaver sends both `type` and `processingEntityType`.
+ */
+export const JOB_DOCUMENT_MEMBERS: ReadonlySet<string> = new Set([
+  "jobID",
+  "id",
+  "status",
+  "message",
+  "created",
+  "started",
+  "finished",
+  "updated",
+  "progress",
+  "percentCompleted",
+  "processID",
+  "type",
+  "processingEntityType",
+  "profileEntityType",
+  "request",
+  "title",
+  "description",
+  "keywords",
+  "metadata",
+  "links",
+  "exception",
+]);

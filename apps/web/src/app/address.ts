@@ -16,6 +16,12 @@
  *
  * Leaving the page is questioned while a run is under way or the form holds
  * something typed: the browser asks before throwing it away.
+ *
+ * A job removed from My jobs is not named again: "Remove from list" takes it
+ * out of the address at once, in place, and the address leaves it out from
+ * then on, even while its results stay on screen. Otherwise a reload would
+ * follow the job from the address and list it again. A reload still on its way
+ * back to the job when it is removed does not follow it either.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -248,6 +254,16 @@ export interface AddressView {
   readonly connect: (endpoint: EndpointRef) => void;
   /** Open `processId` on `endpoint`, then follow the job at `statusUrl` there. */
   readonly followJob: (endpoint: EndpointRef, processId: string, statusUrl: string) => void;
+  /** "Remove from list": forget the job, and take it out of the address. */
+  readonly removeJob: (statusUrl: string) => void;
+}
+
+/** `place` without its job when that job was removed from My jobs. */
+function withoutRemoved(place: Place, removed: ReadonlySet<string>): Place {
+  if (place.service === undefined || place.job === undefined) return place;
+  return removed.has(jobUrl(place.service, place.job))
+    ? { service: place.service, process: place.process }
+    : place;
 }
 
 export function useAddress(state: Workflow, commands: WorkflowCommands): AddressView {
@@ -264,6 +280,9 @@ export function useAddress(state: Workflow, commands: WorkflowCommands): Address
   useEffect(() => {
     latest.current = { state, commands };
   });
+
+  // Jobs removed from My jobs this visit, by status URL: never named again.
+  const removed = useRef(new Set<string>());
 
   // A job to follow once its process is open, and whether that was just
   // asked for: the address waits for the job rather than name the form.
@@ -312,7 +331,7 @@ export function useAddress(state: Workflow, commands: WorkflowCommands): Address
       if (state.stage === "choose-endpoint" && state.error === undefined) return;
       resuming.current = false;
     }
-    const place = placeOf(state);
+    const place = withoutRemoved(placeOf(state), removed.current);
     const shown = placeInSearch(globalThis.location.search);
     if (samePlace(place, shown)) return;
     // A link's place stays in the address until the user connects or leaves it.
@@ -396,5 +415,23 @@ export function useAddress(state: Workflow, commands: WorkflowCommands): Address
     commands.openExample(endpoint, processId);
   };
 
-  return { linked, connect, followJob };
+  const removeJob = (statusUrl: string) => {
+    commands.removeJob(statusUrl);
+    removed.current.add(statusUrl);
+    // A reload may still be on its way back to this job, to follow it once its
+    // process is open: it would list the job again. Not any more.
+    if (following.current?.statusUrl === statusUrl) following.current = undefined;
+    const shown = placeInSearch(globalThis.location.search);
+    const kept = withoutRemoved(shown, removed.current);
+    if (samePlace(kept, shown)) return;
+    // In place: Back should not lead to an entry that names it either.
+    const { pathname, hash } = globalThis.location;
+    globalThis.history.replaceState(
+      globalThis.history.state,
+      "",
+      `${pathname}${withPlace(globalThis.location.search, kept)}${hash}`,
+    );
+  };
+
+  return { linked, connect, followJob, removeJob };
 }

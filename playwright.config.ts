@@ -10,21 +10,43 @@ export default defineConfig({
   outputDir: ".playwright/results",
   fullyParallel: true,
   forbidOnly: CI,
-  reporter: CI ? [["html", { outputFolder: ".playwright/report" }]] : "list",
+  // Beside the usual reporter, every skip and why, at the end (e2e/skip-reporter.ts).
+  reporter: CI
+    ? [["html", { outputFolder: ".playwright/report" }], ["./e2e/skip-reporter.ts"]]
+    : [["list"], ["./e2e/skip-reporter.ts"]],
   use: { baseURL: WEB },
   // Refuses a relay or web build on the lane's ports that this checkout did
   // not make. Runs after the servers below are started, or found running.
   globalSetup: "./e2e/global-setup.ts",
   projects: [
     // `pnpm test:e2e`: blocks CI. pygeoapi only, from infra/compose.
-    { name: "blocking", testIgnore: /zoo-browser\.spec\.ts/, grepInvert: /@pdok/ },
+    // Before the lanes that use the lane's pygeoapi, and only those: its job
+    // stores are kept small (e2e/job-store.setup.ts).
+    { name: "pygeoapi-jobs", testMatch: /job-store\.setup\.ts/ },
+    {
+      name: "blocking",
+      testIgnore: /(zoo-.*|weaver)\.spec\.ts/,
+      grepInvert: /@pdok/,
+      dependencies: ["pygeoapi-jobs"],
+    },
     // `pnpm test:e2e:pdok`: the tests that reach PDOK (tagged PDOK_LANE in
     // e2e/services.ts). Opt-in: a third party's uptime must not block a merge.
-    { name: "pdok", testIgnore: /zoo-browser\.spec\.ts/, grep: /@pdok/ },
+    {
+      name: "pdok",
+      testIgnore: /(zoo-.*|weaver)\.spec\.ts/,
+      grep: /@pdok/,
+      dependencies: ["pygeoapi-jobs"],
+    },
     // `pnpm test:e2e:zoo`: ZOO-Project from a browser. Reports, never blocks:
     // ZOO is a second implementation built from source, and its worker pool
     // runs out as it is used (finding 0044). See .github/workflows/interop.yml.
-    { name: "zoo", testMatch: /zoo-browser\.spec\.ts/ },
+    { name: "zoo", testMatch: /zoo-.*\.spec\.ts/ },
+    // `pnpm test:e2e:weaver`: the OGC API - Processes 2.0 draft, against
+    // Weaver from infra/compose/weaver.yml. Named, never blocking: the draft
+    // still moves, and Weaver's images are amd64 only. Under CI a Weaver that
+    // is not answering fails this lane rather than skipping it. A failure
+    // keeps its trace, and the axe tests attach what axe found.
+    { name: "weaver", testMatch: /weaver\.spec\.ts/, use: { trace: "retain-on-failure" } },
     // `pnpm capture:observations`: not a test lane. Drives the client against
     // the local stack and saves the matrix's evidence, one export per
     // endpoint. See e2e/observations.capture.ts.

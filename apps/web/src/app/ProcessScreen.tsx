@@ -35,6 +35,8 @@ import { initialValues } from "../forms/defaults.js";
 import { shownOnMap } from "./input-shapes.js";
 import { MapLimitsContext } from "./map-limits.js";
 import { offersLink, namedFieldError } from "./run.js";
+import { linkExpressible, NO_LINK_IN_DRAFT } from "./protocol-version.js";
+import { formatLine, formatsToAsk, formatWords, offeredFormats } from "../results/format-choice.js";
 import type { WorkflowCommands, WorkflowView } from "./useWorkflow.js";
 import type { Workflow } from "./workflow.js";
 
@@ -104,6 +106,61 @@ function About({ state }: { readonly state: Open }) {
 }
 
 /**
+ * #F3: the format asked for each output that offers several, and the way to
+ * pick another before running. The page's own choice is the first it can
+ * show (`results/format-choice.ts`); "Let the service choose" asks for none.
+ * Said in words beside each output, so the choice is never only a selected
+ * option.
+ */
+function OutputFormats({
+  state,
+  onChange,
+}: {
+  readonly state: Open;
+  readonly onChange: WorkflowCommands["setFormat"];
+}) {
+  const base = useId();
+  const { process, formatChoices } = state;
+  const asked = formatsToAsk(process.outputs, formatChoices);
+  const offering = process.outputs
+    .map((output) => ({ output, offered: offeredFormats(output) }))
+    .filter(({ offered }) => offered.length >= 2);
+  if (offering.length === 0) return null;
+  return (
+    <fieldset className="outputs formats">
+      <legend>Formats</legend>
+      {offering.map(({ output, offered }, index) => {
+        const id = `${base}-format-${String(index)}`;
+        const chosen = asked[output.id];
+        return (
+          <div key={output.id} className="field" data-output-format={output.id}>
+            <label htmlFor={id}>Format of “{output.title ?? output.id}”</label>
+            <p id={`${id}-line`} className="help" data-testid="format-line">
+              {formatLine(output, offered, chosen)}
+            </p>
+            <select
+              id={id}
+              value={chosen ?? ""}
+              aria-describedby={`${id}-line`}
+              onChange={(event) => {
+                onChange(output.id, event.target.value === "" ? null : event.target.value);
+              }}
+            >
+              {offered.map((format) => (
+                <option key={format.mediaType} value={format.mediaType}>
+                  {formatWords(format)} ({format.mediaType})
+                </option>
+              ))}
+              <option value="">Let the service choose</option>
+            </select>
+          </div>
+        );
+      })}
+    </fieldset>
+  );
+}
+
+/**
  * Task 8, T2: how each output comes back. Offered when the description allows
  * a reference, and then per output, value by default. Where it does not — every
  * pygeoapi process, which describes itself as value-only whatever it honours
@@ -120,8 +177,17 @@ function OutputChoices({
   readonly onChange: WorkflowCommands["setTransmission"];
 }) {
   const { process, linkOutputs } = state;
+  const reasonId = useId();
   const allowed = offersLink(process);
+  // The 2.0 draft has no per-output `transmissionMode`, which is what "Link"
+  // is sent as: the choice stays in view, off, with the reason beside it.
+  const expressible = linkExpressible(state.service.capabilities);
   if (process.outputs.length === 0 || (!allowed && !developer)) return null;
+  const reason = !expressible && (
+    <p id={reasonId} className="help" data-testid="no-link-reason">
+      {NO_LINK_IN_DRAFT}
+    </p>
+  );
   if (!allowed) {
     return (
       <fieldset className="outputs developer">
@@ -133,11 +199,14 @@ function OutputChoices({
             : `it declares ${process.outputTransmission.join(", ")}`}
           ). Asking anyway is recorded as going beyond it.
         </p>
+        {reason}
         {process.outputs.map((output) => (
           <label key={output.id} className="choice">
             <input
               type="checkbox"
               checked={linkOutputs.includes(output.id)}
+              disabled={!expressible}
+              aria-describedby={expressible ? undefined : reasonId}
               onChange={(event) => {
                 onChange(output.id, event.target.checked ? "reference" : "value");
               }}
@@ -151,6 +220,7 @@ function OutputChoices({
   return (
     <fieldset className="outputs">
       <legend>Outputs</legend>
+      {reason}
       {process.outputs.map((output) => {
         const link = linkOutputs.includes(output.id);
         return (
@@ -172,6 +242,8 @@ function OutputChoices({
                 type="radio"
                 name={`transmission-${output.id}`}
                 checked={link}
+                disabled={!expressible}
+                aria-describedby={expressible ? undefined : reasonId}
                 onChange={() => {
                   onChange(output.id, "reference");
                 }}
@@ -445,41 +517,47 @@ function ResultStrip({
 
 /**
  * The requests this page made to the service, newest last, as the session
- * recorded them.
+ * recorded them: folded, with how many there were, unless `open`.
  */
 export function RequestLog({
   entries,
   endpoint,
+  open = false,
 }: {
   readonly entries: readonly SessionObservation[];
   readonly endpoint: string;
+  /** Unfolded, for where it is in a fold already (the Developer section). */
+  readonly open?: boolean;
 }) {
   const base = useId();
-  const requests = requestLog(entries, endpoint, 12);
+  const all = requestLog(entries, endpoint, Number.POSITIVE_INFINITY);
+  const requests = all.slice(-12);
   return (
     <section className="request-log" aria-labelledby={`${base}-log`}>
-      <h3 id={`${base}-log`} className="label">
-        Requests to this service
-      </h3>
-      <ol>
-        {requests.length === 0 && <li className="mono muted">Nothing sent yet.</li>}
-        {requests.map((request, index) => (
-          // The same request can repeat (a poll): its place is its identity.
-          <li key={index} className="mono">
-            <span className="request-method">{request.method}</span>{" "}
-            {/* The path under the service's address: the address is the page's already. */}
-            <span className="request-url" title={request.url}>
-              {pathUnder(request.url, endpoint)}
-            </span>{" "}
-            <span
-              className="request-status"
-              data-ok={request.status !== undefined && request.status < 400}
-            >
-              {request.status === undefined ? "—" : String(request.status)}
-            </span>
-          </li>
-        ))}
-      </ol>
+      <details open={open}>
+        <summary className="label">
+          <span id={`${base}-log`}>Requests to this service</span> ({all.length})
+        </summary>
+        <ol>
+          {requests.length === 0 && <li className="mono muted">Nothing sent yet.</li>}
+          {requests.map((request, index) => (
+            // The same request can repeat (a poll): its place is its identity.
+            <li key={index} className="mono">
+              <span className="request-method">{request.method}</span>{" "}
+              {/* The path under the service's address: the address is the page's already. */}
+              <span className="request-url" title={request.url}>
+                {pathUnder(request.url, endpoint)}
+              </span>{" "}
+              <span
+                className="request-status"
+                data-ok={request.status !== undefined && request.status < 400}
+              >
+                {request.status === undefined ? "—" : String(request.status)}
+              </span>
+            </li>
+          ))}
+        </ol>
+      </details>
     </section>
   );
 }
@@ -960,6 +1038,7 @@ export function ProcessScreen(props: ProcessScreenProps) {
             </p>
           )}
 
+          <OutputFormats state={state} onChange={commands.setFormat} />
           <OutputChoices state={state} developer={developer} onChange={commands.setTransmission} />
 
           {errorCount > 0 && (
@@ -1016,7 +1095,9 @@ export function ProcessScreen(props: ProcessScreenProps) {
                 Prefer: respond-async
               </code>
             )}
-            <button type="submit">{onlyAsync ? "Run in the background" : "Run"}</button>
+            <button type="submit" className="primary">
+              {onlyAsync ? "Run in the background" : "Run"}
+            </button>
           </div>
         </form>
       )}

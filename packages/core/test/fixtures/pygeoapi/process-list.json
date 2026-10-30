@@ -876,6 +876,227 @@
         },
         {
             "version":"1.0.0",
+            "id":"breinstein-formats",
+            "title":"An area, in a format of your choice",
+            "description":"Returns the area given as one polygon feature, as GeoJSON, GML 3.2 or KML, whichever is asked for. Exists so that a client's choice of an output format can be tested.",
+            "jobControlOptions":[
+                "sync-execute",
+                "async-execute"
+            ],
+            "keywords":[
+                "formats",
+                "geojson",
+                "gml",
+                "kml",
+                "testbed"
+            ],
+            "links":[
+                {
+                    "type":"application/json",
+                    "rel":"self",
+                    "href":"http://localhost:5080/processes/breinstein-formats?f=json",
+                    "title":"Process description as JSON",
+                    "hreflang":"en-US"
+                },
+                {
+                    "type":"text/html",
+                    "rel":"alternate",
+                    "href":"http://localhost:5080/processes/breinstein-formats?f=html",
+                    "title":"Process description as HTML",
+                    "hreflang":"en-US"
+                },
+                {
+                    "type":"text/html",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/job-list",
+                    "href":"http://localhost:5080/jobs?f=html",
+                    "title":"Jobs list as HTML",
+                    "hreflang":"en-US"
+                },
+                {
+                    "type":"application/json",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/job-list",
+                    "href":"http://localhost:5080/jobs?f=json",
+                    "title":"Jobs list as JSON",
+                    "hreflang":"en-US"
+                },
+                {
+                    "type":"application/json",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/execute",
+                    "href":"http://localhost:5080/processes/breinstein-formats/execution?f=json",
+                    "title":"Execution for this process as JSON",
+                    "hreflang":"en-US"
+                }
+            ],
+            "outputTransmission":[
+                "value"
+            ]
+        },
+        {
+            "version":"1.0.0",
+            "id":"breinstein-gml",
+            "title":"An area as GML, as ZOO-Project writes it",
+            "description":"Returns the area given as one polygon feature and its centre as a point feature, in GML 2 as an OGR feature collection, with srsName EPSG:4326, EPSG:28992 or none. Exists so that a client's GML reading can be tested.",
+            "jobControlOptions":[
+                "sync-execute",
+                "async-execute"
+            ],
+            "keywords":[
+                "gml",
+                "testbed"
+            ],
+            "links":[
+                {
+                    "type":"application/json",
+                    "rel":"self",
+                    "href":"http://localhost:5080/processes/breinstein-gml?f=json",
+                    "title":"Process description as JSON",
+                    "hreflang":"en-US"
+                },
+                {
+                    "type":"text/html",
+                    "rel":"alternate",
+                    "href":"http://localhost:5080/processes/breinstein-gml?f=html",
+                    "title":"Process description as HTML",
+                    "hreflang":"en-US"
+                },
+                {
+                    "type":"text/html",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/job-list",
+                    "href":"http://localhost:5080/jobs?f=html",
+                    "title":"Jobs list as HTML",
+                    "hreflang":"en-US"
+                },
+                {
+                    "type":"application/json",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/job-list",
+                    "href":"http://localhost:5080/jobs?f=json",
+                    "title":"Jobs list as JSON",
+                    "hreflang":"en-US"
+                },
+                {
+                    "type":"application/json",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/execute",
+                    "href":"http://localhost:5080/processes/breinstein-gml/execution?f=json",
+                    "title":"Execution for this process as JSON",
+                    "hreflang":"en-US"
+                }
+            ],
+            "outputTransmission":[
+                "value"
+            ]
+        },
+        {
+            "version":"1.0.0",
+            "id":"breinstein-kml",
+            "title":"An area as KML, with HTML in it",
+            "description":"Returns the area given as four KML Placemarks: a polygon whose description is HTML, a point with ExtendedData Data, a line with SchemaData and a MultiGeometry. Exists so that a client's KML reading can be tested.",
+            "jobControlOptions":[
+                "sync-execute",
+                "async-execute"
+            ],
+            "keywords":[
+                "kml",
+                "testbed"
+            ],
+            "links":[
+                {
+                    "type":"application/json",
+                    "rel":"self",
+                    "href":"http://localhost:5080/processes/breinstein-kml?f=json",
+                    "title":"Process description as JSON",
+                    "hreflang":"en-US"
+                },
+                {
+                    "type":"text/html",
+                    "rel":"alternate",
+                    "href":"http://localhost:5080/processes/breinstein-kml?f=html",
+                    "title":"Process description as HTML",
+                    "hreflang":"en-US"
+                },
+                {
+                    "type":"text/html",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/job-list",
+                    "href":"http://localhost:5080/jobs?f=html",
+                    "title":"Jobs list as HTML",
+                    "hreflang":"en-US"
+                },
+                {
+                    "type":"application/json",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/job-list",
+                    "href":"http://localhost:5080/jobs?f=json",
+                    "title":"Jobs list as JSON",
+                    "hreflang":"en-US"
+                },
+                {
+                    "type":"application/json",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/execute",
+                    "href":"http://localhost:5080/processes/breinstein-kml/execution?f=json",
+                    "title":"Execution for this process as JSON",
+                    "hreflang":"en-US"
+                }
+            ],
+            "outputTransmission":[
+                "value"
+            ]
+        },
+        {
+            "version":"1.0.0",
+            "id":"breinstein-rd-link",
+            "title":"Areas in RD New, by reference",
+            "description":"Returns one output by reference: a link to three fixed features on this server, in RD New (EPSG:28992) or in CRS84, whichever is asked for. The features API sends Content-Crs.",
+            "jobControlOptions":[
+                "sync-execute",
+                "async-execute"
+            ],
+            "outputTransmission":[
+                "value"
+            ],
+            "keywords":[
+                "reference",
+                "crs",
+                "rd-new",
+                "testbed"
+            ],
+            "links":[
+                {
+                    "type":"application/json",
+                    "rel":"self",
+                    "href":"http://localhost:5080/processes/breinstein-rd-link?f=json",
+                    "title":"Process description as JSON",
+                    "hreflang":"en-US"
+                },
+                {
+                    "type":"text/html",
+                    "rel":"alternate",
+                    "href":"http://localhost:5080/processes/breinstein-rd-link?f=html",
+                    "title":"Process description as HTML",
+                    "hreflang":"en-US"
+                },
+                {
+                    "type":"text/html",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/job-list",
+                    "href":"http://localhost:5080/jobs?f=html",
+                    "title":"Jobs list as HTML",
+                    "hreflang":"en-US"
+                },
+                {
+                    "type":"application/json",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/job-list",
+                    "href":"http://localhost:5080/jobs?f=json",
+                    "title":"Jobs list as JSON",
+                    "hreflang":"en-US"
+                },
+                {
+                    "type":"application/json",
+                    "rel":"http://www.opengis.net/def/rel/ogc/1.0/execute",
+                    "href":"http://localhost:5080/processes/breinstein-rd-link/execution?f=json",
+                    "title":"Execution for this process as JSON",
+                    "hreflang":"en-US"
+                }
+            ]
+        },
+        {
+            "version":"1.0.0",
             "id":"breinstein-link",
             "title":"A link to a file on another server",
             "description":"Takes nothing and returns one output by reference: a link to a static file on another server, set in this server's configuration.",

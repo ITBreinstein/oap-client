@@ -73,6 +73,18 @@ describe("parseConfig", () => {
     ).toThrow(/readRoute/);
   });
 
+  it("takes an optional list of process ids to list, and checks each one", () => {
+    expect(parseConfig({ endpoints: [endpoint] }).endpoints[0]?.processes).toBeUndefined();
+    expect(
+      parseConfig({
+        endpoints: [{ ...endpoint, processes: ["hellojs", "OTB.BandMath", "ns:process:v1"] }],
+      }).endpoints[0]?.processes,
+    ).toEqual(["hellojs", "OTB.BandMath", "ns:process:v1"]);
+    for (const processes of [[], "hellojs", ["../x"], [""], [":x"], [1], ["a", "a"]]) {
+      expect(() => parseConfig({ endpoints: [{ ...endpoint, processes }] })).toThrow(/processes/);
+    }
+  });
+
   it("caps the read route at 50 MB and 120 s unless told otherwise", () => {
     const { limits } = parseConfig({ endpoints: [] });
     expect(limits.maxReadResponseBytes).toBe(50 * 1024 * 1024);

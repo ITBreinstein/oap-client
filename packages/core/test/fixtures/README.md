@@ -63,9 +63,28 @@ the versions are recorded here rather than left to a commit message.
                 with breinstein-link)                                 2026-09-26
               execution/breinstein-inputs-{base64-not-decoded,
                 array-passed-through}.http  (finding 0052)            2026-10-02
+              processes/breinstein-formats.json,
+              process-list.json  (re-captured; all fifteen, now
+                with breinstein-formats)                              2026-10-23
+              processes/breinstein-{gml,kml,rd-link}.json,
+              process-list.json  (re-captured; all eighteen),
+              conformance.json  (re-captured; ten OGC API - Features
+                classes, from the `breinstein-rd` collection),
+              execution/breinstein-gml-{epsg4326,epsg28992,
+                no-srsname}.http, execution/breinstein-kml.http,
+              execution/breinstein-formats-{gml32,
+                kml-document}.http, execution/breinstein-rd-link.http,
+              features/breinstein-rd-items-{epsg28992,crs84}.http   2026-10-26
               processes/breinstein-area-what-if.json,
               process-list.json  (re-captured; all fifteen, now
                 with breinstein-area-what-if)                         2026-10-29
+              process-list.json  (re-captured; all nineteen: the
+                eighteen and breinstein-area-what-if)                 2026-10-30
+
+Each `execution/*.http` from 2026-10-26 has the body it answered beside it
+as `*-request.json`. `features/` holds pygeoapi's OGC API - Features answers
+for the `breinstein-rd` collection that `breinstein-rd-link` points at: the
+same three features in RD New, with `Content-Crs`, and in CRS84.
 
 The `breinstein-*` descriptions are processes this repository adds to the
 pinned image (see `infra/README.md`). They are the only descriptions a browser
@@ -105,6 +124,19 @@ the set is a handful of files and the server is one pinned image.
                 (finding 0053)                                         2026-10-02
               execution/getarea-gml-bare-polygon-500.http
                 (finding 0065)                                         2026-10-02
+              execution/buffer-raw-gml-{epsg28992,from-urn4326}.http,
+              execution/centroid-raw-gml-no-srsname.http,
+              execution/saga-fractals-raw-{gml,kml}.http,
+              execution/saga-fractals-wfs-getfeature.http
+                (step zero 6 of the result-formats brief)              2026-10-23
+
+The 2026-10-23 captures are raw answers, `response: "raw"`, each with the
+request that produced it beside it as `*-request.http`: GML 2 as OGR writes it,
+labelled `application/json` (finding 0026), with `srsName` `EPSG:4326`,
+`EPSG:28992` or none, and the SAGA fractal as GML and KML. `buffer-raw-gml.http`
+above is the bare `EPSG:4326` case. `saga-fractals-wfs-getfeature.http` is what
+the link in `saga-fractals-reference-wfs.http` answers: WFS 1.0 GML from
+MapServer, `text/xml`, an `srsName` on every geometry.
 
 Re-capture with `./infra/zoo/capture-fixtures.sh`, and only when the pinned SHA
 in `infra/zoo/pinned.env` changes. Read the diff before committing it.
@@ -210,6 +242,60 @@ area of the process description, `limit=1000`. It is 1 082 394 bytes of
 no `numberMatched` and no `next` link — a whole answer on one page. Its headers
 and member layout are those of `bag-pand-items-default-page.http`, which is the
 same query without `limit`: 10 features and a cursor `next`.
+
+## `weaver/`
+
+    server    pavics/weaver:latest-manager@sha256:5413e646…, with latest-worker
+              @sha256:a06d5f85… and mongo:7.0 — infra/compose/weaver.yml
+              (6.16.0 plus master to about 868d357f)
+    port      5100
+    captured  landing-page.json, conformance.json,
+              processes/EchoProcess.json, execution/*, jobs/*         2026-10-23
+
+The one server found that declares the OGC API - Processes 2.0 draft's Core
+class (`http://www.opengis.net/spec/ogcapi-processes-1/2.0/conf/core`, beside 68
+classes of 1.0). Every capture here is the builtin `EchoProcess`, with the
+inputs in `execution/*-request.json`: `sync-every-output-request.json` lists
+every output, as the web app does; `one-output-request.json` lists one.
+
+- `execution/sync-one-output.http` — one output, `Accept: */*`: the value raw,
+  `text/plain`, as `/req/core/process-execute-sync-one` says.
+  `…-accept-json.http` is the same request with `Accept: application/json`:
+  a JSON map, `{"stringOutput":"Value1"}` — content negotiation, not a
+  deviation.
+- `execution/sync-every-output.http` — every output: a results map, with
+  `geometryOutput` and `imagesOutput` as arrays although the description gives
+  no output a `maxOccurs`, so by the draft's default each has one value.
+- `execution/async-*.http`, `jobs/status-*.http` — `201` with `Location` and
+  `Preference-Applied: respond-async`; the status document carries both 1.0's
+  `jobID` and `type` and the draft's `id` and `processingEntityType`, under a
+  `$schema` naming 1.0's `statusInfo.yaml`.
+- `jobs/results-one-output.http` — **500**, `TypeError` in Weaver's
+  `get_job_results_response`: the results of an async job that asked for one
+  output cannot be read. `jobs/results-every-output.http`, the same job with
+  every output asked for, answers 200.
+- `execution/preflight-execute.http` — `405` to a CORS preflight, and
+  `execution/get-with-origin.http` — a 200 with no
+  `Access-Control-Allow-Origin`: Weaver sends no CORS headers, so a browser
+  reaches it only through the relay's read route.
+
+- `execution/accept-language-star-406.http` — the one-output request of
+  `one-output-request.json`, sent with `Accept-Language: *`, which is what
+  Node's `fetch` sends by default: **406**, "Requested language [*] not in
+  supported languages". RFC 9110 reads `*` as any language. Captured
+  2026-10-23.
+- `deploy/cwl-without-docker-{request,422}.http` — a CWL CommandLineTool
+  deployed through `POST /processes` (Part 2, out of the client's scope; kept
+  as evidence): one string in, `echo`, one string out, and no
+  `DockerRequirement`. **422**: Weaver insists on one of its application
+  requirements — Docker, or a builtin or remote one — before it runs
+  anything. Captured 2026-10-23.
+
+Re-capture by hand against `http://localhost:5100`, as for pygeoapi:
+
+    docker compose -f infra/compose/weaver.yml -p oap-weaver up -d --wait
+    curl -sSf -H 'Accept: application/json' -o weaver/conformance.json \
+      http://localhost:5100/conformance
 
 ## `*/execution/`
 

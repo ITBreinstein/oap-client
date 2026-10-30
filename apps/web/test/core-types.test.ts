@@ -38,7 +38,13 @@ it("exposes the process types and the value exports the form generator needs", (
     multiple: false,
     schema,
   };
-  const output: OutputDescription = { id: "c", schema };
+  const output: OutputDescription = {
+    id: "c",
+    minOccurs: 1,
+    maxOccurs: 1,
+    multiple: false,
+    schema,
+  };
   const execution: ProcessExecutionOptions = {
     sync: true,
     async: true,
