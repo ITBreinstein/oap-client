@@ -177,7 +177,12 @@ closes their streams; registrations after 24 hours. A session holds at most
 four event streams (`limits.maxStreamsPerSession`); a fifth closes the oldest.
 The relay holds at most 1 000 in all (`limits.maxOpenStreams`); one more is
 refused with `503`, `X-Relay-Error: stream-capacity`, and the page carries on
-polling. State is in memory and swept every minute. Losing it — a restart —
+polling. It holds at most 10 000 sessions (`limits.maxSessions`). At that cap a
+new session takes the place of the least recently used one without an open
+stream, so creating sessions alone cannot lock pages out; only when every
+session has a stream open is one more refused, with `503`,
+`X-Relay-Error: session-capacity`. A page using its session holds a stream
+open, and an evicted session's jobs lose their doorbells, not their state. State is in memory and swept every minute. Losing it — a restart —
 costs doorbells, never jobs; see below.
 
 ### Callback receivers
