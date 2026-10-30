@@ -1,0 +1,106 @@
+name: deploy-web
+
+# Every merge to main publishes the web app as a new release on the static
+# host; see "Automatic deploys" in deploy/static/README.md. Nothing about the
+# host lives here: it comes from the `production` environment's variables.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One deploy at a time, in the order they were started. A running deploy is
+# never cancelled halfway; a newer one waits, and replaces any that is still
+# only waiting.
+concurrency:
+  group: deploy-web
+  cancel-in-progress: false
+
+jobs:
+  # Builds the release exactly as deploy/static/deploy.sh does, and never sees
+  # a secret: `pnpm install` runs third-party package scripts, which must not
+  # share a job with the deploy key.
+  build:
+    # The environment allows main only; this also stops a manual run from
+    # another branch before it builds anything.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with: { persist-credentials: false }
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24.21.0, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @breinstein/web build
+      # What deploy.sh adds, and what it refuses to send.
+      - name: Add config.json and check the release
+        run: |
+          dist=apps/web/dist
+          cp deploy/static/config.json "$dist/config.json"
+          fail() { echo "::error::$1"; exit 1; }
+          [[ -f $dist/index.html ]] || fail "the build has no index.html"
+          node -e 'JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"))' "$dist/config.json" ||
+            fail "deploy/static/config.json is not JSON"
+          [[ -z $(find "$dist" -name '*.map') ]] || fail "the build contains source maps"
+          if grep -rq -E 'localhost:50[89][01]' "$dist"; then
+            fail "the build contains development addresses"
+          fi
+          tar -C "$dist" -czf web.tar.gz .
+          echo "release: $(du -sh "$dist" | cut -f1), archive: $(du -h web.tar.gz | cut -f1)"
+      - uses: actions/upload-artifact@v4
+        with: { name: web, path: web.tar.gz, if-no-files-found: error, retention-days: 7 }
+
+  # Sends the archive to the host over plain OpenSSH, where the key can only
+  # run oap-receive (deploy/static/oap-receive.sh), then checks the live site.
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: production
+    steps:
+      # For smoke.sh only.
+      - uses: actions/checkout@v4
+        with: { persist-credentials: false }
+      # smoke.sh reads JSON and resolves the hostname with node.
+      - uses: actions/setup-node@v4
+        with: { node-version: 24.21.0 }
+      - uses: actions/download-artifact@v4
+        with: { name: web }
+      - name: Send the release
+        env:
+          OAP_DEPLOY_KEY: ${{ secrets.OAP_DEPLOY_KEY }}
+          OAP_DEPLOY_HOST: ${{ vars.OAP_DEPLOY_HOST }}
+          OAP_KNOWN_HOSTS: ${{ vars.OAP_KNOWN_HOSTS }}
+        run: |
+          fail() { echo "::error::$1"; exit 1; }
+          [[ -n $OAP_DEPLOY_KEY ]] || fail "the production environment has no OAP_DEPLOY_KEY secret"
+          [[ -n $OAP_KNOWN_HOSTS ]] || fail "the production environment has no OAP_KNOWN_HOSTS variable"
+          # user@host, and nothing ssh would read as an option.
+          [[ $OAP_DEPLOY_HOST =~ ^[A-Za-z0-9._-]+@[A-Za-z0-9.-]+$ ]] ||
+            fail "OAP_DEPLOY_HOST must be user@host"
+          ssh_dir="$RUNNER_TEMP/ssh"
+          install -d -m 700 "$ssh_dir"
+          install -m 600 /dev/null "$ssh_dir/key"
+          printf '%s\n' "$OAP_DEPLOY_KEY" >"$ssh_dir/key"
+          printf '%s\n' "$OAP_KNOWN_HOSTS" >"$ssh_dir/known_hosts"
+          # The host must already be in known_hosts: an unknown or changed host
+          # key fails the deploy instead of being trusted.
+          ssh -i "$ssh_dir/key" -o UserKnownHostsFile="$ssh_dir/known_hosts" \
+            -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            "$OAP_DEPLOY_HOST" "deploy $GITHUB_SHA" <web.tar.gz
+      - name: Remove the key
+        if: always()
+        run: rm -rf -- "$RUNNER_TEMP/ssh"
+      # Fails the run when the live site is wrong. It does not roll back: see
+      # "Rolling back" in deploy/static/README.md. The relay is not deployed on
+      # this host yet; remove SMOKE_SKIP_RELAY once it is.
+      - name: Smoke test
+        env:
+          OAP_HOSTNAME: ${{ vars.OAP_HOSTNAME }}
+          SMOKE_SKIP_RELAY: 1
+        run: deploy/static/smoke.sh
