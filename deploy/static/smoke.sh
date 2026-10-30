@@ -8,6 +8,8 @@
 # internal CA only. SMOKE_RATE_LIMIT=1 also checks that the relay rate-limits
 # new sessions, even from a client that names itself differently each time;
 # that leaves the machine running it rate-limited for about a minute.
+# SMOKE_SKIP_RELAY=1 skips the checks that need the relay behind /api (and
+# SMOKE_RATE_LIMIT with them), for a host where it is not deployed yet.
 set -euo pipefail
 
 hostname=${OAP_HOSTNAME:-}
@@ -21,6 +23,7 @@ curl_opts=(--silent --show-error --max-time 20)
 
 failures=0
 ok() { printf 'ok    %s\n' "$1"; }
+skip() { printf 'skip  %s\n' "$1"; }
 bad() {
   printf 'FAIL  %s\n' "$1"
   failures=$((failures + 1))
@@ -78,32 +81,36 @@ fi
 
 # --- The relay, at /api -----------------------------------------------------
 
-relay_head=$(head_of /api/healthz)
-expect "/api/healthz answers 200" "$(status_in "$relay_head")" 200
-expect "/api/healthz comes from the relay (X-Relay: 1)" "$(header_in "$relay_head" x-relay)" 1
-
-endpoints=$(curl "${curl_opts[@]}" "$base/api/endpoints")
-# One line per endpoint: key, then base URL.
-# shellcheck disable=SC2016 # JavaScript, not shell
-listed=$(node -e '
-  const { endpoints } = JSON.parse(process.argv[1]);
-  for (const e of endpoints) console.log(`${e.key} ${e.baseUrl}`);
-' "$endpoints" 2>/dev/null || echo "unreadable")
-if [[ $listed == unreadable ]]; then
-  bad "/api/endpoints is the relay's endpoint list"
-elif [[ -z $listed ]]; then
-  bad "/api/endpoints lists at least one endpoint"
+if [[ ${SMOKE_SKIP_RELAY:-} == 1 ]]; then
+  skip "the relay at /api: SMOKE_SKIP_RELAY=1"
 else
-  if grep -qv ' https://' <<<"$listed"; then
-    bad "/api/endpoints lists https: endpoints only: $(grep -v ' https://' <<<"$listed" | tr '\n' ' ')"
+  relay_head=$(head_of /api/healthz)
+  expect "/api/healthz answers 200" "$(status_in "$relay_head")" 200
+  expect "/api/healthz comes from the relay (X-Relay: 1)" "$(header_in "$relay_head" x-relay)" 1
+
+  endpoints=$(curl "${curl_opts[@]}" "$base/api/endpoints")
+  # One line per endpoint: key, then base URL.
+  # shellcheck disable=SC2016 # JavaScript, not shell
+  listed=$(node -e '
+    const { endpoints } = JSON.parse(process.argv[1]);
+    for (const e of endpoints) console.log(`${e.key} ${e.baseUrl}`);
+  ' "$endpoints" 2>/dev/null || echo "unreadable")
+  if [[ $listed == unreadable ]]; then
+    bad "/api/endpoints is the relay's endpoint list"
+  elif [[ -z $listed ]]; then
+    bad "/api/endpoints lists at least one endpoint"
   else
-    ok "/api/endpoints lists https: endpoints only ($(wc -l <<<"$listed" | tr -d ' '))"
+    if grep -qv ' https://' <<<"$listed"; then
+      bad "/api/endpoints lists https: endpoints only: $(grep -v ' https://' <<<"$listed" | tr '\n' ' ')"
+    else
+      ok "/api/endpoints lists https: endpoints only ($(wc -l <<<"$listed" | tr -d ' '))"
+    fi
+    first=$(head -n 1 <<<"$listed" | cut -d' ' -f1)
+    unauthorised=$(head_of "/api/read/$first/")
+    expect "/api/read/$first/ without a session answers 401" "$(status_in "$unauthorised")" 401
+    expect "… refused by the relay as unknown-session" \
+      "$(header_in "$unauthorised" x-relay-error)" unknown-session
   fi
-  first=$(head -n 1 <<<"$listed" | cut -d' ' -f1)
-  unauthorised=$(head_of "/api/read/$first/")
-  expect "/api/read/$first/ without a session answers 401" "$(status_in "$unauthorised")" 401
-  expect "… refused by the relay as unknown-session" \
-    "$(header_in "$unauthorised" x-relay-error)" unknown-session
 fi
 
 # The relay's own port must not answer from outside: published on 127.0.0.1
@@ -128,7 +135,9 @@ while read -r address; do
   fi
 done <<<"$addresses"
 
-if [[ ${SMOKE_RATE_LIMIT:-} == 1 ]]; then
+if [[ ${SMOKE_RATE_LIMIT:-} == 1 && ${SMOKE_SKIP_RELAY:-} == 1 ]]; then
+  skip "the relay's rate limit: SMOKE_SKIP_RELAY=1"
+elif [[ ${SMOKE_RATE_LIMIT:-} == 1 ]]; then
   # More sessions than any sane limit, each naming a different client in
   # X-Forwarded-For. Caddy replaces the header, so all count as this machine.
   limited=
