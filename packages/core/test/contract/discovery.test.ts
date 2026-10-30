@@ -94,6 +94,10 @@ describe("the conformance document", () => {
       // Neither is declared. See the under-advertisement test below.
       dismiss: false,
       jobList: false,
+      // 1.0 only: spoken to as 1.0, as declared.
+      protocolVersion: "1.0",
+      versionSource: "declared",
+      declaredVersions: ["1.0"],
       rawConformance: conformanceFixture.conformsTo,
     });
   });

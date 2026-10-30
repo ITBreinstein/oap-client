@@ -26,6 +26,7 @@ pnpm --filter @breinstein/web dev     # interface on :5173
 pnpm test:e2e                         # Playwright, blocking lane: pygeoapi; its own relay :8797 and build :4183
 pnpm test:e2e:zoo                     # Playwright against ZOO-Project; reports, never blocks
 pnpm test:e2e:pdok                    # the specs that reach PDOK; opt-in, never blocks
+pnpm test:e2e:weaver                  # the OGC API - Processes 2.0 draft, against Weaver; never blocks
 pnpm capture:observations             # not a test: one observation export per local endpoint, for the matrix
 pnpm test:contract                    # pinned pygeoapi; needs the compose stack up
 pnpm test:interop                     # ZOO-Project and third-party servers; never blocking
@@ -34,6 +35,7 @@ pnpm graph                            # write docs/architecture.svg, not committ
 
 docker compose -f infra/compose/pygeoapi.yml up -d   # reference servers on :5080 (CORS) and :5081 (no CORS)
 ./infra/zoo/zoo.sh up                               # ZOO-Project reference deployment on :5090
+docker compose -f infra/compose/weaver.yml -p oap-weaver up -d --wait   # Weaver, the 2.0 draft, on :5100
 ```
 
 Two implementations, because one cannot tell a server's deviation apart from an

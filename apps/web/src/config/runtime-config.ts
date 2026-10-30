@@ -16,8 +16,13 @@
  *   `https:` URL, or a path below this site's root (`/api`). Plain `http:`
  *   only on a loopback host, the one exemption browsers make too, for local
  *   development and CI.
- * - `presets`: services offered on the start screen, each `https:`. Reached
- *   directly, exactly as if the address had been typed.
+ * - `presets`: services offered on the start screen, each `https:`, or
+ *   `http:` on `localhost`, `127.0.0.1` or `[::1]`. Reached directly, exactly
+ *   as if the address had been typed. Optional: `protocolVersion`, one of
+ *   `"auto"`, `"1.0"` or `"2.0-draft"`, pins which version of OGC API -
+ *   Processes the page speaks to that address, however it is reached; `"auto"`
+ *   or absent reads it from the service's conformance declaration. For
+ *   testing a service as the other version.
  * - `examples`: processes offered on the start screen, each opened with one
  *   click: the page connects to `service` and opens `process`. Each has a
  *   `title` and a one-line `summary`; `service` follows the rules for a
@@ -45,12 +50,18 @@
  * into shape: the file is operator input on a public site.
  */
 
+import {
+  isProtocolVersionPreference,
+  type ProtocolVersionPreference,
+} from "@breinstein/oap-client";
 import { isNeeds, type Needs } from "../app/needs.js";
 import { isLoopback } from "../mixed-content.js";
 
 export interface Preset {
   readonly title: string;
   readonly url: string;
+  /** Pins the version spoken to this address; undefined reads the declaration. */
+  readonly protocolVersion?: ProtocolVersionPreference | undefined;
 }
 
 /** One process offered on the start screen, opened with one click. */
@@ -161,6 +172,15 @@ function checkRelayUrl(value: unknown): string | { readonly problem: string } {
   return { problem: "relay.url must be https:, or http: on a loopback host" };
 }
 
+/**
+ * The hosts a preset may name over plain `http:`: these three exactly, for
+ * local development and CI. Narrower than what a browser treats as secure
+ * (`isLoopback` also takes `*.localhost` and all of 127.0.0.0/8), on purpose:
+ * a preset is offered to every visitor, and these are the only loopback
+ * names anything here needs.
+ */
+const LOOPBACK_PRESET_HOSTS: ReadonlySet<string> = new Set(["localhost", "127.0.0.1", "[::1]"]);
+
 function checkPresets(value: unknown): Preset[] | { readonly problem: string } {
   if (value === undefined) return [];
   if (!Array.isArray(value)) return { problem: "presets must be a list" };
@@ -168,17 +188,25 @@ function checkPresets(value: unknown): Preset[] | { readonly problem: string } {
   for (const [index, entry] of value.entries()) {
     const where = `presets[${String(index)}]`;
     if (!isRecord(entry)) return { problem: `${where} must be an object` };
-    const extra = unknownMember(entry, ["title", "url"]);
+    const extra = unknownMember(entry, ["title", "url", "protocolVersion"]);
     if (extra !== undefined) return { problem: `${where} has an unknown member "${extra}"` };
-    const { title, url } = entry;
+    const { title, url, protocolVersion } = entry;
     if (typeof title !== "string" || title.trim() === "") {
       return { problem: `${where}.title must be a non-empty string` };
     }
     if (typeof url !== "string") return { problem: `${where}.url must be a string` };
     const parsed = plainAbsoluteUrl(url);
-    if (parsed?.protocol !== "https:")
-      return { problem: `${where}.url must be a plain https: URL` };
-    presets.push({ title: title.trim(), url: url.replace(/\/+$/, "") });
+    const loopback = parsed?.protocol === "http:" && LOOPBACK_PRESET_HOSTS.has(parsed.hostname);
+    if (parsed?.protocol !== "https:" && !loopback)
+      return { problem: `${where}.url must be a plain https: URL, or http: on a loopback host` };
+    if (protocolVersion !== undefined && !isProtocolVersionPreference(protocolVersion)) {
+      return { problem: `${where}.protocolVersion must be "auto", "1.0" or "2.0-draft"` };
+    }
+    presets.push({
+      title: title.trim(),
+      url: url.replace(/\/+$/, ""),
+      ...(protocolVersion === undefined ? {} : { protocolVersion }),
+    });
   }
   return presets;
 }

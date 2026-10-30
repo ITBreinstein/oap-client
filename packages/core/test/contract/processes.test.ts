@@ -155,6 +155,10 @@ describe("getProcess against pygeoapi", () => {
         id: "echo",
         title: "Hello, world",
         description: helloWorldFixture.outputs.echo.description,
+        // A 1.0 output says nothing of its cardinality: the defaults.
+        minOccurs: 1,
+        maxOccurs: 1,
+        multiple: false,
         schema: { type: "object", contentMediaType: "application/json" },
       },
     ]);

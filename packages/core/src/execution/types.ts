@@ -18,6 +18,7 @@ import type { ResponseEnvelope } from "../http/envelope.js";
 import type { Link } from "../links/types.js";
 import type { ObservationSink } from "../observations.js";
 import type { ProcessDescription } from "../processes/types.js";
+import type { VersionChoice } from "../vocabulary/protocol-version.js";
 
 /** What the caller asked the server to do. `"sync"` sends no `Prefer` header. */
 export type ExecutionMode = "sync" | "async";
@@ -129,4 +130,16 @@ export interface ExecuteOptions extends ExecuteTransportOptions {
   /** Milliseconds. Defaults to {@link DEFAULT_EXECUTE_TIMEOUT_MS}. */
   readonly timeoutMs?: number | undefined;
   readonly onObservation?: ObservationSink | undefined;
+  /**
+   * The version of Part 1 this request is written in, and where that choice
+   * came from: recorded on the `execution` observation. Absent, it is 1.0
+   * with source `default`.
+   *
+   * **It records and guards; it does not translate.** A request for the 2.0
+   * draft goes through `draftExecuteOptions()` first, which the client does
+   * for you. Called on its own with `version` the draft, `execute()` refuses
+   * options that still carry `response` or a `transmissionMode`, with
+   * `DraftUnsupportedRequestError`, before sending.
+   */
+  readonly version?: VersionChoice | undefined;
 }

@@ -54,30 +54,8 @@ import { readBodyLinks, resolveBodyLinks } from "../links/resolve.js";
 import { findLink } from "../links/find.js";
 import type { Link } from "../links/types.js";
 import type { ObservationSink } from "../observations.js";
-import { toJobState } from "../vocabulary/job-status.js";
+import { JOB_DOCUMENT_MEMBERS, toJobState } from "../vocabulary/job-status.js";
 import type { Execution, ExecutionMode, JobHandle } from "./types.js";
-
-/**
- * Members of a job document this layer models. Anything else at the top level
- * is recorded by name — vendor extension or v2 draft, and either way not
- * something to drop silently. Same rule as Task 3.
- */
-const KNOWN_JOB_MEMBERS: ReadonlySet<string> = new Set([
-  "jobID",
-  "id",
-  "status",
-  "message",
-  "created",
-  "started",
-  "finished",
-  "updated",
-  "progress",
-  "percentCompleted",
-  "processID",
-  "type",
-  "links",
-  "exception",
-]);
 
 /** What the response looked like, kept so an error can name all of it at once. */
 export interface ExecutionEvidence {
@@ -132,7 +110,7 @@ export async function gatherEvidence(
 
   const unrecognisedKeys =
     isRecord(body) && isJobDocument(body)
-      ? Object.keys(body).filter((key) => !KNOWN_JOB_MEMBERS.has(key))
+      ? Object.keys(body).filter((key) => !JOB_DOCUMENT_MEMBERS.has(key))
       : [];
 
   return {

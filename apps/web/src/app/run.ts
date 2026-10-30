@@ -5,6 +5,7 @@
 
 import {
   BodyTooLargeError,
+  DraftUnsupportedRequestError,
   isAbsoluteUrl,
   ProcessesError,
   type ExecuteOutputSelection,
@@ -81,6 +82,8 @@ export function runRequest(
 
 /** The relay's view of an endpoint. A typed URL is always direct (T8). */
 export function relayEndpointFor(endpoint: EndpointRef): RelayEndpoint {
+  const pinned =
+    endpoint.protocolVersion === undefined ? {} : { protocolVersion: endpoint.protocolVersion };
   return endpoint.source === "configured"
     ? {
         key: endpoint.key,
@@ -88,6 +91,7 @@ export function relayEndpointFor(endpoint: EndpointRef): RelayEndpoint {
         executeRoute: endpoint.executeRoute,
         readRoute: endpoint.readRoute,
         callbacks: endpoint.callbacks,
+        ...pinned,
       }
     : {
         key: "typed",
@@ -95,6 +99,7 @@ export function relayEndpointFor(endpoint: EndpointRef): RelayEndpoint {
         executeRoute: "direct",
         readRoute: "direct",
         callbacks: false,
+        ...pinned,
       };
 }
 
@@ -188,6 +193,14 @@ export function runError(cause: unknown, plan: FormPlan): WorkflowError {
       problem?.title ??
       cause.bodyPreview;
     return serviceError(detail, plan);
+  }
+  if (cause instanceof DraftUnsupportedRequestError) {
+    // Refused by the core before anything was sent: nothing ran, and no job
+    // exists. The core's words say which request, and why.
+    return {
+      title: "Not sent: this service's version of the standard can't express this request.",
+      detail: cause.message,
+    };
   }
   if (cause instanceof BodyTooLargeError) {
     // The run finished; its answer is more than this page reads. Not "did not

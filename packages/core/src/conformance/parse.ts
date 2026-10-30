@@ -12,10 +12,9 @@
  * silently reports a v2 service as supporting nothing. Splitting the URI makes
  * a v2 class *recognised at a different version* instead.
  *
- * That is the whole of the v2 story in this task, deliberately. Recognising a
- * version is not negotiating one: no compatibility shims, no branching on
- * version, no framework. Per §6.4 those belong in a small dated module written
- * when a real service demands it.
+ * Recognising a version is not negotiating one. Choosing which version to
+ * speak is `conformance/version.ts`; what the 2.0 draft changes on the wire is
+ * the one dated module, `compat/processes-2.0-draft.ts`.
  */
 
 import { MalformedDocumentError } from "../errors.js";

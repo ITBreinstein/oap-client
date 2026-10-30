@@ -28,6 +28,7 @@ import type {
   ExecutionMode,
   ProcessDescription,
   ProcessList,
+  ProtocolVersionPreference,
   ServiceDescription,
 } from "@breinstein/oap-client";
 import type { FormValues } from "../forms/encode.js";
@@ -49,8 +50,14 @@ export type EndpointRef =
       /** Whether the relay may carry this endpoint's reads, once the user confirmed. */
       readonly readRoute: "direct" | "relay";
       readonly callbacks: boolean;
+      /** A pin from `config.json`'s preset of this address; see `protocol-version.ts`. */
+      readonly protocolVersion?: ProtocolVersionPreference | undefined;
     }
-  | { readonly source: "typed"; readonly baseUrl: string };
+  | {
+      readonly source: "typed";
+      readonly baseUrl: string;
+      readonly protocolVersion?: ProtocolVersionPreference | undefined;
+    };
 
 /** Said to the user. What happened, and what to do next (T11). */
 export interface WorkflowError {

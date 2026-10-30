@@ -115,6 +115,25 @@ export interface OutputDescription {
   readonly title?: string;
   readonly description?: string;
   readonly keywords?: readonly string[];
+  /**
+   * New in the 2.0 draft, absent from every 1.0 description: 1 when absent.
+   *
+   * The draft states no requirement for an output's default. It comes from
+   * the schema both inputs and outputs share, `schemaAndOccurrences.yaml`
+   * (`minOccurs`/`maxOccurs`, `default: 1`) in
+   * `openapi/schemas/processes-core/` at commit 756b659.
+   */
+  readonly minOccurs: number;
+  /**
+   * In the 2.0 draft this shapes the synchronous answer: one requested output
+   * with `maxOccurs` 1 comes back raw (`/req/core/process-execute-sync-one`),
+   * one with `maxOccurs` above 1 as a JSON list of values
+   * (`/req/core/process-execute-sync-one-multi-valued-json`). Same union as an
+   * input's: handle `"unbounded"`.
+   */
+  readonly maxOccurs: number | "unbounded";
+  /** `maxOccurs` is `"unbounded"` or greater than 1. */
+  readonly multiple: boolean;
   /** Verbatim. Never `undefined`: an absent schema degrades to `{}` and warns. */
   readonly schema: JsonSchema;
 }

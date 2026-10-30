@@ -40,6 +40,28 @@ jobs:
         uses: actions/upload-artifact@v4
         with: { name: playwright-report-zoo, path: .playwright/report/ }
 
+  # The OGC API - Processes 2.0 draft from a browser, against Weaver: the one
+  # server found that declares it. A moving draft, so this lane reports and
+  # never blocks. Starts Weaver itself: with CI set, a spec whose server is not
+  # answering fails.
+  browser-weaver:
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: start Weaver
+        run: docker compose -f infra/compose/weaver.yml -p oap-weaver up -d --wait
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:e2e:weaver
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with: { name: playwright-report-weaver, path: .playwright/report/ }
+
   # The browser specs that reach PDOK, kept out of the blocking lane so that a
   # third party's uptime never blocks a merge. Reports, never blocks.
   browser-pdok:

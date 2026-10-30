@@ -168,6 +168,10 @@ describe("inspect — degradation", () => {
       dismiss: false,
       callback: false,
       jobList: false,
+      // Nothing declared is not "no version": 1.0, the published standard, by default.
+      protocolVersion: "1.0",
+      versionSource: "default",
+      declaredVersions: [],
       rawConformance: [],
     });
     expect(service.links.length).toBeGreaterThan(0);

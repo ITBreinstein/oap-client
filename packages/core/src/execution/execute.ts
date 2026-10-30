@@ -18,12 +18,17 @@ import type { ResponseEnvelope } from "../http/envelope.js";
 import { AbortError, ProcessesError, TransportError } from "../http/errors.js";
 import { withDeadline } from "../http/deadline.js";
 import { send } from "../http/transport.js";
-import { AmbiguousExecutionResponseError, ExecutionTimeoutError } from "../errors.js";
+import {
+  AmbiguousExecutionResponseError,
+  DraftUnsupportedRequestError,
+  ExecutionTimeoutError,
+} from "../errors.js";
 import { observe, redactUrl } from "../observations.js";
 import { buildRequest } from "./build-request.js";
 import { classifyExecution, gatherEvidence } from "./classify-execution.js";
-import { preferenceOutcome } from "./preference.js";
+import { preferenceAppliedTokens, preferenceOutcome } from "./preference.js";
 import { DEFAULT_EXECUTE_TIMEOUT_MS, type Execution, type ExecuteOptions } from "./types.js";
+import { DEFAULT_VERSION_CHOICE } from "../vocabulary/protocol-version.js";
 
 /**
  * Start a process.
@@ -43,6 +48,7 @@ export async function execute(
   processId: string,
   options: ExecuteOptions = {},
 ): Promise<Execution> {
+  refuseUntranslated(options);
   const sink = options.onObservation;
   const requestedMode = options.mode ?? "sync";
   const timeoutMs = options.timeoutMs ?? DEFAULT_EXECUTE_TIMEOUT_MS;
@@ -63,6 +69,9 @@ export async function execute(
     requestedMode,
     requestedResponse: options.response,
     outputsSupplied: options.outputs !== undefined,
+    protocolVersion: (options.version ?? DEFAULT_VERSION_CHOICE).version,
+    versionSource: (options.version ?? DEFAULT_VERSION_CHOICE).source,
+    formatRequested: formatRequested(options),
     warnings: request.warnings,
     inputIds: request.inputIds,
     inputKinds: request.inputKinds,
@@ -93,6 +102,7 @@ export async function execute(
       disagreedWithRequestedMode: false,
       preferenceApplied: undefined,
       preferenceAppliedHeader: undefined,
+      preferenceAppliedTokens: undefined,
       discoveredVia: undefined,
       locationPresent: false,
       jobIdKnown: false,
@@ -105,6 +115,7 @@ export async function execute(
 
   const elapsedMs = Date.now() - startedAt;
   const preferenceAppliedHeader = envelope.headers.has("preference-applied");
+  const appliedTokens = preferenceAppliedTokens(envelope.headers.get("preference-applied"));
 
   // The headers are in, and the body is still to come: the classifier, the
   // problem check and the evidence all read it. The deadline and the caller's
@@ -125,6 +136,7 @@ export async function execute(
         disagreedWithRequestedMode: false,
         preferenceApplied: undefined,
         preferenceAppliedHeader,
+        preferenceAppliedTokens: appliedTokens,
         discoveredVia: undefined,
         locationPresent: envelope.locationRaw !== undefined,
         jobIdKnown: false,
@@ -172,6 +184,7 @@ export async function execute(
         disagreedWithRequestedMode: false,
         preferenceApplied: undefined,
         preferenceAppliedHeader,
+        preferenceAppliedTokens: appliedTokens,
         discoveredVia: undefined,
         locationPresent: envelope.locationRaw !== undefined,
         jobIdKnown: false,
@@ -205,6 +218,7 @@ export async function execute(
             locationPresent: evidence.locationPresent,
           }),
           preferenceAppliedHeader,
+          preferenceAppliedTokens: appliedTokens,
           discoveredVia: undefined,
           locationPresent: evidence.locationPresent,
           jobIdKnown: false,
@@ -233,6 +247,7 @@ export async function execute(
         locationPresent: evidence.locationPresent,
       }),
       preferenceAppliedHeader,
+      preferenceAppliedTokens: appliedTokens,
       discoveredVia: execution.kind === "job" ? execution.job.discoveredVia : undefined,
       locationPresent: evidence.locationPresent,
       jobIdKnown: execution.kind === "job" && execution.job.jobId !== undefined,
@@ -242,4 +257,43 @@ export async function execute(
 
     return execution;
   }
+}
+
+/**
+ * A guard, not a translation: a request said to be in the 2.0 draft must not
+ * carry 1.0's `response` or any `transmissionMode`, which the draft does not
+ * have. `client.execute()` translates through `draftExecuteOptions()` first,
+ * so this throws only for a caller of `execute()` that skipped it — and does
+ * so before anything is sent, rather than sending 1.0's words to a server
+ * told to expect the draft's.
+ */
+function refuseUntranslated(options: ExecuteOptions): void {
+  if (options.version?.version !== "2.0-draft") return;
+  if (options.response !== undefined) {
+    throw new DraftUnsupportedRequestError(
+      options.response,
+      "response-not-in-draft",
+      Object.keys(options.outputs ?? {}),
+    );
+  }
+  for (const [id, selection] of Object.entries(options.outputs ?? {})) {
+    if (selection.transmissionMode !== undefined) {
+      throw new DraftUnsupportedRequestError(selection.transmissionMode, "no-transmission-mode", [
+        id,
+      ]);
+    }
+  }
+}
+
+/**
+ * The media type asked for each output that names one, or undefined when none
+ * does. Output ids and media types only: both are the description's words,
+ * never the user's data.
+ */
+function formatRequested(options: ExecuteOptions): Readonly<Record<string, string>> | undefined {
+  const asked = Object.entries(options.outputs ?? {}).flatMap(([id, selection]) => {
+    const mediaType = selection.format?.mediaType;
+    return mediaType === undefined ? [] : [[id, mediaType] as const];
+  });
+  return asked.length === 0 ? undefined : Object.freeze(Object.fromEntries(asked));
 }

@@ -3,15 +3,33 @@
 Two implementations, because one cannot tell a server's deviation apart from an
 ambiguous specification.
 
-| Where                  | What                                                    | Lane                              |
-| ---------------------- | ------------------------------------------------------- | --------------------------------- |
-| `compose/pygeoapi.yml` | pygeoapi 0.21.0 on `:5080` (CORS) and `:5081` (no CORS) | `pnpm test:contract`, blocks CI   |
-| `zoo/`                 | ZOO-Project fork on `:5090`                             | `pnpm test:interop`, never blocks |
+| Where                  | What                                                    | Lane                                 |
+| ---------------------- | ------------------------------------------------------- | ------------------------------------ |
+| `compose/pygeoapi.yml` | pygeoapi 0.21.0 on `:5080` (CORS) and `:5081` (no CORS) | `pnpm test:contract`, blocks CI      |
+| `zoo/`                 | ZOO-Project fork on `:5090`                             | `pnpm test:interop`, never blocks    |
+| `compose/weaver.yml`   | Weaver on `:5100`, the OGC API - Processes 2.0 draft    | `pnpm test:e2e:weaver`, never blocks |
 
 ```bash
 docker compose -f infra/compose/pygeoapi.yml up -d --wait
 ./infra/zoo/zoo.sh up
+docker compose -f infra/compose/weaver.yml -p oap-weaver up -d --wait
 ```
+
+Weaver is the one server found, 2026-10-23, that declares the 2.0 draft's Core
+class; ZOO-Project and pygeoapi declare 1.0 only. Its config is
+[weaver/weaver.ini](weaver/weaver.ini), and the compose file says why it is
+shaped as it is. Two things about this image limit what can be run on it: of
+its builtin processes only `EchoProcess` runs (the others look for a Python
+interpreter the image does not have), and it refuses, with a 422, the arrays of
+arrays a form generated from `EchoProcess`'s description sends. See
+`e2e/weaver.spec.ts`.
+
+Stop Weaver before running the blocking lane on a laptop
+(`docker compose -f infra/compose/weaver.yml -p oap-weaver stop`). Its API and
+worker hold about 2 GB and run under emulation on Apple Silicon. Beside them,
+pygeoapi answered slowly enough on 2026-10-23 that five of the lane's 5-second
+waits ran out, and all 200 passed once Weaver was stopped. CI runs the two
+lanes in separate jobs.
 
 ZOO keeps its job results in a Docker volume, `zoo-data` (`compose/zoo.yml`),
 not in the pinned checkout, so they do not survive `./infra/zoo/zoo.sh down`,

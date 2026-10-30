@@ -34,6 +34,12 @@ import {
   type PollReport,
 } from "./jobs/index.js";
 import type { ProcessDescription, ProcessList } from "./processes/types.js";
+import { draftExecuteOptions } from "./compat/processes-2.0-draft.js";
+import {
+  DEFAULT_VERSION_CHOICE,
+  type ProtocolVersionPreference,
+  type VersionChoice,
+} from "./vocabulary/protocol-version.js";
 
 export interface ClientOptions {
   /** Landing page of the OGC API - Processes service. */
@@ -48,13 +54,24 @@ export interface ClientOptions {
    * forgetting it on one method. Overridable per call all the same.
    */
   readonly onObservation?: ObservationSink | undefined;
+  /**
+   * Which version of OGC API - Processes Part 1 to speak. `"auto"`, the
+   * default, chooses from the service's conformance declaration before the
+   * first execute: the 2.0 draft when it declares the draft's Core class,
+   * else 1.0. A version pins it, for testing a service as the other version.
+   * See `conformance/version.ts`.
+   */
+  readonly protocolVersion?: ProtocolVersionPreference | undefined;
 }
 
 /** Per-request options; `fetch` is fixed at construction and cannot be overridden here. */
 export type RequestOptions = Omit<SendOptions, "fetch">;
 
 /** Per-call discovery options; transport concerns come from the client. */
-export type InspectRequestOptions = Omit<InspectOptions, "fetch" | "maxBufferBytes">;
+export type InspectRequestOptions = Omit<
+  InspectOptions,
+  "fetch" | "maxBufferBytes" | "protocolVersion"
+>;
 
 /** Per-call list options; transport concerns come from the client. */
 export type ListRequestOptions = Omit<ListProcessesOptions, "fetch" | "maxBufferBytes">;
@@ -62,8 +79,11 @@ export type ListRequestOptions = Omit<ListProcessesOptions, "fetch" | "maxBuffer
 /** Per-call description options; transport concerns come from the client. */
 export type GetProcessRequestOptions = Omit<GetProcessOptions, "fetch" | "maxBufferBytes">;
 
-/** Per-call execution options; transport concerns come from the client. */
-export type ExecuteRequestOptions = Omit<ExecuteOptions, "fetch" | "maxBufferBytes">;
+/**
+ * Per-call execution options; transport concerns come from the client, and so
+ * does the version, chosen once per client.
+ */
+export type ExecuteRequestOptions = Omit<ExecuteOptions, "fetch" | "maxBufferBytes" | "version">;
 
 /** Per-call job options; transport concerns come from the client. */
 export type JobRequestOptionsFor<T> = Omit<T, "fetch" | "maxBufferBytes">;
@@ -288,6 +308,20 @@ export function createClient(options: ClientOptions): Client {
     fetch: doFetch,
   };
 
+  const preference = options.protocolVersion ?? "auto";
+  /**
+   * The version the last successful discovery chose, read off the service's
+   * capabilities. Left undefined when discovery could not read the landing
+   * page; then a pinned version still holds, and `"auto"` falls back to 1.0.
+   */
+  let discoveredVersion: VersionChoice | undefined;
+
+  /** The version an execute is written in, chosen before it is sent. */
+  function versionChoice(): VersionChoice {
+    if (preference !== "auto") return { version: preference, source: "configured" };
+    return discoveredVersion ?? DEFAULT_VERSION_CHOICE;
+  }
+
   /**
    * The resolved process-list URL, remembered per client.
    *
@@ -313,11 +347,15 @@ export function createClient(options: ClientOptions): Client {
   ): Promise<ServiceDescription> {
     const deadline = withDeadline(undefined, DISCOVERY_TIMEOUT_MS);
     try {
-      return await inspect(baseUrl, {
+      const service = await inspect(baseUrl, {
         ...transport,
         signal: deadline.signal,
+        protocolVersion: preference,
         ...(sink === undefined ? {} : { onObservation: sink }),
       });
+      const { protocolVersion: version, versionSource: source } = service.capabilities;
+      discoveredVersion = { version, source };
+      return service;
     } finally {
       deadline.dispose();
     }
@@ -476,12 +514,16 @@ export function createClient(options: ClientOptions): Client {
     send(path: string, requestOptions: RequestOptions = {}): Promise<ResponseEnvelope> {
       return send(new URL(path, baseUrl), { ...transport, ...requestOptions, fetch: doFetch });
     },
-    inspect(inspectOptions: InspectRequestOptions = {}): Promise<ServiceDescription> {
-      return inspect(baseUrl, {
+    async inspect(inspectOptions: InspectRequestOptions = {}): Promise<ServiceDescription> {
+      const service = await inspect(baseUrl, {
         ...transport,
+        protocolVersion: preference,
         ...(options.onObservation === undefined ? {} : { onObservation: options.onObservation }),
         ...inspectOptions,
       });
+      const { protocolVersion: version, versionSource: source } = service.capabilities;
+      discoveredVersion = { version, source };
+      return service;
     },
     async listProcesses(listOptions: ListRequestOptions = {}): Promise<ProcessList> {
       const sink = listOptions.onObservation ?? options.onObservation;
@@ -519,9 +561,16 @@ export function createClient(options: ClientOptions): Client {
         timeoutMs,
         (cause) => new ExecutionTimeoutError(baseUrl.toString(), timeoutMs, { cause }),
       );
+      // Chosen after discovery, which is what reads the declaration, and
+      // before sending: execute is never retried, so there is no falling back
+      // once it has gone. A request the draft cannot express throws here.
+      const version = versionChoice();
+      const written =
+        version.version === "2.0-draft" ? draftExecuteOptions(executeOptions) : executeOptions;
       return execute(url, processId, {
         ...transport,
-        ...executeOptions,
+        ...written,
+        version,
         timeoutMs: remainingMs,
         ...(sink === undefined ? {} : { onObservation: sink }),
       });

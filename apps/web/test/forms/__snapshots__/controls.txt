@@ -101,6 +101,17 @@ pygeoapi/breinstein-sync-only — needs values
 pygeoapi/hello-world — needs values
   pygeoapi/hello-world/name → text
   pygeoapi/hello-world/message → text
+weaver/EchoProcess — needs area
+  weaver/EchoProcess/stringInput → select
+  weaver/EchoProcess/measureInput → json [`oneOf` is outside the supported JSON Schema subset] · unsupported-keyword
+  weaver/EchoProcess/dateInput → text
+  weaver/EchoProcess/doubleInput → number
+  weaver/EchoProcess/arrayInput → list<list<number>>
+  weaver/EchoProcess/complexObjectInput → json [`oneOf` is outside the supported JSON Schema subset] · unsupported-keyword
+  weaver/EchoProcess/geometryInput → list<list<geometry (geometry, Point|MultiPoint|LineString|MultiLineString|Polygon|MultiPolygon|GeometryCollection)>>
+  weaver/EchoProcess/boundingBoxInput → json [`oneOf` is outside the supported JSON Schema subset] · unsupported-keyword
+  weaver/EchoProcess/imagesInput → list<json [`oneOf` is outside the supported JSON Schema subset]> · unsupported-keyword
+  weaver/EchoProcess/featureCollectionInput → geometry (feature-collection, Point|MultiPoint|LineString|MultiLineString|Polygon|MultiPolygon|GeometryCollection) · map
 zoo-project/Buffer — needs data
   zoo-project/Buffer/InputPolygon → complex (text/xml, JSON object) · map
   zoo-project/Buffer/BufferDistance → number

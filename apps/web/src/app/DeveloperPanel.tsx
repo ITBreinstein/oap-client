@@ -68,6 +68,7 @@ export function DeveloperPanel({
   onDescribeAll,
   first,
   notes = [],
+  version,
 }: {
   readonly observations: readonly SessionObservation[];
   /** How many the session dropped to stay under its cap. */
@@ -84,6 +85,11 @@ export function DeveloperPanel({
    * developer is told it, the job on screen by its id.
    */
   readonly notes?: readonly string[] | undefined;
+  /**
+   * Which version of OGC API - Processes the page speaks to the connected
+   * service, and why. Undefined while nothing is connected.
+   */
+  readonly version?: string | undefined;
 }) {
   const [expanded, setExpanded] = useState(open);
   const [endpoint, setEndpoint] = useState("");
@@ -111,6 +117,11 @@ export function DeveloperPanel({
           {note}
         </p>
       ))}
+      {version !== undefined && (
+        <p className="developer-version" data-testid="protocol-version">
+          {version}
+        </p>
+      )}
       {first}
       <p>
         {observations.length} observations this session, {forms} from form generation.
