@@ -44,16 +44,19 @@ CI; ZOO-Project is a second implementation with nothing in common but the
 standard, and it reports without blocking — see [infra/README.md](infra/README.md)
 and [infra/zoo/README.md](infra/zoo/README.md).
 
-The pinned pygeoapi also carries thirteen processes of our own, mounted from
+The pinned pygeoapi also carries seventeen processes of our own, mounted from
 [infra/pygeoapi/plugins](infra/pygeoapi/plugins) without rebuilding the image:
 `slow`, because the stock image's only process finishes before the first poll
-returns, and twelve `breinstein-*` processes, each there for one thing the
+returns, and sixteen `breinstein-*` processes, each there for one thing the
 client must handle and no stock process exercises — a bounding box, every
 control kind, a non-JSON output, a geometry in and out, an image of a place, one
 execution mode, a job that fails partway, dates, an input by reference, a CSV
-output, a large result, and an output by reference to a server that sends no
-CORS headers. Three reach PDOK, so they need the network. See
-[infra/README.md](infra/README.md).
+output, a large result, an output by reference to a server that sends no CORS
+headers, an output offered in several formats, GML as ZOO-Project writes it,
+KML with HTML in it, and a link to features in RD New. That last one links to
+`breinstein-rd`, a small features collection on the same server, so the
+pygeoapi also serves OGC API - Features. Three processes reach PDOK, so they
+need the network. See [infra/README.md](infra/README.md).
 
 ## Boundaries
 

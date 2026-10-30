@@ -1,0 +1,120 @@
+HTTP/1.1 200 OK
+Server: gunicorn
+Date: Mon, 26 Oct 2026 09:34:00 GMT
+Connection: keep-alive
+Content-Type: application/json
+X-Powered-By: pygeoapi 0.21.0
+Content-Language: en-US
+Content-Crs: <http://www.opengis.net/def/crs/OGC/1.3/CRS84>
+Access-Control-Allow-Origin: *
+Content-Length: 3221
+
+{
+    "type":"FeatureCollection",
+    "features":[
+        {
+            "type":"Feature",
+            "id":"area",
+            "properties":{
+                "name":"An area",
+                "kind":"polygon"
+            },
+            "geometry":{
+                "type":"Polygon",
+                "coordinates":[
+                    [
+                        [
+                            5.121822397975329,
+                            52.09027276964295
+                        ],
+                        [
+                            5.124740646172874,
+                            52.09027930149971
+                        ],
+                        [
+                            5.124730100377294,
+                            52.0920768907204
+                        ],
+                        [
+                            5.121811734853232,
+                            52.09207035852319
+                        ],
+                        [
+                            5.121822397975329,
+                            52.09027276964295
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type":"Feature",
+            "id":"route",
+            "properties":{
+                "name":"A route",
+                "kind":"line"
+            },
+            "geometry":{
+                "type":"LineString",
+                "coordinates":[
+                    [
+                        5.12018691848981,
+                        52.08925791984979
+                    ],
+                    [
+                        5.123091835939629,
+                        52.091511478736514
+                    ],
+                    [
+                        5.126002293967696,
+                        52.09286617101533
+                    ]
+                ]
+            }
+        },
+        {
+            "type":"Feature",
+            "id":"place",
+            "properties":{
+                "name":"A place",
+                "kind":"point"
+            },
+            "geometry":{
+                "type":"Point",
+                "coordinates":[
+                    5.1230944889029235,
+                    52.091062081487266
+                ]
+            }
+        }
+    ],
+    "numberMatched":3,
+    "numberReturned":3,
+    "links":[
+        {
+            "type":"application/geo+json",
+            "rel":"self",
+            "title":"This document as GeoJSON",
+            "href":"http://localhost:5080/collections/breinstein-rd/items?f=json"
+        },
+        {
+            "rel":"alternate",
+            "type":"application/ld+json",
+            "title":"This document as RDF (JSON-LD)",
+            "href":"http://localhost:5080/collections/breinstein-rd/items?f=jsonld"
+        },
+        {
+            "type":"text/html",
+            "rel":"alternate",
+            "title":"This document as HTML",
+            "href":"http://localhost:5080/collections/breinstein-rd/items?f=html"
+        },
+        {
+            "type":"application/json",
+            "title":"Three areas in Utrecht, stored in RD New",
+            "rel":"collection",
+            "href":"http://localhost:5080/collections/breinstein-rd"
+        }
+    ],
+    "timeStamp":"2026-10-26T09:34:00.926441Z"
+}

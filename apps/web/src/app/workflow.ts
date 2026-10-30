@@ -34,6 +34,7 @@ import type {
 import type { FormValues } from "../forms/encode.js";
 import type { FormPlan } from "../forms/plan.js";
 import type { LoadedReference } from "../results/reference.js";
+import type { FormatChoices } from "../results/format-choice.js";
 import type { RenderableResult } from "../results/renderable.js";
 
 /**
@@ -114,6 +115,12 @@ interface ProcessOpen extends Connected {
    * output is asked for as the server prefers, as before.
    */
   readonly linkOutputs: readonly string[];
+  /**
+   * The user's own format choices (#F3), by output id: a media type, or
+   * `null` for "let the service choose". An output not here gets the page's
+   * own choice, `preferredFormat`.
+   */
+  readonly formatChoices: FormatChoices;
 }
 
 export type AsyncRun = {
@@ -224,6 +231,8 @@ export type WorkflowAction =
       readonly outputId: string;
       readonly transmission: "value" | "reference";
     }
+  /** #F3: ask for this media type for one output, or `null` for none. */
+  | { readonly type: "set-format"; readonly outputId: string; readonly mediaType: string | null }
   | { readonly type: "run-started"; readonly runId: string; readonly mode: ExecutionMode }
   | { readonly type: "job-started"; readonly runId: string; readonly jobRef: string }
   /** Follow a job already on the server, from the open process. */
@@ -297,6 +306,7 @@ function openPart(state: ProcessOpen): ProcessOpen {
     warnings: state.warnings,
     mode: state.mode,
     linkOutputs: state.linkOutputs,
+    formatChoices: state.formatChoices,
   };
 }
 
@@ -419,6 +429,7 @@ export function workflowReducer(state: Workflow, action: WorkflowAction): Workfl
             warnings: action.warnings,
             mode: defaultMode(action.process),
             linkOutputs: [],
+            formatChoices: {},
           }
         : state;
 
@@ -469,6 +480,15 @@ export function workflowReducer(state: Workflow, action: WorkflowAction): Workfl
               ...state.linkOutputs.filter((id) => id !== action.outputId),
               ...(action.transmission === "reference" ? [action.outputId] : []),
             ],
+          }
+        : state;
+
+    case "set-format":
+      return state.stage === "process" &&
+        state.process.outputs.some((output) => output.id === action.outputId)
+        ? {
+            ...state,
+            formatChoices: { ...state.formatChoices, [action.outputId]: action.mediaType },
           }
         : state;
 

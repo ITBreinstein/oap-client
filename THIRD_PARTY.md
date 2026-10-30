@@ -83,14 +83,15 @@ for its notice to go with a binary. maplibre-gl ships a build that already
 holds its own dependencies (pbf, vector-tile, tiny-sdf, unitbezier, earcut and
 more), which is why their licences are listed too.
 
-| Package                          | Version | Licence      | Used by                                   |
-| -------------------------------- | ------- | ------------ | ----------------------------------------- |
-| `maplibre-gl`                    | 6.11.1  | BSD-3-Clause | `apps/web/src/map` only (boundary rule 3) |
-| `terra-draw`                     | 1.35.0  | MIT          | `apps/web/src/map` only (boundary rule 3) |
-| `terra-draw-maplibre-gl-adapter` | 1.4.1   | MIT          | `apps/web/src/map` only (boundary rule 3) |
-| `@fontsource/manrope`            | 5.3.0   | OFL-1.1      | `apps/web/src/styles/fonts.ts`            |
-| `@fontsource/jetbrains-mono`     | 5.3.0   | OFL-1.1      | `apps/web/src/styles/fonts.ts`            |
-| _(the rest: generated)_          |         |              |                                           |
+| Package                          | Version | Licence      | Used by                                                        |
+| -------------------------------- | ------- | ------------ | -------------------------------------------------------------- |
+| `maplibre-gl`                    | 6.11.1  | BSD-3-Clause | `apps/web/src/map` only (boundary rule 3)                      |
+| `terra-draw`                     | 1.35.0  | MIT          | `apps/web/src/map` only (boundary rule 3)                      |
+| `terra-draw-maplibre-gl-adapter` | 1.4.1   | MIT          | `apps/web/src/map` only (boundary rule 3)                      |
+| `proj4`                          | 2.22.0  | MIT          | `apps/web/src/results/crs.ts`, loaded only to reproject RD New |
+| `@fontsource/manrope`            | 5.3.0   | OFL-1.1      | `apps/web/src/styles/fonts.ts`                                 |
+| `@fontsource/jetbrains-mono`     | 5.3.0   | OFL-1.1      | `apps/web/src/styles/fonts.ts`                                 |
+| _(the rest: generated)_          |         |              |                                                                |
 
 ## 4. Data the web app loads at run time
 

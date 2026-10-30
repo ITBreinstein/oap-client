@@ -25,7 +25,7 @@ export default defineConfig({
     { name: "pygeoapi-jobs", testMatch: /job-store\.setup\.ts/ },
     {
       name: "blocking",
-      testIgnore: /(zoo-browser|weaver)\.spec\.ts/,
+      testIgnore: /(zoo-.*|weaver)\.spec\.ts/,
       grepInvert: /@pdok/,
       dependencies: ["pygeoapi-jobs"],
     },
@@ -33,14 +33,14 @@ export default defineConfig({
     // e2e/services.ts). Opt-in: a third party's uptime must not block a merge.
     {
       name: "pdok",
-      testIgnore: /(zoo-browser|weaver)\.spec\.ts/,
+      testIgnore: /(zoo-.*|weaver)\.spec\.ts/,
       grep: /@pdok/,
       dependencies: ["pygeoapi-jobs"],
     },
     // `pnpm test:e2e:zoo`: ZOO-Project from a browser. Reports, never blocks:
     // ZOO is a second implementation built from source, and its worker pool
     // runs out as it is used (finding 0044). See .github/workflows/interop.yml.
-    { name: "zoo", testMatch: /zoo-browser\.spec\.ts/ },
+    { name: "zoo", testMatch: /zoo-.*\.spec\.ts/ },
     // `pnpm test:e2e:weaver`: the OGC API - Processes 2.0 draft, against
     // Weaver from infra/compose/weaver.yml. Named, never blocking: the draft
     // still moves, and Weaver's images are amd64 only. Under CI a Weaver that
