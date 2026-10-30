@@ -1,5 +1,5 @@
 /**
- * #36: the form's width beside the map, between 400 and 640px, by the keys a
+ * #36: the form's width beside the map, between 440 and 640px, by the keys a
  * window splitter takes.
  */
 
@@ -14,7 +14,7 @@ import {
 } from "../../src/app/panel-width.js";
 
 describe("clampPanel", () => {
-  it("keeps a width within 400 and 640, in whole pixels", () => {
+  it("keeps a width within 440 and 640, in whole pixels", () => {
     expect(clampPanel(300)).toBe(PANEL_MIN);
     expect(clampPanel(900)).toBe(PANEL_MAX);
     expect(clampPanel(512.6)).toBe(513);
@@ -24,7 +24,7 @@ describe("clampPanel", () => {
 
 describe("widthForKey", () => {
   it("moves the edge a step with the arrow keys, to an end with Home and End", () => {
-    expect(widthForKey("ArrowRight", 400)).toBe(400 + PANEL_STEP);
+    expect(widthForKey("ArrowRight", 480)).toBe(480 + PANEL_STEP);
     expect(widthForKey("ArrowLeft", 500)).toBe(500 - PANEL_STEP);
     expect(widthForKey("ArrowLeft", PANEL_MIN)).toBe(PANEL_MIN);
     expect(widthForKey("ArrowRight", PANEL_MAX)).toBe(PANEL_MAX);

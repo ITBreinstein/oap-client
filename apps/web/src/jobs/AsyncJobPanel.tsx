@@ -184,7 +184,7 @@ export function AsyncJobPanel({ relayUrl }: { readonly relayUrl: string | undefi
           />
         </label>
         <br />
-        <button type="submit" data-testid="run" disabled={busy}>
+        <button type="submit" className="primary" data-testid="run" disabled={busy}>
           Run asynchronously
         </button>
       </form>
