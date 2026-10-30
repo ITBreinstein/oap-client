@@ -63,9 +63,28 @@ the versions are recorded here rather than left to a commit message.
                 with breinstein-link)                                 2026-09-26
               execution/breinstein-inputs-{base64-not-decoded,
                 array-passed-through}.http  (finding 0052)            2026-10-02
+              processes/breinstein-formats.json,
+              process-list.json  (re-captured; all fifteen, now
+                with breinstein-formats)                              2026-10-23
+              processes/breinstein-{gml,kml,rd-link}.json,
+              process-list.json  (re-captured; all eighteen),
+              conformance.json  (re-captured; ten OGC API - Features
+                classes, from the `breinstein-rd` collection),
+              execution/breinstein-gml-{epsg4326,epsg28992,
+                no-srsname}.http, execution/breinstein-kml.http,
+              execution/breinstein-formats-{gml32,
+                kml-document}.http, execution/breinstein-rd-link.http,
+              features/breinstein-rd-items-{epsg28992,crs84}.http   2026-10-26
               processes/breinstein-area-what-if.json,
               process-list.json  (re-captured; all fifteen, now
                 with breinstein-area-what-if)                         2026-10-29
+              process-list.json  (re-captured; all nineteen: the
+                eighteen and breinstein-area-what-if)                 2026-10-30
+
+Each `execution/*.http` from 2026-10-26 has the body it answered beside it
+as `*-request.json`. `features/` holds pygeoapi's OGC API - Features answers
+for the `breinstein-rd` collection that `breinstein-rd-link` points at: the
+same three features in RD New, with `Content-Crs`, and in CRS84.
 
 The `breinstein-*` descriptions are processes this repository adds to the
 pinned image (see `infra/README.md`). They are the only descriptions a browser
@@ -105,6 +124,19 @@ the set is a handful of files and the server is one pinned image.
                 (finding 0053)                                         2026-10-02
               execution/getarea-gml-bare-polygon-500.http
                 (finding 0065)                                         2026-10-02
+              execution/buffer-raw-gml-{epsg28992,from-urn4326}.http,
+              execution/centroid-raw-gml-no-srsname.http,
+              execution/saga-fractals-raw-{gml,kml}.http,
+              execution/saga-fractals-wfs-getfeature.http
+                (step zero 6 of the result-formats brief)              2026-10-23
+
+The 2026-10-23 captures are raw answers, `response: "raw"`, each with the
+request that produced it beside it as `*-request.http`: GML 2 as OGR writes it,
+labelled `application/json` (finding 0026), with `srsName` `EPSG:4326`,
+`EPSG:28992` or none, and the SAGA fractal as GML and KML. `buffer-raw-gml.http`
+above is the bare `EPSG:4326` case. `saga-fractals-wfs-getfeature.http` is what
+the link in `saga-fractals-reference-wfs.http` answers: WFS 1.0 GML from
+MapServer, `text/xml`, an `srsName` on every geometry.
 
 Re-capture with `./infra/zoo/capture-fixtures.sh`, and only when the pinned SHA
 in `infra/zoo/pinned.env` changes. Read the diff before committing it.

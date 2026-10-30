@@ -6,7 +6,8 @@
 # Both mount ../pygeoapi/plugins on PYTHONPATH so the repository's own
 # processors (`slow` and the `breinstein-*` family, one file each under
 # infra/pygeoapi/plugins/) load as ordinary pygeoapi plugins without
-# rebuilding the image. See infra/README.md.
+# rebuilding the image. See infra/README.md. ../pygeoapi/data holds the one
+# features collection's data (`breinstein-rd`, #F1).
 #
 # Both can reach the host as `host.docker.internal`, which is where the relay's
 # callback receiver listens when it runs outside Docker (infra/relay/). Docker
@@ -35,6 +36,7 @@ services:
     volumes:
       - "../pygeoapi/config-cors.yml:/pygeoapi/local.config.yml:ro"
       - "../pygeoapi/plugins:/pygeoapi/plugins:ro"
+      - "../pygeoapi/data:/pygeoapi/breinstein-data:ro"
     # So `up --wait` returns once gunicorn answers, not once the container
     # exists: the image has no healthcheck of its own, and a lane that started
     # before pygeoapi listened used to skip its tests (review T3).
@@ -59,4 +61,5 @@ services:
     volumes:
       - "../pygeoapi/config-nocors.yml:/pygeoapi/local.config.yml:ro"
       - "../pygeoapi/plugins:/pygeoapi/plugins:ro"
+      - "../pygeoapi/data:/pygeoapi/breinstein-data:ro"
     healthcheck: *answering

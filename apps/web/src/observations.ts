@@ -24,6 +24,9 @@ import {
   type ReferenceOutcome,
   type Representation,
 } from "./results/reference.js";
+import type { CrsSource, KnownCrs, Placement } from "./results/crs.js";
+import { placementOf } from "./results/plottable.js";
+import { xmlLabel, type ParsedAs } from "./results/sniff.js";
 import type { RenderableResult } from "./results/renderable.js";
 import type { ExecuteRouteObservation } from "./relay/routed-fetch.js";
 
@@ -163,6 +166,29 @@ export interface ResultObservation {
   readonly contentCrs: string | undefined;
   readonly axisSwapped: boolean | undefined;
   /**
+   * The coordinate system the result named, when it named one this page
+   * places (#F1): `CRS84`, `EPSG:4326` or `EPSG:28992`. Absent otherwise.
+   */
+  readonly sourceCrs?: KnownCrs | undefined;
+  /** Where that CRS was read from. Absent when none was named. */
+  readonly crsFrom?: CrsSource | undefined;
+  /** Present, and true, when the result was reprojected to put it on the map. */
+  readonly reprojected?: true | undefined;
+  /** What the result was read as for the map: GML or KML (#F4, #F5). Absent otherwise. */
+  readonly parsedAs?: ParsedAs | undefined;
+  /**
+   * Present, and true, when the label said one thing and the bytes another,
+   * and the bytes won (`results/sniff.ts`): ZOO's KML labelled JSON.
+   */
+  readonly sniffed?: true | undefined;
+  /**
+   * The media type the output was labelled with, verbatim, beside what it
+   * was read as: present with `parsedAs` or `sniffed`. The same as
+   * `mediaType` in the first record; said again so that the pair is in one
+   * place.
+   */
+  readonly declaredMediaType?: string | undefined;
+  /**
    * Second record (#28): the href, an image this page could not read, was
    * shown with an `<img>` instead, which a browser loads from anywhere.
    * What the page could read of it is `referenceOutcome`, as ever.
@@ -199,6 +225,8 @@ export interface RunFacts {
   readonly declaredTransmission: readonly string[];
   /** The outputs asked for by reference. */
   readonly linkOutputs: readonly string[];
+  /** The media type asked for each output that was asked for one (#F3). */
+  readonly formatsAsked?: Readonly<Record<string, string>> | undefined;
 }
 
 function declaredMediaType(result: RenderableResult): string | undefined {
@@ -206,11 +234,27 @@ function declaredMediaType(result: RenderableResult): string | undefined {
     case "json":
       return undefined;
     case "text":
-      return result.mediaType;
     case "download":
+      // Sniffed: the label, not what it turned out to be (that is `parsedAs`).
+      return result.sniffed?.declaredMediaType ?? result.mediaType;
     case "reference":
       return result.mediaType;
   }
+}
+
+/** `parsedAs`, `sniffed` and `declaredMediaType`, for a result read as something its label did not say. */
+function readFacts(
+  result: RenderableResult,
+): Pick<ResultObservation, "parsedAs" | "sniffed" | "declaredMediaType"> {
+  if (result.kind !== "text" && result.kind !== "download") return {};
+  const label = declaredMediaType(result);
+  const parsedAs = result.geo?.parsedAs;
+  if (parsedAs === undefined && result.sniffed === undefined) return {};
+  return {
+    ...(parsedAs === undefined ? {} : { parsedAs }),
+    ...(result.sniffed === undefined ? {} : { sniffed: true }),
+    ...(label === undefined ? {} : { declaredMediaType: label }),
+  };
 }
 
 /** The first record for each output, written when the result is shown. */
@@ -238,10 +282,41 @@ export function resultObservations(
       referenceOutcome: reference ? "not-followed" : undefined,
       representation: undefined,
       truncated: undefined,
-      contentCrs: undefined,
-      axisSwapped: undefined,
+      contentCrs: reference ? undefined : crsUriOf(placementOf(result)),
+      axisSwapped: reference ? undefined : swappedBy(placementOf(result)),
+      ...(reference ? {} : crsFacts(placementOf(result))),
+      ...readFacts(result),
     };
   });
+}
+
+/** The `Content-Crs` a placement read, when the result was sent with one. */
+function crsUriOf(placement: Placement | undefined): string | undefined {
+  return placement === undefined ||
+    placement.kind === "as-sent" ||
+    placement.kind === "unstated" ||
+    placement.from !== "content-crs"
+    ? undefined
+    : placement.uri;
+}
+
+/** Whether placing it by its `Content-Crs` swapped its axes; undefined when it was sent with none. */
+function swappedBy(placement: Placement | undefined): boolean | undefined {
+  return crsUriOf(placement) === undefined ? undefined : placement?.kind === "swapped";
+}
+
+/** `sourceCrs`, `crsFrom` and `reprojected`, for a result that named a CRS (#F1). */
+function crsFacts(
+  placement: Placement | undefined,
+): Pick<ResultObservation, "sourceCrs" | "crsFrom" | "reprojected"> {
+  if (placement === undefined || placement.kind === "as-sent") return {};
+  if (placement.kind === "other" || placement.kind === "unstated")
+    return { crsFrom: placement.from };
+  return {
+    sourceCrs: placement.crs,
+    crsFrom: placement.from,
+    ...(placement.kind === "reprojected" ? { reprojected: true } : {}),
+  };
 }
 
 /** The second record for an output given by reference: what Load found. */
@@ -260,6 +335,14 @@ export function loadedObservation(
     truncated: loaded.page === undefined ? undefined : isTruncated(loaded.page),
     contentCrs: loaded.contentCrs,
     axisSwapped: loaded.axes === undefined ? undefined : loaded.axes === "swapped",
+    ...crsFacts(loaded.geo?.ok === true ? loaded.geo.placement : loaded.placement),
+    ...(loaded.geo === undefined
+      ? {}
+      : {
+          parsedAs: loaded.geo.parsedAs,
+          ...(xmlLabel(loaded.mediaType) === undefined ? { sniffed: true } : {}),
+          ...(loaded.mediaType === undefined ? {} : { declaredMediaType: loaded.mediaType }),
+        }),
     ...(loaded.image === true && (loaded.outcome === "cors-blocked" || loaded.outcome === "failed")
       ? { shownAsImage: true }
       : {}),

@@ -85,9 +85,9 @@ describe("plotStatus", () => {
     expect(plotStatus(tooLarge).kind).toBe("plotted");
   });
 
-  it("says a geometry in projected coordinates is not plotted, rather than misplacing it", () => {
+  it("does not plot coordinates that are not degrees when no CRS is named, nor guess one (#F1)", () => {
     const rd = { type: "Point", coordinates: [155000, 463000] };
-    expect(plotStatus(json("rd", rd))).toEqual({ kind: "projected" });
+    expect(plotStatus(json("rd", rd))).toEqual({ kind: "crs-unstated" });
   });
 });
 
