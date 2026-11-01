@@ -80,6 +80,17 @@ the versions are recorded here rather than left to a commit message.
                 with breinstein-area-what-if)                         2026-10-29
               process-list.json  (re-captured; all nineteen: the
                 eighteen and breinstein-area-what-if)                 2026-10-30
+              execution/breinstein-{feature-area,aerial}-two-outputs-
+                {none,document,raw}.http  (finding 0027)              2026-10-31
+
+The 2026-10-31 captures each have their request beside them as
+`*-request.json`, sent as the core sends it (`Accept: */*`). Two outputs by
+value, with no `response`, `"document"` or `"raw"`. `none` and `raw` give the
+same bytes: the process's own JSON map. `document` gives that map inside a
+one-element `outputs` array. `breinstein-aerial`'s JPEG is a base64 string
+inside `{value, mediaType, encoding}`, which pygeoapi serialises, so its
+`document` succeeds too (about 0.5 MB per capture). The 400 in finding 0027 is
+for a process that returns bytes.
 
 Each `execution/*.http` from 2026-10-26 has the body it answered beside it
 as `*-request.json`. `features/` holds pygeoapi's OGC API - Features answers
@@ -129,6 +140,10 @@ the set is a handful of files and the server is one pinned image.
               execution/saga-fractals-raw-{gml,kml}.http,
               execution/saga-fractals-wfs-getfeature.http
                 (step zero 6 of the result-formats brief)              2026-10-23
+              execution/echo-two-outputs-{none,document,raw}.http,
+              execution/echo-one-output-none.http,
+              execution/echo-no-outputs-none.http
+                (findings 0072, 0073)                                  2026-10-31
 
 The 2026-10-23 captures are raw answers, `response: "raw"`, each with the
 request that produced it beside it as `*-request.http`: GML 2 as OGR writes it,
@@ -137,6 +152,12 @@ labelled `application/json` (finding 0026), with `srsName` `EPSG:4326`,
 above is the bare `EPSG:4326` case. `saga-fractals-wfs-getfeature.http` is what
 the link in `saga-fractals-reference-wfs.http` answers: WFS 1.0 GML from
 MapServer, `text/xml`, an `srsName` on every geometry.
+
+The 2026-10-31 captures are `echo` by value, each beside its
+`*-request.json`, sent with `Accept: */*`. With no `response`, ZOO sends a
+results document, the same bytes as for `"document"`, with two outputs, one
+or none listed (finding 0072). `"raw"` gives `multipart/related` with no line
+break before the second and closing delimiters (finding 0073).
 
 Re-capture with `./infra/zoo/capture-fixtures.sh`, and only when the pinned SHA
 in `infra/zoo/pinned.env` changes. Read the diff before committing it.
@@ -213,6 +234,31 @@ Only what it serves to anyone is kept, never another party's job documents.
               process-list.json  (first page: ten, `next` to offset 10),
               process-list-offset-10.json  (the other two),
               processes/*.json  (all twelve)              2026-10-29 10:54 UTC
+              execution/rustplekken-no-response{,-output-crs-4326,-rd}.http
+                                                          2026-10-29 10:57 UTC
+              execution/rustplekken-every-output-document.http
+                                                          2026-10-31 11:18 UTC
+              execution/rustplekken-every-output-none.http
+                                                          2026-11-01 12:39 UTC
+
+The `execution/` captures are our own synchronous `rustplekken` runs on one
+small area in Alkmaar, each beside its `*-request.json`.
+
+- `rustplekken-no-response*.http` were sent **without `response` and without
+  `outputs`**, with `Accept: application/json`, during the GeoJSON-inputs step
+  zero: CRS84 with no `output_crs`, `output_crs: 4326`, and the area in RD New.
+  Each is the raw answer the default asks for: `multipart/related`, one part
+  per output (`Content-ID` the output id, `application/json`), lines ending
+  in LF alone. The boundary in the HTTP header is not quoted, although it
+  holds `=`. The body repeats a `Content-Type` and `MIME-Version` header
+  block before the first delimiter, as preamble.
+- `rustplekken-every-output-none.http` is the web app's request before the
+  response-document fix: all four outputs listed, no `response`,
+  `Accept: */*`. The answer has the same `multipart/related` framing as the
+  2026-10-29 runs.
+- `rustplekken-every-output-document.http` is the same request with
+  `"response": "document"`: a results document. The two FeatureCollections arrive as
+  `{"value": …, "mediaType": "application/json"}`.
 
 Every `geometry` input is a `oneOf` of a structural GeoJSON `Polygon` and
 `MultiPolygon`, each branch with `format: "geojson-geometry"` and
@@ -284,6 +330,16 @@ every output, as the web app does; `one-output-request.json` lists one.
   Node's `fetch` sends by default: **406**, "Requested language [*] not in
   supported languages". RFC 9110 reads `*` as any language. Captured
   2026-10-23.
+- `execution/echo-two-outputs-{none,document,raw}.http` — `EchoProcess` with
+  two outputs listed by value, `stringOutput` and `featureCollectionOutput`,
+  and no `response`, `"document"` or `"raw"`, sent with `Accept: */*`.
+  `none` and `document` give the same results map. In it,
+  `featureCollectionOutput` is an `{href, type}` link, although it was asked
+  for by value. `raw` gives **two `Content-Type` headers**,
+  `text/html; charset=UTF-8` and then `multipart/mixed; boundary=…`. The parts
+  have `Content-ID: <stringOutput@{job}>`, not the output id. The
+  FeatureCollection is an empty part with `Content-Location`. Captured
+  2026-10-31.
 - `deploy/cwl-without-docker-{request,422}.http` — a CWL CommandLineTool
   deployed through `POST /processes` (Part 2, out of the client's scope; kept
   as evidence): one string in, `echo`, one string out, and no

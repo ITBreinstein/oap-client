@@ -1,0 +1,61 @@
+HTTP/1.1 200 OK
+Server: gunicorn
+Date: Sat, 31 Oct 2026 11:15:46 GMT
+Connection: keep-alive
+Content-Type: application/json
+X-Powered-By: pygeoapi 0.21.0
+Content-Language: en-US
+Location: http://localhost:5080/jobs/6bcdb090-d51c-11f1-b3a8-ea75d4b299ea
+Access-Control-Allow-Origin: *
+Content-Length: 1757
+
+{
+    "outputs":[
+        {
+            "features":{
+                "type":"FeatureCollection",
+                "source":{
+                    "by":"value"
+                },
+                "features":[
+                    {
+                        "type":"Feature",
+                        "id":"block",
+                        "properties":{
+                            "name":"a block in Utrecht",
+                            "area_m2":183029.64
+                        },
+                        "geometry":{
+                            "type":"Polygon",
+                            "coordinates":[
+                                [
+                                    [
+                                        5.118,
+                                        52.089
+                                    ],
+                                    [
+                                        5.124,
+                                        52.089
+                                    ],
+                                    [
+                                        5.124,
+                                        52.093
+                                    ],
+                                    [
+                                        5.118,
+                                        52.093
+                                    ],
+                                    [
+                                        5.118,
+                                        52.089
+                                    ]
+                                ]
+                            ]
+                        }
+                    }
+                ]
+            },
+            "table":"number,id,geometry,area_m2,name\n1,block,Polygon,183029.64,a block in Utrecht\n"
+        }
+    ]
+}

@@ -1,0 +1,19 @@
+HTTP/1.1 200 OK
+Date: Sat, 31 Oct 2026 11:16:28 GMT
+Server: Apache/2.4.29 (Ubuntu)
+Transfer-Encoding: chunked
+Content-Type: multipart/related; boundary="--84be00d2-d51c-11f1-be3c-4295c06131fe"; type=text/plain; start=a
+
+----84be00d2-d51c-11f1-be3c-4295c06131fe
+Content-ID: a
+Content-Type: text/plain; charset=utf-8
+Status: 200 OK
+
+Content-Disposition: INLINE
+plugfest----84be00d2-d51c-11f1-be3c-4295c06131fe
+Content-ID: c
+Content-Type: text/plain; charset=utf-8
+Status: 200 OK
+
+Content-Disposition: INLINE
+[ 4.74, 52.63, 4.75, 52.64 ]----84be00d2-d51c-11f1-be3c-4295c06131fe--
