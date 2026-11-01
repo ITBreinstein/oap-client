@@ -333,8 +333,9 @@ interface ProcessExecutionOptions {
 ```
 
 `defaulted` separates "the server told us sync-only" from "the server said
-nothing and the spec default is sync-only". The two look identical without it,
-and they are different statements.
+nothing and this client assumed sync-only". The two look identical without it,
+and they are different statements. The assumption is the client's, not the
+standard's: neither 1.0 nor the 2.0 draft gives `jobControlOptions` a default.
 
 ### Pagination is followed, with a ceiling
 
