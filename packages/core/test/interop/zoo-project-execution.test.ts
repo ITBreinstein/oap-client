@@ -210,13 +210,13 @@ describe.skipIf(!zooUp)("what ZOO does with a request it dislikes", () => {
     expect(failure.status).toBe(400);
   });
 
-  it("records the arity warning but still sends, for an unbounded input", async () => {
+  it("sends a single value for an unbounded input, with no arity warning", async () => {
     // Gdal_Translate declares GCP as maxOccurs: "unbounded" — the one live
     // `"unbounded"` Task 3 found. It cannot be executed cheaply: it needs a
     // real raster, and fails at GDALOpen whatever we send. What *is* testable
     // is that the array wire shape reaches the service rather than being
-    // rejected at parse time, and that a single value produces a warning and
-    // is still sent.
+    // rejected at parse time, and that a single value, which is valid, is
+    // sent without one.
     const gdal = await client.getProcess("Gdal_Translate");
     const before = executions().length;
 
@@ -229,9 +229,9 @@ describe.skipIf(!zooUp)("what ZOO does with a request it dislikes", () => {
       .then(() => undefined)
       .catch((error: unknown) => error);
 
-    expect(executions()[before]?.warnings).toContain(
-      'input "GCP" accepts multiple values but a single value was supplied',
-    );
+    // A single value for a multi-valued input is valid (execute.yaml), so
+    // it is sent with no arity warning.
+    expect(executions()[before]?.warnings).toEqual([]);
     // It got past parsing and died inside GDAL, which is what proves the
     // request was sent rather than blocked by our own warning.
     expect(failure).toBeInstanceOf(ProcessesError);

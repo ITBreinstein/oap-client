@@ -163,7 +163,6 @@ describe("arity warnings never block the request", () => {
 
   it.each([
     ["an array for a single-valued input", { one: ["a"] }, "accepts one value"],
-    ["a bare value for a multi-valued input", { one: "a", many: "b" }, "accepts multiple values"],
     ["a missing required input", {}, "missing required input"],
   ])("still sends when given %s", async (_label, inputs, expected) => {
     const fake = fakeFetch(json({ value: 1 }));

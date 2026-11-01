@@ -59,6 +59,11 @@ is 0.6.0, not a patch.
 
 - An output's `minOccurs` and `maxOccurs` are read, and no longer reported in
   `ParseReport.unrecognisedKeys`.
+- `checkArity()`, and so the `execution` observation's `warnings`, no longer
+  warns about a single value for an input whose `maxOccurs` exceeds 1, which
+  `execute.yaml` allows. It no longer warns about an array for a single-valued
+  input whose schema takes an array (`type: "array"`, or a `oneOf`/`anyOf`
+  branch that is).
 
 ## 0.5.0 — 2026-10-21
 

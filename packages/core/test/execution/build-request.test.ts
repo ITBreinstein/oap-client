@@ -21,6 +21,7 @@ import {
 import { parseDescription } from "../../src/processes/parse-description.js";
 import type { ProcessDescription } from "../../src/processes/types.js";
 import helloWorld from "../fixtures/pygeoapi/processes/hello-world.json" with { type: "json" };
+import beleidsnormenEcho from "../fixtures/beleidsnormen/processes/echo.json" with { type: "json" };
 import echo from "../fixtures/zoo-project/processes/echo.json" with { type: "json" };
 
 const LIST = "https://service.test/oapi/processes";
@@ -203,10 +204,42 @@ describe("checkArity", () => {
     );
   });
 
-  it("warns when a multi-valued input is given a bare value", () => {
-    expect(checkArity(description, { one: "a", many: "b" })).toContain(
-      'input "many" accepts multiple values but a single value was supplied',
+  it("does not warn when a multi-valued input is given a bare value, which is valid", () => {
+    // execute.yaml: every input is `oneOf [inlineOrRefData, array]`.
+    expect(checkArity(description, { one: "a", many: "b" })).toEqual([]);
+  });
+
+  it("does not warn about an array for a single-valued input whose schema is an array", () => {
+    // The Beleidsnormen API's echo.arrayInput, as described (2026-10-29).
+    const echo = parseDescription(beleidsnormenEcho, {
+      documentUrl: "https://beleidsnormen.example/api/processes/echo",
+    }).process;
+    expect(echo.inputs.find((input) => input.id === "arrayInput")?.multiple).toBe(false);
+    // Its required inputs are left out here; only the array is in question.
+    expect(
+      checkArity(echo, { arrayInput: [1, 2, 3] }).filter((w) => w.includes("arrayInput")),
+    ).toEqual([]);
+    // An array for a single-valued input whose schema is not one still warns.
+    expect(checkArity(echo, { stringInput: ["a"] })).toContain(
+      'input "stringInput" accepts one value but an array was supplied',
     );
+  });
+
+  it("does not warn when a oneOf branch of the input's schema is an array", () => {
+    const branched: ProcessDescription = {
+      ...description,
+      inputs: [
+        {
+          id: "one",
+          minOccurs: 1,
+          maxOccurs: 1,
+          required: true,
+          multiple: false,
+          schema: { oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }] },
+        },
+      ],
+    };
+    expect(checkArity(branched, { one: ["a", "b"] })).toEqual([]);
   });
 
   it("warns when a required input is missing", () => {

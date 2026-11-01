@@ -474,10 +474,15 @@ need to run against ZOO.**
 ### Arity is checked and never enforced
 
 Pass `description` and each supplied input is compared against the cardinality
-the server published — an array where `maxOccurs` is 1, a bare value where it is
-greater, a missing required input, an input the description does not declare.
-Each mismatch becomes a warning on the observation, and **the request is sent
-anyway**.
+the server published — an array where `maxOccurs` is 1 and the input's own
+schema does not take an array, a missing required input, an input the
+description does not declare. Each mismatch becomes a warning on the
+observation, and **the request is sent anyway**.
+
+A bare value where `maxOccurs` is greater than 1 is not a mismatch:
+`execute.yaml` lets any input take a single value. An array for an input whose
+schema is `type: "array"` (or has a `oneOf`/`anyOf` branch that is) is that
+input's one value, not several.
 
 Warning rather than blocking is the point. Neither reference server validates the
 cardinality it publishes — one leaks a Python traceback, the other stringifies

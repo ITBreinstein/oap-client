@@ -162,12 +162,34 @@ export function describeInputKind(value: ExecuteInputValue): string {
 }
 
 /**
+ * Whether an input's own schema takes an array as **one** value: `type`
+ * `"array"` (alone or in a list), or a `oneOf` or `anyOf` branch that does.
+ * The Beleidsnormen API's `echo.arrayInput` is one: `maxOccurs` 1, schema
+ * `type: "array"`.
+ */
+function takesArrayValue(schema: unknown, depth = 0): boolean {
+  if (typeof schema !== "object" || schema === null || depth > 8) return false;
+  const record = schema as Record<string, unknown>;
+  const type = record["type"];
+  if (type === "array" || (Array.isArray(type) && type.includes("array"))) return true;
+  return ["oneOf", "anyOf"].some((keyword) => {
+    const branches = record[keyword];
+    return Array.isArray(branches) && branches.some((branch) => takesArrayValue(branch, depth + 1));
+  });
+}
+
+/**
  * Arity checks against the description. **Warns; never throws, never rewrites.**
  *
- * Task 3 derived `multiple` for exactly this moment: an input whose `maxOccurs`
- * exceeds 1 must be a JSON array on the wire, and one whose `maxOccurs` is 1
- * must not be. Getting it wrong produces a rejection that reads like a client
- * bug.
+ * Task 3 derived `multiple` for exactly this moment. 18-062r2 Requirement 19
+ * `/req/core/process-execute-input-array` has a server accept an array for an
+ * input whose `maxOccurs` exceeds 1, even an array of one; `execute.yaml` lets
+ * any input take a single value as well. So the one mismatch worth a warning is an
+ * array sent to an input that takes one value, and only when that input's own
+ * schema does not take an array: then the array *is* the one value. A single
+ * value for a multi-valued input is valid, and is not warned about (the
+ * 2026-10-30 review: the warnings reach the `execution` observation, and from
+ * there the matrix, as evidence against a correct request).
  *
  * The core does not fix it silently, for a reason the servers themselves make
  * concrete. Task 3 found 1 541 inputs with an absent `minOccurs` and one live
@@ -195,10 +217,7 @@ export function checkArity(
       if (input.required) warnings.push(`missing required input "${input.id}"`);
       continue;
     }
-    if (input.multiple && !Array.isArray(supplied)) {
-      warnings.push(`input "${input.id}" accepts multiple values but a single value was supplied`);
-    }
-    if (!input.multiple && Array.isArray(supplied)) {
+    if (!input.multiple && Array.isArray(supplied) && !takesArrayValue(input.schema)) {
       warnings.push(`input "${input.id}" accepts one value but an array was supplied`);
     }
   }
