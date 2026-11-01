@@ -210,6 +210,7 @@ export async function inspect(
     dismiss: capabilities.dismiss,
     callback: capabilities.callback,
     jobList: capabilities.jobList,
+    processDescription: capabilities.processDescription,
     protocolVersion: capabilities.protocolVersion,
     versionSource: capabilities.versionSource,
     declaredVersions: capabilities.declaredVersions,

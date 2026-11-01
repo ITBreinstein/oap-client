@@ -37,6 +37,9 @@ is 0.6.0, not a patch.
   `job-list` query parameters and applied to the returned list as well. The
   `job-list` observation gains `filtersSent`, `filteredOutCount` and
   `filtersHonoured`, which say whether the server applied them (finding 0038).
+- `ServiceCapabilities.processDescription`: whether the service declares the
+  `ogc-process-description` class. Also on the `capabilities-derived`
+  observation.
 
 ### Breaking
 
@@ -44,7 +47,7 @@ is 0.6.0, not a patch.
   objects itself, as tests often do, stops compiling until it adds them; code
   that only reads them is unaffected:
   - `ServiceCapabilities`: `protocolVersion`, `versionSource`,
-    `declaredVersions`.
+    `declaredVersions`, `processDescription`.
   - `OutputDescription`: `minOccurs`, `maxOccurs`, `multiple`.
   - The `execution`, `capabilities-derived` and `job-list` members of
     `Observation`, as above.

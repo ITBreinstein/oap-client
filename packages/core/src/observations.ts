@@ -112,6 +112,8 @@ export type Observation =
       readonly dismiss: boolean;
       readonly callback: boolean;
       readonly jobList: boolean;
+      /** Whether `ogc-process-description` is declared. */
+      readonly processDescription: boolean;
       /**
        * The version of Part 1 the client will speak, chosen before anything is
        * sent. Spelled out rather than imported, so this module stays a leaf.
