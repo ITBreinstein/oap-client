@@ -37,9 +37,10 @@ is 0.6.0, not a patch.
   `job-list` query parameters and applied to the returned list as well. The
   `job-list` observation gains `filtersSent`, `filteredOutCount` and
   `filtersHonoured`, which say whether the server applied them (finding 0038).
+  The three are required: see **Breaking**.
 - `ServiceCapabilities.processDescription`: whether the service declares the
   `ogc-process-description` class. Also on the `capabilities-derived`
-  observation.
+  observation. Required on both: see **Breaking**.
 
 ### Breaking
 
@@ -47,10 +48,14 @@ is 0.6.0, not a patch.
   objects itself, as tests often do, stops compiling until it adds them; code
   that only reads them is unaffected:
   - `ServiceCapabilities`: `protocolVersion`, `versionSource`,
-    `declaredVersions`, `processDescription`.
+    `declaredVersions`, **`processDescription`**.
   - `OutputDescription`: `minOccurs`, `maxOccurs`, `multiple`.
-  - The `execution`, `capabilities-derived` and `job-list` members of
-    `Observation`, as above.
+  - `Observation`, member `execution`: `protocolVersion`, `versionSource`,
+    `formatRequested`, `preferenceAppliedTokens`.
+  - `Observation`, member `capabilities-derived`: `protocolVersion`,
+    `versionSource`, `declaredVersions`, **`processDescription`**.
+  - `Observation`, member `job-list`: **`filtersSent`**,
+    **`filteredOutCount`**, **`filtersHonoured`**.
 - On a service that declares the 2.0 draft, `client.execute()` with
   `response`, or with any output's `transmissionMode`, now sends the draft's
   form of the request or throws `DraftUnsupportedRequestError`, where it used

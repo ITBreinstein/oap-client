@@ -968,6 +968,15 @@ Where Weaver differs from the pinned draft:
 `Prefer: respond-async`, so a `return=` preference would not pass through it.
 The client sends none, so nothing is lost today.
 
+**Known limit, 1.0:** the raw answer for outputs by reference, a `204` with a
+`Link` header per output (18-062r2 Requirement 30), is returned as its
+envelope and read no further: the core does not parse result bodies, and the
+web app does not read the `Link` headers. Cross-origin, a page could read them
+only if the server sent `Access-Control-Expose-Headers: Link`. On 1.0 the web
+app avoids the answer: it asks for `response: "document"` whenever any output
+is asked for by reference, and reads the links in the results document
+instead.
+
 Open issues on the draft that touch what is read here: #450 (`jobID` or `id`),
 #618 (`http` or `https` URIs), #619 (exception types) and #620 (dismissal).
 
