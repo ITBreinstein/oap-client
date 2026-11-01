@@ -15,6 +15,7 @@ import { resolveFormPlan } from "../../src/forms/resolve.js";
 import {
   offersLink,
   outputSelection,
+  responseFor,
   runError,
   runRequest,
   typedEndpoint,
@@ -392,6 +393,34 @@ describe("the run request", () => {
     expect(request.notes).toEqual([
       { inputId: "c", code: "bbox-axis-swapped", crs: "urn:ogc:def:crs:EPSG:6.6:4326" },
     ]);
+  });
+});
+
+describe("the response a run asks for (18-062r2 §7.11.2.4)", () => {
+  it("asks a 1.0 service for a document when two or more outputs are asked for", () => {
+    expect(responseFor("1.0", { features: {}, table: {} })).toBe("document");
+  });
+
+  it("asks a 1.0 service for a document when one output is asked for by reference", () => {
+    expect(responseFor("1.0", { buildings: { transmissionMode: "reference" } })).toBe("document");
+  });
+
+  it("leaves one output by value raw, the default, so a PNG still arrives as a PNG", () => {
+    expect(responseFor("1.0", { image: {} })).toBeUndefined();
+    expect(responseFor("1.0", { image: { format: { mediaType: "image/png" } } })).toBeUndefined();
+    expect(responseFor("1.0", {})).toBeUndefined();
+  });
+
+  it("sends nothing on the 2.0 draft, where the outputs decide the form", () => {
+    expect(responseFor("2.0-draft", { features: {}, table: {} })).toBeUndefined();
+    expect(responseFor("2.0-draft", { a: { transmissionMode: "reference" } })).toBeUndefined();
+  });
+
+  it("asks for a document for every output the page names on a process with several", () => {
+    const echo = fixtureProcess("zoo-project/echo");
+    expect(responseFor("1.0", runRequest(echo, resolveFormPlan(echo), {}).outputs)).toBe(
+      "document",
+    );
   });
 });
 

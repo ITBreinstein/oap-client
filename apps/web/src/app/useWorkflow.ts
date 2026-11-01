@@ -64,6 +64,7 @@ import {
   declaredMediaTypes,
   rateLimitMessage,
   relayEndpointFor,
+  responseFor,
   runError,
   runRequest,
   serviceError,
@@ -707,6 +708,7 @@ export function useWorkflow(
     // #F3: a format for each output that offers several, unless the user chose.
     const formats = formatsToAsk(process.outputs, state.formatChoices);
     const request = runRequest(process, plan, state.values, linkOutputs, formats);
+    const response = responseFor(state.service.capabilities.protocolVersion, request.outputs);
     // Package 6: the schema warnings were on screen and do not stop the run;
     // an input whose value could not be checked is recorded, once.
     record(
@@ -729,6 +731,7 @@ export function useWorkflow(
       declaredTransmission: process.outputTransmission,
       linkOutputs,
       formatsAsked: formats,
+      ...(response === undefined ? {} : { response }),
     };
     record(
       request.notes.map((note) => ({
@@ -758,6 +761,7 @@ export function useWorkflow(
             ? await connection.client.execute(process.id, {
                 inputs: request.inputs,
                 outputs: request.outputs,
+                ...(response === undefined ? {} : { response }),
                 mode: "sync",
                 description: process,
                 signal: stop?.signal,
@@ -769,6 +773,7 @@ export function useWorkflow(
                 request.outputs,
                 process,
                 connection.reads,
+                response,
               );
         if (execution.kind === "job") {
           // The reconciler owns the job from here; `run` already tracks an
@@ -786,6 +791,7 @@ export function useWorkflow(
           declaredMediaTypes: declaredMediaTypes(process),
           askedFormats: formats,
           base64Outputs: base64Outputs(process, formats),
+          requestedResponse: response,
         });
         recordResults(results);
         dispatch({ type: "results", runId, results });
@@ -918,6 +924,8 @@ export function useWorkflow(
     const declared = declaredMediaTypes(state.process);
     // What this run asked for (#F3); nothing for a job followed from elsewhere.
     const asked = lastRun.current?.runId === runId ? lastRun.current.formatsAsked : undefined;
+    // And the `response` it sent: a document asked for is read as one.
+    const response = lastRun.current?.runId === runId ? lastRun.current.response : undefined;
     void (async () => {
       try {
         const { envelope } = await connection.client.getResults(jobRef, { status: decided });
@@ -927,6 +935,7 @@ export function useWorkflow(
           declaredMediaTypes: declared,
           askedFormats: asked,
           base64Outputs: base64Outputs(state.process, asked),
+          requestedResponse: response,
         });
         recordResults(results);
         dispatch({ type: "results", runId, results });

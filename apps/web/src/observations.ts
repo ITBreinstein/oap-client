@@ -233,6 +233,8 @@ export interface RunFacts {
   readonly linkOutputs: readonly string[];
   /** The media type asked for each output that was asked for one (#F3). */
   readonly formatsAsked?: Readonly<Record<string, string>> | undefined;
+  /** The `response` the run sent, when it sent one (`app/run.ts`, `responseFor`). */
+  readonly response?: "document" | undefined;
 }
 
 function declaredMediaType(result: RenderableResult): string | undefined {

@@ -101,6 +101,8 @@ export interface JobSession {
     outputs: Record<string, unknown>,
     description?: ProcessDescription,
     reads?: Reads,
+    /** The `response` to send, when the run sends one (`app/run.ts`). */
+    response?: "document",
   ): Promise<Execution>;
   /**
    * Start reconciling a job the caller found some other way: a sync run the
@@ -531,7 +533,7 @@ export function createJobSession(
       observeFor(endpoint)(observation);
     },
 
-    async run(endpoint, processId, inputs, outputs, description, reads = "direct") {
+    async run(endpoint, processId, inputs, outputs, description, reads = "direct", response) {
       const startedAt = now().toISOString();
       const refs = new Map<string, string>();
       let route: "direct" | "relay" | undefined;
@@ -547,6 +549,7 @@ export function createJobSession(
       const execution = await client.execute(processId, {
         inputs,
         outputs: toOutputSelection(outputs),
+        ...(response === undefined ? {} : { response }),
         mode: "async",
         ...(description === undefined ? {} : { description }),
       });
