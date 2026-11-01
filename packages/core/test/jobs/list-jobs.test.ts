@@ -238,3 +238,92 @@ describe("tolerance", () => {
     );
   });
 });
+
+describe("the filters: sent, applied here, and checked (Requirements 68–71)", () => {
+  const filtered = `${JOBS_URL}?processID=slow&status=running&status=accepted`;
+
+  it("sends processID and status on the first request, one parameter per value", async () => {
+    const fake = pages({ [filtered]: { jobs: [job("a", "running")], links: [] } });
+
+    await listJobs(JOBS_URL, {
+      fetch: fake.fetch,
+      processID: ["slow"],
+      status: ["running", "accepted"],
+    });
+
+    expect(fake.calls).toEqual([filtered]);
+  });
+
+  it("records a server that applied them", async () => {
+    const fake = pages({ [filtered]: { jobs: [job("a", "running")], links: [] } });
+    const { sink, seen } = collect();
+
+    const list = await listJobs(JOBS_URL, {
+      fetch: fake.fetch,
+      onObservation: sink,
+      processID: ["slow"],
+      status: ["running", "accepted"],
+    });
+
+    expect(list.jobs.map((entry) => entry.jobId)).toEqual(["a"]);
+    expect(seen.find((entry) => entry.kind === "job-list")).toMatchObject({
+      filtersSent: ["processID", "status"],
+      filteredOutCount: 0,
+      filtersHonoured: true,
+    });
+  });
+
+  it("filters what a server that ignores them returns, and records that it did (finding 0038)", async () => {
+    const other = { type: "process", jobID: "b", processID: "hello-world", status: "running" };
+    const fake = pages({
+      [filtered]: { jobs: [job("a", "running"), other, job("c", "successful")], links: [] },
+    });
+    const { sink, seen } = collect();
+
+    const list = await listJobs(JOBS_URL, {
+      fetch: fake.fetch,
+      onObservation: sink,
+      processID: ["slow"],
+      status: ["running", "accepted"],
+    });
+
+    expect(list.jobs.map((entry) => entry.jobId)).toEqual(["a"]);
+    expect(seen.find((entry) => entry.kind === "job-list")).toMatchObject({
+      jobCount: 1,
+      filteredOutCount: 2,
+      filtersHonoured: false,
+    });
+  });
+
+  it("keeps a job that names no process: it may be the one asked for", async () => {
+    const url = `${JOBS_URL}?processID=slow`;
+    const fake = pages({ [url]: { jobs: [{ jobID: "a", status: "running" }], links: [] } });
+
+    const list = await listJobs(JOBS_URL, { fetch: fake.fetch, processID: ["slow"] });
+
+    expect(list.jobs.map((entry) => entry.jobId)).toEqual(["a"]);
+  });
+
+  it("sends and records no filter when none is asked for", async () => {
+    const fake = pages({ [JOBS_URL]: { jobs: [job("a")], links: [] } });
+    const { sink, seen } = collect();
+
+    await listJobs(JOBS_URL, { fetch: fake.fetch, onObservation: sink });
+
+    expect(fake.calls).toEqual([JOBS_URL]);
+    expect(seen.find((entry) => entry.kind === "job-list")).toMatchObject({
+      filtersSent: [],
+      filteredOutCount: 0,
+      filtersHonoured: undefined,
+    });
+  });
+
+  it("keeps the limit hint beside the filters", async () => {
+    const url = `${JOBS_URL}?limit=5&processID=slow`;
+    const fake = pages({ [url]: { jobs: [], links: [] } });
+
+    await listJobs(JOBS_URL, { fetch: fake.fetch, limit: 5, processID: ["slow"] });
+
+    expect(fake.calls).toEqual([url]);
+  });
+});

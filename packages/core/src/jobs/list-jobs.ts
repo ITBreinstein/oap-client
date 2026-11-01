@@ -23,12 +23,17 @@
  * URL from this server; here are its recent jobs". A person can recognise their
  * own job. A heuristic cannot.
  *
- * ## The filters, which are not usable
+ * ## The filters: sent, and checked
  *
- * pygeoapi accepts `?processID=` and `?status=` and **ignores both**, returning
- * the full list either way (finding 0038); ZOO honours both. A filter that is
- * silently ignored is worse than no filter, so neither is part of this API: the
- * caller filters the returned array, which is correct against every server.
+ * The `job-list` class makes a server honour `processID` and `status`
+ * (Requirements 68–71). pygeoapi accepts both and **ignores both**, returning
+ * the full list either way (finding 0038); ZOO honours both. So they are sent
+ * when asked for, which is cheaper on a server that applies them, *and* the
+ * returned list is filtered here, which is correct on every server. Whether
+ * the server applied them is recorded on the `job-list` observation: any entry
+ * it returned that the filters exclude is evidence it did not. That turns 0038
+ * into a measured cell, and on a busy shared server the page walk reaches the
+ * user's job sooner.
  */
 
 import { fetchJson } from "../discovery/negotiate.js";
@@ -38,6 +43,7 @@ import { collectLinks, readBodyLinks } from "../links/resolve.js";
 import { findLink } from "../links/find.js";
 import type { Link } from "../links/types.js";
 import { observe, redactUrl, type ObservationSink } from "../observations.js";
+import type { JobState } from "../vocabulary/job-status.js";
 import { isRecord, parseJobStatus } from "./parse-status.js";
 import type { JobList, JobListTruncation, JobStatus } from "./types.js";
 import type { FetchJsonOptions } from "../discovery/negotiate.js";
@@ -59,14 +65,41 @@ export interface ListJobsOptions extends FetchJsonOptions {
    * that difference cost nothing.
    */
   readonly limit?: number | undefined;
+  /**
+   * Only jobs of these processes (Requirement 68). Sent as one `processID`
+   * parameter per id on the first request, and applied to the returned list
+   * as well. A job that names no process is kept: it may be the one wanted.
+   */
+  readonly processID?: readonly string[] | undefined;
+  /**
+   * Only jobs in these states (Requirement 70). Sent and applied as
+   * `processID` is. A job whose status this client does not recognise is kept.
+   */
+  readonly status?: readonly JobState[] | undefined;
 }
 
-/** Apply the `limit` hint without disturbing any other parameter the URL carries. */
-function withLimit(url: string, limit: number | undefined): string {
-  if (limit === undefined) return url;
+/**
+ * Apply the `limit` hint and the filters to the first request, without
+ * disturbing any other parameter the URL carries. OpenAPI 3.0's default for an
+ * array in the query is one parameter per value.
+ */
+function firstPageUrl(url: string, options: ListJobsOptions): string {
+  const { limit, processID = [], status = [] } = options;
+  if (limit === undefined && processID.length === 0 && status.length === 0) return url;
   const parsed = new URL(url);
-  parsed.searchParams.set("limit", String(limit));
+  if (limit !== undefined) parsed.searchParams.set("limit", String(limit));
+  for (const id of processID) parsed.searchParams.append("processID", id);
+  for (const state of status) parsed.searchParams.append("status", state);
   return parsed.toString();
+}
+
+/** Whether the filters exclude a job. A job missing the field in question is not excluded. */
+function excludedBy(job: JobStatus, options: ListJobsOptions): boolean {
+  const { processID = [], status = [] } = options;
+  if (processID.length > 0 && job.processId !== undefined && !processID.includes(job.processId)) {
+    return true;
+  }
+  return status.length > 0 && job.statusRecognised && !status.includes(job.status);
 }
 
 /** A non-negative integer `numberTotal`, or nothing. pygeoapi omits it; ZOO sends it. */
@@ -100,7 +133,7 @@ export async function listJobs(jobsUrl: string, options: ListJobsOptions = {}): 
   const visited = new Set<string>();
   const anonymous: JobStatus[] = [];
 
-  let url = withLimit(jobsUrl, options.limit);
+  let url = firstPageUrl(jobsUrl, options);
   let pageCount = 0;
   let duplicateCount = 0;
   let unparseableCount = 0;
@@ -187,7 +220,13 @@ export async function listJobs(jobsUrl: string, options: ListJobsOptions = {}): 
     url = next.href;
   }
 
-  const jobs = [...byId.values(), ...anonymous];
+  const returned = [...byId.values(), ...anonymous];
+  const jobs = returned.filter((job) => !excludedBy(job, options));
+  const filtersSent = [
+    ...((options.processID?.length ?? 0) > 0 ? (["processID"] as const) : []),
+    ...((options.status?.length ?? 0) > 0 ? (["status"] as const) : []),
+  ];
+  const filteredOutCount = returned.length - jobs.length;
 
   observe(sink, {
     kind: "job-list",
@@ -202,6 +241,9 @@ export async function listJobs(jobsUrl: string, options: ListJobsOptions = {}): 
     truncationReason,
     numberTotal,
     advertisedPagination,
+    filtersSent,
+    filteredOutCount,
+    filtersHonoured: filtersSent.length === 0 ? undefined : filteredOutCount === 0,
   });
 
   return {

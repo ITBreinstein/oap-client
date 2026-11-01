@@ -33,6 +33,10 @@ is 0.6.0, not a patch.
 - Observations: `execution` gains `protocolVersion`, `versionSource`,
   `formatRequested` and `preferenceAppliedTokens`; `capabilities-derived`
   gains `protocolVersion`, `versionSource` and `declaredVersions`.
+- `ListJobsOptions.processID` and `ListJobsOptions.status`: sent as the
+  `job-list` query parameters and applied to the returned list as well. The
+  `job-list` observation gains `filtersSent`, `filteredOutCount` and
+  `filtersHonoured`, which say whether the server applied them (finding 0038).
 
 ### Breaking
 
@@ -42,8 +46,8 @@ is 0.6.0, not a patch.
   - `ServiceCapabilities`: `protocolVersion`, `versionSource`,
     `declaredVersions`.
   - `OutputDescription`: `minOccurs`, `maxOccurs`, `multiple`.
-  - The `execution` and `capabilities-derived` members of `Observation`, as
-    above.
+  - The `execution`, `capabilities-derived` and `job-list` members of
+    `Observation`, as above.
 - On a service that declares the 2.0 draft, `client.execute()` with
   `response`, or with any output's `transmissionMode`, now sends the draft's
   form of the request or throws `DraftUnsupportedRequestError`, where it used

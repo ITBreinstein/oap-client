@@ -751,10 +751,10 @@ The default, 8 MiB, reads PDOK's 1.08 MB page of 815 buildings and stops a
 10.8 MB WFS response from ZOO about 16 KB past the limit. Pass an explicit
 `maxBufferBytes` to read more.
 
-### The job list, and why it is not a filter API
+### The job list, and its filters, which are checked
 
 ```ts
-const { jobs, truncated } = await client.listJobs({ limit: 20 });
+const { jobs, truncated } = await client.listJobs({ limit: 20, processID: ["slow"] });
 ```
 
 Follows `rel="next"` to a bounded depth, stopping on a cycle or the page cap and
@@ -762,10 +762,14 @@ setting `truncated` when it does. The two servers page differently — pygeoapi
 builds `next` with `offset=`, ZOO with `skip=` — which costs nothing, because
 the walk follows the advertised link rather than constructing one.
 
-There are deliberately **no `processID` or `status` arguments**. ZOO honours both
-query parameters; pygeoapi accepts them and silently ignores them, returning the
-full list either way. A filter that is silently ignored is worse than no filter,
-so the caller filters the returned array, which is correct everywhere.
+`processID` and `status` are sent as the `job-list` class defines them
+(Requirements 68–71), one query parameter per value, **and** applied to the
+returned list, which is correct everywhere. ZOO honours both; pygeoapi accepts
+them and silently ignores them, returning the full list either way. The
+`job-list` observation records what was sent (`filtersSent`), how many returned
+entries the filters excluded (`filteredOutCount`), and so whether the server
+applied them (`filtersHonoured`). A job that names no process, or whose status
+this client does not recognise, is kept: it may be the one wanted.
 
 One unreadable entry is skipped and counted rather than failing the page. That
 matters more than it sounds: in a browser against pygeoapi, an asynchronous
