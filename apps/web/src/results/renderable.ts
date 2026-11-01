@@ -15,12 +15,19 @@
  */
 
 import {
+  createEnvelope,
   DEFAULT_MAX_BUFFER_BYTES,
   isJsonMediaType,
   resolveHref,
   type ResponseEnvelope,
 } from "@breinstein/oap-client";
 import { placeGeoJson, readContentCrs, type Placement } from "./crs.js";
+import {
+  mediaTypesNamed,
+  readMultipart,
+  type MultipartLeniency,
+  type MultipartPart,
+} from "./multipart.js";
 import type { LoadedReference } from "./reference.js";
 import {
   base64Bytes,
@@ -54,7 +61,21 @@ export interface ReadFacts {
    * pygeoapi's answer to `response: "document"` (finding 0027).
    */
   readonly documentWrapper?: "outputs-array" | undefined;
+  /**
+   * The output was one part of a `multipart/related` answer (`multipart.ts`):
+   * the tolerances its framing needed, empty when it needed none.
+   */
+  readonly multipartLenient?: readonly MultipartLeniency[] | undefined;
 }
+
+/**
+ * Why a download was not shown. `multipart-unreadable`: a `multipart/related`
+ * answer whose parts cannot be told apart by RFC 2046, even with the two
+ * tolerances `multipart.ts` allows (ZOO, finding 0073).
+ * `two-media-types`: a Content-Type naming more than one media type, the
+ * header sent twice (Weaver), so nothing says what the body is.
+ */
+export type DownloadReason = "not-text" | "too-large" | "multipart-unreadable" | "two-media-types";
 
 export type RenderableResult = (
   | {
@@ -85,8 +106,8 @@ export type RenderableResult = (
       readonly blob: Blob;
       readonly mediaType?: string | undefined;
       readonly filename?: string | undefined;
-      /** Why this was not shown: not text, or too large to show. */
-      readonly reason: "not-text" | "too-large";
+      /** Why this was not shown. */
+      readonly reason: DownloadReason;
       /**
        * The parsed value, when this is JSON too large to show: not shown, but
        * still read, so GeoJSON can go on the map (`plottable.ts`).
@@ -452,17 +473,82 @@ export async function toRenderable(
   envelope: ResponseEnvelope,
   options: RenderOptions,
 ): Promise<RenderableResult[]> {
-  const { results, entries } = await render(envelope, options);
+  const { results, entries, parts } = await render(envelope, options);
   return withFormats(results, options.askedFormats, (outputId) =>
-    entries === undefined ? envelope.mediaType : entryMediaType(entries.get(outputId)),
+    parts !== undefined
+      ? parts.get(outputId)
+      : entries === undefined
+        ? envelope.mediaType
+        : entryMediaType(entries.get(outputId)),
   );
 }
 
-/** The results, and the results document's entries when the body was one. */
-async function render(
+interface Rendered {
+  readonly results: RenderableResult[];
+  /** A results document's entries, by output id, when the body was one. */
+  readonly entries?: ReadonlyMap<string, unknown>;
+  /** A multipart answer's parts' media types, by output id, when the body was one. */
+  readonly parts?: ReadonlyMap<string, string | undefined>;
+}
+
+/** A part's `Content-ID`, without the angle brackets RFC 2392 puts round it. */
+function contentIdOf(part: MultipartPart): string | undefined {
+  const id = part.headers["content-id"]?.trim();
+  if (id === undefined || id === "") return undefined;
+  return id.startsWith("<") && id.endsWith(">") ? id.slice(1, -1) : id;
+}
+
+/**
+ * Each part of a `multipart/related` answer, read as the one output its
+ * `Content-ID` names (Requirement 29 E), through the same path a raw answer
+ * with one output takes. A part with an empty body and a `Content-Location`
+ * is that output by reference (Requirement 31 F).
+ */
+async function fromParts(
   envelope: ResponseEnvelope,
+  parts: readonly MultipartPart[],
+  lenient: readonly MultipartLeniency[],
   options: RenderOptions,
-): Promise<{ results: RenderableResult[]; entries?: ReadonlyMap<string, unknown> }> {
+): Promise<Rendered> {
+  const types = new Map<string, string | undefined>();
+  const read = await Promise.all(
+    parts.map(async (part, index): Promise<RenderableResult[]> => {
+      const outputId = contentIdOf(part) ?? `part ${String(index + 1)}`;
+      const mediaType = part.headers["content-type"];
+      types.set(outputId, mediaType);
+      const location = part.headers["content-location"];
+      if (location !== undefined && part.body.byteLength === 0) {
+        return [
+          {
+            kind: "reference",
+            outputId,
+            href: resolveHref(location, envelope.url) ?? location,
+            ...(mediaType === undefined ? {} : { mediaType }),
+          },
+        ];
+      }
+      const headers = new Headers();
+      for (const [name, value] of Object.entries(part.headers)) {
+        try {
+          headers.set(name, value);
+        } catch {
+          // A header Fetch will not carry is left behind; the bytes are what count.
+        }
+      }
+      const one = createEnvelope(new Response(part.body.slice(), { headers }), {
+        requestedUrl: envelope.url,
+      });
+      return (await render(one, { ...options, outputIds: [outputId] })).results;
+    }),
+  );
+  return {
+    results: read.flat().map((result) => ({ ...result, multipartLenient: lenient })),
+    parts: types,
+  };
+}
+
+/** The results, and the results document's entries when the body was one. */
+async function render(envelope: ResponseEnvelope, options: RenderOptions): Promise<Rendered> {
   const results = (list: RenderableResult[]) => ({ results: list });
   const limit = options.displayLimitBytes ?? DEFAULT_DISPLAY_LIMIT_BYTES;
   const single = options.outputIds.length === 1 ? (options.outputIds[0] ?? "result") : "result";
@@ -476,7 +562,7 @@ async function render(
       ? {}
       : { placement: await placeGeoJson(value, contentCrs, "content-crs") };
   const download = async (
-    reason: "not-text" | "too-large",
+    reason: DownloadReason,
     json?: unknown,
     geo?: GeoRead,
   ): Promise<RenderableResult[]> => [
@@ -493,6 +579,36 @@ async function render(
   ];
 
   if (envelope.bodyTooLarge) return results(await download("too-large"));
+
+  // A Content-Type sent twice names two media types (Weaver's raw answer):
+  // nothing says which the body is, so it is offered as it came, labelled as
+  // it came, and not read as either.
+  const contentType = envelope.headers.get("content-type") ?? "";
+  if (mediaTypesNamed(contentType).length > 1) {
+    return results([
+      {
+        kind: "download",
+        outputId: single,
+        blob: await envelope.blob(),
+        mediaType: contentType,
+        filename: envelope.filename ?? defaultFilename(options.processId, single, undefined),
+        reason: "two-media-types",
+      },
+    ]);
+  }
+
+  // 1.0's raw answer for several outputs (Requirement 29): read by RFC 2046,
+  // with the two tolerances `multipart.ts` records, or not read at all.
+  if (mediaType === "multipart/related") {
+    const body = await envelope.arrayBuffer();
+    if (body.byteLength > (options.parseLimitBytes ?? DEFAULT_PARSE_LIMIT_BYTES)) {
+      return results(await download("too-large"));
+    }
+    const read = readMultipart(contentType, new Uint8Array(body));
+    if (!read.ok) return results(await download("multipart-unreadable"));
+    return fromParts(envelope, read.parts, read.lenient, options);
+  }
+
   if (!envelope.isJson && !isTextual(mediaType)) return results(await download("not-text"));
 
   // The bytes first: they are what a Download saves, and text is only what
