@@ -194,6 +194,12 @@ export interface ResultObservation {
    * What the page could read of it is `referenceOutcome`, as ever.
    */
   readonly shownAsImage?: true | undefined;
+  /**
+   * First record: the results document came inside a one-element `outputs`
+   * array, pygeoapi's answer to `response: "document"`, and was read as the
+   * document inside it (finding 0027). Absent otherwise.
+   */
+  readonly documentWrapper?: "outputs-array" | undefined;
 }
 
 /**
@@ -286,6 +292,7 @@ export function resultObservations(
       axisSwapped: reference ? undefined : swappedBy(placementOf(result)),
       ...(reference ? {} : crsFacts(placementOf(result))),
       ...readFacts(result),
+      ...(result.documentWrapper === undefined ? {} : { documentWrapper: result.documentWrapper }),
     };
   });
 }

@@ -43,6 +43,19 @@ export interface FormatFacts {
   readonly received?: string | undefined;
 }
 
+/**
+ * How the answer was read, where it took more than the standard's own shape.
+ * Each is a tolerance the result observation records, so it stays visible in
+ * the matrix rather than being smoothed over.
+ */
+export interface ReadFacts {
+  /**
+   * The results document came inside a one-element `outputs` array:
+   * pygeoapi's answer to `response: "document"` (finding 0027).
+   */
+  readonly documentWrapper?: "outputs-array" | undefined;
+}
+
 export type RenderableResult = (
   | {
       readonly kind: "json";
@@ -103,7 +116,8 @@ export type RenderableResult = (
       readonly loaded?: LoadedReference | undefined;
     }
 ) &
-  FormatFacts;
+  FormatFacts &
+  ReadFacts;
 
 /**
  * Above this, JSON and text are offered as a download instead of shown. It
@@ -154,6 +168,12 @@ export interface RenderOptions {
    * knows is tried as base64 once (§11 of the brief).
    */
   readonly base64Outputs?: readonly string[] | undefined;
+  /**
+   * The `response` the run sent, when it sent one. A body answering
+   * `"document"` is read as a results document, pygeoapi's wrapped one
+   * included (finding 0027).
+   */
+  readonly requestedResponse?: "document" | undefined;
 }
 
 const EXTENSIONS: Readonly<Record<string, string>> = {
@@ -358,6 +378,27 @@ function splitResults(
 }
 
 /**
+ * pygeoapi's answer to `response: "document"`: `{"outputs": [map]}`, the map
+ * keyed by output id (finding 0027). Only when a document was asked for, only
+ * when `outputs` is not itself an output, and only when the one element's keys
+ * are all declared outputs. Anything else is not this shape and is read as it
+ * came.
+ */
+function outputsArrayDocument(
+  value: unknown,
+  outputIds: readonly string[],
+): Record<string, unknown> | undefined {
+  if (!isRecord(value) || outputIds.includes("outputs")) return undefined;
+  const keys = Object.keys(value);
+  const list = value["outputs"];
+  if (keys.length !== 1 || !Array.isArray(list) || list.length !== 1) return undefined;
+  const [map] = list as unknown[];
+  if (!isRecord(map)) return undefined;
+  const ids = Object.keys(map);
+  return ids.length > 0 && ids.every((id) => outputIds.includes(id)) ? map : undefined;
+}
+
+/**
  * The body as text, only if its bytes decode cleanly in the charset it
  * declares (UTF-8 when it declares none, or one this browser does not know).
  * Bytes that do not are not text, whatever the label says: ZOO labels every raw
@@ -552,17 +593,26 @@ async function render(
       if (tooLarge) return results(await download("too-large"));
       return results(await shownAsText());
     }
-    const entries = splitResults(value, options.outputIds);
+    // A document asked for and sent in pygeoapi's wrapper is a document: its
+    // map is split whatever its size, and the wrapper is recorded.
+    const wrapped =
+      options.requestedResponse === "document"
+        ? outputsArrayDocument(value, options.outputIds)
+        : undefined;
+    const entries =
+      wrapped === undefined ? splitResults(value, options.outputIds) : Object.entries(wrapped);
     if (entries !== undefined) {
+      const facts: ReadFacts = wrapped === undefined ? {} : { documentWrapper: "outputs-array" };
       return {
         results: await Promise.all(
-          entries.map(async ([id, entry]) =>
-            withinLimit(
+          entries.map(async ([id, entry]) => ({
+            ...withinLimit(
               await withGeo(fromEntry(id, entry, options, envelope.url)),
               limit,
               options.processId,
             ),
-          ),
+            ...facts,
+          })),
         ),
         entries: new Map(entries),
       };
