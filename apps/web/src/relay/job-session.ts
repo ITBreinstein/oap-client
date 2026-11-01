@@ -55,6 +55,8 @@ export interface JobRow extends TrackedJob {
   readonly followed: boolean;
   /** ISO 8601: when this browser had the server cancel it (#31), kept across a reload (#14e). */
   readonly cancelledAt: string | undefined;
+  /** The `response` its execute request sent, kept across a reload. Undefined when none. */
+  readonly response: "document" | undefined;
 }
 
 /**
@@ -114,6 +116,8 @@ export interface JobSession {
     reads?: Reads,
     processId?: string,
     followed?: boolean,
+    /** The `response` the request that made the job sent, when it sent one. */
+    response?: "document",
   ): void;
   /** Take a job off this browser's list, and out of storage. The server is not told. */
   remove(statusUrl: string): void;
@@ -222,6 +226,7 @@ export function createJobSession(
       restored: boolean;
       followed: boolean;
       cancelledAt: string | undefined;
+      response: "document" | undefined;
     }
   >();
 
@@ -259,6 +264,7 @@ export function createJobSession(
         startedAt: job.startedAt,
         ...(job.followed ? { followed: true } : {}),
         ...(job.cancelledAt === undefined ? {} : { cancelledAt: job.cancelledAt }),
+        ...(job.response === undefined ? {} : { response: job.response }),
       });
     }
     store.save([...kept.values()]);
@@ -278,6 +284,7 @@ export function createJobSession(
       restored: meta.get(job.statusUrl)?.restored ?? false,
       followed: meta.get(job.statusUrl)?.followed ?? false,
       cancelledAt: meta.get(job.statusUrl)?.cancelledAt,
+      response: meta.get(job.statusUrl)?.response,
     })),
     observations,
     droppedObservations: dropped,
@@ -396,6 +403,7 @@ export function createJobSession(
       restored: true,
       followed: stored.followed === true,
       cancelledAt: stored.cancelledAt,
+      response: stored.response,
     });
     reconciler.track(stored.statusUrl);
   };
@@ -485,7 +493,7 @@ export function createJobSession(
       return routedClient(endpoint, readFetch(endpoint, reads));
     },
 
-    track(endpoint, statusUrl, reads = "direct", processId, followed = false) {
+    track(endpoint, statusUrl, reads = "direct", processId, followed = false, response) {
       const read = readFetch(endpoint, reads);
       meta.set(statusUrl, {
         endpointKey: endpoint.key,
@@ -497,6 +505,7 @@ export function createJobSession(
         restored: false,
         followed,
         cancelledAt: undefined,
+        response,
       });
       persist();
       reconciler.track(statusUrl);
@@ -565,6 +574,7 @@ export function createJobSession(
           restored: false,
           followed: false,
           cancelledAt: undefined,
+          response,
         });
         persist();
         reconciler.track(statusUrl, refs.get(statusUrl));

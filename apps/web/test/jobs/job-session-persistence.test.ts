@@ -6,7 +6,9 @@
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { JobStore, StoredJob } from "../../src/jobs/job-store.js";
+import { readStoredJob, type JobStore, type StoredJob } from "../../src/jobs/job-store.js";
+import { toRenderable } from "../../src/results/renderable.js";
+import { envelopeOf } from "../results/http-fixtures.js";
 import type { RelayEndpoint } from "../../src/relay/contract.js";
 import { createJobSession, type JobSession } from "../../src/relay/job-session.js";
 
@@ -189,5 +191,92 @@ describe("a job this browser had cancelled (#14e)", () => {
     session = createJobSession(undefined, { store });
     session.markCancelled(`${BASE}/jobs/elsewhere`, "2026-10-22T10:15:00.000Z");
     expect(store.saved).toEqual([]);
+  });
+});
+
+describe("the response a background job sent, across a reload", () => {
+  // pygeoapi wraps a document job's results as it wraps a sync answer
+  // (finding 0027): GET /jobs/{id}/results, captured 2026-11-01.
+  const RESULTS = "pygeoapi/jobs/breinstein-feature-area-document-async-results.http";
+  const RESULTS_URL = "http://localhost:5080/jobs/5b377c82-d618-11f1-99d8-d69c154369f5/results";
+
+  it("is stored with the job when the run sent one", async () => {
+    server();
+    const store = memoryStore();
+    session = createJobSession(undefined, {
+      store,
+      now: () => new Date("2026-11-01T17:00:00.000Z"),
+    });
+    await session.run(
+      ENDPOINT,
+      "slow",
+      { seconds: 3 },
+      { a: {}, b: {} },
+      undefined,
+      "direct",
+      "document",
+    );
+    expect(store.saved.at(-1)).toEqual([
+      {
+        endpoint: BASE,
+        statusUrl: `${BASE}/jobs/9`,
+        processId: "slow",
+        startedAt: "2026-11-01T17:00:00.000Z",
+        response: "document",
+      },
+    ]);
+  });
+
+  it("restores a document job, and its results are read as a document: outputs split", async () => {
+    server();
+    session = createJobSession(undefined, {
+      store: memoryStore([
+        { ...STORED, processId: "breinstein-feature-area", response: "document" },
+      ]),
+    });
+    let rows: readonly { readonly response: "document" | undefined }[] = [];
+    session.subscribe((snapshot) => {
+      rows = snapshot.jobs;
+    });
+    await vi.waitFor(() => {
+      expect(rows).toHaveLength(1);
+    });
+    const results = await toRenderable(envelopeOf(RESULTS, RESULTS_URL), {
+      outputIds: ["features", "table"],
+      processId: "breinstein-feature-area",
+      declaredMediaTypes: { features: "application/geo+json", table: "text/csv" },
+      requestedResponse: rows[0]?.response,
+    });
+    expect(results.map((result) => `${result.kind}:${result.outputId}`)).toEqual([
+      "json:features",
+      "text:table",
+    ]);
+    expect(results.every((result) => result.documentWrapper === "outputs-array")).toBe(true);
+  });
+
+  it("is 'not asked' for a job stored before it was kept, so its results come as they are", async () => {
+    server();
+    session = createJobSession(undefined, { store: memoryStore([STORED]) });
+    let rows: readonly { readonly response: "document" | undefined }[] = [];
+    session.subscribe((snapshot) => {
+      rows = snapshot.jobs;
+    });
+    await vi.waitFor(() => {
+      expect(rows).toHaveLength(1);
+    });
+    expect(rows[0]?.response).toBeUndefined();
+    const results = await toRenderable(envelopeOf(RESULTS, RESULTS_URL), {
+      outputIds: ["features", "table"],
+      processId: "breinstein-feature-area",
+      requestedResponse: rows[0]?.response,
+    });
+    expect(results.map((result) => `${result.kind}:${result.outputId}`)).toEqual(["json:result"]);
+  });
+
+  it('is read back only as "document": anything else stored is dropped', () => {
+    expect(readStoredJob({ ...STORED, response: "document" })?.response).toBe("document");
+    expect(readStoredJob({ ...STORED, response: "raw" })).toEqual(STORED);
+    expect(readStoredJob({ ...STORED, response: 1 })).toEqual(STORED);
+    expect(readStoredJob(STORED)).toEqual(STORED);
   });
 });

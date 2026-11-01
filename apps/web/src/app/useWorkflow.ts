@@ -780,7 +780,14 @@ export function useWorkflow(
           // asynchronous one, and a sync request the server made async is
           // handed over here.
           if (mode === "sync") {
-            active.track(relayEndpoint, execution.job.statusUrl, connection.reads, process.id);
+            active.track(
+              relayEndpoint,
+              execution.job.statusUrl,
+              connection.reads,
+              process.id,
+              false,
+              response,
+            );
           }
           dispatch({ type: "job-started", runId, jobRef: execution.job.statusUrl });
           return;
@@ -924,8 +931,9 @@ export function useWorkflow(
     const declared = declaredMediaTypes(state.process);
     // What this run asked for (#F3); nothing for a job followed from elsewhere.
     const asked = lastRun.current?.runId === runId ? lastRun.current.formatsAsked : undefined;
-    // And the `response` it sent: a document asked for is read as one.
-    const response = lastRun.current?.runId === runId ? lastRun.current.response : undefined;
+    // And the `response` it sent: a document asked for is read as one. A job
+    // restored after a reload has it from storage, with the job.
+    const response = lastRun.current?.runId === runId ? lastRun.current.response : job.response;
     void (async () => {
       try {
         const { envelope } = await connection.client.getResults(jobRef, { status: decided });

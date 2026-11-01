@@ -82,6 +82,8 @@ the versions are recorded here rather than left to a commit message.
                 eighteen and breinstein-area-what-if)                 2026-10-30
               execution/breinstein-{feature-area,aerial}-two-outputs-
                 {none,document,raw}.http  (finding 0027)              2026-10-31
+              jobs/breinstein-feature-area-document-async-{201,
+                results}.http  (finding 0027)                         2026-11-01
 
 The 2026-10-31 captures each have their request beside them as
 `*-request.json`, sent as the core sends it (`Accept: */*`). Two outputs by
@@ -91,6 +93,12 @@ one-element `outputs` array. `breinstein-aerial`'s JPEG is a base64 string
 inside `{value, mediaType, encoding}`, which pygeoapi serialises, so its
 `document` succeeds too (about 0.5 MB per capture). The 400 in finding 0027 is
 for a process that returns bytes.
+
+`jobs/breinstein-feature-area-document-async-*.http` is the same two-output
+request with `"response": "document"`, run in the background
+(`Prefer: respond-async`, request in `*-request.json`). It gets a 201, and
+`GET /jobs/{id}/results` once the job succeeds is the same
+`{"outputs": [map]}` wrapper.
 
 Each `execution/*.http` from 2026-10-26 has the body it answered beside it
 as `*-request.json`. `features/` holds pygeoapi's OGC API - Features answers

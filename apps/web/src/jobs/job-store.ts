@@ -39,6 +39,13 @@ export interface StoredJob {
   readonly followed?: true | undefined;
   /** ISO 8601: when this browser had the server cancel it (#31, #14e). Absent otherwise. */
   readonly cancelledAt?: string | undefined;
+  /**
+   * The `response` the execute request sent (`app/run.ts`, `responseFor`), so
+   * results read after a reload are read as what was asked: pygeoapi wraps a
+   * document job's results too (finding 0027). Absent when none was sent, and
+   * for every job stored before this was: the same thing, "not asked".
+   */
+  readonly response?: "document" | undefined;
 }
 
 export interface JobStore {
@@ -76,7 +83,7 @@ function isHttpUrl(value: string): boolean {
 /** One stored entry, or undefined when it is not one. */
 export function readStoredJob(value: unknown): StoredJob | undefined {
   if (!isRecord(value)) return undefined;
-  const { endpoint, statusUrl, processId, startedAt, followed, cancelledAt } = value;
+  const { endpoint, statusUrl, processId, startedAt, followed, cancelledAt, response } = value;
   if (
     typeof endpoint !== "string" ||
     typeof statusUrl !== "string" ||
@@ -89,8 +96,9 @@ export function readStoredJob(value: unknown): StoredJob | undefined {
   ) {
     return undefined;
   }
-  // Rebuilt from the four fields (and the flag and the time of a cancel), so
-  // nothing else stored alongside survives. A cancel time that is no time is dropped.
+  // Rebuilt from the four fields (and the flag, the time of a cancel and the
+  // response sent), so nothing else stored alongside survives. A cancel time
+  // that is no time is dropped, and so is any response but "document".
   return {
     endpoint,
     statusUrl,
@@ -100,6 +108,7 @@ export function readStoredJob(value: unknown): StoredJob | undefined {
     ...(typeof cancelledAt === "string" && !Number.isNaN(Date.parse(cancelledAt))
       ? { cancelledAt }
       : {}),
+    ...(response === "document" ? { response } : {}),
   };
 }
 

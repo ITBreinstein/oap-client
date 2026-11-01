@@ -1,0 +1,13 @@
+HTTP/1.1 201 CREATED
+Server: gunicorn
+Date: Sun, 01 Nov 2026 17:19:12 GMT
+Connection: keep-alive
+Content-Type: application/json
+X-Powered-By: pygeoapi 0.21.0
+Content-Language: en-US
+Preference-Applied: respond-async
+Location: http://localhost:5080/jobs/5b377c82-d618-11f1-99d8-d69c154369f5
+Access-Control-Allow-Origin: *
+Content-Length: 2
+
+{}
