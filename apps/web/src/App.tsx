@@ -8,9 +8,10 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
-import { createPortal } from "react-dom";
 import { PanelHandle } from "./app/PanelHandle.js";
 import { useWide } from "./app/useWide.js";
+import { SHEET_START, type SheetSize } from "./app/sheet.js";
+import { SheetHandle } from "./app/SheetHandle.js";
 import { PANEL_START } from "./app/panel-width.js";
 import type { Appearance } from "./app/appearance.js";
 import { AppearanceControl } from "./app/AppearanceControl.js";
@@ -108,7 +109,7 @@ export interface AppProps {
 
 export function App({ config = STATIC_ONLY, configWarning, appearance: initial }: AppProps) {
   const { relayUrl } = config;
-  const { appearance, setStyle, setTheme } = useAppearance(initial);
+  const { appearance, setTheme } = useAppearance(initial);
   // The local reference servers, in development only: `import.meta.env.DEV` is
   // `false` in a production build, and the list is dropped from the bundle.
   const presets = useMemo(
@@ -404,13 +405,22 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
   const updatedStyle = appearance.style === "instrument-updated";
   const wide = useWide();
   const [panelWidth, setPanelWidth] = useState(PANEL_START);
-  // STYLE TRIAL (#40): on a narrow screen the updated Instrument puts the map
-  // right under the result, not at the foot of the page.
-  const mapUnderResult = updatedStyle && !wide && state.stage === "result" && showMap;
-  const [mapSlot, setMapSlot] = useState<HTMLElement | undefined>();
-  const giveMapSlot = useCallback((element: HTMLDivElement | null) => {
-    setMapSlot(element ?? undefined);
-  }, []);
+  // On a phone the updated Instrument has the map fill the screen and the
+  // form in a sheet along its foot (`app/sheet.ts`). Drawing lowers the sheet
+  // to a strip, and Done raises it again; a result comes up at half height,
+  // so it and the map are both in view.
+  const sheetShown = updatedStyle && showMap && !wide;
+  const [sheet, setSheet] = useState<SheetSize>(SHEET_START);
+  const drawing = drawField !== undefined;
+  const [sheetFor, setSheetFor] = useState({ drawing, stage: state.stage, before: sheet });
+  if (sheetFor.drawing !== drawing || sheetFor.stage !== state.stage) {
+    let next = sheet;
+    if (drawing && !sheetFor.drawing) next = "peek";
+    else if (!drawing && sheetFor.drawing) next = sheetFor.before;
+    if (state.stage === "result" && sheetFor.stage !== "result" && next === "peek") next = "half";
+    setSheetFor({ drawing, stage: state.stage, before: drawing ? sheet : next });
+    if (next !== sheet) setSheet(next);
+  }
 
   let screen: ReactNode;
   switch (state.stage) {
@@ -492,7 +502,6 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
           observations={view.snapshot?.observations}
           backgroundUnfindable={backgroundUnfindable}
           onRelayForBackground={switchToRelay}
-          mapSlot={mapUnderResult ? giveMapSlot : undefined}
         />
       );
       break;
@@ -598,13 +607,7 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
                 // The rail stays in reach behind a side panel: its item closes
                 // the panel again, another opens that one instead.
                 inert={offerOpen}
-                appearance={
-                  <AppearanceControl
-                    appearance={appearance}
-                    onStyle={setStyle}
-                    onTheme={setTheme}
-                  />
-                }
+                appearance={<AppearanceControl appearance={appearance} onTheme={setTheme} />}
                 place={place}
                 onConnect={onConnect}
                 onProcesses={onProcesses}
@@ -658,6 +661,7 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
                 )}
                 <div
                   className={docked ? "layout" : "layout layout-single"}
+                  data-sheet={sheetShown ? sheet : undefined}
                   inert={behind}
                   // STYLE TRIAL (#36): the form's width, as the visitor set it.
                   style={
@@ -673,6 +677,7 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
                     ref={panel}
                     data-stage={state.stage}
                   >
+                    {sheetShown && <SheetHandle size={sheet} onSize={setSheet} />}
                     {state.stage !== "choose-endpoint" && state.route === "relay" && (
                       <RelayBanner />
                     )}
@@ -716,11 +721,7 @@ export function App({ config = STATIC_ONLY, configWarning, appearance: initial }
                       />
                     )}
                   </main>
-                  {showMap &&
-                    // STYLE TRIAL (#40): under the result on a narrow screen.
-                    (mapUnderResult
-                      ? mapSlot !== undefined && createPortal(mapElement, mapSlot)
-                      : mapElement)}
+                  {showMap && mapElement}
                   {updatedStyle && showMap && wide && (
                     <PanelHandle width={panelWidth} onWidth={setPanelWidth} />
                   )}

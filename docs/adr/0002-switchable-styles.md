@@ -144,6 +144,21 @@ Fixes that change nothing on screen (what screen readers are told, where
 focus goes) and plain bugs apply to both versions; only what changes how
 the app looks or reads is the update's.
 
+### The update chosen (2026-11-02)
+
+The updated version is what every visitor sees. The Appearance control has
+no "Style" group any more, only "Night mode", and a style saved while it
+had one is ignored: only the theme is saved now. `?style=instrument` still
+opens the earlier version, for comparison and for the tests written
+against it; nothing links to it. The code that tells the two apart stays
+until the steps under "Instrument or its update" are done.
+
+On a phone the update also puts the map behind the form: the map fills the
+screen and the form is a sheet along its foot, a strip, half or nearly all
+of the screen (`app/sheet.ts`, `app/SheetHandle.tsx`). That replaced the map
+under the result (#40). The page is one screen tall there and never scrolls
+as a whole, so the bar at the foot stays put.
+
 ## Consequences
 
 - The trial costs three stylesheets, six colour blocks and one branch in

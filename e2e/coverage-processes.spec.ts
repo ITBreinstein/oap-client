@@ -13,12 +13,20 @@ import { expect, test } from "./fixtures.js";
 import { RELAY } from "./servers.js";
 import { PDOK_LANE, requireService } from "./services.js";
 
+/**
+ * The Instrument as it was before the UI/UX review, which only the address
+ * asks for now: these steps were written against it (its Developer section
+ * without `?developer`, its words for the relay). The updated one has its own
+ * specs (`instrument-updated.spec.ts`, and both versions in `ux-fixes.spec.ts`).
+ */
+const EARLIER = "/?style=instrument";
+
 const PYGEOAPI = "http://localhost:5080";
 const PDOK_BAG = "https://api.pdok.nl/kadaster/bag/ogc/v2/collections/pand";
 
 /** Connect to a typed address, which is always reached directly. */
 async function connectTyped(page: Page) {
-  await page.goto("/");
+  await page.goto(EARLIER);
   const typed = page.getByRole("radio", { name: "Another service" });
   if (await typed.isVisible()) await typed.check();
   await page.getByRole("textbox", { name: "Service address" }).fill(PYGEOAPI);
@@ -27,7 +35,7 @@ async function connectTyped(page: Page) {
 
 /** Connect through the relay's configuration, which background runs need. */
 async function connectConfigured(page: Page) {
-  await page.goto("/");
+  await page.goto(EARLIER);
   await page.getByRole("radio", { name: /^pygeoapi-cors / }).check();
   await page.getByRole("button", { name: "Connect" }).click();
 }

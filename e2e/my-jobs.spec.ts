@@ -12,6 +12,14 @@ import { expect, test } from "@playwright/test";
 import { RELAY } from "./servers.js";
 import { requireService } from "./services.js";
 
+/**
+ * The Instrument as it was before the UI/UX review, which only the address
+ * asks for now: these steps were written against it (its Developer section
+ * without `?developer`, its words for the relay). The updated one has its own
+ * specs (`instrument-updated.spec.ts`, and both versions in `ux-fixes.spec.ts`).
+ */
+const EARLIER = "/?style=instrument";
+
 const PYGEOAPI = "http://localhost:5080";
 const STORAGE_KEY = "oap-client.jobs.v1";
 
@@ -24,7 +32,7 @@ test.describe("My jobs", () => {
   test("lists a background job, keeps it across a reload, and removes it for good", async ({
     page,
   }) => {
-    await page.goto("/");
+    await page.goto(EARLIER);
     await page.evaluate((key) => {
       localStorage.removeItem(key);
     }, STORAGE_KEY);
@@ -97,7 +105,7 @@ test.describe("My jobs", () => {
   test("a job removed while a reload is still on its way back to it stays removed", async ({
     page,
   }) => {
-    await page.goto("/");
+    await page.goto(EARLIER);
     await page.evaluate((key) => {
       localStorage.removeItem(key);
     }, STORAGE_KEY);

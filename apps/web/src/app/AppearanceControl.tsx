@@ -1,6 +1,6 @@
 /**
- * The Appearance control: a button, and a small popover with two groups of
- * radio buttons. A change applies at once; there is no Apply. Escape closes
+ * The Appearance control: a button, and a small popover with one group of
+ * radio buttons, for night mode. A change applies at once; there is no Apply. Escape closes
  * the popover and puts focus back on the button, as does choosing the button
  * again; a click elsewhere, or focus moving out of it, closes it and leaves
  * focus where it went.
@@ -9,25 +9,12 @@
  * bar at a phone's foot): the rail scrolls when it is taller than the window
  * (#41), and a scrolling box would clip anything that stands out of it.
  *
- * The "Style" group is a trial: once one is chosen, delete that fieldset
- * (and `STYLE_LABELS`), and keep "Night mode"
- * (`docs/adr/0002-switchable-styles.md`).
+ * The "Style" group it had while two versions were on trial is gone: the
+ * updated Instrument is the page's look (`docs/adr/0002-switchable-styles.md`).
  */
 
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
-import {
-  STYLE_NAMES,
-  THEME_PREFERENCES,
-  type Appearance,
-  type StyleName,
-  type ThemePreference,
-} from "./appearance.js";
-
-// STYLE TRIAL: delete with the "Style" fieldset once a style is chosen.
-const STYLE_LABELS: Readonly<Record<StyleName, string>> = {
-  instrument: "Instrument",
-  "instrument-updated": "Instrument (updated)",
-};
+import { THEME_PREFERENCES, type Appearance, type ThemePreference } from "./appearance.js";
 
 const THEME_LABELS: Readonly<Record<ThemePreference, string>> = {
   system: "Follow system",
@@ -37,7 +24,6 @@ const THEME_LABELS: Readonly<Record<ThemePreference, string>> = {
 
 export interface AppearanceControlProps {
   readonly appearance: Appearance;
-  readonly onStyle: (style: StyleName) => void;
   readonly onTheme: (theme: ThemePreference) => void;
   /** Extra class on the wrapper, so the frame can place it (header or rail). */
   readonly className?: string | undefined;
@@ -54,7 +40,7 @@ export function AppearanceIcon() {
 }
 
 export function AppearanceControl(props: AppearanceControlProps) {
-  const { appearance, onStyle, onTheme, className } = props;
+  const { appearance, onTheme, className } = props;
   const base = useId();
   const [open, setOpen] = useState(false);
   const button = useRef<HTMLButtonElement>(null);
@@ -177,24 +163,6 @@ export function AppearanceControl(props: AppearanceControlProps) {
           role="dialog"
           aria-label="Appearance"
         >
-          {/* STYLE TRIAL: delete this fieldset once a style is chosen. */}
-          <fieldset>
-            <legend>Style</legend>
-            {STYLE_NAMES.map((style) => (
-              <label key={style} className="choice">
-                <input
-                  type="radio"
-                  name={`${base}-style`}
-                  value={style}
-                  checked={appearance.style === style}
-                  onChange={() => {
-                    onStyle(style);
-                  }}
-                />{" "}
-                {STYLE_LABELS[style]}
-              </label>
-            ))}
-          </fieldset>
           <fieldset>
             <legend>Night mode</legend>
             {THEME_PREFERENCES.map((theme) => (

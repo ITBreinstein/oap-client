@@ -1,7 +1,7 @@
 /*
- * STYLE TRIAL: Instrument, updated after a UI/UX review, to compare with
- * Instrument as it is. Appearance → Style → "Instrument (updated)", or
- * `?style=instrument-updated`. Both versions are `data-style="instrument"`;
+ * STYLE TRIAL: Instrument, updated after a UI/UX review, and chosen
+ * (2026-11-02): every visitor has it; `?style=instrument` still opens the
+ * earlier version. Both versions are `data-style="instrument"`;
  * this one is also `data-variant="updated"`, and every rule here is under it.
  *
  * Once one is chosen: if the update wins, drop the `[data-variant="updated"]`
@@ -39,9 +39,9 @@
  * value is shown large, and the status line says "Finished" and how long it
  * took (`ResultsView`, `results/plain-value.ts`, `ProcessScreen` `ResultStrip`;
  * #27); the form beside the map can be made wider (`App.tsx`,
- * `app/PanelHandle.tsx`, `app/panel-width.ts`; #36); on a narrow screen the map is right under the
- * result, which links to it (`App.tsx` `mapUnderResult`, `ProcessScreen`
- * `mapSlot`; #40); the Developer section is there only with `?developer`
+ * `app/PanelHandle.tsx`, `app/panel-width.ts`; #36); on a phone the map
+ * fills the screen and the form is a sheet along its foot (`App.tsx`
+ * `sheetShown`, `app/sheet.ts`, `app/SheetHandle.tsx`); the Developer section is there only with `?developer`
  * (`App.tsx`, #38); a form leaves out a line of limits its description
  * already gives, and a yes/no box has "Yes" beside it (`FormFields.tsx`
  * `limitsSaid`, `labelId`; `forms/limits-stated.ts`; #14); JSON that doesn't
@@ -1091,30 +1091,6 @@
   }
 }
 
-/* ------------------------------------------------- the map under the result, narrow */
-
-/*
- * On a narrow screen the map is right under the result (#40; App.tsx
- * `mapUnderResult`), before what was sent and the developer section, and the
- * result links to it.
- */
-[data-variant="updated"] .map-slot {
-  margin: 16px 0 0;
-  scroll-margin-top: 8px;
-}
-
-[data-variant="updated"] .map-slot > .map-pane {
-  height: 60vh;
-  min-height: 20rem;
-  border: 1px solid var(--line-strong);
-  border-radius: var(--r-card);
-  overflow: hidden;
-}
-
-[data-variant="updated"] .show-on-map {
-  margin: 8px 0 0;
-}
-
 /* ------------------------------------------------- a short window */
 
 /*
@@ -1224,31 +1200,163 @@
   margin: 12px 0 0;
 }
 
+/* ------------------------------------------------- a phone: one screen, the map behind the form */
+
 /*
- * With the rail a bar at the foot (#14b): the picture reaches down to the
- * bar however short the page, rather than stopping above it on a grey band.
+ * The page is one screen tall and never scrolls as a whole: the bar at the
+ * foot is a row of the layout, not pinned over a page that scrolls under it,
+ * so a phone's toolbars growing and shrinking can't move it. What scrolls is
+ * the part above the bar. Without a map that is the layout itself, and a
+ * scrolling box's background stays where it is: the picture behind the start
+ * screen is still while its card moves.
  */
 @media (max-width: 52rem) {
+  html[data-variant="updated"],
+  [data-variant="updated"] body {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  [data-variant="updated"] .app {
+    height: 100vh;
+    height: 100dvh;
+    padding-bottom: 0;
+  }
+
+  [data-variant="updated"] .app-rail {
+    position: relative;
+    inset: auto;
+    order: 1;
+  }
+
+  [data-variant="updated"] .app-body {
+    flex: 1 1 0;
+  }
+
+  /* Over what is above the bar, not over the bar. */
+  [data-variant="updated"] .side-panel {
+    position: absolute;
+  }
+
   [data-variant="updated"] .layout-single {
-    min-height: calc(100vh - 64px);
-    min-height: calc(100dvh - 64px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  /*
+   * With a map: the map fills the screen and the form is a sheet along its
+   * foot, as in a maps app (`app/sheet.ts`). The map stops where the sheet
+   * starts, less the sheet's rounded top, so what it fits a result or a
+   * drawing into, and "Use the current map view", are what is in sight.
+   */
+  [data-variant="updated"] .layout[data-sheet] {
+    --sheet-overlap: 14px;
+    display: flex;
+    flex-direction: column;
+    overflow: clip;
+  }
+
+  [data-variant="updated"] .layout[data-sheet] > .map-pane {
+    flex: 1 1 0;
+    min-height: 0;
+    height: auto;
+  }
+
+  /* The map's scale and credit, clear of the sheet's top. */
+  [data-variant="updated"]
+    .layout[data-sheet]
+    > .map-pane
+    :is(.maplibregl-ctrl-bottom-left, .maplibregl-ctrl-bottom-right) {
+    margin-bottom: var(--sheet-overlap);
+  }
+
+  [data-variant="updated"] .layout[data-sheet] > .panel {
+    position: relative;
+    z-index: 5;
+    order: 1;
+    flex: none;
+    height: 50%;
+    margin-top: calc(-1 * var(--sheet-overlap));
+    padding-top: 0;
+    border-top: 1px solid var(--line-strong);
+    border-radius: 14px 14px 0 0;
+    box-shadow: var(--shadow-popover);
+    overscroll-behavior: contain;
+    /* What scrolls into view stops below the grip, not under it. */
+    scroll-padding-top: 40px;
+    transition: height 0.2s ease;
+  }
+
+  /* A strip with the process's name and Run; nearly all of the screen. */
+  [data-variant="updated"] .layout[data-sheet="peek"] > .panel {
+    height: 9.5rem;
+  }
+
+  [data-variant="updated"] .layout[data-sheet="full"] > .panel {
+    height: calc(100% - 4.5rem);
+  }
+
+  /* While a finger moves the sheet, it follows at once (`SheetHandle.tsx`). */
+  [data-variant="updated"] .layout[data-sheet-dragging] > .panel {
+    transition: none;
+  }
+
+  /* The grip: always at the sheet's top, however far the form has scrolled. */
+  [data-variant="updated"] .sheet-handle-region {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    margin: 0 -1.25rem 0.5rem;
+    background: var(--surface);
+  }
+
+  [data-variant="updated"] .sheet-handle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 28px;
+    min-height: 0;
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: 14px 14px 0 0;
+    box-shadow: none;
+    cursor: grab;
+    touch-action: none;
+  }
+
+  /* No button colour on a press or under the pointer: a grip is a grip. */
+  [data-variant="updated"] .sheet-handle:is(:hover, :active):not(:disabled) {
+    background: transparent;
+  }
+
+  [data-variant="updated"] .sheet-handle:hover::before {
+    background: var(--muted);
+  }
+
+  [data-variant="updated"] .sheet-handle::before {
+    content: "";
+    width: 40px;
+    height: 5px;
+    background: var(--line-strong);
+    border-radius: 3px;
+  }
+
+  [data-variant="updated"] .sheet-handle:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: -2px;
+  }
+
+  /* Drawing (#14d): Done and Clear across the map's top, the zoom buttons below them. */
+  [data-variant="updated"] .map-pane[data-drawing-here="true"] .maplibregl-ctrl-top-right {
+    margin-top: 3.75rem;
   }
 }
 
-/*
- * Drawing on a phone (#14d): the map fills the window above the bar at the
- * foot, so its lower edge (the scale, the attribution) is never under the
- * bar, and the page can bring its top, with Done and Clear, to the window's
- * top. The zoom buttons step down below Done and Clear.
- */
-@media (max-width: 52rem) {
-  [data-variant="updated"] .map-pane[data-drawing-here="true"] {
-    min-height: 0;
-    height: calc(100vh - 64px);
-    height: calc(100dvh - 64px);
-  }
-
-  [data-variant="updated"] .map-pane[data-drawing-here="true"] .maplibregl-ctrl-top-right {
-    margin-top: 3.75rem;
+@media (max-width: 52rem) and (prefers-reduced-motion: reduce) {
+  [data-variant="updated"] .layout[data-sheet] > .panel {
+    transition: none;
   }
 }

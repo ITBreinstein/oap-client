@@ -13,6 +13,13 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "../../src/App.js";
 
+/**
+ * The Instrument as it was before the UI/UX review, which only the address
+ * asks for now: what this file reads, the Developer section among it, is there
+ * without `?developer`.
+ */
+const EARLIER = { style: "instrument", theme: "light" } as const;
+
 const RELAY = "http://relay.test";
 
 let root: Root | undefined;
@@ -70,7 +77,7 @@ async function render(page: ReactNode) {
   });
 }
 
-const app = <App config={{ relayUrl: RELAY, presets: [] }} />;
+const app = <App config={{ relayUrl: RELAY, presets: [] }} appearance={EARLIER} />;
 
 describe("relay sessions per page", () => {
   it("opens one session and one stream", async () => {

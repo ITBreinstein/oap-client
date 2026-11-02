@@ -43,20 +43,23 @@ const throwingStorage: AppearanceStorage = {
 };
 
 describe("parseAppearance", () => {
-  it("starts from the defaults: the instrument style, following the system", () => {
-    expect(parseAppearance("", undefined)).toEqual({ style: "instrument", theme: "system" });
-    expect(DEFAULT_APPEARANCE).toEqual({ style: "instrument", theme: "system" });
+  it("starts from the defaults: the updated instrument, following the system", () => {
+    expect(parseAppearance("", undefined)).toEqual({
+      style: "instrument-updated",
+      theme: "system",
+    });
+    expect(DEFAULT_APPEARANCE).toEqual({ style: "instrument-updated", theme: "system" });
   });
 
-  it("takes the saved choice over the defaults", () => {
-    expect(parseAppearance("", { style: "instrument-updated", theme: "dark" })).toEqual({
+  it("takes the saved theme over the defaults, and never a saved style", () => {
+    expect(parseAppearance("", { style: "instrument", theme: "dark" })).toEqual({
       style: "instrument-updated",
       theme: "dark",
     });
   });
 
   it("takes the address over the saved choice, member by member", () => {
-    const saved = { style: "instrument-updated", theme: "dark" };
+    const saved = { theme: "dark" };
     expect(parseAppearance("?style=instrument", saved)).toEqual({
       style: "instrument",
       theme: "dark",
@@ -74,10 +77,7 @@ describe("parseAppearance", () => {
   it("ignores values it does not know, from either source, without a word", () => {
     expect(parseAppearance("?style=brutalist&theme=sepia", undefined)).toEqual(DEFAULT_APPEARANCE);
     expect(parseAppearance("?style=INSTRUMENT", undefined)).toEqual(DEFAULT_APPEARANCE);
-    expect(parseAppearance("?style=", { style: "instrument-updated" })).toEqual({
-      style: "instrument-updated",
-      theme: "system",
-    });
+    expect(parseAppearance("?style=", { style: "instrument" })).toEqual(DEFAULT_APPEARANCE);
     for (const stored of [
       null,
       42,
@@ -90,9 +90,9 @@ describe("parseAppearance", () => {
     }
   });
 
-  it("keeps a good member of a saved value whose other member is bad", () => {
+  it("keeps a good theme of a saved value whose other member is bad", () => {
     expect(parseAppearance("", { style: "nope", theme: "dark" })).toEqual({
-      style: "instrument",
+      style: "instrument-updated",
       theme: "dark",
     });
   });
@@ -117,14 +117,13 @@ describe("saved choice", () => {
     expect(readStoredAppearance(undefined)).toBeUndefined();
   });
 
-  it("writes only the member the user changed, so a style from the address stays out", () => {
+  it("writes the theme only, so a style from the address, or saved before, stays out", () => {
     const storage = memoryStorage({
       [APPEARANCE_STORAGE_KEY]: JSON.stringify({ style: "instrument", theme: "light" }),
     });
-    // The page was opened with ?style=instrument-updated; the user then turned night mode on.
+    // The page was opened with ?style=instrument; the user then turned night mode on.
     saveAppearanceChoice(storage, { theme: "dark" });
     expect(JSON.parse(storage.items.get(APPEARANCE_STORAGE_KEY) ?? "")).toEqual({
-      style: "instrument",
       theme: "dark",
     });
   });
@@ -132,10 +131,10 @@ describe("saved choice", () => {
   it("never throws when storage does", () => {
     expect(readStoredAppearance(throwingStorage)).toBeUndefined();
     expect(() => {
-      saveAppearanceChoice(throwingStorage, { style: "instrument-updated" });
+      saveAppearanceChoice(throwingStorage, { theme: "dark" });
     }).not.toThrow();
     expect(parseAppearance("?theme=dark", readStoredAppearance(throwingStorage))).toEqual({
-      style: "instrument",
+      style: "instrument-updated",
       theme: "dark",
     });
   });
@@ -216,21 +215,22 @@ describe("useAppearance", () => {
     });
     expect(view?.resolvedTheme).toBe("light");
     expect(JSON.parse(localStorage.getItem(APPEARANCE_STORAGE_KEY) ?? "")).toEqual({
-      style: "instrument",
       theme: "light",
     });
   });
 
-  it("changes the version at once, on <html> too: both are the instrument style", () => {
-    mount({ style: "instrument", theme: "dark" });
-    expect(document.documentElement.dataset["variant"]).toBe("current");
-    act(() => {
-      view?.setStyle("instrument-updated");
-    });
-    expect(view?.appearance).toEqual({ style: "instrument-updated", theme: "dark" });
+  it("writes the version on <html>: both are the instrument style", () => {
+    mount({ style: "instrument-updated", theme: "dark" });
     expect(document.documentElement.dataset["style"]).toBe("instrument");
     expect(document.documentElement.dataset["variant"]).toBe("updated");
     expect(document.documentElement.dataset["theme"]).toBe("dark");
+    act(() => {
+      root?.unmount();
+    });
+    // The earlier version, which only the address asks for.
+    mount({ style: "instrument", theme: "dark" });
+    expect(document.documentElement.dataset["style"]).toBe("instrument");
+    expect(document.documentElement.dataset["variant"]).toBe("current");
   });
 });
 
@@ -247,15 +247,13 @@ describe("the Appearance control", () => {
   it("applies a change at once, and Escape closes it with focus back on its button", () => {
     const host = document.createElement("div");
     document.body.append(host);
-    const onStyle = vi.fn();
     const onTheme = vi.fn();
     const created = createRoot(host);
     root = created;
     act(() => {
       created.render(
         <AppearanceControl
-          appearance={{ style: "instrument", theme: "system" }}
-          onStyle={onStyle}
+          appearance={{ style: "instrument-updated", theme: "system" }}
           onTheme={onTheme}
         />,
       );
@@ -266,15 +264,15 @@ describe("the Appearance control", () => {
     });
     expect(button?.getAttribute("aria-expanded")).toBe("true");
     const legends = [...host.querySelectorAll("legend")].map((legend) => legend.textContent);
-    expect(legends).toEqual(["Style", "Night mode"]);
+    // Night mode only: no choice of style.
+    expect(legends).toEqual(["Night mode"]);
+    expect(host.querySelector("input[value^='instrument']")).toBeNull();
     // Focus moved in, onto the choice already made.
-    expect(document.activeElement).toBe(host.querySelector("input[value='instrument']"));
+    expect(document.activeElement).toBe(host.querySelector("input[value='system']"));
 
     act(() => {
-      host.querySelector<HTMLInputElement>("input[value='instrument-updated']")?.click();
       host.querySelector<HTMLInputElement>("input[value='dark']")?.click();
     });
-    expect(onStyle).toHaveBeenCalledWith("instrument-updated");
     expect(onTheme).toHaveBeenCalledWith("dark");
 
     act(() => {
