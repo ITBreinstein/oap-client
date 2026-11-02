@@ -1,0 +1,1 @@
+{"inputs":{"features":{"value":{"type":"FeatureCollection","features":[{"type":"Feature","id":"block","properties":{"name":"a block in Utrecht"},"geometry":{"type":"Polygon","coordinates":[[[5.118,52.089],[5.124,52.089],[5.124,52.093],[5.118,52.093],[5.118,52.089]]]}}]},"mediaType":"application/geo+json"}},"outputs":{"features":{},"table":{}},"response":"raw"}

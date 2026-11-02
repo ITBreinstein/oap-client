@@ -124,11 +124,16 @@ export function stringArray(
 }
 
 /**
- * The OGC default when a server declares nothing: synchronous execution only.
+ * What this client assumes when a server declares no `jobControlOptions`:
+ * synchronous execution only.
  *
- * 18-062r2 §7.10: `jobControlOptions` defaults to `["sync-execute"]`. Getting
- * this backwards would have the UI offer an async button against a server that
- * cannot honour it.
+ * **Not defined by the standard.** Neither 18-062r2 nor the 2.0 draft gives
+ * `jobControlOptions` a default; its only schema, `jobControlOptions.yaml`, is
+ * an enum. Sync-only is this client's cautious reading, so the UI does not
+ * offer a background run a server may not honour, and `defaulted: true`
+ * records that it is an assumption. A request with no `Prefer` is safe either
+ * way: the server then picks the mode from its own job control options
+ * (`/req/core/process-execute-default-execution-mode`).
  */
 export const SYNC_EXECUTE = "sync-execute";
 export const ASYNC_EXECUTE = "async-execute";

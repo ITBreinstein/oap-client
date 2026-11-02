@@ -333,8 +333,9 @@ interface ProcessExecutionOptions {
 ```
 
 `defaulted` separates "the server told us sync-only" from "the server said
-nothing and the spec default is sync-only". The two look identical without it,
-and they are different statements.
+nothing and this client assumed sync-only". The two look identical without it,
+and they are different statements. The assumption is the client's, not the
+standard's: neither 1.0 nor the 2.0 draft gives `jobControlOptions` a default.
 
 ### Pagination is followed, with a ceiling
 
@@ -474,10 +475,15 @@ need to run against ZOO.**
 ### Arity is checked and never enforced
 
 Pass `description` and each supplied input is compared against the cardinality
-the server published — an array where `maxOccurs` is 1, a bare value where it is
-greater, a missing required input, an input the description does not declare.
-Each mismatch becomes a warning on the observation, and **the request is sent
-anyway**.
+the server published — an array where `maxOccurs` is 1 and the input's own
+schema does not take an array, a missing required input, an input the
+description does not declare. Each mismatch becomes a warning on the
+observation, and **the request is sent anyway**.
+
+A bare value where `maxOccurs` is greater than 1 is not a mismatch:
+`execute.yaml` lets any input take a single value. An array for an input whose
+schema is `type: "array"` (or has a `oneOf`/`anyOf` branch that is) is that
+input's one value, not several.
 
 Warning rather than blocking is the point. Neither reference server validates the
 cardinality it publishes — one leaks a Python traceback, the other stringifies
@@ -745,10 +751,10 @@ The default, 8 MiB, reads PDOK's 1.08 MB page of 815 buildings and stops a
 10.8 MB WFS response from ZOO about 16 KB past the limit. Pass an explicit
 `maxBufferBytes` to read more.
 
-### The job list, and why it is not a filter API
+### The job list, and its filters, which are checked
 
 ```ts
-const { jobs, truncated } = await client.listJobs({ limit: 20 });
+const { jobs, truncated } = await client.listJobs({ limit: 20, processID: ["slow"] });
 ```
 
 Follows `rel="next"` to a bounded depth, stopping on a cycle or the page cap and
@@ -756,10 +762,14 @@ setting `truncated` when it does. The two servers page differently — pygeoapi
 builds `next` with `offset=`, ZOO with `skip=` — which costs nothing, because
 the walk follows the advertised link rather than constructing one.
 
-There are deliberately **no `processID` or `status` arguments**. ZOO honours both
-query parameters; pygeoapi accepts them and silently ignores them, returning the
-full list either way. A filter that is silently ignored is worse than no filter,
-so the caller filters the returned array, which is correct everywhere.
+`processID` and `status` are sent as the `job-list` class defines them
+(Requirements 68–71), one query parameter per value, **and** applied to the
+returned list, which is correct everywhere. ZOO honours both; pygeoapi accepts
+them and silently ignores them, returning the full list either way. The
+`job-list` observation records what was sent (`filtersSent`), how many returned
+entries the filters excluded (`filteredOutCount`), and so whether the server
+applied them (`filtersHonoured`). A job that names no process, or whose status
+this client does not recognise, is kept: it may be the one wanted.
 
 One unreadable entry is skipped and counted rather than failing the page. That
 matters more than it sounds: in a browser against pygeoapi, an asynchronous
@@ -957,6 +967,15 @@ Where Weaver differs from the pinned draft:
 **Known limit:** the relay's asynchronous execute route sends a fixed
 `Prefer: respond-async`, so a `return=` preference would not pass through it.
 The client sends none, so nothing is lost today.
+
+**Known limit, 1.0:** the raw answer for outputs by reference, a `204` with a
+`Link` header per output (18-062r2 Requirement 30), is returned as its
+envelope and read no further: the core does not parse result bodies, and the
+web app does not read the `Link` headers. Cross-origin, a page could read them
+only if the server sent `Access-Control-Expose-Headers: Link`. On 1.0 the web
+app avoids the answer: it asks for `response: "document"` whenever any output
+is asked for by reference, and reads the links in the results document
+instead.
 
 Open issues on the draft that touch what is read here: #450 (`jobID` or `id`),
 #618 (`http` or `https` URIs), #619 (exception types) and #620 (dismissal).

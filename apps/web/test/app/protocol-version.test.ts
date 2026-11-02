@@ -28,6 +28,7 @@ function capabilities(overrides: Partial<ServiceCapabilities>): ServiceCapabilit
     dismiss: false,
     callback: false,
     jobList: false,
+    processDescription: true,
     protocolVersion: "1.0",
     versionSource: "declared",
     declaredVersions: ["1.0"],

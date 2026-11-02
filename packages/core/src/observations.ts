@@ -112,6 +112,8 @@ export type Observation =
       readonly dismiss: boolean;
       readonly callback: boolean;
       readonly jobList: boolean;
+      /** Whether `ogc-process-description` is declared. */
+      readonly processDescription: boolean;
       /**
        * The version of Part 1 the client will speak, chosen before anything is
        * sent. Spelled out rather than imported, so this module stays a leaf.
@@ -449,6 +451,20 @@ export type Observation =
       readonly numberTotal: number | undefined;
       /** Whether the server advertised `next` at all. */
       readonly advertisedPagination: boolean;
+      /** The filters asked of the server (`ListJobsOptions`), by parameter name. Empty when none. */
+      readonly filtersSent: readonly ("processID" | "status")[];
+      /**
+       * Entries the server returned that the filters exclude, dropped here.
+       * Above 0, the server did not apply what was sent (finding 0038).
+       */
+      readonly filteredOutCount: number;
+      /**
+       * `false` when the server returned a job the filters exclude; `true` when
+       * it returned none, which is what a server applying them does, though a
+       * list that happened to match would look the same. Undefined when no
+       * filter was sent.
+       */
+      readonly filtersHonoured: boolean | undefined;
     };
 
 export type ObservationKind = Observation["kind"];

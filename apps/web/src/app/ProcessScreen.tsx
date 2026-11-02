@@ -804,6 +804,14 @@ export function ProcessScreen(props: ProcessScreenProps) {
           The server did not state how this process can run; assuming synchronous.
         </p>
       )}
+      {/* /per/core/alternative-process-description: a server may describe its
+          processes another way, and say so by not declaring the class. */}
+      {!state.service.capabilities.processDescription && (
+        <p className="notice">
+          The service does not say its descriptions follow the OGC process description, so these
+          fields are this page's best reading of this one.
+        </p>
+      )}
       {warnings.length > 0 && (
         <div className="notice">
           <p>The description has problems this client worked around:</p>

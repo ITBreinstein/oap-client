@@ -27,6 +27,7 @@ import {
 import type { CrsSource, KnownCrs, Placement } from "./results/crs.js";
 import { placementOf } from "./results/plottable.js";
 import { xmlLabel, type ParsedAs } from "./results/sniff.js";
+import type { MultipartLeniency } from "./results/multipart.js";
 import type { RenderableResult } from "./results/renderable.js";
 import type { ExecuteRouteObservation } from "./relay/routed-fetch.js";
 
@@ -194,6 +195,25 @@ export interface ResultObservation {
    * What the page could read of it is `referenceOutcome`, as ever.
    */
   readonly shownAsImage?: true | undefined;
+  /**
+   * First record: the results document came inside a one-element `outputs`
+   * array, pygeoapi's answer to `response: "document"`, and was read as the
+   * document inside it (finding 0027). Absent otherwise.
+   */
+  readonly documentWrapper?: "outputs-array" | undefined;
+  /**
+   * First record: the output came as one part of a `multipart/related`
+   * answer, and these are the tolerances its framing needed
+   * (`results/multipart.ts`): `lf-line-endings`, `unquoted-boundary`, or
+   * none. Absent for an output that did not come in a multipart answer.
+   */
+  readonly multipartLenient?: readonly MultipartLeniency[] | undefined;
+  /**
+   * First record: why a download was not read, when it was for a reason other
+   * than its type or size. `multipart-unreadable` (finding 0073) or
+   * `two-media-types`.
+   */
+  readonly notReadBecause?: "multipart-unreadable" | "two-media-types" | undefined;
 }
 
 /**
@@ -227,6 +247,8 @@ export interface RunFacts {
   readonly linkOutputs: readonly string[];
   /** The media type asked for each output that was asked for one (#F3). */
   readonly formatsAsked?: Readonly<Record<string, string>> | undefined;
+  /** The `response` the run sent, when it sent one (`app/run.ts`, `responseFor`). */
+  readonly response?: "document" | undefined;
 }
 
 function declaredMediaType(result: RenderableResult): string | undefined {
@@ -286,6 +308,14 @@ export function resultObservations(
       axisSwapped: reference ? undefined : swappedBy(placementOf(result)),
       ...(reference ? {} : crsFacts(placementOf(result))),
       ...readFacts(result),
+      ...(result.documentWrapper === undefined ? {} : { documentWrapper: result.documentWrapper }),
+      ...(result.multipartLenient === undefined
+        ? {}
+        : { multipartLenient: result.multipartLenient }),
+      ...(result.kind === "download" &&
+      (result.reason === "multipart-unreadable" || result.reason === "two-media-types")
+        ? { notReadBecause: result.reason }
+        : {}),
     };
   });
 }

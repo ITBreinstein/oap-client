@@ -99,6 +99,7 @@ function row(change: Partial<JobRow>): JobRow {
     restored: false,
     followed: false,
     cancelledAt: undefined,
+    response: undefined,
     ...change,
   };
 }

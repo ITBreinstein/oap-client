@@ -101,6 +101,7 @@ describe("a job in My jobs, in the updated Instrument", () => {
     restored: false,
     followed: false,
     cancelledAt: undefined,
+    response: undefined,
   };
 
   it("has its title and status as a badge, then one labelled line per fact", () => {
@@ -169,6 +170,7 @@ describe("Run again in My jobs, in the updated Instrument", () => {
     restored: true,
     followed: false,
     cancelledAt: undefined,
+    response: undefined,
   };
 
   function panelWith(filled: boolean, busy: boolean) {

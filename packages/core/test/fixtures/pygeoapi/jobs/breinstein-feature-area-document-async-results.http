@@ -1,0 +1,60 @@
+HTTP/1.1 200 OK
+Server: gunicorn
+Date: Sun, 01 Nov 2026 17:19:20 GMT
+Connection: keep-alive
+Content-Type: application/json
+X-Powered-By: pygeoapi 0.21.0
+Content-Language: en-US
+Access-Control-Allow-Origin: *
+Content-Length: 1772
+
+{
+    "outputs": [
+        {
+            "features": {
+                "features": [
+                    {
+                        "geometry": {
+                            "coordinates": [
+                                [
+                                    [
+                                        5.118,
+                                        52.089
+                                    ],
+                                    [
+                                        5.124,
+                                        52.089
+                                    ],
+                                    [
+                                        5.124,
+                                        52.093
+                                    ],
+                                    [
+                                        5.118,
+                                        52.093
+                                    ],
+                                    [
+                                        5.118,
+                                        52.089
+                                    ]
+                                ]
+                            ],
+                            "type": "Polygon"
+                        },
+                        "id": "block",
+                        "properties": {
+                            "area_m2": 183029.64,
+                            "name": "a block in Utrecht"
+                        },
+                        "type": "Feature"
+                    }
+                ],
+                "source": {
+                    "by": "value"
+                },
+                "type": "FeatureCollection"
+            },
+            "table": "number,id,geometry,area_m2,name\n1,block,Polygon,183029.64,a block in Utrecht\n"
+        }
+    ]
+}

@@ -145,6 +145,52 @@ function executionRecords(of: JobSession): ExecutionObservation[] {
   );
 }
 
+describe("the response a session's run sends", () => {
+  it("sends the response it is given, and the core records it", async () => {
+    const bodies: unknown[] = [];
+    stubNetwork({ directExecute: "created" });
+    const stubbed = globalThis.fetch;
+    vi.stubGlobal("fetch", (input: string | URL | Request, init?: RequestInit) => {
+      if ((init?.method ?? "GET").toUpperCase() === "POST" && typeof init?.body === "string") {
+        bodies.push(JSON.parse(init.body));
+      }
+      return stubbed(input, init);
+    });
+    session = createJobSession(RELAY);
+
+    await session.run(
+      DIRECT,
+      "slow",
+      { seconds: 1 },
+      { a: {}, b: {} },
+      undefined,
+      "direct",
+      "document",
+    );
+
+    expect(bodies).toMatchObject([{ response: "document" }]);
+    expect(executionRecords(session)).toMatchObject([{ requestedResponse: "document" }]);
+  });
+
+  it("sends no response when it is given none", async () => {
+    const bodies: unknown[] = [];
+    stubNetwork({ directExecute: "created" });
+    const stubbed = globalThis.fetch;
+    vi.stubGlobal("fetch", (input: string | URL | Request, init?: RequestInit) => {
+      if ((init?.method ?? "GET").toUpperCase() === "POST" && typeof init?.body === "string") {
+        bodies.push(JSON.parse(init.body));
+      }
+      return stubbed(input, init);
+    });
+    session = createJobSession(RELAY);
+
+    await session.run(DIRECT, "slow", { seconds: 1 }, { a: {} });
+
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0]).not.toHaveProperty("response");
+  });
+});
+
 describe("the route on a session's execution records (W13, finding 0039)", () => {
   it("tags an asynchronous run the relay named as relay, though the core read Location", async () => {
     stubNetwork({ directExecute: "created" });

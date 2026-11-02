@@ -91,6 +91,10 @@ describe.skipIf(!zooUp)("ZOO-Project discovery", () => {
       dismiss: true,
       callback: true,
       jobList: true,
+      processDescription: true,
+      protocolVersion: "1.0",
+      versionSource: "declared",
+      declaredVersions: ["1.0"],
       rawConformance: conformanceFixture.conformsTo,
     });
   });

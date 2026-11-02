@@ -75,6 +75,15 @@ export interface ServiceCapabilities {
    */
   readonly jobList: boolean;
   /**
+   * Whether the service declares the `ogc-process-description` class: that
+   * its process descriptions follow the OGC model a generated form is built
+   * from. A server MAY describe its processes another way
+   * (`/per/core/alternative-process-description`), and a form read from one is
+   * then a best reading. Not declared is not the same as not followed: all four
+   * servers seen so far declare it.
+   */
+  readonly processDescription: boolean;
+  /**
    * The version of Part 1 the client speaks to this service, chosen before
    * anything is sent. See `conformance/version.ts` for the rules.
    */
@@ -120,6 +129,7 @@ export function deriveCapabilities(
     dismiss: declares(parsed, "dismiss"),
     callback: declares(parsed, "callback"),
     jobList: declares(parsed, "job-list"),
+    processDescription: declares(parsed, "ogc-process-description"),
     protocolVersion: version,
     versionSource: source,
     declaredVersions: declaredCoreVersions(parsed),
@@ -144,6 +154,7 @@ export function unknownCapabilities(
     dismiss: false,
     callback: false,
     jobList: false,
+    processDescription: false,
     protocolVersion: version,
     versionSource: source,
     declaredVersions: Object.freeze([]),

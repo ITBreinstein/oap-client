@@ -147,6 +147,17 @@ describe("a broken conformance document", () => {
   });
 });
 
+describe("ogc-process-description (/per/core/alternative-process-description)", () => {
+  it("is read when declared, as all four servers seen so far do", () => {
+    expect(capabilitiesFor(FULL_V1).processDescription).toBe(true);
+    expect(capabilitiesFor(fixture.conformsTo).processDescription).toBe(true);
+  });
+
+  it("is false when not declared: the descriptions may follow another model", () => {
+    expect(capabilitiesFor([`${SPEC}/core`, `${SPEC}/json`]).processDescription).toBe(false);
+  });
+});
+
 describe("unknownCapabilities", () => {
   it("claims nothing at all", () => {
     expect(unknownCapabilities()).toEqual({
@@ -155,6 +166,7 @@ describe("unknownCapabilities", () => {
       dismiss: false,
       callback: false,
       jobList: false,
+      processDescription: false,
       // Nothing declared is not "no version": 1.0, the published standard, by default.
       protocolVersion: "1.0",
       versionSource: "default",

@@ -1,0 +1,1 @@
+{"inputs":{"area":{"value":{"type":"Polygon","coordinates":[[[5.1,52.08],[5.14,52.08],[5.14,52.1],[5.1,52.1],[5.1,52.08]]]},"mediaType":"application/geo+json"}},"outputs":{"image":{},"bbox":{}},"response":"raw"}

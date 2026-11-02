@@ -39,6 +39,7 @@ import {
   defaultFilename,
   isCsv,
   textFilename,
+  type DownloadReason,
   type RenderableResult,
 } from "../results/renderable.js";
 
@@ -271,7 +272,7 @@ function ResultItem({
           <strong>{result.outputId}</strong>{" "}
           <span className="muted">
             {result.mediaType ?? "unknown type"}, {sizeLabel(result.blob.size)}
-            {result.reason === "too-large" ? " — too large to show here" : ""}
+            {DOWNLOAD_REASONS[result.reason]}
           </span>
           <br />
           <span className="muted">{filename}</span>
@@ -283,6 +284,14 @@ function ResultItem({
     </article>
   );
 }
+
+/** Said after a download's type and size, when it was not shown for a reason worth saying. */
+const DOWNLOAD_REASONS: Readonly<Record<DownloadReason, string>> = {
+  "not-text": "",
+  "too-large": " — too large to show here",
+  "multipart-unreadable": " — sent in parts this page could not tell apart",
+  "two-media-types": " — labelled as two different types at once, so not opened",
+};
 
 /**
  * A text result as it came. Its lines can be wider than the panel (GML and KML

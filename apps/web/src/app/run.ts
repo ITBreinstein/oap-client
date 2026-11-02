@@ -10,6 +10,7 @@ import {
   ProcessesError,
   type ExecuteOutputSelection,
   type ProcessDescription,
+  type ProtocolVersion,
 } from "@breinstein/oap-client";
 import { toExecuteBody, type EncodeNote, type FormValues } from "../forms/encode.js";
 import type { FieldPlan, FormPlan } from "../forms/plan.js";
@@ -54,6 +55,35 @@ export function outputSelection(
       ];
     }),
   );
+}
+
+/**
+ * The `response` a run sends: `"document"` on a 1.0 service when two or more
+ * outputs, or any output by reference, are asked for, and nothing otherwise.
+ *
+ * 1.0 makes `raw` the default (18-062r2 §7.11.2.4). Raw with several outputs
+ * is `multipart/related` (Requirement 29), and raw by reference is a 204 with
+ * `Link` headers (Requirement 30). This page shows a results document; a
+ * multipart body it reads only as a fallback (`results/multipart.ts`), and a
+ * 204 not at all. So it asks for the document in exactly those cases. One
+ * output by value stays raw, so a PNG still arrives as a PNG.
+ *
+ * Both reference servers hid the need: ZOO answers a document when nothing
+ * is asked (finding 0072), and pygeoapi's processes choose their own raw form
+ * (finding 0027). The Beleidsnormen API follows the default and answered
+ * `multipart/related`.
+ *
+ * Nothing on the 2.0 draft: the number of outputs decides the form there, and
+ * the core translates or refuses a `response` itself.
+ */
+export function responseFor(
+  version: ProtocolVersion,
+  outputs: Readonly<Record<string, ExecuteOutputSelection>>,
+): "document" | undefined {
+  if (version !== "1.0") return undefined;
+  const selections = Object.values(outputs);
+  const byReference = selections.some((selection) => selection.transmissionMode === "reference");
+  return selections.length >= 2 || byReference ? "document" : undefined;
 }
 
 /**
