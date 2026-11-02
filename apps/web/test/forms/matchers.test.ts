@@ -153,6 +153,62 @@ const cases: readonly { name: string; schema: unknown; expected: Control }[] = [
     },
   },
   {
+    name: "the GeoJSON media type, its type pinned to FeatureCollection",
+    schema: {
+      type: "object",
+      contentMediaType: "application/geo+json",
+      properties: { type: { type: "string", enum: ["FeatureCollection"] } },
+    },
+    expected: {
+      kind: "geometry",
+      wrapper: "feature-collection",
+      geometryTypes: ALL_GEOMETRIES,
+      recognisedBy: "contentMediaType",
+    },
+  },
+  {
+    name: "the GeoJSON media type, its type a const Feature",
+    schema: {
+      type: "object",
+      contentMediaType: "application/geo+json",
+      properties: { type: { const: "Feature" } },
+    },
+    expected: {
+      kind: "geometry",
+      wrapper: "feature",
+      geometryTypes: ALL_GEOMETRIES,
+      recognisedBy: "contentMediaType",
+    },
+  },
+  {
+    name: "the GeoJSON media type, its type pinned to Polygon",
+    schema: {
+      type: "object",
+      contentMediaType: "application/geo+json",
+      properties: { type: { type: "string", enum: ["Polygon"] } },
+    },
+    expected: {
+      kind: "geometry",
+      wrapper: "geometry",
+      geometryTypes: ["Polygon"],
+      recognisedBy: "contentMediaType",
+    },
+  },
+  {
+    name: "the GeoJSON media type, its type allowing two names",
+    schema: {
+      type: "object",
+      contentMediaType: "application/geo+json",
+      properties: { type: { type: "string", enum: ["Feature", "FeatureCollection"] } },
+    },
+    expected: {
+      kind: "geometry",
+      wrapper: "geometry",
+      geometryTypes: ALL_GEOMETRIES,
+      recognisedBy: "contentMediaType",
+    },
+  },
+  {
     // Changed: the plan now also records the default CRS (R5) and the
     // coordinate counts (R4). A bare format hint means bbox.yaml: CRS84 by
     // default, four or six numbers.

@@ -11,6 +11,7 @@
 
 import { describe, expect, it } from "vitest";
 import { toExecuteBody } from "../../src/forms/encode.js";
+import { toGeoJson } from "../../src/forms/geometry.js";
 import { resolveFormPlan } from "../../src/forms/resolve.js";
 import { controlFor, fixtureProcess, planFor } from "./helpers.js";
 
@@ -259,6 +260,58 @@ describe("#G3: GeoJSON told by its structure", () => {
         },
       }),
     ).toMatchObject({ kind: "geometry", wrapper: "feature" });
+  });
+});
+
+describe("the GeoJSON media type with a pinned type", () => {
+  // Observed on a server in the testbed: the media type, and a `type` that
+  // allows only FeatureCollection. Its features' items name no type, so the
+  // structural reading (#G3) does not apply; the media type is what says GeoJSON.
+  const AREA = {
+    type: "object",
+    contentMediaType: "application/geo+json",
+    properties: {
+      type: { type: "string", enum: ["FeatureCollection"] },
+      features: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: { type: { type: "string" } },
+          required: ["type"],
+        },
+        minItems: 1,
+      },
+    },
+    required: ["type", "features"],
+  };
+
+  it("sends a drawn polygon inside a FeatureCollection, as a qualified value", () => {
+    const plan = planFor({ geojson: { schema: AREA } });
+    const control = plan.fields.find((field) => field.id === "geojson")?.control;
+    expect(control).toMatchObject({ kind: "geometry", wrapper: "feature-collection" });
+    if (control?.kind !== "geometry") throw new Error("not a geometry control");
+
+    const polygon = {
+      type: "Polygon" as const,
+      coordinates: [
+        [
+          [5.1, 52.1],
+          [5.2, 52.1],
+          [5.2, 52.2],
+          [5.1, 52.1],
+        ],
+      ],
+    };
+    const { geojson } = toGeoJson(control, [polygon]);
+    expect(toExecuteBody(plan, { geojson: { geojson: JSON.stringify(geojson) } }).inputs).toEqual({
+      geojson: {
+        value: {
+          type: "FeatureCollection",
+          features: [{ type: "Feature", properties: {}, geometry: polygon }],
+        },
+        mediaType: "application/geo+json",
+      },
+    });
   });
 });
 

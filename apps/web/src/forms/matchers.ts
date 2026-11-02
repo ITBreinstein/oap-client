@@ -307,12 +307,15 @@ const matchGeometry: Matcher = (schema) => {
   if (inAllOf !== undefined) return { kind: "geometry", ...inAllOf, recognisedBy: "allOf" };
 
   // A media type alone does not say whether the server wants a bare geometry or
-  // a feature. We assume a geometry; which servers disagree is a finding.
+  // a feature. A `type` property pinned to one GeoJSON type does: a schema that
+  // allows only `FeatureCollection` gets one. Otherwise we assume a geometry;
+  // which servers disagree is a finding.
   if (readString(schema, "contentMediaType") === GEOJSON_MEDIA_TYPE) {
+    const name = typeNameOf(schema);
+    const byName = name === undefined ? undefined : hintFromTypeName(name);
     return {
       kind: "geometry",
-      wrapper: "geometry",
-      geometryTypes: GEOMETRY_TYPES,
+      ...(byName ?? { wrapper: "geometry", geometryTypes: GEOMETRY_TYPES }),
       recognisedBy: "contentMediaType",
     };
   }
