@@ -897,7 +897,7 @@ for (const style of STYLES) {
 
 test("#37 the tab's title says where the page is", async ({ page }) => {
   await open(page, "instrument");
-  await expect(page).toHaveTitle("Connect · Breinstein");
+  await expect(page).toHaveTitle("OAP client · Breinstein");
   await connectTyped(page);
   await expect(page).toHaveTitle(/^Processes · \S/);
   const serviceName = (await page.title()).replace(/^Processes · /, "");

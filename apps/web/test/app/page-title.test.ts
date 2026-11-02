@@ -8,7 +8,7 @@ import { pageTitle } from "../../src/app/titles.js";
 
 describe("pageTitle", () => {
   it("names each stage", () => {
-    expect(pageTitle({ stage: "choose-endpoint" })).toBe("Connect · Breinstein");
+    expect(pageTitle({ stage: "choose-endpoint" })).toBe("OAP client · Breinstein");
     expect(pageTitle({ stage: "connected", service: "pygeoapi" })).toBe("Processes · pygeoapi");
     expect(pageTitle({ stage: "process", service: "pygeoapi", process: "Slow process" })).toBe(
       "Slow process · pygeoapi",

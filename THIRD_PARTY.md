@@ -107,10 +107,13 @@ credited on screen as its licence requires.
 
 The Breinstein logo and wordmark, drawn inline in
 `apps/web/src/app/BrandMark.tsx` from files Breinstein supplied, are
-Breinstein's trademarks. They are not covered by this project's MIT licence
-and may not be reused without Breinstein's permission. A fork or a deployment
-by anyone else removes them, with `BrandMark.tsx` and the places it is used
-(the rail, the start card and the About panel in the instrument style).
+Breinstein's trademarks. So is the favicon, `apps/web/public/favicon.svg`: the
+B of the wordmark on Breinstein's navy. They are not covered by this project's MIT
+licence and may not be reused without Breinstein's permission. A fork or a
+deployment by anyone else removes them, with `BrandMark.tsx` and the places it
+is used (the rail, the start card and the About panel in the instrument style),
+the favicon and its `<link>` in `apps/web/index.html`, and "Breinstein" in the
+start screen's tab title (`apps/web/src/app/titles.ts`).
 
 ## 6. Imagery in the web app
 

@@ -128,7 +128,7 @@ export type TitledPlace =
 export function pageTitle(place: TitledPlace): string {
   switch (place.stage) {
     case "choose-endpoint":
-      return "Connect · Breinstein";
+      return "OAP client · Breinstein";
     case "connected":
       return `Processes · ${place.service}`;
     case "process":
