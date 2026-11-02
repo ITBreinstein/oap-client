@@ -23,6 +23,14 @@ import { expect, test, type Page } from "@playwright/test";
 import { RELAY } from "./servers.js";
 import { requireService } from "./services.js";
 
+/**
+ * The Instrument as it was before the UI/UX review, which only the address
+ * asks for now: these steps were written against it (its Developer section
+ * without `?developer`, its words for the relay). The updated one has its own
+ * specs (`instrument-updated.spec.ts`, and both versions in `ux-fixes.spec.ts`).
+ */
+const EARLIER = "/?style=instrument";
+
 const PYGEOAPI = "http://localhost:5080";
 
 async function observations(page: Page): Promise<{ kind: string; [key: string]: unknown }[]> {
@@ -52,7 +60,7 @@ test.describe("the asynchronous milestone", () => {
   });
 
   test("callback, doorbell, poll, result — end to end", async ({ page }) => {
-    await page.goto("/");
+    await page.goto(EARLIER);
     // Callbacks are asked for only while the doorbell stream is open.
     await expect(page.locator(".app")).toHaveAttribute("data-relay-stream", "open", {
       timeout: 15_000,
@@ -109,7 +117,7 @@ test.describe("the asynchronous milestone", () => {
   }) => {
     // The stream cannot open; everything else on the relay still answers.
     await page.route(`${RELAY}/sessions/events`, (route) => route.abort());
-    await page.goto("/");
+    await page.goto(EARLIER);
     await expect(page.locator(".app")).toHaveAttribute("data-relay-stream", /connecting|waiting/);
 
     await runSlowInBackground(page);

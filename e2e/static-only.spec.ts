@@ -13,6 +13,14 @@ import { expect, test } from "@playwright/test";
 import { RELAY } from "./servers.js";
 import { requireService } from "./services.js";
 
+/**
+ * The Instrument as it was before the UI/UX review, which only the address
+ * asks for now: these steps were written against it (its Developer section
+ * without `?developer`, its words for the relay). The updated one has its own
+ * specs (`instrument-updated.spec.ts`, and both versions in `ux-fixes.spec.ts`).
+ */
+const EARLIER = "/?style=instrument";
+
 const PYGEOAPI = "http://localhost:5080";
 /** The relay's routes, anywhere, and the path the static site keeps free for it. */
 const RELAY_PATH = /^\/(api|endpoints|sessions|execute|read|callbacks)(\/|$)/;
@@ -34,7 +42,7 @@ test.describe("the static site, without a relay", () => {
       route.fulfill({ contentType: "application/json", body: '{"relay":null,"presets":[]}' }),
     );
 
-    await page.goto("/");
+    await page.goto(EARLIER);
     await expect(page.getByTestId("static-only")).toContainText("without the relay");
     await expect(page.getByTestId("config-warning")).toHaveCount(0);
 
@@ -62,7 +70,7 @@ test.describe("the static site, without a relay", () => {
     });
     await page.route("**/config.json", (route) => route.fulfill({ status: 404, body: "" }));
 
-    await page.goto("/");
+    await page.goto(EARLIER);
     await expect(page.getByTestId("config-warning")).toContainText("missing");
     await expect(page.getByTestId("static-only")).toBeVisible();
     expect(relayRequests).toEqual([]);

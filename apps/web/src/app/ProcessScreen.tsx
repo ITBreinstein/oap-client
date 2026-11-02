@@ -5,7 +5,6 @@
 
 import { redactUrl } from "@breinstein/oap-client";
 import {
-  useCallback,
   useContext,
   useEffect,
   useId,
@@ -597,11 +596,6 @@ export interface ProcessScreenProps {
    * reconnect that way, to this process, the form as it is (#25).
    */
   readonly onRelayForBackground?: (() => void) | undefined;
-  /**
-   * STYLE TRIAL (#40): on a narrow screen, where the map goes, right under
-   * the result: the element is handed to this, and the result links to it.
-   */
-  readonly mapSlot?: ((element: HTMLDivElement | null) => void) | undefined;
 }
 
 /** After this long, a foreground run that may go in the background says so. */
@@ -722,16 +716,6 @@ export function ProcessScreen(props: ProcessScreenProps) {
   useEffect(() => {
     submitted.current = false;
   }, [state.stage]);
-
-  // STYLE TRIAL (#40): the map's place under the result, on a narrow screen.
-  const giveMapSlot = props.mapSlot;
-  const mapHere = giveMapSlot !== undefined;
-  const mapSlotRef = useCallback(
-    (element: HTMLDivElement | null) => {
-      giveMapSlot?.(element);
-    },
-    [giveMapSlot],
-  );
 
   // Cancel job asks first (#31); the question goes with the run.
   const [confirmingCancel, setConfirmingCancel] = useState(false);
@@ -959,28 +943,7 @@ export function ProcessScreen(props: ProcessScreenProps) {
             execution={lastExecution(observations, endpointKey, process.id)}
             spared={spared}
           />
-          {mapHere && (
-            <p className="show-on-map">
-              {/* A button, not a #fragment link: that would be a step in the
-                  page's history, which Back reads as leaving the result. */}
-              <button
-                type="button"
-                className="link"
-                onClick={() => {
-                  const map = document.getElementById("result-map");
-                  map?.scrollIntoView({ block: "start" });
-                  map?.focus({ preventScroll: true });
-                }}
-              >
-                Show on the map
-              </button>
-            </p>
-          )}
         </div>
-      )}
-      {/* STYLE TRIAL (#40): the map, right under the result, on a narrow screen. */}
-      {state.stage === "result" && mapHere && (
-        <div id="result-map" className="map-slot" ref={mapSlotRef} tabIndex={-1} />
       )}
       {state.stage === "result" && (
         <p className="actions next-steps">

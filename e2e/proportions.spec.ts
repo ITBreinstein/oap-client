@@ -392,7 +392,7 @@ test.describe("proportions", () => {
         expect(widths).toEqual(updated ? { result: 332, json: 306 } : { result: 300, json: 274 });
       });
 
-      test(`the Appearance menu ${updated ? "has one rule between its groups, above the name" : "keeps its boxes"} (#13a)`, async ({
+      test(`the Appearance menu has one group, Night mode, ${updated ? "with no box round it" : "in its box"} (#13a)`, async ({
         page,
       }) => {
         await open(page, style);
@@ -412,17 +412,10 @@ test.describe("proportions", () => {
             };
           }),
         );
-        expect(groups).toHaveLength(2);
-        if (!updated) {
-          for (const group of groups) expect(group.borders).toEqual(["1px", "1px"]);
-          return;
-        }
-        expect(groups[0]?.borders).toEqual(["0px", "0px"]);
-        expect(groups[1]?.borders).toEqual(["1px", "0px"]);
-        // A straight rule: no corner for it to curl round.
-        expect(groups[1]?.radius).toBe("0px");
-        // Under the rule, after the 12px padding: not on it.
-        expect(groups[1]?.nameBelowTop).toBeGreaterThanOrEqual(12);
+        // The Style group is gone: the updated Instrument is chosen.
+        expect(groups).toHaveLength(1);
+        await expect(page.locator(".appearance-popover legend")).toHaveText("Night mode");
+        expect(groups[0]?.borders).toEqual(updated ? ["0px", "0px"] : ["1px", "1px"]);
       });
 
       test("what lies over the map keeps one inset, as its zoom buttons do (#13c)", async ({

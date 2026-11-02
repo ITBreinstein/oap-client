@@ -10,6 +10,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "../../src/App.js";
 import { STATIC_ONLY, type RuntimeConfig } from "../../src/config/runtime-config.js";
 
+/**
+ * The Instrument as it was before the UI/UX review, which only the address
+ * asks for now: what this file reads, the Developer section among it, is there
+ * without `?developer`.
+ */
+const EARLIER = { style: "instrument", theme: "light" } as const;
+
 const relayClients = vi.hoisted((): { made: string[] } => ({ made: [] }));
 
 vi.mock("../../src/relay/relay-client.js", async (importOriginal) => {
@@ -52,7 +59,7 @@ async function render(config: RuntimeConfig, configWarning?: string): Promise<HT
   const created = createRoot(host);
   root = created;
   await act(async () => {
-    created.render(<App config={config} configWarning={configWarning} />);
+    created.render(<App config={config} configWarning={configWarning} appearance={EARLIER} />);
     await Promise.resolve();
   });
   return host;

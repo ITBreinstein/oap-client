@@ -1,7 +1,7 @@
 /**
- * The page's appearance as React state: the style and theme chosen
- * (`appearance.ts`), the theme that is actually on, and the two setters the
- * Appearance control calls.
+ * The page's appearance as React state: the style and theme
+ * (`appearance.ts`), the theme that is actually on, and the setter the
+ * Appearance control calls. The style comes from the address only.
  *
  * The system's light or dark setting is read with `useSyncExternalStore`, so
  * a change in the operating system's setting re-renders the page while the
@@ -22,7 +22,6 @@ import {
   systemPrefersDark,
   type Appearance,
   type ResolvedTheme,
-  type StyleName,
   type ThemePreference,
 } from "./appearance.js";
 import {
@@ -52,7 +51,6 @@ export interface AppearanceView {
   readonly appearance: Appearance;
   /** The theme on screen: the preference, with "system" resolved. */
   readonly resolvedTheme: ResolvedTheme;
-  readonly setStyle: (style: StyleName) => void;
   readonly setTheme: (theme: ThemePreference) => void;
 }
 
@@ -92,15 +90,10 @@ export function useAppearance(initial?: Appearance): AppearanceView {
     return prefetchOtherBackdrop(resolvedTheme);
   }, [resolvedTheme]);
 
-  const setStyle = useCallback((style: StyleName) => {
-    setAppearance((current) => ({ ...current, style }));
-    saveAppearanceChoice(browserStorage(), { style });
-  }, []);
-
   const setTheme = useCallback((theme: ThemePreference) => {
     setAppearance((current) => ({ ...current, theme }));
     saveAppearanceChoice(browserStorage(), { theme });
   }, []);
 
-  return { appearance, resolvedTheme, setStyle, setTheme };
+  return { appearance, resolvedTheme, setTheme };
 }

@@ -787,7 +787,7 @@ for (const size of [
 ]) {
   for (const style of STYLES) {
     const updated = style === "instrument-updated";
-    test(`#40 at ${String(size.width)}×${String(size.height)}, the map ${updated ? "is right under the result" : "stays at the foot"} (${style})`, async ({
+    test(`#40 at ${String(size.width)}×${String(size.height)}, the map ${updated ? "is above the result's sheet" : "stays at the foot"} (${style})`, async ({
       page,
     }) => {
       await page.setViewportSize(size);
@@ -796,29 +796,86 @@ for (const size of [
       await openProcess(page, "Area of each feature");
       await page.getByRole("textbox", { name: "Value (JSON)" }).fill(JSON.stringify(TWO_PLOTS));
       await page.getByRole("button", { name: "Run", exact: true }).click();
-      await expect(page.locator('[data-output-id="table"]')).toBeVisible({ timeout: 30_000 });
+      const table = page.locator('[data-output-id="table"]');
+      await expect(table).toBeVisible({ timeout: 30_000 });
       const map = page.locator(".map-pane");
       await expect(map).toHaveCount(1);
-      const showOnMap = page.getByRole("button", { name: "Show on the map" });
-      if (!updated) {
-        await expect(page.locator(".map-slot")).toHaveCount(0);
-        await expect(showOnMap).toHaveCount(0);
-        return;
-      }
-      // Under the result, before what was sent.
-      await expect(page.locator(".result-block + .map-slot > .map-pane")).toHaveCount(1);
-      const [mapBox, sentBox] = await Promise.all([
+      // No link down to the map, and no second place for it, in either version.
+      await expect(page.getByRole("button", { name: "Show on the map" })).toHaveCount(0);
+      await expect(page.locator(".map-slot")).toHaveCount(0);
+      if (!updated) return;
+      // The map above, the result in the sheet below it, both in sight at once.
+      await expect(page.locator(".layout")).toHaveAttribute("data-sheet", "half");
+      await expect(map).toBeInViewport({ ratio: 0.9 });
+      await expect(page.locator(".result-block")).toBeInViewport();
+      const [mapBox, sheetBox] = await Promise.all([
         map.boundingBox(),
-        page.getByTestId("sent-inputs").boundingBox(),
+        page.locator("main.panel").boundingBox(),
       ]);
-      expect((mapBox?.y ?? 0) < (sentBox?.y ?? 0)).toBe(true);
-      await showOnMap.click();
-      await expect(map).toBeInViewport({ ratio: 0.5 });
-      // Still the result: the button is no step in the page's history.
-      await expect(page.locator('[data-output-id="table"]')).toBeVisible();
+      expect((mapBox?.y ?? 0) < (sheetBox?.y ?? 0)).toBe(true);
     });
   }
 }
+
+test("on a phone the page never scrolls as a whole: the bar stays, the picture stays, the form is a sheet over the map (instrument-updated)", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await open(page, "instrument-updated");
+  const frame = () =>
+    page.evaluate(() => ({
+      page: document.scrollingElement?.scrollHeight ?? 0,
+      bar: document.querySelector("header.app-rail")?.getBoundingClientRect().bottom ?? 0,
+    }));
+  // The start screen: its card scrolls, the page and the bar do not.
+  expect(await frame()).toEqual({ page: 844, bar: 844 });
+  const scroller = page.locator(".layout-single .panel");
+  await scroller.evaluate((element) => {
+    element.scrollTop = 400;
+  });
+  expect(await scroller.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+  expect(await frame()).toEqual({ page: 844, bar: 844 });
+  // The picture is the layout's, which does not scroll.
+  expect(await page.locator(".layout-single").evaluate((element) => element.scrollTop)).toBe(0);
+
+  await connectTyped(page);
+  await openProcess(page, "Rotate a polygon a quarter turn");
+  await page.locator(".map-pane canvas").waitFor();
+  expect(await frame()).toEqual({ page: 844, bar: 844 });
+  const layout = page.locator(".layout");
+  await expect(layout).toHaveAttribute("data-sheet", "half");
+  const heights = async () => {
+    const [map, sheet] = await Promise.all([
+      page.locator(".map-pane").boundingBox(),
+      page.locator("main.panel").boundingBox(),
+    ]);
+    return { map: Math.round(map?.height ?? 0), sheet: Math.round(sheet?.height ?? 0) };
+  };
+  const half = await heights();
+
+  // A press on the grip: the whole form, then back to a strip, then half again.
+  await page.getByRole("button", { name: "Show the whole form" }).click();
+  await expect(layout).toHaveAttribute("data-sheet", "full");
+  await page.getByRole("button", { name: "Show the map" }).click();
+  await expect(layout).toHaveAttribute("data-sheet", "peek");
+  await expect.poll(async () => (await heights()).map).toBeGreaterThan(half.map);
+  const grip = page.getByRole("button", { name: "Show the form" });
+  await grip.focus();
+  await page.keyboard.press("ArrowUp");
+  await expect(layout).toHaveAttribute("data-sheet", "half");
+
+  // Drawing lowers the sheet to a strip; Done raises it again.
+  await page.getByRole("button", { name: "Draw on the map" }).click();
+  await expect(layout).toHaveAttribute("data-sheet", "peek");
+  await page
+    .getByRole("group", { name: "Drawing “Polygon”" })
+    .getByRole("button", {
+      name: "Done",
+    })
+    .click();
+  await expect(layout).toHaveAttribute("data-sheet", "half");
+  expect(await frame()).toEqual({ page: 844, bar: 844 });
+});
 
 for (const style of STYLES) {
   test(`#41 a phone on its side: the rail scrolls to Appearance, and the form has the height (${style})`, async ({

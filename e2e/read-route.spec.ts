@@ -23,11 +23,19 @@ import { RELAY } from "./servers.js";
 import { requireService } from "./services.js";
 import { readFile } from "node:fs/promises";
 
+/**
+ * The Instrument as it was before the UI/UX review, which only the address
+ * asks for now: these steps were written against it (its Developer section
+ * without `?developer`, its words for the relay). The updated one has its own
+ * specs (`instrument-updated.spec.ts`, and both versions in `ux-fixes.spec.ts`).
+ */
+const EARLIER = "/?style=instrument";
+
 const CORS = "http://localhost:5080";
 const NOCORS = "http://localhost:5081";
 
 async function connectConfigured(page: Page, key: string) {
-  await page.goto("/");
+  await page.goto(EARLIER);
   await page.getByRole("radio", { name: new RegExp(`^${key} `) }).check();
   await page.getByRole("button", { name: "Connect" }).click();
 }
@@ -117,7 +125,7 @@ test.describe("the relay's read route", () => {
     // `"` and `:`, which take `Accept` off the CORS safelist: the browser then
     // asks the relay in a preflight whether it may send it. No session here,
     // so the relay's answer is its own refusal; what matters is that one came.
-    await page.goto("/");
+    await page.goto(EARLIER);
     const outcome = await page.evaluate(async (relay) => {
       try {
         const response = await fetch(`${relay}/read/pygeoapi-nocors-relay/processes`, {

@@ -18,13 +18,21 @@ import { RELAY } from "./servers.js";
 import { PDOK_LANE, requireService } from "./services.js";
 import { readFile } from "node:fs/promises";
 
+/**
+ * The Instrument as it was before the UI/UX review, which only the address
+ * asks for now: these steps were written against it (its Developer section
+ * without `?developer`, its words for the relay). The updated one has its own
+ * specs (`instrument-updated.spec.ts`, and both versions in `ux-fixes.spec.ts`).
+ */
+const EARLIER = "/?style=instrument";
+
 const PYGEOAPI = "http://localhost:5080";
 const NOCORS = "http://localhost:5081";
 const CRS84 = "http://www.opengis.net/def/crs/OGC/1.3/CRS84";
 
 /** Connect to a typed address, which is always reached directly (T8). */
 async function connectTyped(page: Page, address: string) {
-  await page.goto("/");
+  await page.goto(EARLIER);
   const typed = page.getByRole("radio", { name: "Another service" });
   if (await typed.isVisible()) await typed.check();
   await page.getByRole("textbox", { name: "Service address" }).fill(address);
@@ -754,7 +762,7 @@ test.describe("the workflow in a browser", () => {
 
   test("runs in the background through the relay, then cancels a second run", async ({ page }) => {
     await requireService(`${RELAY}/healthz`, "the relay");
-    await page.goto("/");
+    await page.goto(EARLIER);
     await page.getByRole("radio", { name: /pygeoapi-cors/ }).check();
     await page.getByRole("button", { name: "Connect" }).click();
     await openProcess(page, "Slow process");

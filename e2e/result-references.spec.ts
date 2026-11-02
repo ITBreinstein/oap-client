@@ -22,6 +22,14 @@ import { RELAY } from "./servers.js";
 import { PDOK_LANE, requireService } from "./services.js";
 import { readFile } from "node:fs/promises";
 
+/**
+ * The Instrument as it was before the UI/UX review, which only the address
+ * asks for now: these steps were written against it (its Developer section
+ * without `?developer`, its words for the relay). The updated one has its own
+ * specs (`instrument-updated.spec.ts`, and both versions in `ux-fixes.spec.ts`).
+ */
+const EARLIER = "/?style=instrument";
+
 const CORS = "http://localhost:5080";
 const NOCORS = "http://localhost:5081";
 const PDOK = "https://api.pdok.nl/";
@@ -48,7 +56,7 @@ async function fulfilFrom(route: Route, fixture: string) {
 }
 
 async function connectTyped(page: Page, address: string, query = "") {
-  await page.goto(`/${query}`);
+  await page.goto(`${EARLIER}${query.replace("?", "&")}`);
   const typed = page.getByRole("radio", { name: "Another service" });
   if (await typed.isVisible()) await typed.check();
   await page.getByRole("textbox", { name: "Service address" }).fill(address);
@@ -162,7 +170,7 @@ test.describe("outputs given by reference", () => {
   }) => {
     await requireService(`${RELAY}/healthz`, "the relay");
     await requireService(`${NOCORS}/?f=json`, "pygeoapi :5081");
-    await page.goto("/");
+    await page.goto(EARLIER);
     await page.getByRole("radio", { name: /^pygeoapi-nocors-relay / }).check();
     await page.getByRole("button", { name: "Connect" }).click();
     await page.getByRole("button", { name: "Use relay" }).click();

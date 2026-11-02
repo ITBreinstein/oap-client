@@ -3,10 +3,12 @@
  *
  * - The style is shape, type and layout: corner radii, borders or shadows,
  *   fonts, label treatment, where panels dock. Of the three on trial, one
- *   is left: instrument (`docs/adr/0002-switchable-styles.md`). It comes in
- *   two versions to compare, as it is and updated after a UI/UX review.
+ *   is left: instrument (`docs/adr/0002-switchable-styles.md`), in its
+ *   updated version. The version as it was before the UI/UX review is still
+ *   there for comparison, but only by address (`?style=instrument`): the
+ *   Appearance menu no longer offers a choice, and none is saved.
  * - The theme is colour only, light or dark. It never changes a radius or a
- *   layout.
+ *   layout. The visitor chooses it, and this browser keeps the choice.
  *
  * Both are written to `<html>`: `data-style="instrument"` for either
  * version, `data-variant` (`current` or `updated`) for which, and
@@ -14,13 +16,14 @@
  * `styles/instrument-updated.css`); no component asks.
  *
  * Where the choice comes from, first match wins: the address
- * (`?style=instrument&theme=dark`), then what this browser saved, then the
- * defaults. An address never overwrites the saved choice, so opening a shared
- * link does not change anyone's own setting. Anything unrecognised, from
- * either source, is ignored silently: neither is ours to trust.
+ * (`?style=instrument&theme=dark`), then what this browser saved (the theme
+ * only), then the defaults. An address never overwrites the saved choice, so
+ * opening a shared link does not change anyone's own setting. Anything
+ * unrecognised, from either source, is ignored silently: neither is ours to
+ * trust.
  */
 
-/** STYLE TRIAL: the two versions of instrument, until one is chosen. */
+/** STYLE TRIAL: the two versions of instrument. Only the address picks the earlier one. */
 export const STYLE_NAMES = ["instrument", "instrument-updated"] as const;
 export type StyleName = (typeof STYLE_NAMES)[number];
 
@@ -34,7 +37,7 @@ export interface Appearance {
   readonly theme: ThemePreference;
 }
 
-export const DEFAULT_APPEARANCE: Appearance = { style: "instrument", theme: "system" };
+export const DEFAULT_APPEARANCE: Appearance = { style: "instrument-updated", theme: "system" };
 
 /** Where this browser keeps the choice. One key, one small JSON object. */
 export const APPEARANCE_STORAGE_KEY = "oap.appearance";
@@ -50,15 +53,14 @@ function isThemePreference(value: unknown): value is ThemePreference {
   return THEME_PREFERENCES.some((name) => name === value);
 }
 
-/** What a saved value holds that can be used, member by member. */
+/**
+ * What a saved value holds that can be used: its theme. A style saved while
+ * the menu still offered one is ignored, so everyone sees the same version.
+ */
 function fromStored(stored: unknown): Partial<Appearance> {
   if (typeof stored !== "object" || stored === null || Array.isArray(stored)) return {};
-  const style: unknown = Reflect.get(stored, "style");
   const theme: unknown = Reflect.get(stored, "theme");
-  return {
-    ...(isStyleName(style) ? { style } : {}),
-    ...(isThemePreference(theme) ? { theme } : {}),
-  };
+  return isThemePreference(theme) ? { theme } : {};
 }
 
 /** What the address asks for, parameter by parameter. */
@@ -78,7 +80,7 @@ function fromSearch(search: string): Partial<Appearance> {
 }
 
 /**
- * The appearance to start with: the address first, then the saved value,
+ * The appearance to start with: the address first, then the saved theme,
  * then {@link DEFAULT_APPEARANCE}, each member on its own. `stored` is the
  * parsed saved value, of any shape.
  */
@@ -124,21 +126,16 @@ export function readStoredAppearance(storage: AppearanceStorage | undefined): un
 }
 
 /**
- * Save one choice the user made, on top of what was saved before. Only the
- * member they changed is written: a style or theme that came from the address
- * stays out of storage. Never throws; a choice that cannot be saved still
- * applies to this visit.
+ * Save the theme the user chose. Only the theme: a style that came from the
+ * address stays out of storage. Never throws; a choice that cannot be saved
+ * still applies to this visit.
  */
 export function saveAppearanceChoice(
   storage: AppearanceStorage | undefined,
-  choice: Partial<Appearance>,
+  choice: { readonly theme: ThemePreference },
 ): void {
-  const saved = { ...DEFAULT_APPEARANCE, ...fromStored(readStoredAppearance(storage)), ...choice };
   try {
-    storage?.setItem(
-      APPEARANCE_STORAGE_KEY,
-      JSON.stringify({ style: saved.style, theme: saved.theme }),
-    );
+    storage?.setItem(APPEARANCE_STORAGE_KEY, JSON.stringify({ theme: choice.theme }));
   } catch {
     // Full, or refused: the page carries on with the choice unsaved.
   }

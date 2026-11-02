@@ -12,6 +12,13 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { App } from "../../src/App.js";
 import { STATIC_ONLY } from "../../src/config/runtime-config.js";
 
+/**
+ * The Instrument as it was before the UI/UX review, which only the address
+ * asks for now: what this file reads, the Developer section among it, is there
+ * without `?developer`.
+ */
+const EARLIER = { style: "instrument", theme: "light" } as const;
+
 let root: Root | undefined;
 let host: HTMLElement | undefined;
 const fetched: string[] = [];
@@ -40,7 +47,7 @@ async function connectTo(address: string): Promise<HTMLElement> {
   const created = createRoot(host);
   root = created;
   await act(async () => {
-    created.render(<App config={STATIC_ONLY} />);
+    created.render(<App config={STATIC_ONLY} appearance={EARLIER} />);
     await Promise.resolve();
   });
   const view = host;
