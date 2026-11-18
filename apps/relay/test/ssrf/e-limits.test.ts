@@ -395,7 +395,12 @@ describe("E — on the wire", () => {
     );
     if (!("raw" in answer)) throw new Error("expected a raw answer");
     await expect(new Response(answer.raw.body).arrayBuffer()).rejects.toThrow();
-    await expect(answer.raw.done).resolves.toMatchObject({ capHit: "bytes", bytes: 1_200 });
+    const done = await answer.raw.done;
+    expect(done.capHit).toBe("bytes");
+    // Past the cap, by however much the read that crossed it carried: the
+    // stub's 600-byte writes arrive one by one on Node 24 and as one on Node 26.
+    expect(done.bytes).toBeGreaterThan(1_024);
+    expect(done.bytes).toBeLessThanOrEqual(2_400);
   });
 
   /** Holds the request open, and says when it arrived and when its socket closed. */
