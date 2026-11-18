@@ -3,10 +3,9 @@
 Changes to `@breinstein/oap-client` that a consumer has to know about. Started
 at 0.5.0; earlier versions are recorded only in the git history.
 
-## Unreleased — to be 0.6.0
+## 0.6.0 — 2026-11-18
 
-Contains breaking changes, listed under **Breaking** below: the next release
-is 0.6.0, not a patch.
+Contains breaking changes, listed under **Breaking** below.
 
 ### Added
 
