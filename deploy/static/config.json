@@ -1,4 +1,45 @@
 {
-  "relay": { "url": "/api" },
-  "presets": []
+  "relay": null,
+  "examples": [
+    {
+      "service": "https://demo.204.168.187.249.sslip.io",
+      "process": "how-green",
+      "title": "How green is this area?",
+      "summary": "Draw an area of up to 1 km² and see how much of it is green.",
+      "needs": "area",
+      "featured": true
+    },
+    {
+      "service": "https://demo.204.168.187.249.sslip.io",
+      "process": "feels-like",
+      "title": "Feels-like temperature on a hot day",
+      "summary": "Draw an area of up to 4 km² and see how hot it feels there on a summer afternoon.",
+      "needs": "area",
+      "featured": true
+    },
+    {
+      "service": "https://demo.204.168.187.249.sslip.io",
+      "process": "shade",
+      "title": "Where is the shade?",
+      "summary": "Draw an area of up to 1 km², pick a moment, and see where the shade falls.",
+      "needs": "area",
+      "featured": true
+    },
+    {
+      "service": "https://demo.204.168.187.249.sslip.io",
+      "process": "solar-roofs",
+      "title": "Roof space for solar panels",
+      "summary": "Draw an area of up to 4 km² and see how much roof space it has.",
+      "needs": "area",
+      "featured": true
+    },
+    {
+      "service": "https://demo.204.168.187.249.sslip.io",
+      "process": "building-age",
+      "title": "Age of the buildings",
+      "summary": "Draw an area of up to 2 km² and see how old its buildings are.",
+      "needs": "area",
+      "featured": false
+    }
+  ]
 }

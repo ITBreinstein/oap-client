@@ -10,7 +10,7 @@ agreed. The relay is deployed separately, from
 | File                | What it is                                                                  |
 | ------------------- | --------------------------------------------------------------------------- |
 | `Caddyfile.snippet` | The site block to add to the host's Caddyfile                               |
-| `config.json`       | The page's runtime config for this site: the relay at `/api`, no presets    |
+| `config.json`       | The page's runtime config: no relay, no presets, the demo server's examples |
 | `deploy.sh`         | Build the current commit and publish it as a new release, atomically        |
 | `activate.sh`       | The server half of `deploy.sh`, fed to it over ssh; never run by hand       |
 | `oap-receive.sh`    | The server half of automatic deploys, installed as `oap-receive`            |

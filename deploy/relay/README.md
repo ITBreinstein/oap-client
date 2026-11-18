@@ -122,9 +122,10 @@ change is validated before it is applied.
    sudo systemctl reload caddy                            # or: docker exec <c> caddy reload --config /etc/caddy/Caddyfile
    ```
 
-4. **Deploy the web client** with the new `deploy/static/config.json`, which
-   points the page at `/api` and lists the relayed servers as presets:
-   `deploy/static/deploy.sh`.
+4. **Deploy the web client** with `deploy/static/config.json` pointing the
+   page at the relay, `"relay": { "url": "/api" }` (it ships with
+   `"relay": null`, as no relay is deployed yet), and listing the relayed
+   servers as presets: `deploy/static/deploy.sh`.
 5. **Smoke:** `OAP_HOSTNAME=oap.example.nl deploy/static/smoke.sh`.
 6. **In a browser:** open the site, choose a relayed server, see the CORS
    failure and the offer, click **Use relay**, list its processes, and run
