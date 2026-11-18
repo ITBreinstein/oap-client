@@ -147,6 +147,10 @@ export default defineConfig({
     name: "web",
     environment: "jsdom",
     setupFiles: ["./test/setup.ts"],
+    // From Node 25, Node has its own `localStorage`, undefined without
+    // --localstorage-file, and it hides jsdom's from the tests. Switched off,
+    // jsdom's is the one the tests see, as on Node 24.
+    execArgv: ["--no-experimental-webstorage"],
     // The stylesheets, as text, for test/styles/tokens.test.ts: left out,
     // Vitest hands every CSS import over empty, `?raw` included.
     css: { include: [/src\/styles(\.css|\/)/] },
